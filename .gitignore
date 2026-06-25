@@ -1,0 +1,37 @@
+# Local environment files
+.env
+.env.local
+.env.*.local
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.classpath
+.project
+.settings/
+.factorypath
+
+# OS files
+Thumbs.db
+db.properties
+.DS_Store
+
+# Build artifacts
+target/
+build/
+bin/
+out/
+*.jar
+*.war
+*.ear
+
+# Logs
+*.log
+logs/
+
+# Docker/Compose
+.docker/
+docker-compose.override.yml

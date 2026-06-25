@@ -1,0 +1,27 @@
+# Exclude Git and IDE files
+.git/
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+
+# Exclude build directories
+**/target/
+**/build/
+**/bin/
+**/out/
+
+# Exclude local env and docker compose files
+.env
+.env.*
+docker-compose*.yml
+docker-compose*.yaml
+
+# Exclude documentation and help files
+**/HELP.md
+**/README.md
+
+# Exclude log files
+**/*.log
+**/logs/
