@@ -100,7 +100,7 @@ public class StandardizationService {
         LlmChatRequest request = LlmChatRequest.builder()
                 .model(appProperties.getLlm().getModel())
                 .maxTokens(appProperties.getLlm().getMaxTokens())
-                .temperature(0.3)
+                .temperature(0.0)
                 .messages(List.of(
                         LlmChatRequest.Message.system(systemPrompt),
                         LlmChatRequest.Message.user(userContent)

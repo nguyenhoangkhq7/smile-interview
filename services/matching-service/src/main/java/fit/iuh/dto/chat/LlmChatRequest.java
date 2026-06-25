@@ -36,7 +36,17 @@ public class LlmChatRequest {
      */
     @JsonProperty("temperature")
     @Builder.Default
-    private double temperature = 0.3;
+    private double temperature = 0.0;
+
+    /**
+     * Whether to stream the response token-by-token.
+     * Must be explicitly set to {@code false} for standard blocking calls — some
+     * providers (Groq, OpenAI) will return an empty {@code content} field if this
+     * field is absent from the request body.
+     */
+    @JsonProperty("stream")
+    @Builder.Default
+    private boolean stream = false;
 
     // -------------------------------------------------------------------------
     // Nested message class
