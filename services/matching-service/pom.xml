@@ -5,14 +5,15 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.1.0</version>
+        <!-- Downgraded to stable Spring Boot 3.3.0 for pgvector & langchain4j compatibility -->
+        <version>3.3.0</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>fit.iuh</groupId>
     <artifactId>matching-service</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>matching-service</name>
-    <description>matching-service</description>
+    <description>Smile Interview - Matching Service (Data Ingestion and Vectorization)</description>
     <url/>
     <licenses>
         <license/>
@@ -26,37 +27,98 @@
         <tag/>
         <url/>
     </scm>
+
     <properties>
         <java.version>21</java.version>
+        <langchain4j.version>0.36.2</langchain4j.version>
+        <pdfbox.version>3.0.3</pdfbox.version>
+        <pgvector.version>0.1.6</pgvector.version>
     </properties>
+
     <dependencies>
+        <!-- ===== Web Layer ===== -->
+        <!-- Spring MVC (REST API) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- Spring WebFlux (WebClient for async HTTP calls to Groq & OpenAI) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+
+        <!-- Bean Validation (@Valid annotations) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <!-- ===== Persistence Layer ===== -->
+        <!-- Spring Data JPA + Hibernate 6 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-webmvc</artifactId>
-        </dependency>
 
+        <!-- PostgreSQL JDBC Driver
+             NOTE: scope is intentionally 'compile' (not 'runtime') because
+             pgvector-java references org.postgresql.util.PGBinaryObject at compile time.
+             Keeping it as 'runtime' causes: "class file for PGBinaryObject not found" -->
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <scope>runtime</scope>
+            <!-- compile scope (default) - required by pgvector at compile time -->
         </dependency>
+
+        <!-- pgvector-java: PGvector type for PostgreSQL vector columns -->
+        <dependency>
+            <groupId>com.pgvector</groupId>
+            <artifactId>pgvector</artifactId>
+            <version>${pgvector.version}</version>
+        </dependency>
+
+        <!-- ===== PDF Parsing ===== -->
+        <!-- Apache PDFBox 3.x for extracting text from PDF files -->
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>${pdfbox.version}</version>
+        </dependency>
+
+        <!-- ===== LangChain4j (AI Tooling) ===== -->
+        <!-- Core: DocumentSplitter, Document, TextSegment APIs -->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j</artifactId>
+            <version>${langchain4j.version}</version>
+        </dependency>
+
+        <!-- OpenAI integration: OpenAiTokenizer for token-aware splitting -->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-open-ai</artifactId>
+            <version>${langchain4j.version}</version>
+        </dependency>
+
+        <!-- ===== Utilities ===== -->
+        <!-- Lombok: reduces boilerplate (@Data, @Builder, @Slf4j, etc.) -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <optional>true</optional>
         </dependency>
+
+        <!-- ===== Test Layer ===== -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-jpa-test</artifactId>
+            <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-webmvc-test</artifactId>
+            <groupId>io.projectreactor</groupId>
+            <artifactId>reactor-test</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

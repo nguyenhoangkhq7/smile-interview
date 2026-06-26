@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:17-alpine
+    image: pgvector/pgvector:pg17
     container_name: postgres_db
     restart: always
     environment:
@@ -39,13 +39,30 @@ services:
     container_name: matching_service
     restart: always
     ports:
-      - "${MATCHING_SERVICE_PORT}:8080"
+      - "${MATCHING_SERVICE_PORT}:8081"
     environment:
+      # Application
+      SERVER_PORT: ${SERVER_PORT}
+      # Database
       SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL}
       SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
       SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: ${SPRING_JPA_HIBERNATE_DDL_AUTO}
+      # Redis
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
+      # AI APIs
+      LLM_API_KEY: ${LLM_API_KEY}
+      LLM_API_URL: ${LLM_API_URL}
+      LLM_MODEL: ${LLM_MODEL}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS}
+      LLM_MAX_TOKENS: ${LLM_MAX_TOKENS}
+      OLLAMA_EMBEDDING_URL: ${OLLAMA_EMBEDDING_URL}
+      OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL}
+      OLLAMA_EMBEDDING_TIMEOUT_SECONDS: ${OLLAMA_EMBEDDING_TIMEOUT_SECONDS}
+      # Chunking
+      CHUNKING_MAX_TOKENS: ${CHUNKING_MAX_TOKENS}
+      CHUNKING_OVERLAP_TOKENS: ${CHUNKING_OVERLAP_TOKENS}
     depends_on:
       postgres:
         condition: service_healthy
