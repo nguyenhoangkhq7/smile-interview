@@ -2,9 +2,11 @@ package fit.iuh.service;
 
 import fit.iuh.dto.IngestionResponse;
 import fit.iuh.entity.DocumentChunk;
+import fit.iuh.entity.SessionDocument;
 import fit.iuh.entity.enums.DocumentType;
 import fit.iuh.exception.IngestionException;
 import fit.iuh.repository.DocumentChunkRepository;
+import fit.iuh.repository.SessionDocumentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -42,6 +44,7 @@ public class IngestionService {
     private final ChunkingService chunkingService;
     private final EmbeddingService embeddingService;
     private final DocumentChunkRepository documentChunkRepository;
+    private final SessionDocumentRepository sessionDocumentRepository;
 
     /**
      * Executes the full ingestion pipeline for a given interview session.
@@ -66,10 +69,14 @@ public class IngestionService {
 
         log.info("=== [INGESTION START] sessionId={} ===", sessionId);
 
-        // ── Re-ingestion: clean up existing chunks for this session ──────────
+        // ── Re-ingestion: clean up existing chunks and documents for this session ──────────
         if (documentChunkRepository.existsBySessionId(sessionId)) {
             log.warn("Existing chunks found for session={}. Deleting before re-ingestion.", sessionId);
             documentChunkRepository.deleteAllBySessionId(sessionId);
+        }
+        if (sessionDocumentRepository.existsBySessionId(sessionId)) {
+            log.warn("Existing full documents found for session={}. Deleting before re-ingestion.", sessionId);
+            sessionDocumentRepository.deleteAllBySessionId(sessionId);
         }
 
         // ────────────────────────────────────────────────────────────────────
@@ -97,6 +104,19 @@ public class IngestionService {
         String markdownJd = standardizationService.standardizeJd(rawJdText);
         log.info("[Step 2/4] Done. CV Markdown: {} chars | JD Markdown: {} chars",
                 markdownCv.length(), markdownJd.length());
+
+        // ── Save full Markdown documents ──────────────────────────────────────
+        log.info("Saving full standardized Markdown documents to database...");
+        sessionDocumentRepository.save(SessionDocument.builder()
+                .sessionId(sessionId)
+                .documentType(DocumentType.CV)
+                .markdownContent(markdownCv)
+                .build());
+        sessionDocumentRepository.save(SessionDocument.builder()
+                .sessionId(sessionId)
+                .documentType(DocumentType.JD)
+                .markdownContent(markdownJd)
+                .build());
 
         // ────────────────────────────────────────────────────────────────────
         // STEP 3 — Split Markdown into token-bounded chunks

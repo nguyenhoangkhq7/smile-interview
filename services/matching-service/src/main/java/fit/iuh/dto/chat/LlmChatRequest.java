@@ -1,5 +1,6 @@
 package fit.iuh.dto.chat;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -7,11 +8,13 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.util.List;
+import java.util.Map;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class LlmChatRequest {
 
     /** The model identifier (provider-specific, e.g., {@code llama3-70b-8192} or {@code gpt-4o}). */
@@ -47,6 +50,16 @@ public class LlmChatRequest {
     @JsonProperty("stream")
     @Builder.Default
     private boolean stream = false;
+
+    /**
+     * Optional JSON mode enforcement. Set to {@code Map.of("type", "json_object")}
+     * to force the LLM to return a valid JSON object (Groq / OpenAI compatible).
+     *
+     * <p>When {@code null} (the default), this field is omitted from the request
+     * body entirely ({@code @JsonInclude(NON_NULL)}) so existing calls are unaffected.
+     */
+    @JsonProperty("response_format")
+    private Map<String, String> responseFormat;
 
     // -------------------------------------------------------------------------
     // Nested message class

@@ -6,25 +6,47 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
-import reactor.core.publisher.Flux;
 
 /**
- * REST Controller exposing the holistic Resume Assessment API.
+ * REST Controller exposing the SimInterview Resume Assessment API.
  *
  * <p>Base path: {@code /api/v2/assess-resume}
  *
- * <h2>Endpoint Summary</h2>
+ * <h2>Endpoint</h2>
  * <pre>
- *   GET /api/v2/assess-resume?sessionId={id}[&forceRefresh=true]  — Blocking JSON response (Cache-Aside)
- *   GET /api/v2/assess-resume/stream?sessionId={id}               — SSE streaming response
+ *   GET /api/v2/assess-resume?sessionId={id}[&amp;forceRefresh=true]
  * </pre>
  *
+ * <h2>Response Structure (3-Part SimInterview Output)</h2>
+ * <pre>{@code
+ * {
+ *   "id": "...",
+ *   "session_id": "session-123",
+ *   "competency_fit_score": 78,
+ *   "section_wise_feedback": {
+ *     "skills_evaluation": {
+ *       "analysis": "...",
+ *       "critical_missing_skills": ["Docker", "Kubernetes"]
+ *     },
+ *     "experience_evaluation": "...",
+ *     "project_evaluation": "..."
+ *   },
+ *   "actionable_improvement_suggestions": ["...", "..."],
+ *   "cached": false,
+ *   "created_at": "2026-06-26T10:00:00"
+ * }
+ * }</pre>
+ *
  * <h2>Cache-Aside Behavior</h2>
- * The blocking endpoint checks the database for a cached result before calling
- * the LLM API. Pass {@code forceRefresh=true} to delete the cache and regenerate.
- * The response includes a {@code "cached": true/false} field to indicate the source.
+ * The endpoint checks the {@code resume_assessments} table for an existing record
+ * before invoking the LLM. Use {@code forceRefresh=true} to delete the cache and
+ * regenerate. The response includes {@code "cached": true/false} to indicate the source.
+ *
+ * <h2>Note on Loading Time</h2>
+ * The LLM call (Groq JSON mode, {@code temperature: 0.0}) typically takes 10–15 seconds
+ * on a cache miss. Clients should render a loading skeleton during this time.
+ * On a cache hit, the response is returned immediately from the database.
  */
 @Slf4j
 @RestController
@@ -35,45 +57,23 @@ public class AssessmentController {
     private final AssessmentService assessmentService;
 
     /**
-     * Performs a synchronous resume assessment and returns the complete report as JSON.
+     * Performs a synchronous SimInterview resume assessment and returns the
+     * complete 3-part structured result as JSON.
      *
      * <p>Implements Cache-Aside: returns the cached DB result if available.
-     * Use {@code forceRefresh=true} to bypass the cache and regenerate from LLM.
+     * Use {@code forceRefresh=true} to bypass the cache and regenerate from the LLM.
      *
      * @param sessionId    the unique interview session identifier (required)
-     * @param forceRefresh if {@code true}, bypasses the cache and re-generates (default: false)
-     * @return HTTP 200 with an {@link AssessmentResponse} containing the report and metadata
+     * @param forceRefresh if {@code true}, bypasses cache and re-invokes the LLM (default: false)
+     * @return HTTP 200 with an {@link AssessmentResponse} containing the 3 SimInterview outputs
      */
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<AssessmentResponse> assessResumeBlocking(
+    public ResponseEntity<AssessmentResponse> assessResume(
             @RequestParam("sessionId") String sessionId,
             @RequestParam(value = "forceRefresh", defaultValue = "false") boolean forceRefresh) {
 
-        log.info("Blocking assessment request: sessionId={}, forceRefresh={}", sessionId, forceRefresh);
+        log.info("Assessment request: sessionId={}, forceRefresh={}", sessionId, forceRefresh);
         AssessmentResponse response = assessmentService.assessResumeBlocking(sessionId, forceRefresh);
         return ResponseEntity.ok(response);
-    }
-
-    /**
-     * Streams a holistic resume assessment report as Server-Sent Events.
-     *
-     * <p>Each SSE event carries a plain-text token fragment of the Markdown report.
-     * The complete report is persisted to the database after the stream completes.
-     *
-     * <p>Example cURL:
-     * <pre>
-     *   curl -N -H "Accept: text/event-stream" \
-     *     "http://localhost:8081/api/v2/assess-resume/stream?sessionId=session-123"
-     * </pre>
-     *
-     * @param sessionId the unique interview session identifier (required)
-     * @return a reactive {@link Flux} of {@link ServerSentEvent} tokens
-     */
-    @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<ServerSentEvent<String>> streamAssessment(
-            @RequestParam("sessionId") String sessionId) {
-
-        log.info("SSE assessment request: sessionId={}", sessionId);
-        return assessmentService.streamAssessment(sessionId);
     }
 }

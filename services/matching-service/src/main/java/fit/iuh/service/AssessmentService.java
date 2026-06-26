@@ -5,82 +5,67 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import fit.iuh.config.AppProperties;
 import fit.iuh.config.PromptTemplateConfig;
 import fit.iuh.dto.AssessmentResponse;
+import fit.iuh.dto.AssessmentResponseDto;
 import fit.iuh.dto.chat.LlmChatRequest;
 import fit.iuh.dto.chat.LlmChatResponse;
-import fit.iuh.dto.chat.LlmChatStreamResponse;
 import fit.iuh.entity.DocumentChunk;
 import fit.iuh.entity.ResumeAssessment;
+import fit.iuh.entity.SessionDocument;
 import fit.iuh.entity.enums.DocumentType;
 import fit.iuh.exception.LlmApiException;
 import fit.iuh.repository.DocumentChunkRepository;
 import fit.iuh.repository.ResumeAssessmentRepository;
+import fit.iuh.repository.SessionDocumentRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
-import reactor.core.publisher.Flux;
 
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * Service responsible for holistic resume assessment with persistence (Cache-Aside pattern).
+ * Service responsible for holistic resume assessment following the SimInterview
+ * 3-part architecture (Competency Fit Score, Section-wise Feedback, Actionable Suggestions).
  *
- * <p><strong>Cache-Aside Flow (Blocking API):</strong>
+ * <h3>Cache-Aside Flow</h3>
  * <pre>
- *  Client (GET /api/v2/assess-resume?sessionId=X)
- *    └── AssessmentService.assessResumeBlocking(sessionId)
- *          ├── 1. Check DB cache → if found: return cached AssessmentResponse immediately
- *          ├── 2. Load CV & JD chunks → Semantic Cross-Matching
- *          ├── 3. Call LLM API (stream=false) → receive full Markdown report
- *          ├── 4. Extract overallScore & hiringRecommendation from Markdown
- *          ├── 5. Persist ResumeAssessment entity → PostgreSQL
- *          └── 6. Return AssessmentResponse to Controller
+ *  Client → GET /api/v2/assess-resume?sessionId=X
+ *    └── AssessmentService.assessResumeBlocking(sessionId, forceRefresh)
+ *          ├── 1. Check DB cache → if hit: return cached AssessmentResponse immediately
+ *          ├── 2. Load CV &amp; JD chunks from PostgreSQL
+ *          ├── 3. Semantic Cross-Matching (Cosine Similarity, threshold 0.75, topK 5)
+ *          ├── 4. Call Groq API (JSON mode, stream=false, temperature=0.0)
+ *          ├── 5. Deserialize LLM JSON → AssessmentResponseDto
+ *          ├── 6. Persist ResumeAssessment entity (3 JSONB fields)
+ *          └── 7. Return AssessmentResponse to Controller
  * </pre>
  *
- * <p><strong>SSE Streaming Flow:</strong>
- * <pre>
- *  Client (GET /api/v2/assess-resume/stream?sessionId=X)
- *    └── AssessmentService.streamAssessment(sessionId)
- *          ├── 1. Load CV & JD chunks → Semantic Cross-Matching
- *          ├── 2. Call LLM API (stream=true) → Flux<String> tokens via SSE
- *          ├── 3. Collect all tokens → persist full report on stream completion
- *          └── 4. Emit each token as ServerSentEvent to Client
- * </pre>
+ * <h3>JSON Mode</h3>
+ * The request includes {@code "response_format": {"type": "json_object"}} and
+ * {@code "stream": false}. This forces Groq to return a well-formed JSON object
+ * that can be directly deserialized into {@link AssessmentResponseDto}.
  */
 @Slf4j
 @Service
 public class AssessmentService {
 
-    /** Path on the LLM provider's base URL for chat completions. */
+    /** Path on the LLM provider's base URL for chat completions (OpenAI-compatible). */
     private static final String CHAT_COMPLETIONS_PATH = "/openai/v1/chat/completions";
 
-    /** Sentinel value sent by OpenAI-compatible APIs to signal stream end. */
-    private static final String SSE_DONE_SENTINEL = "[DONE]";
-
     /**
-     * Regex to extract the overall match score from the Markdown report.
-     * Looks for patterns like "OVERALL MATCH SCORE | 72/100" or "Overall Match Score: 72".
+     * {@code response_format} payload for Groq/OpenAI JSON mode.
+     * Instructs the model to return a valid JSON object (no Markdown wrapping).
      */
-    private static final Pattern SCORE_PATTERN = Pattern.compile(
-            "(?i)overall\\s*match\\s*score.*?(\\d{1,3})\\s*/\\s*100");
-
-    /**
-     * Regex to extract the hiring verdict from the Markdown report.
-     * Looks for patterns like "**Verdict:** Strong Fit" or "Verdict: Good Fit".
-     */
-    private static final Pattern VERDICT_PATTERN = Pattern.compile(
-            "(?i)\\*{0,2}verdict\\*{0,2}[:\\s]+\\*{0,2}(Strong Fit|Good Fit|Partial Fit|Poor Fit)\\*{0,2}");
+    private static final Map<String, String> JSON_RESPONSE_FORMAT = Map.of("type", "json_object");
 
     private final AppProperties appProperties;
     private final WebClient llmWebClient;
     private final DocumentChunkRepository documentChunkRepository;
     private final ResumeAssessmentRepository resumeAssessmentRepository;
+    private final SessionDocumentRepository sessionDocumentRepository;
     private final ObjectMapper objectMapper;
 
     public AssessmentService(
@@ -88,11 +73,13 @@ public class AssessmentService {
             @Qualifier("llmWebClient") WebClient llmWebClient,
             DocumentChunkRepository documentChunkRepository,
             ResumeAssessmentRepository resumeAssessmentRepository,
+            SessionDocumentRepository sessionDocumentRepository,
             ObjectMapper objectMapper) {
         this.appProperties = appProperties;
         this.llmWebClient = llmWebClient;
         this.documentChunkRepository = documentChunkRepository;
         this.resumeAssessmentRepository = resumeAssessmentRepository;
+        this.sessionDocumentRepository = sessionDocumentRepository;
         this.objectMapper = objectMapper;
     }
 
@@ -101,16 +88,17 @@ public class AssessmentService {
     // -------------------------------------------------------------------------
 
     /**
-     * Returns a holistic resume assessment for the given session.
+     * Returns the SimInterview 3-part assessment for the given session.
      *
      * <p>Implements Cache-Aside: if a result already exists in DB it is returned
-     * immediately without calling the LLM. Otherwise the LLM is called, the result
-     * is persisted, and then returned.
+     * immediately without calling the LLM. Otherwise the LLM is called (JSON mode),
+     * the 3 structured parts are parsed and persisted, then returned.
      *
-     * @param sessionId the unique interview session identifier
+     * @param sessionId    the unique interview session identifier
      * @param forceRefresh if {@code true}, deletes any cached result and regenerates from LLM
-     * @return {@link AssessmentResponse} containing the full report and metadata
-     * @throws LlmApiException if CV/JD chunks are missing or the LLM call fails
+     * @return {@link AssessmentResponse} containing the 3 SimInterview outputs and metadata
+     * @throws LlmApiException if CV/JD chunks are missing, the LLM call fails,
+     *                         or the LLM response is not valid JSON
      */
     @Transactional
     public AssessmentResponse assessResumeBlocking(String sessionId, boolean forceRefresh) {
@@ -124,124 +112,65 @@ public class AssessmentService {
                 return toResponse(cached.get(), true);
             }
         } else if (resumeAssessmentRepository.existsBySessionId(sessionId)) {
-            log.warn("[Assessment] Force-refresh requested for sessionId={}. Deleting cached result.", sessionId);
+            log.warn("[Assessment] Force-refresh for sessionId={}. Deleting cached result.", sessionId);
             resumeAssessmentRepository.deleteBySessionId(sessionId);
+            resumeAssessmentRepository.flush();
         }
 
-        // ── Cache MISS: Generate via LLM ─────────────────────────────────────
-        log.info("[Assessment] Cache MISS for sessionId={}. Calling LLM API...", sessionId);
+        // ── Cache MISS: Generate via LLM (JSON mode) ─────────────────────────
+        log.info("[Assessment] Cache MISS for sessionId={}. Calling LLM API (JSON mode)...", sessionId);
 
-        List<DocumentChunk> cvChunks = documentChunkRepository.findBySessionIdAndDocumentType(sessionId, DocumentType.CV);
-        if (cvChunks.isEmpty()) {
-            throw new LlmApiException("No CV data found for session '" + sessionId + "'. Please ingest files first.");
-        }
-        List<DocumentChunk> jdChunks = documentChunkRepository.findBySessionIdAndDocumentType(sessionId, DocumentType.JD);
-        if (jdChunks.isEmpty()) {
-            throw new LlmApiException("No JD data found for session '" + sessionId + "'. Please ingest files first.");
-        }
+        SessionDocument cvDoc = sessionDocumentRepository
+                .findBySessionIdAndDocumentType(sessionId, DocumentType.CV)
+                .orElseThrow(() -> new LlmApiException(
+                        "No CV data found for session '" + sessionId + "'. Please ingest files first."));
 
-        String matchedCvText = matchAndAggregateCv(cvChunks, jdChunks);
-        String aggregatedJdText = jdChunks.stream()
-                .map(DocumentChunk::getChunkText)
-                .collect(Collectors.joining("\n\n"));
+        SessionDocument jdDoc = sessionDocumentRepository
+                .findBySessionIdAndDocumentType(sessionId, DocumentType.JD)
+                .orElseThrow(() -> new LlmApiException(
+                        "No JD data found for session '" + sessionId + "'. Please ingest files first."));
 
-        log.info("[Assessment] Matched CV: {} chars, JD: {} chars → sending to LLM.",
-                matchedCvText.length(), aggregatedJdText.length());
+        String fullCvText = cvDoc.getMarkdownContent();
+        String aggregatedJdText = jdDoc.getMarkdownContent();
 
-        String userContent = buildUserContent(matchedCvText, aggregatedJdText);
-        String reportMarkdown = callLlmBlocking(userContent);
+        log.info("[Assessment] Full CV: {} chars | JD: {} chars → sending to LLM.",
+                fullCvText.length(), aggregatedJdText.length());
 
-        // ── Extract metadata & persist ────────────────────────────────────────
-        ResumeAssessment entity = buildAndPersistEntity(sessionId, reportMarkdown);
+        String userContent = buildUserContent(fullCvText, aggregatedJdText);
+        String llmJsonResponse = callLlmBlocking(userContent);
+
+        // ── Parse JSON → DTO → Entity → Persist ──────────────────────────────
+        AssessmentResponseDto dto = parseAssessmentDto(sessionId, llmJsonResponse);
+        ResumeAssessment entity = buildAndPersistEntity(sessionId, dto);
 
         return toResponse(entity, false);
     }
 
     // -------------------------------------------------------------------------
-    // Public API — SSE Streaming
+    // Private — LLM Call (JSON mode)
     // -------------------------------------------------------------------------
 
     /**
-     * Streams a holistic resume assessment report for the given session as
-     * Server-Sent Events. Persists the complete report after the stream finishes.
+     * Calls the Groq LLM API in blocking mode with JSON mode enabled.
      *
-     * @param sessionId the unique interview session identifier
-     * @return a reactive {@link Flux} of SSE events; never null
+     * <p>The request explicitly sets:
+     * <ul>
+     *   <li>{@code "stream": false} — required by Groq to populate the {@code content} field.
+     *   <li>{@code "response_format": {"type": "json_object"}} — enforces valid JSON output.
+     *   <li>{@code "temperature": 0.0} — deterministic output for consistent schema compliance.
+     * </ul>
+     *
+     * @param userContent the user-role prompt containing the CV and JD text
+     * @return the raw JSON string returned by the LLM
+     * @throws LlmApiException on HTTP error or empty response
      */
-    public Flux<ServerSentEvent<String>> streamAssessment(String sessionId) {
-        log.info("[Assessment] SSE stream request for sessionId={}", sessionId);
-
-        List<DocumentChunk> cvChunks = documentChunkRepository.findBySessionIdAndDocumentType(sessionId, DocumentType.CV);
-        if (cvChunks.isEmpty()) {
-            return Flux.error(new LlmApiException(
-                    "No CV data found for session '" + sessionId + "'. Please ingest first."));
-        }
-        List<DocumentChunk> jdChunks = documentChunkRepository.findBySessionIdAndDocumentType(sessionId, DocumentType.JD);
-        if (jdChunks.isEmpty()) {
-            return Flux.error(new LlmApiException(
-                    "No JD data found for session '" + sessionId + "'. Please ingest first."));
-        }
-
-        String matchedCvText = matchAndAggregateCv(cvChunks, jdChunks);
-        String aggregatedJdText = jdChunks.stream()
-                .map(DocumentChunk::getChunkText)
-                .collect(Collectors.joining("\n\n"));
-
-        String userContent = buildUserContent(matchedCvText, aggregatedJdText);
-
-        LlmChatRequest request = LlmChatRequest.builder()
-                .model(appProperties.getLlm().getModel())
-                .maxTokens(appProperties.getLlm().getMaxTokens())
-                .temperature(0.0)
-                .stream(true)
-                .messages(List.of(
-                        LlmChatRequest.Message.system(PromptTemplateConfig.SYSTEM_PROMPT_ASSESSMENT),
-                        LlmChatRequest.Message.user(userContent)
-                ))
-                .build();
-
-        // Collect all tokens for persistence after stream completes
-        StringBuilder fullReportBuffer = new StringBuilder();
-
-        return llmWebClient.post()
-                .uri(CHAT_COMPLETIONS_PATH)
-                .bodyValue(request)
-                .retrieve()
-                .bodyToFlux(String.class)
-                .filter(line -> !line.isBlank())
-                .flatMap(this::parseStreamLine)
-                .doOnNext(token -> fullReportBuffer.append(token))
-                .doOnComplete(() -> {
-                    log.info("[Assessment] SSE stream complete for sessionId={}. Persisting report...", sessionId);
-                    try {
-                        buildAndPersistEntity(sessionId, fullReportBuffer.toString());
-                        log.info("[Assessment] Assessment persisted for sessionId={}", sessionId);
-                    } catch (Exception e) {
-                        log.error("[Assessment] Failed to persist assessment for sessionId={}: {}", sessionId, e.getMessage());
-                    }
-                })
-                .map(token -> ServerSentEvent.<String>builder()
-                        .data(token)
-                        .build())
-                .doOnError(err -> log.error("[Assessment] SSE error for sessionId={}: {}", sessionId, err.getMessage()))
-                .onErrorResume(err -> Flux.just(
-                        ServerSentEvent.<String>builder()
-                                .event("error")
-                                .data("[ERROR] " + err.getMessage())
-                                .build()
-                ));
-    }
-
-    // -------------------------------------------------------------------------
-    // Private — LLM call
-    // -------------------------------------------------------------------------
-
     private String callLlmBlocking(String userContent) {
         LlmChatRequest request = LlmChatRequest.builder()
                 .model(appProperties.getLlm().getModel())
                 .maxTokens(appProperties.getLlm().getMaxTokens())
                 .temperature(0.0)
                 .stream(false)
+                .responseFormat(JSON_RESPONSE_FORMAT)
                 .messages(List.of(
                         LlmChatRequest.Message.system(PromptTemplateConfig.SYSTEM_PROMPT_ASSESSMENT),
                         LlmChatRequest.Message.user(userContent)
@@ -262,7 +191,8 @@ public class AssessmentService {
             return response.getFirstChoiceContent().strip();
 
         } catch (WebClientResponseException e) {
-            throw new LlmApiException("LLM API HTTP " + e.getStatusCode() + ": " + e.getResponseBodyAsString(), e);
+            throw new LlmApiException(
+                    "LLM API HTTP " + e.getStatusCode() + ": " + e.getResponseBodyAsString(), e);
         } catch (LlmApiException e) {
             throw e;
         } catch (Exception e) {
@@ -271,104 +201,116 @@ public class AssessmentService {
     }
 
     // -------------------------------------------------------------------------
-    // Private — Persistence helpers
+    // Private — JSON Parsing
     // -------------------------------------------------------------------------
 
     /**
-     * Extracts metadata from the Markdown report, builds a {@link ResumeAssessment}
-     * entity, persists it, and returns it.
+     * Parses the raw LLM JSON response into an {@link AssessmentResponseDto}.
      *
-     * <p>If a record for this session already exists (e.g. concurrent call), the
-     * existing record is returned instead to avoid a unique-constraint violation.
+     * <p>If the LLM wraps the JSON in a Markdown code fence (```json ... ```),
+     * the fence is stripped before deserialization as a safety fallback —
+     * even though JSON mode should prevent this.
+     *
+     * @param sessionId        used only for error log context
+     * @param llmJsonResponse  the raw string from the LLM content field
+     * @return a fully populated {@link AssessmentResponseDto}
+     * @throws LlmApiException if the response cannot be parsed into the required schema
+     */
+    private AssessmentResponseDto parseAssessmentDto(String sessionId, String llmJsonResponse) {
+        // Safety: strip Markdown code fences if the LLM ignores JSON mode
+        String json = llmJsonResponse
+                .replaceAll("(?s)^```json\\s*", "")
+                .replaceAll("(?s)\\s*```$", "")
+                .strip();
+
+        log.debug("[Assessment] Raw LLM JSON for sessionId={}: {}", sessionId, json);
+
+        try {
+            AssessmentResponseDto dto = objectMapper.readValue(json, AssessmentResponseDto.class);
+
+            // Validate required fields are present
+            if (dto.competencyFitScore() == null) {
+                throw new LlmApiException(
+                        "LLM response missing 'competency_fit_score' for sessionId=" + sessionId);
+            }
+            if (dto.sectionWiseFeedback() == null) {
+                throw new LlmApiException(
+                        "LLM response missing 'section_wise_feedback' for sessionId=" + sessionId);
+            }
+            if (dto.actionableImprovementSuggestions() == null
+                    || dto.actionableImprovementSuggestions().isEmpty()) {
+                throw new LlmApiException(
+                        "LLM response missing 'actionable_improvement_suggestions' for sessionId=" + sessionId);
+            }
+
+            log.info("[Assessment] Parsed LLM JSON: score={}, missingSkills={}, suggestions={}",
+                    dto.competencyFitScore(),
+                    dto.sectionWiseFeedback().skillsEvaluation() != null
+                            ? dto.sectionWiseFeedback().skillsEvaluation().criticalMissingSkills() : "[]",
+                    dto.actionableImprovementSuggestions().size());
+
+            return dto;
+
+        } catch (JsonProcessingException e) {
+            log.error("[Assessment] Failed to parse LLM JSON for sessionId={}: {}\nRaw: {}",
+                    sessionId, e.getMessage(), json);
+            throw new LlmApiException(
+                    "LLM returned invalid JSON for sessionId=" + sessionId + ": " + e.getMessage(), e);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Private — Persistence
+    // -------------------------------------------------------------------------
+
+    /**
+     * Maps the parsed {@link AssessmentResponseDto} to a {@link ResumeAssessment} entity,
+     * persists it to PostgreSQL, and returns the saved entity.
+     *
+     * <p>Hibernate 6 automatically serializes the {@link AssessmentResponseDto.SectionWiseFeedback}
+     * record and the {@code List<String>} into {@code jsonb} columns — no manual
+     * {@code ObjectMapper.writeValueAsString()} call is needed.
+     *
+     * @param sessionId the unique interview session identifier
+     * @param dto       the fully populated DTO from LLM response parsing
+     * @return the saved {@link ResumeAssessment} entity (with generated id and createdAt)
      */
     @Transactional
-    protected ResumeAssessment buildAndPersistEntity(String sessionId, String reportMarkdown) {
-        Integer overallScore = extractOverallScore(reportMarkdown);
-        String hiringRecommendation = extractHiringRecommendation(reportMarkdown);
-
-        // Wrap the Markdown in a JSON envelope for the jsonb column
-        String assessmentDataJson;
-        try {
-            assessmentDataJson = objectMapper.writeValueAsString(
-                    Map.of("report", reportMarkdown)
-            );
-        } catch (JsonProcessingException e) {
-            log.warn("[Assessment] Could not serialize report to JSON, storing as plain string.");
-            assessmentDataJson = "{\"report\": \"serialization_error\"}";
-        }
-
+    protected ResumeAssessment buildAndPersistEntity(String sessionId, AssessmentResponseDto dto) {
         ResumeAssessment entity = ResumeAssessment.builder()
                 .sessionId(sessionId)
-                .overallScore(overallScore)
-                .hiringRecommendation(hiringRecommendation)
-                .assessmentData(assessmentDataJson)
+                .competencyFitScore(dto.competencyFitScore())
+                .sectionWiseFeedback(dto.sectionWiseFeedback())
+                .actionableSuggestions(dto.actionableImprovementSuggestions())
                 .build();
 
         ResumeAssessment saved = resumeAssessmentRepository.save(entity);
-        log.info("[Assessment] Persisted ResumeAssessment id={} for sessionId={} | score={} | verdict={}",
-                saved.getId(), sessionId, overallScore, hiringRecommendation);
+        log.info("[Assessment] Persisted ResumeAssessment id={} for sessionId={} | score={}",
+                saved.getId(), sessionId, saved.getCompetencyFitScore());
         return saved;
     }
 
     /**
-     * Converts a persisted {@link ResumeAssessment} entity to an {@link AssessmentResponse} DTO.
-     * Extracts the plain Markdown text back out of the JSON envelope.
+     * Converts a persisted {@link ResumeAssessment} entity to the {@link AssessmentResponse} API DTO.
+     *
+     * <p>Hibernate reads the {@code jsonb} columns back into their Java types automatically —
+     * the {@link AssessmentResponseDto.SectionWiseFeedback} record is hydrated by Jackson
+     * through Hibernate's JSON type handling.
+     *
+     * @param entity the persisted entity (from DB or fresh save)
+     * @param cached {@code true} if the result was served from the DB cache
+     * @return the fully populated API response DTO
      */
     private AssessmentResponse toResponse(ResumeAssessment entity, boolean cached) {
-        String reportMarkdown = entity.getAssessmentData();
-        try {
-            // Un-wrap the JSON envelope: {"report": "...markdown..."} → "...markdown..."
-            Map<?, ?> dataMap = objectMapper.readValue(entity.getAssessmentData(), Map.class);
-            Object reportObj = dataMap.get("report");
-            if (reportObj != null) {
-                reportMarkdown = reportObj.toString();
-            }
-        } catch (Exception e) {
-            log.debug("[Assessment] Could not unwrap assessmentData JSON for id={}, returning raw.", entity.getId());
-        }
-
         return AssessmentResponse.builder()
                 .id(entity.getId())
                 .sessionId(entity.getSessionId())
-                .overallScore(entity.getOverallScore())
-                .hiringRecommendation(entity.getHiringRecommendation())
-                .report(reportMarkdown)
+                .competencyFitScore(entity.getCompetencyFitScore())
+                .sectionWiseFeedback(entity.getSectionWiseFeedback())
+                .actionableImprovementSuggestions(entity.getActionableSuggestions())
                 .cached(cached)
                 .createdAt(entity.getCreatedAt())
                 .build();
-    }
-
-    // -------------------------------------------------------------------------
-    // Private — Metadata extraction (regex)
-    // -------------------------------------------------------------------------
-
-    /**
-     * Attempts to extract the numeric overall match score from the Markdown report.
-     * Returns {@code null} if not found (non-fatal).
-     */
-    private Integer extractOverallScore(String markdown) {
-        Matcher m = SCORE_PATTERN.matcher(markdown);
-        if (m.find()) {
-            try {
-                int score = Integer.parseInt(m.group(1));
-                if (score >= 0 && score <= 100) return score;
-            } catch (NumberFormatException ignored) { /* fall through */ }
-        }
-        log.debug("[Assessment] Could not extract overall score from report.");
-        return null;
-    }
-
-    /**
-     * Attempts to extract the hiring recommendation string from the Markdown report.
-     * Returns {@code null} if not found (non-fatal).
-     */
-    private String extractHiringRecommendation(String markdown) {
-        Matcher m = VERDICT_PATTERN.matcher(markdown);
-        if (m.find()) {
-            return m.group(1).trim();
-        }
-        log.debug("[Assessment] Could not extract hiring recommendation from report.");
-        return null;
     }
 
     // -------------------------------------------------------------------------
@@ -377,10 +319,17 @@ public class AssessmentService {
 
     /**
      * Semantically matches CV chunks against JD requirements using Cosine Similarity.
-     * For each JD chunk, the top {@code topK} CV chunks with similarity >= threshold
-     * are selected. The selected set is then sorted back into natural document order.
      *
-     * <p>Falls back to all CV chunks if none pass the threshold.
+     * <p>For each JD chunk, the top {@code topK} CV chunks with similarity &gt;= threshold
+     * are selected. The resulting set is deduplicated and sorted back into natural document
+     * order (by chunk UUID, which is monotonically increasing at ingest time).
+     *
+     * <p>Falls back to all CV chunks if none pass the threshold, ensuring the LLM always
+     * receives some context.
+     *
+     * @param cvChunks all CV {@link DocumentChunk}s for this session
+     * @param jdChunks all JD {@link DocumentChunk}s for this session
+     * @return the aggregated text of the selected CV chunks, joined by double newlines
      */
     private String matchAndAggregateCv(List<DocumentChunk> cvChunks, List<DocumentChunk> jdChunks) {
         final double SIMILARITY_THRESHOLD = 0.75;
@@ -411,7 +360,7 @@ public class AssessmentService {
         sortedList.sort(Comparator.comparing(DocumentChunk::getId));
 
         if (sortedList.isEmpty()) {
-            log.warn("[Assessment] No CV chunks crossed threshold {}. Falling back to all {} chunks.",
+            log.warn("[Assessment] No CV chunks crossed similarity threshold {}. Falling back to all {} chunks.",
                     SIMILARITY_THRESHOLD, cvChunks.size());
             return cvChunks.stream()
                     .map(DocumentChunk::getChunkText)
@@ -424,12 +373,12 @@ public class AssessmentService {
                 .collect(Collectors.joining("\n\n"));
     }
 
-    /** Computes the cosine similarity between two equal-length float vectors. */
+    /** Computes the cosine similarity between two equal-length float vectors. Returns 0.0 on error. */
     private double calculateCosineSimilarity(float[] vectorA, float[] vectorB) {
         if (vectorA.length != vectorB.length) return 0.0;
         double dotProduct = 0.0, normA = 0.0, normB = 0.0;
         for (int i = 0; i < vectorA.length; i++) {
-            dotProduct += vectorA[i] * vectorB[i];
+            dotProduct += (double) vectorA[i] * vectorB[i];
             normA += Math.pow(vectorA[i], 2);
             normB += Math.pow(vectorB[i], 2);
         }
@@ -441,9 +390,16 @@ public class AssessmentService {
     // Private — Prompt builder
     // -------------------------------------------------------------------------
 
+    /**
+     * Builds the user-role message containing the matched CV text and full JD text.
+     *
+     * <p>The system prompt ({@link PromptTemplateConfig#SYSTEM_PROMPT_ASSESSMENT}) instructs
+     * the LLM to produce a JSON object. This user message supplies the raw documents
+     * that the LLM analyzes to populate the JSON fields.
+     */
     private String buildUserContent(String cvText, String jdText) {
         return """
-                Please perform a comprehensive holistic assessment based on the following documents:
+                Evaluate the following CV against the provided JD and return ONLY the JSON object.
 
                 ====== CANDIDATE RESUME (CV) ======
                 %s
@@ -451,30 +407,5 @@ public class AssessmentService {
                 ====== JOB DESCRIPTION (JD) ======
                 %s
                 """.formatted(cvText, jdText);
-    }
-
-    // -------------------------------------------------------------------------
-    // Private — SSE stream parser
-    // -------------------------------------------------------------------------
-
-    /**
-     * Parses a raw SSE data line from the LLM stream into a token string.
-     * Strips the "data: " prefix, ignores [DONE], and handles parse errors gracefully.
-     */
-    private Flux<String> parseStreamLine(String rawLine) {
-        String json = rawLine.startsWith("data: ")
-                ? rawLine.substring(6).trim()
-                : rawLine.trim();
-
-        if (SSE_DONE_SENTINEL.equals(json)) return Flux.empty();
-
-        try {
-            LlmChatStreamResponse chunk = objectMapper.readValue(json, LlmChatStreamResponse.class);
-            String content = chunk.getDeltaContent();
-            return (content == null || content.isEmpty()) ? Flux.empty() : Flux.just(content);
-        } catch (Exception e) {
-            log.debug("[Assessment] Skipping unparseable SSE chunk: {} | error: {}", rawLine, e.getMessage());
-            return Flux.empty();
-        }
     }
 }
