@@ -1,50 +1,30 @@
 package fit.iuh.controller;
 
+import fit.iuh.dto.AssessmentResponse;
 import fit.iuh.service.AssessmentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.ServerSentEvent;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 
 /**
- * REST Controller that exposes the holistic Resume Assessment API using
- * Server-Sent Events (SSE) for progressive streaming.
+ * REST Controller exposing the holistic Resume Assessment API.
  *
  * <p>Base path: {@code /api/v2/assess-resume}
  *
- * <h2>Why SSE?</h2>
- * The LLM assessment report can exceed 2 000 tokens (~10-15 seconds of generation).
- * A synchronous HTTP response would cause client-side timeouts and poor UX.
- * SSE allows the server to push each token to the client in real-time, producing
- * a ChatGPT-like streaming effect.
- *
  * <h2>Endpoint Summary</h2>
  * <pre>
- *   GET /api/v2/assess-resume/stream?sessionId={sessionId}
+ *   GET /api/v2/assess-resume?sessionId={id}[&forceRefresh=true]  — Blocking JSON response (Cache-Aside)
+ *   GET /api/v2/assess-resume/stream?sessionId={id}               — SSE streaming response
  * </pre>
  *
- * <h2>Example — cURL</h2>
- * <pre>
- *   curl -N -H "Accept: text/event-stream" \
- *     "http://localhost:8081/api/v2/assess-resume/stream?sessionId=session-123"
- * </pre>
- *
- * <h2>Example — JavaScript EventSource</h2>
- * <pre>{@code
- *   const source = new EventSource(
- *     '/api/v2/assess-resume/stream?sessionId=session-123'
- *   );
- *   source.onmessage = (e) => process.stdout.write(e.data);
- *   source.addEventListener('error', (e) => { console.error(e.data); source.close(); });
- * }</pre>
- *
- * <p>The stream sends {@code event: error} with a descriptive message if the
- * session has not been ingested or the LLM API call fails.
+ * <h2>Cache-Aside Behavior</h2>
+ * The blocking endpoint checks the database for a cached result before calling
+ * the LLM API. Pass {@code forceRefresh=true} to delete the cache and regenerate.
+ * The response includes a {@code "cached": true/false} field to indicate the source.
  */
 @Slf4j
 @RestController
@@ -55,42 +35,45 @@ public class AssessmentController {
     private final AssessmentService assessmentService;
 
     /**
-     * Performs a standard synchronous (blocking) resume assessment and returns
-     * the complete Markdown report in a JSON response body.
+     * Performs a synchronous resume assessment and returns the complete report as JSON.
      *
-     * @param sessionId the unique interview session identifier
-     * @return HTTP 200 with the full markdown report inside a JSON object
+     * <p>Implements Cache-Aside: returns the cached DB result if available.
+     * Use {@code forceRefresh=true} to bypass the cache and regenerate from LLM.
+     *
+     * @param sessionId    the unique interview session identifier (required)
+     * @param forceRefresh if {@code true}, bypasses the cache and re-generates (default: false)
+     * @return HTTP 200 with an {@link AssessmentResponse} containing the report and metadata
      */
-    @GetMapping(
-            produces = MediaType.APPLICATION_JSON_VALUE
-    )
-    public org.springframework.http.ResponseEntity<java.util.Map<String, String>> assessResumeBlocking(
-            @RequestParam("sessionId") String sessionId) {
+    @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<AssessmentResponse> assessResumeBlocking(
+            @RequestParam("sessionId") String sessionId,
+            @RequestParam(value = "forceRefresh", defaultValue = "false") boolean forceRefresh) {
 
-        log.info("Blocking assessment request received: sessionId={}", sessionId);
-        String report = assessmentService.assessResumeBlocking(sessionId);
-        return org.springframework.http.ResponseEntity.ok(java.util.Map.of("report", report));
+        log.info("Blocking assessment request: sessionId={}, forceRefresh={}", sessionId, forceRefresh);
+        AssessmentResponse response = assessmentService.assessResumeBlocking(sessionId, forceRefresh);
+        return ResponseEntity.ok(response);
     }
 
     /**
      * Streams a holistic resume assessment report as Server-Sent Events.
      *
-     * <p>The session identified by {@code sessionId} must have been previously
-     * processed by {@code POST /api/v1/ingest/{sessionId}} so that CV and JD
-     * chunks are available in the database.
+     * <p>Each SSE event carries a plain-text token fragment of the Markdown report.
+     * The complete report is persisted to the database after the stream completes.
+     *
+     * <p>Example cURL:
+     * <pre>
+     *   curl -N -H "Accept: text/event-stream" \
+     *     "http://localhost:8081/api/v2/assess-resume/stream?sessionId=session-123"
+     * </pre>
      *
      * @param sessionId the unique interview session identifier (required)
-     * @return a reactive {@link Flux} of {@link ServerSentEvent} where each event
-     *         carries a plain-text token fragment of the assessment report
+     * @return a reactive {@link Flux} of {@link ServerSentEvent} tokens
      */
-    @GetMapping(
-            value = "/stream",
-            produces = MediaType.TEXT_EVENT_STREAM_VALUE
-    )
+    @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> streamAssessment(
             @RequestParam("sessionId") String sessionId) {
 
-        log.info("SSE assessment request received: sessionId={}", sessionId);
+        log.info("SSE assessment request: sessionId={}", sessionId);
         return assessmentService.streamAssessment(sessionId);
     }
 }
