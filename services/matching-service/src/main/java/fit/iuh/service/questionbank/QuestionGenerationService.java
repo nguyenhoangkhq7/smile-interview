@@ -149,6 +149,15 @@ public class QuestionGenerationService {
                     throw new QuestionBankException("LLM returned an empty response for question generation.");
                 }
 
+                if (response.getUsage() != null) {
+                    LlmChatResponse.Usage usage = response.getUsage();
+                    log.info("[LLM_USAGE] Model: {} | Prompt (Input): {} | Completion (Output): {} | Total: {}",
+                            response.getModel(),
+                            usage.getPromptTokens(),
+                            usage.getCompletionTokens(),
+                            usage.getTotalTokens());
+                }
+
                 String rawJson = response.getFirstChoiceContent().strip();
                 List<QuestionDto> questions = parseQuestionsJson(rawJson, type);
 
@@ -324,6 +333,15 @@ public class QuestionGenerationService {
 
                 if (response == null || response.getFirstChoiceContent() == null) {
                     throw new QuestionBankException("LLM returned an empty response for question regeneration.");
+                }
+
+                if (response.getUsage() != null) {
+                    LlmChatResponse.Usage usage = response.getUsage();
+                    log.info("[LLM_USAGE] Model: {} | Prompt (Input): {} | Completion (Output): {} | Total: {}",
+                            response.getModel(),
+                            usage.getPromptTokens(),
+                            usage.getCompletionTokens(),
+                            usage.getTotalTokens());
                 }
 
                 String rawJson = response.getFirstChoiceContent().strip();

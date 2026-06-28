@@ -30,7 +30,6 @@ import java.util.*;
 @RequiredArgsConstructor
 public class QuestionBankService {
 
-    private final ContextExtractionService contextExtractionService;
     private final QuestionGenerationService questionGenerationService;
     private final DifficultyDistributor difficultyDistributor;
     private final ResumeAssessmentRepository assessmentRepo;
@@ -66,13 +65,6 @@ public class QuestionBankService {
         SessionDocument jdDoc = documentRepo.findBySessionIdAndDocumentType(sessionId, DocumentType.JD)
                 .orElseThrow(() -> new QuestionBankException("JD document not found for session: " + sessionId));
 
-        String assessmentJson;
-        try {
-            assessmentJson = objectMapper.writeValueAsString(assessment);
-        } catch (JsonProcessingException e) {
-            throw new QuestionBankException("Failed to serialize assessment data: " + e.getMessage(), e);
-        }
-
         // Load CV & JD chunks to identify semantic matched pairs
         List<DocumentChunk> cvChunks = documentChunkRepository.findBySessionIdAndDocumentType(sessionId, DocumentType.CV);
         List<DocumentChunk> jdChunks = documentChunkRepository.findBySessionIdAndDocumentType(sessionId, DocumentType.JD);
@@ -81,12 +73,55 @@ public class QuestionBankService {
 
         log.info("[QuestionBank] Semantic matching completed. Found {} matched pairs for session {}.", matchedPairs.size(), sessionId);
 
-        // Step 1: Context Extraction
-        CandidateContextDto context = contextExtractionService.extractContext(
-                cvDoc.getMarkdownContent(),
-                jdDoc.getMarkdownContent(),
-                assessmentJson
-        );
+        // Step 1: Programmatic Context Extraction from Assessment (saves LLM call & costs 0 tokens!)
+        List<String> strongAreas = assessment.getStrongAreas() != null ? assessment.getStrongAreas() : Collections.emptyList();
+        List<String> gapAreas = assessment.getGapAreas() != null ? assessment.getGapAreas() : Collections.emptyList();
+
+        List<String> techStackRequired = new ArrayList<>();
+        List<String> techStackPossessed = new ArrayList<>();
+        if (assessment.getSectionWiseFeedback() != null && assessment.getSectionWiseFeedback().techStackAlignment() != null) {
+            var alignment = assessment.getSectionWiseFeedback().techStackAlignment();
+            if (alignment.matched() != null) {
+                techStackRequired.addAll(alignment.matched());
+                techStackPossessed.addAll(alignment.matched());
+            }
+            if (alignment.missing() != null) {
+                techStackRequired.addAll(alignment.missing());
+            }
+            if (alignment.weakEvidence() != null) {
+                techStackPossessed.addAll(alignment.weakEvidence());
+            }
+        }
+
+        // Simple domain heuristic from CV and JD text to avoid calling LLM
+        String cvJdText = ((cvDoc.getMarkdownContent() != null ? cvDoc.getMarkdownContent() : "") + " " 
+                + (jdDoc.getMarkdownContent() != null ? jdDoc.getMarkdownContent() : "")).toLowerCase();
+        String targetDomain = "other";
+        if (cvJdText.contains("wallet") || cvJdText.contains("transaction") || cvJdText.contains("payment") || cvJdText.contains("bank") || cvJdText.contains("fintech")) {
+            targetDomain = "fintech";
+        } else if (cvJdText.contains("cart") || cvJdText.contains("shop") || cvJdText.contains("checkout") || cvJdText.contains("e-commerce") || cvJdText.contains("order")) {
+            targetDomain = "e-commerce";
+        } else if (cvJdText.contains("health") || cvJdText.contains("hospital") || cvJdText.contains("medical") || cvJdText.contains("patient")) {
+            targetDomain = "healthcare";
+        } else if (cvJdText.contains("saas") || cvJdText.contains("multi-tenant") || cvJdText.contains("billing")) {
+            targetDomain = "saas";
+        } else if (cvJdText.contains("enterprise") || cvJdText.contains("b2b")) {
+            targetDomain = "enterprise";
+        } else if (cvJdText.contains("startup") || cvJdText.contains("funding") || cvJdText.contains("mvp")) {
+            targetDomain = "startup";
+        }
+
+        CandidateContextDto context = CandidateContextDto.builder()
+                .candidateLevel(assessment.getCandidateLevel())
+                .overallMatch(assessment.getMatchLevel())
+                .yearsOfExperience(assessment.getYearsOfExperienceEstimate())
+                .strongAreas(strongAreas)
+                .gapAreas(gapAreas)
+                .techStackRequired(techStackRequired)
+                .techStackPossessed(techStackPossessed)
+                .targetDomain(targetDomain)
+                .roleType(assessment.getRoleTypeDetected())
+                .build();
 
         // Step 2: Difficulty Distribution Calculation
         Map<String, Map<String, Integer>> distributions = new LinkedHashMap<>();
@@ -285,35 +320,36 @@ public class QuestionBankService {
 
     private List<String> findMatchedPairs(List<DocumentChunk> cvChunks, List<DocumentChunk> jdChunks) {
         final double SIMILARITY_THRESHOLD = 0.65;
-        final int TOP_K = 3;
+        final int GLOBAL_LIMIT = 7;
 
-        List<String> matchedPairs = new ArrayList<>();
-        int pairCount = 0;
+        record ChunkMatch(DocumentChunk jdChunk, DocumentChunk cvChunk, double score) {}
+
+        List<ChunkMatch> allMatches = new ArrayList<>();
 
         for (DocumentChunk jdChunk : jdChunks) {
             if (jdChunk.getEmbedding() == null) continue;
-
-            List<Map.Entry<DocumentChunk, Double>> similarities = new ArrayList<>();
             for (DocumentChunk cvChunk : cvChunks) {
                 if (cvChunk.getEmbedding() == null) continue;
                 double score = calculateCosineSimilarity(jdChunk.getEmbedding(), cvChunk.getEmbedding());
                 if (score >= SIMILARITY_THRESHOLD) {
-                    similarities.add(new AbstractMap.SimpleEntry<>(cvChunk, score));
+                    allMatches.add(new ChunkMatch(jdChunk, cvChunk, score));
                 }
             }
+        }
 
-            similarities.sort((a, b) -> Double.compare(b.getValue(), a.getValue()));
-            List<DocumentChunk> topCvForJd = similarities.stream()
-                    .limit(TOP_K)
-                    .map(Map.Entry::getKey)
-                    .toList();
+        // Sort globally by similarity score descending
+        allMatches.sort((a, b) -> Double.compare(b.score(), a.score()));
 
-            for (DocumentChunk cvChunk : topCvForJd) {
-                pairCount++;
-                matchedPairs.add(String.format(
-                        "### Match Pair %d:\n- **Required Job Description segment**: %s\n- **Matched Candidate Experience segment**: %s\n",
-                        pairCount, jdChunk.getChunkText(), cvChunk.getChunkText()
-                ));
+        List<String> matchedPairs = new ArrayList<>();
+        int pairCount = 0;
+        for (ChunkMatch match : allMatches) {
+            pairCount++;
+            matchedPairs.add(String.format(
+                    "### Match Pair %d:\n- **Required Job Description segment**: %s\n- **Matched Candidate Experience segment**: %s\n",
+                    pairCount, match.jdChunk().getChunkText(), match.cvChunk().getChunkText()
+            ));
+            if (pairCount >= GLOBAL_LIMIT) {
+                break;
             }
         }
         return matchedPairs;

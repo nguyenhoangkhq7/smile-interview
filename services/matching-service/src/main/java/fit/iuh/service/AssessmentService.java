@@ -192,6 +192,16 @@ public class AssessmentService {
             if (response == null || response.getFirstChoiceContent() == null) {
                 throw new LlmApiException("LLM API returned an empty assessment response.");
             }
+
+            if (response.getUsage() != null) {
+                LlmChatResponse.Usage usage = response.getUsage();
+                log.info("[LLM_USAGE] Model: {} | Prompt (Input): {} | Completion (Output): {} | Total: {}",
+                        response.getModel(),
+                        usage.getPromptTokens(),
+                        usage.getCompletionTokens(),
+                        usage.getTotalTokens());
+            }
+
             return response.getFirstChoiceContent().strip();
 
         } catch (WebClientResponseException e) {
