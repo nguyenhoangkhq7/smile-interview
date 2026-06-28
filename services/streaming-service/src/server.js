@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import { connectRedis } from './config/redis.js';
 import { handleConnection } from './controllers/signaling.controller.js';
 import { transcribe } from './controllers/audio.controller.js';
+import { synthesizeAudio } from './controllers/tts.controller.js';
 
 dotenv.config();
 
@@ -65,6 +66,11 @@ app.post(
   transcribe
 );
 
+// POST /api/v1/audio/synthesize
+// Accepts JSON body: { "text": "...", "voice": "af_bella" }
+// Returns raw MP3 bytes with Content-Type: audio/mpeg
+app.post('/api/v1/audio/synthesize', synthesizeAudio);
+
 // ─── Multer Error Handler ──────────────────────────────────────────────────────
 // Must be defined AFTER routes to intercept multer-specific errors cleanly
 // eslint-disable-next-line no-unused-vars
@@ -101,6 +107,7 @@ const startServer = async () => {
       console.log(`Streaming Service listening on port ${PORT}`);
       console.log(`  → Health:      http://localhost:${PORT}/health`);
       console.log(`  → Transcribe:  POST http://localhost:${PORT}/api/v1/audio/transcribe`);
+      console.log(`  → Synthesize:  POST http://localhost:${PORT}/api/v1/audio/synthesize`);
     });
   } catch (error) {
     console.error('Failed to start Streaming Service:', error);

@@ -72,7 +72,7 @@ services:
   ai-inference-service:
     # Speaches: OpenAI-compatible STT/TTS server powered by faster-whisper
     # Docs: https://speaches.ai | Repo: https://github.com/fedirz/faster-whisper-server
-    image: fedirz/faster-whisper-server:latest-cpu
+    image: ghcr.io/speaches-ai/speaches:latest-cpu
     container_name: ai_inference_service
     restart: always
     ports:
@@ -91,8 +91,8 @@ services:
       # [ĐÃ SỬA] Thêm tiền tố SPEACHES__ để biến này thực sự có tác dụng
       SPEACHES__STT_MODEL_TTL: -1
     volumes:
-      # Persist downloaded HuggingFace models on the host
-      - whisper_models:/root/.cache/huggingface
+      # Persist downloaded HuggingFace models on the host for ubuntu user
+      - whisper_models:/home/ubuntu/.cache/huggingface
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
@@ -107,7 +107,7 @@ services:
     container_name: streaming_service
     restart: always
     ports:
-      - "8001:8001"
+      - "${STREAMING_SERVICE_PORT:-8001}:8001"
     environment:
       PORT: 8001
       REDIS_URL: redis://redis:6379
@@ -115,6 +115,9 @@ services:
       WHISPER_API_KEY: dummy_key_for_local
       # Sử dụng model 'small' để nâng cao độ chính xác nhận diện từ viết tắt & thuật ngữ IT
       WHISPER_MODEL: ${WHISPER_MODEL:-Systran/faster-whisper-small}
+      # TTS — OpenAI-compatible /v1/audio/speech endpoint served by Speaches
+      TTS_API_URL: http://ai-inference-service:8000/v1/audio/speech
+      TTS_MODEL: ${TTS_MODEL:-speaches-ai/piper-vi_VN-vais1000-medium}
     depends_on:
       redis:
         condition: service_healthy
