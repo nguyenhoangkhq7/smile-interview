@@ -63,6 +63,10 @@ services:
       # Chunking
       CHUNKING_MAX_TOKENS: ${CHUNKING_MAX_TOKENS}
       CHUNKING_OVERLAP_TOKENS: ${CHUNKING_OVERLAP_TOKENS}
+      # Question Bank
+      QUESTION_BANK_MAX_TOKENS: ${QUESTION_BANK_MAX_TOKENS}
+      QUESTION_BANK_TEMPERATURE: ${QUESTION_BANK_TEMPERATURE}
+      QUESTION_BANK_MAX_RETRIES: ${QUESTION_BANK_MAX_RETRIES}
     depends_on:
       postgres:
         condition: service_healthy

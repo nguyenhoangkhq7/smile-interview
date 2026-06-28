@@ -20,6 +20,9 @@ public class AppProperties {
     /** LangChain4j text chunking configuration. */
     private Chunking chunking = new Chunking();
 
+    /** Question Bank generation configuration. */
+    private QuestionBank questionBank = new QuestionBank();
+
     // -------------------------------------------------------------------------
     // Nested config classes
     // -------------------------------------------------------------------------
@@ -61,5 +64,17 @@ public class AppProperties {
 
         /** Number of overlapping tokens between consecutive chunks. */
         private int overlapTokens;
+    }
+
+    @Data
+    public static class QuestionBank {
+        /** Maximum tokens to generate in LLM response for question generation. */
+        private int maxTokens = 8192;
+
+        /** Temperature for question generation (slightly creative). */
+        private double temperature = 0.4;
+
+        /** Maximum retry attempts when LLM returns invalid JSON. */
+        private int maxRetries = 2;
     }
 }
