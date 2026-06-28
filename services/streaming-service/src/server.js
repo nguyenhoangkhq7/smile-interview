@@ -1,0 +1,111 @@
+import express from 'express';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
+import cors from 'cors';
+import multer from 'multer';
+import dotenv from 'dotenv';
+import { connectRedis } from './config/redis.js';
+import { handleConnection } from './controllers/signaling.controller.js';
+import { transcribe } from './controllers/audio.controller.js';
+
+dotenv.config();
+
+const app = express();
+const PORT = process.env.PORT || 8001;
+
+// ─── CORS Configuration ────────────────────────────────────────────────────────
+const corsOptions = {
+  origin: process.env.CORS_ORIGIN || '*',
+  methods: ['GET', 'POST'],
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
+app.use(express.json());
+
+// ─── Multer — Memory Storage ───────────────────────────────────────────────────
+// Audio clips are short-lived, so we hold them in RAM rather than writing to
+// disk. The buffer is passed directly to the Whisper API and then discarded.
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 25 * 1024 * 1024, // 25 MB — Whisper API hard limit
+  },
+  fileFilter: (_req, file, cb) => {
+    // Accept common audio MIME types
+    const allowedMimes = [
+      'audio/mpeg',
+      'audio/mp4',
+      'audio/ogg',
+      'audio/wav',
+      'audio/webm',
+      'audio/flac',
+      'audio/x-m4a',
+    ];
+    if (allowedMimes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Unsupported audio format: ${file.mimetype}`), false);
+    }
+  },
+});
+
+// ─── REST Routes ───────────────────────────────────────────────────────────────
+
+// Health Check
+app.get('/health', (_req, res) => {
+  res.status(200).json({ status: 'UP', service: 'streaming-service' });
+});
+
+// POST /api/v1/audio/transcribe
+// Accepts multipart/form-data with a single audio file under field name "audio"
+app.post(
+  '/api/v1/audio/transcribe',
+  upload.single('audio'),
+  transcribe
+);
+
+// ─── Multer Error Handler ──────────────────────────────────────────────────────
+// Must be defined AFTER routes to intercept multer-specific errors cleanly
+// eslint-disable-next-line no-unused-vars
+app.use((err, _req, res, _next) => {
+  if (err instanceof multer.MulterError || err.message?.startsWith('Unsupported audio format')) {
+    return res.status(400).json({ status: 'error', message: err.message });
+  }
+  console.error('[Server] Unhandled error:', err);
+  return res.status(500).json({ status: 'error', message: 'Internal server error' });
+});
+
+// ─── HTTP + Socket.io Server ───────────────────────────────────────────────────
+
+// Wrap Express app with Node's native HTTP server
+const httpServer = createServer(app);
+
+// Initialize Socket.io with matching CORS config
+const io = new Server(httpServer, {
+  cors: corsOptions,
+  pingTimeout: 60000,
+  pingInterval: 25000,
+});
+
+// Register Socket.io connection handler
+io.on('connection', (socket) => {
+  handleConnection(io, socket);
+});
+
+// ─── Bootstrap ────────────────────────────────────────────────────────────────
+const startServer = async () => {
+  try {
+    await connectRedis();
+    httpServer.listen(PORT, () => {
+      console.log(`Streaming Service listening on port ${PORT}`);
+      console.log(`  → Health:      http://localhost:${PORT}/health`);
+      console.log(`  → Transcribe:  POST http://localhost:${PORT}/api/v1/audio/transcribe`);
+    });
+  } catch (error) {
+    console.error('Failed to start Streaming Service:', error);
+    process.exit(1);
+  }
+};
+
+startServer();
