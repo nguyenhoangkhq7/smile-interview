@@ -1,0 +1,156 @@
+/* ── Reset & tokens ─────────────────────────────────────────────── */
+.main {
+  position: relative;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2rem 1rem 1.5rem;
+  overflow: hidden;
+  color: #f5f3ff;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* ── Decorative Background ──────────────────────────────────────── */
+.background {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: #07050f;
+}
+
+.bgGlow1 {
+  position: absolute;
+  top: -15%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 70vw;
+  height: 55vh;
+  background: radial-gradient(ellipse, rgba(109, 40, 217, 0.22) 0%, transparent 70%);
+  filter: blur(40px);
+  pointer-events: none;
+}
+
+.bgGlow2 {
+  position: absolute;
+  bottom: -10%;
+  right: -10%;
+  width: 45vw;
+  height: 45vh;
+  background: radial-gradient(ellipse, rgba(79, 70, 229, 0.14) 0%, transparent 70%);
+  filter: blur(60px);
+  pointer-events: none;
+}
+
+.bgGrid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(139, 92, 246, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(139, 92, 246, 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%);
+  pointer-events: none;
+}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+.header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  user-select: none;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.logoIcon {
+  font-size: 1.6rem;
+  background: linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 0 12px rgba(139, 92, 246, 0.6));
+}
+
+.logoText {
+  font-size: 1.8rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  background: linear-gradient(135deg, #e9d5ff 0%, #a78bfa 60%, #7c3aed 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.logoBadge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(109, 40, 217, 0.3));
+  color: #c4b5fd;
+  border: 1px solid rgba(167, 139, 250, 0.35);
+}
+
+.tagline {
+  font-size: 0.82rem;
+  color: rgba(196, 181, 253, 0.55);
+  margin: 0;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+
+/* ── Avatar Stage ────────────────────────────────────────────────── */
+.stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 560px;
+  padding: 1.5rem 0;
+}
+
+.avatarCard {
+  width: 100%;
+  aspect-ratio: 9 / 14;
+  max-height: 70vh;
+  border-radius: 1.5rem;
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  box-shadow:
+    0 0 0 1px rgba(139, 92, 246, 0.12),
+    0 24px 80px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  transition: box-shadow 0.3s ease;
+}
+
+.avatarCard:hover {
+  box-shadow:
+    0 0 0 1px rgba(139, 92, 246, 0.28),
+    0 32px 100px rgba(0, 0, 0, 0.7),
+    0 0 60px rgba(109, 40, 217, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+/* ── Footer ─────────────────────────────────────────────────────── */
+.footer {
+  font-size: 0.72rem;
+  color: rgba(196, 181, 253, 0.25);
+  letter-spacing: 0.04em;
+}
+
+.footer p {
+  margin: 0;
+}

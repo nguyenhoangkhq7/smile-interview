@@ -124,6 +124,22 @@ services:
       ai-inference-service:
         condition: service_healthy
 
+  # ─────────────────────────────────────────────────────────────────
+  # Next.js Frontend — 3D Avatar (Ditto)
+  # ─────────────────────────────────────────────────────────────────
+  web-app:
+    build:
+      context: ./web-app
+      dockerfile: Dockerfile
+    container_name: web_app
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+    depends_on:
+      - streaming-service
+
 volumes:
   postgres_data:
   redis_data:
