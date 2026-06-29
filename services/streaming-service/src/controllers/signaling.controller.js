@@ -1,4 +1,6 @@
 import redisClient from '../config/redis.js';
+import { transcribeAudio } from '../services/audio.service.js';
+import { synthesizeSpeech } from '../services/tts.service.js';
 
 export const handleConnection = (io, socket) => {
   console.log(`Client connected: ${socket.id}`);
@@ -91,6 +93,40 @@ export const handleConnection = (io, socket) => {
       });
     } catch (error) {
       console.error('Error handling audio chunk:', error);
+    }
+  });
+
+  // Handle STT: receive raw audio buffer → return transcribed text
+  socket.on('process-stt', async (audioBuffer) => {
+    try {
+      // Simulate a multer req.file object so the service signature is satisfied
+      const mockFile = {
+        buffer: audioBuffer,
+        originalname: 'stream.webm',
+        mimetype: 'audio/webm',
+      };
+
+      const resultText = await transcribeAudio(mockFile.buffer, mockFile.originalname);
+
+      socket.emit('stt-result', { status: 'success', text: resultText });
+    } catch (error) {
+      console.error('[STT] Error processing audio:', error);
+      socket.emit('stt-error', { status: 'error', message: error.message });
+    }
+  });
+
+  // Handle TTS: receive text string → return MP3 audio buffer
+  socket.on('process-tts', async (text) => {
+    try {
+      const audioArrayBuffer = await synthesizeSpeech(text);
+
+      // Convert ArrayBuffer → Node.js Buffer for binary-safe Socket.io transmission
+      const audioBuffer = Buffer.from(audioArrayBuffer);
+
+      socket.emit('tts-result', audioBuffer);
+    } catch (error) {
+      console.error('[TTS] Error synthesizing speech:', error);
+      socket.emit('tts-error', { status: 'error', message: error.message });
     }
   });
 
