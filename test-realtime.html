@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Real-time AI Interview - Streaming Service</title>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: rgba(22, 28, 45, 0.6);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --primary-glow: rgba(59, 130, 246, 0.35);
+            --success: #10b981;
+            --danger: #ef4444;
+            --danger-glow: rgba(239, 68, 68, 0.35);
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.1) 0px, transparent 50%);
+        }
+
+        .container {
+            width: 100%;
+            max-width: 640px;
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            padding: 35px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        h2 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #fff 0%, #93c5fd 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-align: center;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            text-align: center;
+            font-size: 0.95rem;
+            margin-bottom: 30px;
+        }
+
+        #status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            padding: 10px 16px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 30px;
+            transition: all 0.3s ease;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--danger);
+            box-shadow: 0 0 8px var(--danger);
+        }
+
+        .status-dot.connected {
+            background-color: var(--success);
+            box-shadow: 0 0 8px var(--success);
+            animation: pulse-green 2s infinite;
+        }
+
+        @keyframes pulse-green {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        .box {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-color);
+            padding: 24px;
+            border-radius: 16px;
+            margin-bottom: 24px;
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+
+        .box:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .desc {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+        }
+
+        /* Input styling */
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        input {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border-color);
+            padding: 12px 16px;
+            border-radius: 12px;
+            color: #fff;
+            font-family: inherit;
+            font-size: 0.95rem;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-glow);
+        }
+
+        /* Button styling */
+        button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.95rem;
+            font-family: inherit;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+            box-shadow: 0 0 12px var(--primary-glow);
+        }
+
+        .btn-record {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+            border: 1px solid var(--border-color);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-record:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .btn-record.recording {
+            background: var(--danger);
+            border-color: var(--danger);
+            box-shadow: 0 0 15px var(--danger-glow);
+            animation: record-pulse 1.5s infinite;
+        }
+
+        @keyframes record-pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.85; }
+            100% { opacity: 1; }
+        }
+
+        /* Results & Audio player */
+        .result-container {
+            margin-top: 16px;
+            padding: 12px 16px;
+            background: rgba(0, 0, 0, 0.15);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            min-height: 50px;
+            display: flex;
+            align-items: center;
+        }
+
+        .result-label {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        #stt-result-text {
+            color: #93c5fd;
+            font-weight: 500;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        audio {
+            width: 100%;
+            height: 40px;
+            border-radius: 8px;
+            outline: none;
+            background: #1e293b;
+        }
+
+        /* Error notification */
+        .error-message {
+            color: var(--danger);
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            margin-top: 12px;
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <h2>🎙️ Streaming Service</h2>
+        <div class="subtitle">Kiểm thử thời gian thực STT & TTS qua WebSocket</div>
+
+        <div id="status">
+            <span class="status-dot" id="statusDot"></span>
+            <span id="statusText">Trạng thái: Đang kết nối...</span>
+        </div>
+
+        <!-- Section 1: STT -->
+        <div class="box">
+            <h3>🎙️ Giọng nói thành Văn bản (STT)</h3>
+            <div class="desc">Bấm bắt đầu, nói một vài câu tiếng Việt (ví dụ: "Tôi lập trình Java và Docker") rồi bấm dừng để gửi âm thanh đến Whisper.</div>
+            
+            <button id="btnRecord" class="btn-record" onclick="toggleRecording()">
+                <span>🎤 Bắt đầu ghi âm</span>
+            </button>
+
+            <div class="error-message" id="sttError"></div>
+
+            <div style="margin-top: 16px;">
+                <div class="result-label">Kết quả từ Whisper</div>
+                <div class="result-container">
+                    <span id="stt-result-text">Chưa có dữ liệu...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 2: TTS -->
+        <div class="box">
+            <h3>🔊 Văn bản thành Giọng nói (TTS)</h3>
+            <div class="desc">Nhập văn bản tiếng Việt để chuyển sang giọng đọc Piper.</div>
+            
+            <div class="input-group">
+                <input type="text" id="ttsInput" value="Xin chào, bạn có kinh nghiệm với Java và Docker không?">
+                <button class="btn-primary" onclick="sendTTS()">AI Đọc 🚀</button>
+            </div>
+
+            <div class="error-message" id="ttsError"></div>
+
+            <div style="margin-top: 16px;">
+                <div class="result-label">Trình phát Audio</div>
+                <div style="margin-top: 8px;">
+                    <audio id="audioPlayer" controls></audio>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 1. Kết nối tới Streaming Service
+        const socket = io('http://localhost:8001');
+
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+
+        socket.on('connect', () => {
+            statusDot.classList.add('connected');
+            statusText.innerText = 'Trạng thái: Đã kết nối WebSocket 🟢';
+        });
+
+        socket.on('disconnect', () => {
+            statusDot.classList.remove('connected');
+            statusText.innerText = 'Trạng thái: Mất kết nối 🔴';
+        });
+
+        // ==========================================
+        // STT LOGIC
+        // ==========================================
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let isRecording = false;
+
+        async function toggleRecording() {
+            const btn = document.getElementById('btnRecord');
+            const sttResult = document.getElementById('stt-result-text');
+            const sttErr = document.getElementById('sttError');
+
+            if (!isRecording) {
+                // Khởi động Ghi âm
+                sttErr.style.display = 'none';
+                audioChunks = [];
+                
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    
+                    mediaRecorder.ondataavailable = (e) => {
+                        if (e.data && e.data.size > 0) {
+                            audioChunks.push(e.data);
+                        }
+                    };
+
+                    mediaRecorder.onstop = async () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        const arrayBuffer = await audioBlob.arrayBuffer();
+
+                        sttResult.innerText = '🔄 Đang xử lý STT...';
+                        
+                        // Gửi dữ liệu nhị phân qua WebSocket
+                        socket.emit('process-stt', arrayBuffer);
+                    };
+
+                    mediaRecorder.start();
+                    isRecording = true;
+                    btn.classList.add('recording');
+                    btn.innerHTML = '🛑 Dừng & Gửi âm thanh';
+                    sttResult.innerText = 'Listening... Đang nghe giọng nói của bạn.';
+                } catch (err) {
+                    console.error('Không thể truy cập Microphone:', err);
+                    sttErr.innerText = `Lỗi Microphone: ${err.message || err}`;
+                    sttErr.style.display = 'block';
+                }
+            } else {
+                // Dừng ghi âm
+                if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                    mediaRecorder.stop();
+                    // Dừng hoàn toàn mic tracks để giải phóng thiết bị
+                    mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                }
+                isRecording = false;
+                btn.classList.remove('recording');
+                btn.innerHTML = '🎤 Bắt đầu ghi âm';
+            }
+        }
+
+        // Nhận kết quả từ STT
+        socket.on('stt-result', (data) => {
+            const sttResult = document.getElementById('stt-result-text');
+            if (data.status === 'success') {
+                sttResult.innerText = data.text;
+            } else {
+                sttResult.innerText = `Lỗi: ${data.message}`;
+            }
+        });
+
+        // Nhận lỗi STT
+        socket.on('stt-error', (err) => {
+            const sttErr = document.getElementById('sttError');
+            sttErr.innerText = `Lỗi từ Server: ${err.message || JSON.stringify(err)}`;
+            sttErr.style.display = 'block';
+            document.getElementById('stt-result-text').innerText = 'Gặp lỗi khi xử lý.';
+        });
+
+        // ==========================================
+        // TTS LOGIC
+        // ==========================================
+        function sendTTS() {
+            const text = document.getElementById('ttsInput').value;
+            const ttsErr = document.getElementById('ttsError');
+            ttsErr.style.display = 'none';
+            
+            if (!text.trim()) {
+                ttsErr.innerText = 'Vui lòng nhập văn bản cần đọc!';
+                ttsErr.style.display = 'block';
+                return;
+            }
+
+            socket.emit('process-tts', text);
+        }
+
+        // Nhận file MP3 (ArrayBuffer) từ Server
+        socket.on('tts-result', (arrayBuffer) => {
+            const blob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
+            const url = URL.createObjectURL(blob);
+            const player = document.getElementById('audioPlayer');
+            player.src = url;
+            player.play().catch(e => console.log('Chờ người dùng tương tác để tự động phát âm thanh:', e));
+        });
+
+        // Nhận lỗi TTS
+        socket.on('tts-error', (err) => {
+            const ttsErr = document.getElementById('ttsError');
+            ttsErr.innerText = `Lỗi từ Server: ${err.message || JSON.stringify(err)}`;
+            ttsErr.style.display = 'block';
+        });
+
+    </script>
+</body>
+
+</html>
