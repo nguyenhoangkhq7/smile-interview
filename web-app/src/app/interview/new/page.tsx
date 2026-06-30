@@ -198,12 +198,9 @@ export default function NewInterviewPage() {
 
   return (
     <div className={styles.container}>
-      {/* Header */}
       <header className={styles.header}>
         <Link href="/history" className={styles.logo}>
-          <span className={styles.logoIcon}>◈</span>
-          <span>Smile Interview</span>
-          <span className={styles.logoBadge}>AI</span>
+          <img src="/logo.png" alt="Smile Interview Logo" className={styles.logoImg} />
         </Link>
         <nav className={styles.navLinks}>
           <Link href="/history" className={styles.navLink}>
@@ -488,6 +485,10 @@ export default function NewInterviewPage() {
           </div>
         )}
       </main>
+
+      <footer className={styles.footer}>
+        <img src="/footer.png" alt="Smile Interview Footer" className={styles.footerImg} />
+      </footer>
     </div>
   );
 }

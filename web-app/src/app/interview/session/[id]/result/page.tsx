@@ -80,8 +80,7 @@ export default function InterviewResultPage() {
       <div className={styles.container}>
         <header className={styles.header}>
           <Link href="/history" className={styles.logo}>
-            <span className={styles.logoIcon}>◈</span>
-            <span>Smile Interview</span>
+            <img src="/logo.png" alt="Smile Interview Logo" className={styles.logoImg} />
           </Link>
         </header>
         <div style={{ display: 'flex', minHeight: '80vh', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', textAlign: 'center' }}>
@@ -123,9 +122,7 @@ export default function InterviewResultPage() {
       {/* Header */}
       <header className={styles.header}>
         <Link href="/history" className={styles.logo}>
-          <span className={styles.logoIcon}>◈</span>
-          <span>Smile Interview</span>
-          <span className={styles.logoBadge}>AI</span>
+          <img src="/logo.png" alt="Smile Interview Logo" className={styles.logoImg} />
         </Link>
         <nav className={styles.navLinks}>
           <Link href="/history" className={styles.navLink}>
@@ -289,6 +286,10 @@ export default function InterviewResultPage() {
           </Link>
         </div>
       </main>
+
+      <footer className={styles.footer}>
+        <img src="/footer.png" alt="Smile Interview Footer" className={styles.footerImg} />
+      </footer>
     </div>
   );
 }

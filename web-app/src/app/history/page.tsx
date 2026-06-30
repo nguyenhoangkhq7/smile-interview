@@ -53,13 +53,10 @@ export default function HistoryPage() {
 
   return (
     <div className={styles.container}>
-      {/* Header */}
       <header className={styles.header}>
-        <div className={styles.logo}>
-          <span className={styles.logoIcon}>◈</span>
-          <span>Smile Interview</span>
-          <span className={styles.logoBadge}>AI</span>
-        </div>
+        <Link href="/history" className={styles.logo}>
+          <img src="/logo.png" alt="Smile Interview Logo" className={styles.logoImg} />
+        </Link>
         <nav className={styles.navLinks}>
           <Link href="/history" className={`${styles.navLink} ${styles.navLinkActive}`}>
             Lịch sử
@@ -157,6 +154,10 @@ export default function HistoryPage() {
           </div>
         )}
       </main>
+
+      <footer className={styles.footer}>
+        <img src="/footer.png" alt="Smile Interview Footer" className={styles.footerImg} />
+      </footer>
     </div>
   );
 }

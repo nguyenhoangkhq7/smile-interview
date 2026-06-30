@@ -5,6 +5,8 @@
   background-color: #f8fafc;
   color: #0f172a;
   font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ── Header ── */
@@ -20,24 +22,12 @@
 .logo {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 1.25rem;
-  font-weight: 800;
-  color: #4f46e5;
-  text-decoration: none;
 }
 
-.logoIcon {
-  font-size: 1.5rem;
-}
-
-.logoBadge {
-  background-color: #e0e7ff;
-  color: #4338ca;
-  font-size: 0.7rem;
-  padding: 0.1rem 0.4rem;
-  border-radius: 9999px;
-  font-weight: 700;
+.logoImg {
+  height: 38px;
+  width: auto;
+  display: block;
 }
 
 .navLinks {
@@ -215,4 +205,23 @@
   background-color: #f8fafc;
   border-color: #94a3b8;
   color: #0f172a;
+}
+
+/* ── Footer ── */
+.footer {
+  margin-top: auto;
+  width: 100%;
+  border-top: 1px solid #e2e8f0;
+  background-color: #ffffff;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem 0;
+}
+
+.footerImg {
+  max-height: 120px;
+  width: auto;
+  object-fit: contain;
+  display: block;
 }
