@@ -29,13 +29,29 @@ function AvatarFallback() {
  *     DittoModel avatar.
  *  4. Shows a status overlay with connection / playback indicators.
  */
-export function DittoAvatarModule() {
+export function DittoAvatarModule({
+  controlled = false,
+  analyser: propsAnalyser = null,
+  isConnected: propsIsConnected = false,
+  isPlaying: propsIsPlaying = false,
+  isListening = false,
+  isThinking = false
+} = {}) {
   const [audioInitialized, setAudioInitialized] = useState(false);
   const [testText, setTestText] = useState('Xin chào, tôi là Ditto.');
   const audioElRef = useRef(null);
 
-  const { analyser, audioUrl, isPlaying, isConnected, initAudio, sendTTS } =
-    useAudioLipSync('http://localhost:8001');
+  // Initialize hook only if NOT in controlled mode (avoids dead socket connections on session screens)
+  const localHook = useAudioLipSync(
+    controlled ? undefined : (process.env.NEXT_PUBLIC_STREAMING_SERVICE_URL || 'http://localhost:8001')
+  );
+
+  const analyser = controlled ? propsAnalyser : localHook.analyser;
+  const audioUrl = controlled ? null : localHook.audioUrl;
+  const isPlaying = controlled ? propsIsPlaying : localHook.isPlaying;
+  const isConnected = controlled ? propsIsConnected : localHook.isConnected;
+  const initAudio = localHook.initAudio;
+  const sendTTS = localHook.sendTTS;
 
   const handleInit = useCallback(() => {
     initAudio();
@@ -99,7 +115,7 @@ export function DittoAvatarModule() {
 
         {/* Avatar with Suspense fallback while GLB is loading */}
         <Suspense fallback={<AvatarFallback />}>
-          <DittoModel analyser={analyser} />
+          <DittoModel analyser={analyser} isListening={isListening} isThinking={isThinking} />
         </Suspense>
 
         {/* Camera controls — face-level lock, T-pose body cropped out */}
@@ -118,55 +134,57 @@ export function DittoAvatarModule() {
       </Canvas>
 
       {/* ── HUD Overlay ── */}
-      <div className={styles.hud}>
-        {/* Status pills */}
-        <div className={styles.statusBar}>
-          <span
-            className={`${styles.pill} ${isConnected ? styles.pillGreen : styles.pillRed}`}
-          >
-            <span className={styles.dot} />
-            {isConnected ? 'Connected' : 'Disconnected'}
-          </span>
-
-          {isPlaying && (
-            <span className={`${styles.pill} ${styles.pillPurple}`}>
-              <span className={`${styles.dot} ${styles.dotPulse}`} />
-              Speaking
+      {!controlled && (
+        <div className={styles.hud}>
+          {/* Status pills */}
+          <div className={styles.statusBar}>
+            <span
+              className={`${styles.pill} ${isConnected ? styles.pillGreen : styles.pillRed}`}
+            >
+              <span className={styles.dot} />
+              {isConnected ? 'Connected' : 'Disconnected'}
             </span>
+
+            {isPlaying && (
+              <span className={`${styles.pill} ${styles.pillPurple}`}>
+                <span className={`${styles.dot} ${styles.dotPulse}`} />
+                Speaking
+              </span>
+            )}
+          </div>
+
+          {/* Init button ── */}
+          {!audioInitialized && (
+            <button className={styles.initButton} onClick={handleInit}>
+              <span className={styles.initIcon}>▶</span>
+              Connect &amp; Initialize Audio
+            </button>
+          )}
+
+          {/* Live Test Speech Panel */}
+          {audioInitialized && isConnected && (
+            <form className={styles.testConsole} onSubmit={handleTestSpeak}>
+              <input
+                type="text"
+                className={styles.testInput}
+                value={testText}
+                onChange={(e) => setTestText(e.target.value)}
+                placeholder="Type test text here..."
+                disabled={isPlaying}
+              />
+              <button type="submit" className={styles.testButton} disabled={isPlaying || !testText.trim()}>
+                {isPlaying ? 'Speaking...' : 'Test Speech'}
+              </button>
+            </form>
+          )}
+
+          {audioInitialized && !isConnected && (
+            <p className={styles.hint}>
+              Waiting for streaming-service on <code>localhost:8001</code>&hellip;
+            </p>
           )}
         </div>
-
-        {/* Init button ── */}
-        {!audioInitialized && (
-          <button className={styles.initButton} onClick={handleInit}>
-            <span className={styles.initIcon}>▶</span>
-            Connect &amp; Initialize Audio
-          </button>
-        )}
-
-        {/* Live Test Speech Panel */}
-        {audioInitialized && isConnected && (
-          <form className={styles.testConsole} onSubmit={handleTestSpeak}>
-            <input
-              type="text"
-              className={styles.testInput}
-              value={testText}
-              onChange={(e) => setTestText(e.target.value)}
-              placeholder="Type test text here..."
-              disabled={isPlaying}
-            />
-            <button type="submit" className={styles.testButton} disabled={isPlaying || !testText.trim()}>
-              {isPlaying ? 'Speaking...' : 'Test Speech'}
-            </button>
-          </form>
-        )}
-
-        {audioInitialized && !isConnected && (
-          <p className={styles.hint}>
-            Waiting for streaming-service on <code>localhost:8001</code>&hellip;
-          </p>
-        )}
-      </div>
+      )}
     </div>
   );
 }

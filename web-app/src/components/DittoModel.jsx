@@ -33,6 +33,8 @@ export function DittoModel({
   position = [0, 0, 0],
   scale    = [1, 1, 1],
   rotation = [0, 0, 0],
+  isListening = false,
+  isThinking = false,
 }) {
   const { scene } = useGLTF('/models/avatar.glb');
 
@@ -270,11 +272,14 @@ export function DittoModel({
     if (headBoneRef.current) {
       const bone = headBoneRef.current;
 
-      // Pitch adjustment: Base posture adjustment to positive +8.5 degrees
-      // (relative to original GLB rotation) to rotate the head forward (downward)
-      // blended with reactive audio-driven nods of up to ~3.5 degrees (0.06 rad).
       const baseRotationX  = originalHeadRotationXRef.current || 0;
-      const tiltCorrection = THREE.MathUtils.degToRad(8.5);
+      let tiltCorrection = THREE.MathUtils.degToRad(8.5);
+      
+      // Attentive tilt when listening
+      if (isListening) {
+        tiltCorrection += THREE.MathUtils.degToRad(4.0); // Tilt slightly more forward
+      }
+      
       const nodPitch       = (volumeEnvRef.current - 0.25) * 0.06;
 
       bone.rotation.x = THREE.MathUtils.lerp(
@@ -283,11 +288,25 @@ export function DittoModel({
         1 - Math.pow(0.05, delta)
       );
 
-      // Yaw: gentle idle sway left-right at ~0.07 Hz (very subtle)
-      const swayYaw = Math.sin(elapsed * 0.44) * 0.015;
+      // Yaw: gentle idle sway
+      // If thinking, sway is slightly more pronounced and slower (confused/pondering look)
+      const swayFreq = isThinking ? 0.25 : 0.44;
+      const swayAmp = isThinking ? 0.045 : 0.015;
+      const swayYaw = Math.sin(elapsed * swayFreq) * swayAmp;
+      
       bone.rotation.y = THREE.MathUtils.lerp(
         bone.rotation.y,
         swayYaw,
+        1 - Math.pow(0.1, delta)
+      );
+
+      // Roll: subtle head roll sway when thinking
+      const rollFreq = 0.35;
+      const rollAmp = isThinking ? 0.05 : 0;
+      const rollAngle = Math.sin(elapsed * rollFreq) * rollAmp;
+      bone.rotation.z = THREE.MathUtils.lerp(
+        bone.rotation.z,
+        rollAngle,
         1 - Math.pow(0.1, delta)
       );
     }
@@ -312,7 +331,8 @@ export function DittoModel({
           if (b.value <= 0) {
             b.phase    = 'idle';
             b.timer    = 0;
-            b.nextTime = 2.5 + Math.random() * 3.0;
+            // Reduce blink frequency when listening to show focus
+            b.nextTime = (2.5 + Math.random() * 3.0) * (isListening ? 2 : 1);
           }
           break;
         default:
