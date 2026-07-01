@@ -49,19 +49,25 @@
 /* ── Content ── */
 .content {
   max-width: 900px;
-  margin: 0 auto;
-  padding: 3rem 2rem;
+  width: 100%;
+  margin: auto;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  flex-grow: 1;
 }
 
 .titleSection {
-  margin-bottom: 2.5rem;
+  margin-bottom: 2rem;
   text-align: center;
 }
 
 .titleSection h1 {
-  font-size: 2rem;
+  font-size: 2.25rem;
   font-weight: 800;
   color: #0f172a;
+  letter-spacing: -0.025em;
 }
 
 .subtitle {
@@ -74,12 +80,12 @@
 .formSection {
   background-color: #ffffff;
   border: 1px solid #e2e8f0;
-  border-radius: 0.75rem;
+  border-radius: 1rem;
   padding: 2.5rem;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.01);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1.75rem;
 }
 
 .inputGroup {
