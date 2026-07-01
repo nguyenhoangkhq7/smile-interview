@@ -44,7 +44,7 @@ export interface SessionHistoryItem {
   actionableSuggestions?: string[];
 }
 
-const STORAGE_KEY = 'ditto_interview_history';
+const STORAGE_KEY = 'interviewer_interview_history';
 
 // Helper to simulate network latency
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));

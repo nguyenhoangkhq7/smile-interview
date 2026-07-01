@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { Calendar, FileText, FolderOpen, Plus } from 'lucide-react';
 import { historyService, SessionHistoryItem } from '@/services/historyService';
 import styles from './history.module.css';
 
@@ -74,8 +75,8 @@ export default function HistoryPage() {
             <h1>Lịch sử luyện tập</h1>
             <p className={styles.subtitle}>Danh sách các buổi phỏng vấn giả lập của bạn với trợ lý AI</p>
           </div>
-          <Link href="/interview/new" className={styles.primaryButton}>
-            <span>+</span> Bắt đầu phỏng vấn mới
+          <Link href="/interview/new" className={styles.primaryButton} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+            <Plus size={16} /> Bắt đầu phỏng vấn mới
           </Link>
         </div>
 
@@ -95,7 +96,9 @@ export default function HistoryPage() {
         ) : sessions.length === 0 ? (
           /* Empty State */
           <div className={styles.emptyState}>
-            <div className={styles.emptyIcon}>📂</div>
+            <div className={styles.emptyIcon}>
+              <FolderOpen size={48} style={{ color: '#94a3b8' }} />
+            </div>
             <h2>Chưa có lịch sử phỏng vấn</h2>
             <p>
               Hãy tải lên CV và Mô tả công việc (JD) của bạn để AI phân tích mức độ phù hợp và bắt đầu buổi phỏng vấn đầu tiên.
@@ -115,14 +118,14 @@ export default function HistoryPage() {
                     <span className={styles.typeBadge}>Kỹ thuật (Technical)</span>
                   </div>
                   <div className={styles.cardMeta}>
-                    <div className={styles.metaItem}>
-                      <span>📅</span>
+                    <div className={styles.metaItem} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <Calendar size={14} style={{ color: '#64748b' }} />
                       <span>{formatDate(item.date)}</span>
                     </div>
                     {item.cvFilename && (
-                      <div className={styles.metaItem}>
-                        <span>📄 CV:</span>
-                        <span>{item.cvFilename}</span>
+                      <div className={styles.metaItem} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <FileText size={14} style={{ color: '#64748b' }} />
+                        <span>CV: {item.cvFilename}</span>
                       </div>
                     )}
                   </div>

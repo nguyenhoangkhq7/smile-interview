@@ -5,12 +5,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { cvJdMatchingService, AssessmentResponse } from '@/services/cvJdMatching';
 import { historyService } from '@/services/historyService';
+import { FolderOpen, FileText, Briefcase, CheckCircle, XCircle, Brain, Lightbulb, X, AlertTriangle } from 'lucide-react';
 import styles from './new.module.css';
 
 export default function NewInterviewPage() {
   const router = useRouter();
   const [roleTitle, setRoleTitle] = useState('React Frontend Engineer');
-  
+
   // Files
   const [cvFile, setCvFile] = useState<File | null>(null);
   const [jdFile, setJdFile] = useState<File | null>(null);
@@ -113,7 +114,7 @@ export default function NewInterviewPage() {
 
     setUploading(true);
     setApiError(null);
-    
+
     // Simulate upload progress
     let progress = 0;
     const interval = setInterval(() => {
@@ -121,7 +122,7 @@ export default function NewInterviewPage() {
       if (progress >= 100) {
         clearInterval(interval);
         setUploadProgress(100);
-        
+
         // Start API pipeline
         setTimeout(async () => {
           setUploading(false);
@@ -162,7 +163,7 @@ export default function NewInterviewPage() {
         cvFile ? cvFile.name : 'CV_Upload.pdf',
         jdInputType === 'file' && jdFile ? jdFile.name : 'JD_Pasted_Text.txt'
       );
-      
+
       // Store full assessment evaluation context into history (so Result page can view it later)
       const currentSession = await historyService.getSessionById(assessment.sessionId);
       if (currentSession) {
@@ -253,7 +254,7 @@ export default function NewInterviewPage() {
                     onDrop={(e) => handleDrop(e, 'cv')}
                     onClick={() => triggerFileSelect('cv')}
                   >
-                    <span className={styles.uploadIcon}>📁</span>
+                    <FolderOpen size={48} className={styles.uploadIcon} style={{ color: '#6366f1', marginBottom: '1rem' }} />
                     <p className={styles.dropzoneText}>
                       Kéo thả CV hoặc <span className={styles.browseLink}>chọn tệp</span>
                     </p>
@@ -269,16 +270,20 @@ export default function NewInterviewPage() {
                 ) : (
                   <div className={styles.fileCard}>
                     <div className={styles.fileInfo}>
-                      <span className={styles.fileIcon}>📄</span>
+                      <FileText size={24} className={styles.fileIcon} style={{ color: '#6366f1', marginRight: '8px' }} />
                       <div>
                         <p className={styles.fileName}>{cvFile.name}</p>
                         <p className={styles.fileSize}>{(cvFile.size / 1024 / 1024).toFixed(2)} MB</p>
                       </div>
                     </div>
-                    <button className={styles.removeBtn} onClick={() => setCvFile(null)}>✕</button>
+                    <button className={styles.removeBtn} onClick={() => setCvFile(null)}><X size={14} /></button>
                   </div>
                 )}
-                {cvError && <span className={styles.errorText}>⚠️ {cvError}</span>}
+                {cvError && (
+                  <span className={styles.errorText} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <AlertTriangle size={12} /> {cvError}
+                  </span>
+                )}
               </div>
 
               {/* JD Upload / Text Area */}
@@ -309,7 +314,7 @@ export default function NewInterviewPage() {
                         onDrop={(e) => handleDrop(e, 'jd')}
                         onClick={() => triggerFileSelect('jd')}
                       >
-                        <span className={styles.uploadIcon}>💼</span>
+                        <Briefcase size={48} className={styles.uploadIcon} style={{ color: '#6366f1', marginBottom: '1rem' }} />
                         <p className={styles.dropzoneText}>
                           Kéo thả JD hoặc <span className={styles.browseLink}>chọn tệp</span>
                         </p>
@@ -325,13 +330,13 @@ export default function NewInterviewPage() {
                     ) : (
                       <div className={styles.fileCard}>
                         <div className={styles.fileInfo}>
-                          <span className={styles.fileIcon} style={{ color: '#3b82f6' }}>📄</span>
+                          <FileText size={24} className={styles.fileIcon} style={{ color: '#3b82f6', marginRight: '8px' }} />
                           <div>
                             <p className={styles.fileName}>{jdFile.name}</p>
                             <p className={styles.fileSize}>{(jdFile.size / 1024 / 1024).toFixed(2)} MB</p>
                           </div>
                         </div>
-                        <button className={styles.removeBtn} onClick={() => setJdFile(null)}>✕</button>
+                        <button className={styles.removeBtn} onClick={() => setJdFile(null)}><X size={14} /></button>
                       </div>
                     )
                   ) : (
@@ -342,7 +347,11 @@ export default function NewInterviewPage() {
                       placeholder="Dán toàn bộ nội dung bản mô tả công việc (JD) vào đây..."
                     />
                   )}
-                  {jdError && <span className={styles.errorText}>⚠️ {jdError}</span>}
+                  {jdError && (
+                    <span className={styles.errorText} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <AlertTriangle size={12} /> {jdError}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -430,7 +439,10 @@ export default function NewInterviewPage() {
             <div className={styles.skillsSection}>
               {/* Matched Skills */}
               <div className={styles.skillsCol}>
-                <h3><span>✓</span> Kỹ năng phù hợp</h3>
+                <h3 style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <CheckCircle size={18} style={{ color: '#10b981' }} />
+                  <span>Kỹ năng phù hợp</span>
+                </h3>
                 <div className={styles.skillsList}>
                   {assessment.skillsAnalysis.analysis ? (
                     // In a real database we have specific fields, let's extract keywords or use mock
@@ -447,7 +459,10 @@ export default function NewInterviewPage() {
 
               {/* Missing Skills */}
               <div className={styles.skillsCol}>
-                <h3><span>✗</span> Kỹ năng còn thiếu (Cần cải thiện)</h3>
+                <h3 style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <XCircle size={18} style={{ color: '#f59e0b' }} />
+                  <span>Kỹ năng còn thiếu (Cần cải thiện)</span>
+                </h3>
                 <div className={styles.skillsList}>
                   {assessment.skillsAnalysis.criticalMissingSkills.map((skill, index) => (
                     <span key={index} className={`${styles.skillBadge} ${styles.skillMissing}`}>
@@ -460,13 +475,19 @@ export default function NewInterviewPage() {
 
             {/* In-depth Evaluation */}
             <div className={styles.evaluationBox}>
-              <h3>📊 Nhận xét chi tiết từ AI</h3>
+              <h3 style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Brain size={18} style={{ color: '#4f46e5' }} />
+                <span>Nhận xét chi tiết từ AI</span>
+              </h3>
               <p>{assessment.skillsAnalysis.analysis}</p>
             </div>
 
             {/* Suggestions for interview */}
             <div className={styles.evaluationBox} style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
-              <h3>💡 Lời khuyên chuẩn bị phỏng vấn</h3>
+              <h3 style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Lightbulb size={18} style={{ color: '#eab308' }} />
+                <span>Lời khuyên chuẩn bị phỏng vấn</span>
+              </h3>
               <ul className={styles.suggestionsList}>
                 {assessment.actionableSuggestions.map((suggestion, index) => (
                   <li key={index}>{suggestion}</li>
@@ -476,10 +497,10 @@ export default function NewInterviewPage() {
 
             <div className={styles.formActions}>
               <button className={styles.secondaryButton} onClick={handleReset}>
-                Làm lại (Tải lên file khác)
+                Quay lại
               </button>
               <button className={styles.primaryButton} onClick={handleContinueToSelection}>
-                Tiếp tục chọn loại hình phỏng vấn ➔
+                Tiếp tục phỏng vấn ➔
               </button>
             </div>
           </div>

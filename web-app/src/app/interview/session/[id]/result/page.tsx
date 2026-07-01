@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
+import { FolderOpen, Target, Briefcase, Wrench, Lightbulb, AlertTriangle, MessageSquare, BarChart3, CheckCircle2, XCircle } from 'lucide-react';
 import { historyService, SessionHistoryItem } from '@/services/historyService';
 import styles from './result.module.css';
 
@@ -84,8 +85,8 @@ export default function InterviewResultPage() {
           </Link>
         </header>
         <div style={{ display: 'flex', minHeight: '80vh', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', textAlign: 'center' }}>
-          <span style={{ fontSize: '3rem' }}>📂</span>
-          <h2 style={{ fontSize: '1.25rem', marginTop: '1rem', fontWeight: 700 }}>Không tìm thấy kết quả phỏng vấn</h2>
+          <FolderOpen size={48} style={{ color: '#94a3b8' }} />
+          <h2 style={{ fontSize: '1.25rem', marginTop: '1.25rem', fontWeight: 700 }}>Không tìm thấy kết quả phỏng vấn</h2>
           <p style={{ color: '#64748b', fontSize: '0.95rem', margin: '0.5rem 0 1.5rem 0', maxWidth: '360px' }}>
             Buổi phỏng vấn này không tồn tại hoặc dữ liệu đã bị xóa khỏi thiết bị.
           </p>
@@ -138,7 +139,7 @@ export default function InterviewResultPage() {
       <main className={styles.content}>
         <div className={styles.titleSection}>
           <h1>Kết quả đánh giá chi tiết</h1>
-          <p className={styles.subtitle}>Báo cáo phân tích năng lực được tự động tạo bởi trợ lý ảo Ditto AI</p>
+          <p className={styles.subtitle}>Báo cáo phân tích năng lực được tự động tạo bởi trợ lý ảo AI</p>
         </div>
 
         {/* ── Summary Section Card ── */}
@@ -161,7 +162,10 @@ export default function InterviewResultPage() {
 
           <div className={styles.evalGrid}>
             <div className={styles.evalBox}>
-              <h3>🎯 Độ tương thích năng lực: {competencyScore}%</h3>
+              <h3 style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Target size={18} style={{ color: '#4f46e5' }} />
+                <span>Độ tương thích năng lực: {competencyScore}%</span>
+              </h3>
               <p>{analysisText}</p>
 
               <div style={{ marginTop: '1rem' }}>
@@ -177,17 +181,26 @@ export default function InterviewResultPage() {
             </div>
 
             <div className={styles.evalBox}>
-              <h3>💼 Đánh giá kinh nghiệm chuyên môn</h3>
+              <h3 style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Briefcase size={18} style={{ color: '#4f46e5' }} />
+                <span>Đánh giá kinh nghiệm chuyên môn</span>
+              </h3>
               <p>{experienceEvaluation}</p>
             </div>
 
             <div className={styles.evalBox}>
-              <h3>🛠️ Đánh giá năng lực dự án</h3>
+              <h3 style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Wrench size={18} style={{ color: '#4f46e5' }} />
+                <span>Đánh giá năng lực dự án</span>
+              </h3>
               <p>{projectEvaluation}</p>
             </div>
 
             <div className={styles.evalBox}>
-              <h3>💡 Lộ trình cải thiện hành động</h3>
+              <h3 style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Lightbulb size={18} style={{ color: '#4f46e5' }} />
+                <span>Lộ trình cải thiện hành động</span>
+              </h3>
               <ul className={styles.actionList}>
                 {actionableSuggestions.map((item, index) => (
                   <li key={index}>{item}</li>
@@ -203,7 +216,7 @@ export default function InterviewResultPage() {
 
           {session.questions.length === 0 ? (
             <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '0.75rem', padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
-              <span style={{ fontSize: '2rem' }}>⚠️</span>
+              <AlertTriangle size={32} style={{ color: '#eab308', margin: '0 auto' }} />
               <p style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>Không có câu hỏi nào được trả lời trong phiên phỏng vấn này.</p>
             </div>
           ) : (
@@ -241,28 +254,43 @@ export default function InterviewResultPage() {
                       <div className={styles.accordionBody}>
                         {/* Candidate Answer */}
                         <div className={styles.sectionBlock}>
-                          <h4>🗣️ Câu trả lời của bạn</h4>
+                          <h4 style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <MessageSquare size={16} style={{ color: '#4f46e5' }} />
+                            <span>Câu trả lời của bạn</span>
+                          </h4>
                           <p className={styles.userAnswerText}>{q.answer}</p>
                         </div>
 
                         {/* AI Strengths & Improvements */}
                         <div className={styles.sectionBlock}>
-                          <h4>📊 Phân tích câu trả lời của AI</h4>
+                          <h4 style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <BarChart3 size={16} style={{ color: '#4f46e5' }} />
+                            <span>Phân tích câu trả lời của AI</span>
+                          </h4>
                           <div className={styles.aiFeedbackGrid}>
                             <div className={`${styles.feedbackBox} ${styles.feedbackStrength}`}>
-                              <strong style={{ display: 'block', marginBottom: '0.25rem' }}>✓ Điểm mạnh:</strong>
-                              {q.strengths}
+                              <strong style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', marginBottom: '0.25rem' }}>
+                                <CheckCircle2 size={14} style={{ color: '#10b981' }} />
+                                <span>Điểm mạnh:</span>
+                              </strong>
+                              <div>{q.strengths}</div>
                             </div>
                             <div className={`${styles.feedbackBox} ${styles.feedbackImprovement}`}>
-                              <strong style={{ display: 'block', marginBottom: '0.25rem' }}>✗ Cần cải thiện:</strong>
-                              {q.improvements}
+                              <strong style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', marginBottom: '0.25rem' }}>
+                                <XCircle size={14} style={{ color: '#f59e0b' }} />
+                                <span>Cần cải thiện:</span>
+                              </strong>
+                              <div>{q.improvements}</div>
                             </div>
                           </div>
                         </div>
 
                         {/* Suggested Answer */}
                         <div className={styles.sectionBlock}>
-                          <h4>💡 Gợi ý câu trả lời tốt hơn từ AI</h4>
+                          <h4 style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <Lightbulb size={16} style={{ color: '#4f46e5' }} />
+                            <span>Gợi ý câu trả lời tốt hơn từ AI</span>
+                          </h4>
                           <div className={styles.suggestedAnswerBox}>
                             {q.suggestedAnswer}
                           </div>

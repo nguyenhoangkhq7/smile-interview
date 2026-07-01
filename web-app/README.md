@@ -1,6 +1,6 @@
-# Ditto — AI Mock Interview Platform Frontend
+# Interviewer — AI Mock Interview Platform Frontend
 
-This is the frontend of the AI Mock Interview Platform built with Next.js (App Router, TypeScript) and styled with Vanilla CSS Modules. It connects with `matching-service` (Spring Boot) and `streaming-service` (Node.js/Socket.IO) to deliver an E2E interactive mock interview experience with a 3D avatar.
+This is the frontend of the AI Mock Interview Platform built with Next.js (App Router, TypeScript) and styled with Vanilla CSS Modules. Real-time 3D WebGL Avatar using React Three Fiber and Web Audio API for heuristic lip-syncing. It connects with `matching-service` (Spring Boot) and `streaming-service` (Node.js/Socket.IO) to deliver an E2E interactive mock interview experience with a 3D avatar.
 
 ---
 
@@ -47,5 +47,5 @@ Open [http://localhost:3000](http://localhost:3000) to view the history dashboar
 
 ## 📁 Key Directories & Architecture
 *   `src/app/`: Next.js App Router folders defining pages, layouts, and API proxy endpoints (such as `/api/matching/` to forward file uploads server-to-server).
-*   `src/components/`: Reusable React components including the refactored controlled `DittoAvatarModule` and Three.js canvas-driving `DittoModel`.
+*   `src/components/`: Reusable React components including the refactored controlled `InterviewerAvatar` and Three.js canvas-driving `InterviewerModel`.
 *   `src/services/`: Isolated services layer. Includes `historyService.ts` (async browser history persistence), `cvJdMatching.ts` (API client), and `questionService.ts` (interviewer heuristic state machine).

@@ -6,7 +6,7 @@ import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 
 /**
- * DittoModel
+ * InterviewerModel
  *
  * Loads a ReadyPlayerMe-compatible GLB avatar and drives:
  *   1. Multi-band lip-sync  — 3 frequency bands → 3 mouth shape categories.
@@ -28,7 +28,7 @@ import * as THREE from 'three';
  * @param {number[]}          [props.scale]
  * @param {number[]}          [props.rotation]
  */
-export function DittoModel({
+export function InterviewerModel({
   analyser,
   position = [0, 0, 0],
   scale    = [1, 1, 1],
@@ -153,7 +153,7 @@ export function DittoModel({
           headBoneRef.current = node;
           originalHeadRotationXRef.current = node.rotation.x;
           console.info(
-            '[DittoModel] Head/neck bone found for alignment:', 
+            '[InterviewerModel] Head/neck bone found for alignment:', 
             node.name, 
             'original X rotation:', 
             node.rotation.x

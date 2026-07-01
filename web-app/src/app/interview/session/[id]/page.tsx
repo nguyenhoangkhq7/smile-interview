@@ -4,9 +4,33 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { io, Socket } from 'socket.io-client';
-import { DittoAvatarModule } from '@/components/DittoAvatarModule';
+import { InterviewerAvatar } from '@/components/InterviewerAvatar';
 import { historyService, SessionHistoryItem, QuestionFeedback } from '@/services/historyService';
 import { questionService } from '@/services/questionService';
+import { useSessionRecorder } from '@/hooks/useSessionRecorder';
+import {
+  Camera,
+  CameraOff,
+  Mic,
+  MicOff,
+  Timer,
+  Info,
+  Download,
+  PhoneOff,
+  ListOrdered,
+  MessageSquare,
+  Keyboard,
+  CornerDownRight,
+  Radio,
+  Copy,
+  Circle,
+  Video,
+  VideoOff,
+  Volume2,
+  Play,
+  Send,
+  X
+} from 'lucide-react';
 import styles from './session.module.css';
 
 type SessionState = 'INITIALIZING' | 'AI_SPEAKING' | 'LISTENING' | 'CONFIRM_ANSWER' | 'AI_THINKING' | 'FINISHED';
@@ -62,6 +86,14 @@ export default function InterviewSessionPage() {
   // Audio playing singletons for TTS Mock Mode
   const mockAnalyserIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Video recording hook & Finished screen states
+  const { startRecording, stopRecording, isRecording, recordedBlob, recordingDurationMs } = useSessionRecorder(mediaStream);
+  const [showInfoBanner, setShowInfoBanner] = useState(true);
+  const [showShortcutTip, setShowShortcutTip] = useState(false);
+
+  // Simulated streaming STT state
+  const [isRevealing, setIsRevealing] = useState(false);
+
   // Scroll to bottom of chat transcript
   const scrollToBottom = useCallback(() => {
     transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -70,6 +102,247 @@ export default function InterviewSessionPage() {
   useEffect(() => {
     scrollToBottom();
   }, [chatLog, scrollToBottom]);
+
+  // Keyboard shortcut hint toast on mount
+  useEffect(() => {
+    const shown = sessionStorage.getItem('si-shortcut-hint-shown');
+    if (shown !== 'true') {
+      setShowShortcutTip(true);
+      const timer = setTimeout(() => {
+        setShowShortcutTip(false);
+        sessionStorage.setItem('si-shortcut-hint-shown', 'true');
+      }, 6000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  // ── Server-Sent Events (SSE) streaming reveal for online STT ──
+  const streamTranscript = useCallback((fullText: string) => {
+    setIsRevealing(true);
+    setUserAnswerDraft('');
+    setSessionState('LISTENING');
+
+    const streamingUrl = process.env.NEXT_PUBLIC_STREAMING_SERVICE_URL || 'http://localhost:8001';
+    const sseUrl = `${streamingUrl}/api/v1/audio/stream-transcribe?text=${encodeURIComponent(fullText)}`;
+
+    let eventSource: EventSource | null = null;
+    let fallbackInterval: NodeJS.Timeout | null = null;
+
+    const runFallback = () => {
+      if (fallbackInterval) return;
+      console.warn('[SSE] EventSource failed or unsupported. Falling back to client-side streaming reveal.');
+      const words = fullText.split(' ');
+      let currentWordIndex = 0;
+      let currentText = '';
+      fallbackInterval = setInterval(() => {
+        if (currentWordIndex < words.length) {
+          currentText += (currentWordIndex === 0 ? '' : ' ') + words[currentWordIndex];
+          setUserAnswerDraft(currentText);
+          currentWordIndex++;
+        } else {
+          if (fallbackInterval) clearInterval(fallbackInterval);
+          setIsRevealing(false);
+          setSessionState('CONFIRM_ANSWER');
+        }
+      }, 80);
+    };
+
+    try {
+      eventSource = new EventSource(sseUrl);
+      let currentText = '';
+
+      eventSource.onmessage = (event) => {
+        const data = event.data;
+        if (data === '[START]') {
+          setUserAnswerDraft('');
+        } else if (data === '[END]') {
+          if (eventSource) eventSource.close();
+          setIsRevealing(false);
+          setSessionState('CONFIRM_ANSWER');
+        } else {
+          currentText += (currentText === '' ? '' : ' ') + data;
+          setUserAnswerDraft(currentText);
+        }
+      };
+
+      eventSource.onerror = () => {
+        if (eventSource) eventSource.close();
+        runFallback();
+      };
+    } catch (e) {
+      runFallback();
+    }
+  }, []);
+
+  // POST fallback if socket STT drops
+  const uploadAudioBlob = useCallback(async (blob: Blob) => {
+    try {
+      const formData = new FormData();
+      formData.append('audio', blob, 'recording.webm');
+      const streamingUrl = process.env.NEXT_PUBLIC_STREAMING_SERVICE_URL || 'http://localhost:8001';
+
+      const res = await fetch(`${streamingUrl}/api/v1/audio/transcribe`, {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!res.ok) throw new Error('API transcribe failed');
+      const data = await res.json();
+      streamTranscript(data.text || '');
+    } catch (err) {
+      console.error('[Session] Ingestion fallback failed:', err);
+      setUserAnswerDraft('[Lỗi kết nối. Không thể nhận diện. Vui lòng điền câu trả lời.]');
+      setSessionState('CONFIRM_ANSWER');
+    }
+  }, [streamTranscript]);
+
+  // TODO: extract STT/TTS logic into src/services/speechService.ts for testability and reuse
+  // ── 5. User Recording & Transcribing (STT Interface & Fallback) ──
+  const handleStartRecording = useCallback(async () => {
+    setUserAnswerDraft('');
+    audioChunksRef.current = [];
+    setRecording(true);
+
+    if (sttMode === 'online' && mediaStream) {
+      // Online mode: record chunks
+      try {
+        const audioTracks = mediaStream.getAudioTracks();
+        if (audioTracks.length === 0) {
+          throw new Error('Không tìm thấy thiết bị Microphone.');
+        }
+        const audioStream = new MediaStream(audioTracks);
+
+        let options = {};
+        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+          options = { mimeType: 'audio/webm;codecs=opus' };
+        } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+          options = { mimeType: 'audio/webm' };
+        }
+
+        const recorder = new MediaRecorder(audioStream, options);
+        mediaRecorderRef.current = recorder;
+
+        recorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) {
+            audioChunksRef.current.push(e.data);
+          }
+        };
+
+        recorder.onstop = async () => {
+          setSessionState('AI_THINKING');
+          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+
+          // Send raw array buffer to Socket.IO transcription endpoint
+          const buffer = await audioBlob.arrayBuffer();
+          if (socketRef.current?.connected) {
+            console.log('[Session] Sending audio buffer to STT socket...');
+            socketRef.current.emit('process-stt', buffer);
+          } else {
+            // Socket disconnected mid-recording, fallback to fetch
+            uploadAudioBlob(audioBlob);
+          }
+        };
+
+        recorder.start();
+      } catch (err) {
+        console.error('Failed to start MediaRecorder:', err);
+        setRecording(false);
+      }
+    } else {
+      // Offline mode: Web Speech API webkitSpeechRecognition (already streams interim word-by-word)
+      console.log('[Session] Starting webkitSpeechRecognition in mock mode...');
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        const rec = new SpeechRecognition();
+        rec.lang = 'vi-VN';
+        rec.interimResults = true;
+        rec.continuous = true;
+        finalTranscriptRef.current = '';
+        setUserAnswerDraft('');
+
+        rec.onresult = (event: any) => {
+          let interimTranscript = '';
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+              finalTranscriptRef.current += event.results[i][0].transcript;
+            } else {
+              interimTranscript += event.results[i][0].transcript;
+            }
+          }
+          // Fulfill live draft text view
+          setUserAnswerDraft(finalTranscriptRef.current + interimTranscript);
+        };
+
+        rec.onerror = (e: any) => {
+          console.error('Speech recognition error:', e);
+        };
+
+        rec.onend = () => {
+          setRecording(false);
+          setSessionState('CONFIRM_ANSWER');
+        };
+
+        speechRecognitionRef.current = rec;
+        rec.start();
+      } else {
+        // Fallback if browser does not support SpeechRecognition
+        console.warn('SpeechRecognition not supported in this browser. Simulating typing answer.');
+        let i = 0;
+        const targetText = 'Tôi nghĩ useMemo và useCallback dùng để tối ưu hóa hiệu năng render trong React. useMemo giúp lưu giữ giá trị của phép tính phức tạp, còn useCallback giúp lưu giữ tham chiếu của callback function nhằm tránh re-render.';
+        const typingInterval = setInterval(() => {
+          setUserAnswerDraft((prev) => prev + targetText.charAt(i));
+          i++;
+          if (i >= targetText.length) {
+            clearInterval(typingInterval);
+            setRecording(false);
+            setSessionState('CONFIRM_ANSWER');
+          }
+        }, 30);
+      }
+    }
+  }, [sttMode, mediaStream, uploadAudioBlob]);
+
+  const handleStopRecording = useCallback(() => {
+    if (sttMode === 'online') {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+    } else {
+      if (speechRecognitionRef.current) {
+        speechRecognitionRef.current.stop();
+      }
+    }
+  }, [sttMode]);
+
+  // Space Bar keyboard shortcut listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        const activeEl = document.activeElement;
+        if (activeEl) {
+          const tag = activeEl.tagName.toUpperCase();
+          if (tag === 'INPUT' || tag === 'TEXTAREA' || activeEl.hasAttribute('contenteditable')) {
+            return;
+          }
+        }
+
+        e.preventDefault(); // Prevent page scrolling
+
+        if (sessionState === 'LISTENING' && !isRevealing) {
+          if (recording) {
+            handleStopRecording();
+          } else {
+            handleStartRecording();
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [sessionState, recording, isRevealing, handleStartRecording, handleStopRecording]);
 
   // ── 1. Init Session Data & Media Permissions ──
   useEffect(() => {
@@ -172,7 +445,7 @@ export default function InterviewSessionPage() {
       setAvatarConnected(true);
       setTtsMode('online');
       setSttMode('online');
-      
+
       // Join interview room
       socket.emit('join-interview', { interviewId: id, userId: 'candidate-user' });
     });
@@ -188,8 +461,7 @@ export default function InterviewSessionPage() {
     // Handle incoming audio transcriptions from server-side STT
     socket.on('stt-result', (data: any) => {
       if (data.status === 'success') {
-        setUserAnswerDraft(data.text);
-        setSessionState('CONFIRM_ANSWER');
+        streamTranscript(data.text);
       } else {
         setUserAnswerDraft('[Không nhận diện được giọng nói. Vui lòng ghi âm lại hoặc nhập tay.]');
         setSessionState('CONFIRM_ANSWER');
@@ -205,8 +477,6 @@ export default function InterviewSessionPage() {
     });
 
     // Wire up TTS audio lip-sync from backend streams
-    // (Note: useAudioLipSync listens directly inside DittoAvatarModule when not controlled,
-    // but here we are in controlled mode, so we handle it at the page level)
     let audioContext: AudioContext | null = null;
     let analyserNode: AnalyserNode | null = null;
     let audioEl: HTMLAudioElement | null = null;
@@ -270,7 +540,7 @@ export default function InterviewSessionPage() {
         audioContext.close();
       }
     };
-  }, [id]);
+  }, [id, streamTranscript]);
 
   // ── 3. Start First Question ──
   const handleStartInterview = async () => {
@@ -306,7 +576,7 @@ export default function InterviewSessionPage() {
     } else {
       // Mock Mode Fallback (Web Speech API speechSynthesis)
       console.log('[Session] Synthesizing speech via native SpeechSynthesis:', text);
-      
+
       // Cancel current playbacks
       window.speechSynthesis.cancel();
       if (mockAnalyserIntervalRef.current) clearInterval(mockAnalyserIntervalRef.current);
@@ -314,17 +584,14 @@ export default function InterviewSessionPage() {
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = 'vi-VN';
 
-      // Find a Vietnamese voice if available
       const voices = window.speechSynthesis.getVoices();
       const viVoice = voices.find(v => v.lang.includes('VI') || v.lang.includes('vi'));
       if (viVoice) utterance.voice = viVoice;
 
-      // Mock Analyser to drive lip-sync mouth movements in offline mode
       const mockAnalyserNode = {
         frequencyBinCount: 128,
         getByteFrequencyData: (array: Uint8Array) => {
           for (let i = 0; i < array.length; i++) {
-            // Generate fluctuating wave-energy to make lips open/close naturally
             array[i] = Math.random() * 160 + 20;
           }
         }
@@ -333,8 +600,7 @@ export default function InterviewSessionPage() {
       utterance.onstart = () => {
         setAvatarPlaying(true);
         setAvatarAnalyser(mockAnalyserNode);
-        
-        // Frequently trigger small variations
+
         mockAnalyserIntervalRef.current = setInterval(() => {
           // Simply triggers useFrame cycles
         }, 100);
@@ -344,7 +610,6 @@ export default function InterviewSessionPage() {
         setAvatarPlaying(false);
         setAvatarAnalyser(null);
         if (mockAnalyserIntervalRef.current) clearInterval(mockAnalyserIntervalRef.current);
-        // Switch to user speaking state
         setSessionState('LISTENING');
       };
 
@@ -356,149 +621,6 @@ export default function InterviewSessionPage() {
       };
 
       window.speechSynthesis.speak(utterance);
-    }
-  };
-
-  // ── 5. User Recording & Transcribing (STT Interface & Fallback) ──
-  const handleStartRecording = async () => {
-    setUserAnswerDraft('');
-    audioChunksRef.current = [];
-    setRecording(true);
-
-    if (sttMode === 'online' && mediaStream) {
-      // Online mode: record chunks
-      try {
-        // Isolate audio tracks to prevent Chrome from throwing NotSupportedError
-        // when using an audio-only mimeType with a video-containing stream.
-        const audioTracks = mediaStream.getAudioTracks();
-        if (audioTracks.length === 0) {
-          throw new Error('Không tìm thấy thiết bị Microphone.');
-        }
-        const audioStream = new MediaStream(audioTracks);
-
-        let options = {};
-        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-          options = { mimeType: 'audio/webm;codecs=opus' };
-        } else if (MediaRecorder.isTypeSupported('audio/webm')) {
-          options = { mimeType: 'audio/webm' };
-        }
-
-        const recorder = new MediaRecorder(audioStream, options);
-        mediaRecorderRef.current = recorder;
-
-        recorder.ondataavailable = (e) => {
-          if (e.data && e.data.size > 0) {
-            audioChunksRef.current.push(e.data);
-          }
-        };
-
-        recorder.onstop = async () => {
-          setSessionState('AI_THINKING');
-          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-          
-          // Send raw array buffer to Socket.IO transcription endpoint
-          const buffer = await audioBlob.arrayBuffer();
-          if (socketRef.current?.connected) {
-            console.log('[Session] Sending audio buffer to STT socket...');
-            socketRef.current.emit('process-stt', buffer);
-          } else {
-            // Socket disconnected mid-recording, fallback to fetch
-            uploadAudioBlob(audioBlob);
-          }
-        };
-
-        recorder.start();
-      } catch (err) {
-        console.error('Failed to start MediaRecorder:', err);
-        setRecording(false);
-      }
-    } else {
-      // Offline mode: Web Speech API webkitSpeechRecognition
-      console.log('[Session] Starting webkitSpeechRecognition in mock mode...');
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        const rec = new SpeechRecognition();
-        rec.lang = 'vi-VN';
-        rec.interimResults = true;
-        rec.continuous = true;
-        finalTranscriptRef.current = '';
-        setUserAnswerDraft('');
-
-        rec.onresult = (event: any) => {
-          let interimTranscript = '';
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
-            if (event.results[i].isFinal) {
-              finalTranscriptRef.current += event.results[i][0].transcript;
-            } else {
-              interimTranscript += event.results[i][0].transcript;
-            }
-          }
-          // Fulfill live draft text view
-          setUserAnswerDraft(finalTranscriptRef.current + interimTranscript);
-        };
-
-        rec.onerror = (e: any) => {
-          console.error('Speech recognition error:', e);
-        };
-
-        rec.onend = () => {
-          setRecording(false);
-          setSessionState('CONFIRM_ANSWER');
-        };
-
-        speechRecognitionRef.current = rec;
-        rec.start();
-      } else {
-        // Fallback if browser does not support SpeechRecognition
-        console.warn('SpeechRecognition not supported in this browser. Simulating typing answer.');
-        // Typing simulation of a technical mock answer
-        let i = 0;
-        const targetText = 'Tôi nghĩ useMemo và useCallback dùng để tối ưu hóa hiệu năng render trong React. useMemo giúp lưu giữ giá trị của phép tính phức tạp, còn useCallback giúp lưu giữ tham chiếu của callback function nhằm tránh re-render.';
-        const typingInterval = setInterval(() => {
-          setUserAnswerDraft((prev) => prev + targetText.charAt(i));
-          i++;
-          if (i >= targetText.length) {
-            clearInterval(typingInterval);
-            setRecording(false);
-            setSessionState('CONFIRM_ANSWER');
-          }
-        }, 30);
-      }
-    }
-  };
-
-  const handleStopRecording = () => {
-    if (sttMode === 'online') {
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-        mediaRecorderRef.current.stop();
-      }
-    } else {
-      if (speechRecognitionRef.current) {
-        speechRecognitionRef.current.stop();
-      }
-    }
-  };
-
-  // POST fallback if socket STT drops
-  const uploadAudioBlob = async (blob: Blob) => {
-    try {
-      const formData = new FormData();
-      formData.append('audio', blob, 'recording.webm');
-      const streamingUrl = process.env.NEXT_PUBLIC_STREAMING_SERVICE_URL || 'http://localhost:8001';
-
-      const res = await fetch(`${streamingUrl}/api/v1/audio/transcribe`, {
-        method: 'POST',
-        body: formData
-      });
-
-      if (!res.ok) throw new Error('API transcribe failed');
-      const data = await res.json();
-      setUserAnswerDraft(data.text || '');
-      setSessionState('CONFIRM_ANSWER');
-    } catch (err) {
-      console.error('[Session] Ingestion fallback failed:', err);
-      setUserAnswerDraft('[Lỗi kết nối. Không thể nhận diện. Vui lòng điền câu trả lời.]');
-      setSessionState('CONFIRM_ANSWER');
     }
   };
 
@@ -562,12 +684,13 @@ export default function InterviewSessionPage() {
   const handleInterviewFinish = async (isTimeout = false) => {
     setSessionState('FINISHED');
     if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-    
+    stopMediaCapture();
+
     try {
       const currentSession = await historyService.getSessionById(id);
       if (currentSession) {
         currentSession.status = 'Completed';
-        
+
         // Calculate average overallScore
         if (currentSession.questions.length > 0) {
           const totalScores = currentSession.questions.reduce((sum, q) => sum + q.score, 0);
@@ -578,17 +701,48 @@ export default function InterviewSessionPage() {
 
         await historyService.saveSession(currentSession);
       }
-      
-      router.push(`/interview/session/${id}/result`);
     } catch (err) {
       console.error('Error completing session:', err);
-      router.push(`/history`);
     }
   };
 
   const handleEndEarlyConfirm = () => {
     setShowExitModal(false);
     handleInterviewFinish(false);
+  };
+
+  // Auto-stop video recording if page transitions to FINISHED
+  useEffect(() => {
+    if (sessionState === 'FINISHED' && isRecording) {
+      stopRecording();
+    }
+  }, [sessionState, isRecording, stopRecording]);
+
+  const handleToggleSessionRecording = () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  };
+
+  const handleDownloadVideo = () => {
+    if (!recordedBlob) return;
+    const url = URL.createObjectURL(recordedBlob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = `smile-interview-${id}-${new Date().toISOString().slice(0, 10)}.webm`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 100);
+  };
+
+  const handleGoToResults = () => {
+    router.push(`/interview/session/${id}/result`);
   };
 
   // Timer format (mm:ss)
@@ -598,30 +752,125 @@ export default function InterviewSessionPage() {
     return `${mins.toString().padStart(2, '0')}:${remaining.toString().padStart(2, '0')}`;
   };
 
-  const isTimerUrgent = timeLeft < 120; // 2 minutes
+  const formatDuration = (ms: number) => {
+    const totalSecs = Math.floor(ms / 1000);
+    const mins = Math.floor(totalSecs / 60);
+    const secs = totalSecs % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Timer colors
+  const getTimerClass = () => {
+    if (timeLeft <= 60) return `${styles.timerDisplay} ${styles.timerUrgent}`;
+    if (timeLeft <= 180) return `${styles.timerDisplay} ${styles.timerWarning}`;
+    return styles.timerDisplay;
+  };
+
+  const getAiStatusChip = () => {
+    if (sessionState === 'AI_SPEAKING') {
+      return (
+        <div className={styles.cornerChip}>
+          <Volume2 size={16} className={styles.dotSpeaking} style={{ animation: 'pulseDot 1s infinite alternate' }} />
+          <span>NGƯỜI PHỎNG VẤN (AI) — Đang nói</span>
+        </div>
+      );
+    }
+    if (sessionState === 'LISTENING') {
+      return (
+        <div className={styles.cornerChip}>
+          <Radio size={16} className={styles.dotListening} />
+          <span>NGƯỜI PHỎNG VẤN (AI) — Đang lắng nghe</span>
+        </div>
+      );
+    }
+    if (sessionState === 'AI_THINKING') {
+      return (
+        <div className={styles.cornerChip}>
+          <Timer size={16} className={styles.dotThinking} />
+          <span>NGƯỜI PHỎNG VẤN (AI) — Đang suy nghĩ</span>
+        </div>
+      );
+    }
+    return (
+      <div className={styles.cornerChip}>
+        <Circle size={16} style={{ color: '#94a3b8' }} />
+        <span>NGƯỜI PHỎNG VẤN (AI)</span>
+      </div>
+    );
+  };
+
+  // ── Render FINISHED Screen (Option a) ──
+  if (sessionState === 'FINISHED') {
+    return (
+      <div className={styles.container}>
+        {/* Header */}
+        <header className={styles.header}>
+          <div className={styles.headerLeft}>
+            <h1>Phỏng vấn Kỹ thuật</h1>
+            <p>
+              {session ? `Vị trí: ${session.roleTitle}` : 'Đang thiết lập...'}
+            </p>
+          </div>
+        </header>
+
+        <main className={styles.mainGrid}>
+          <div className={styles.finishedScreen}>
+            <h2 className={styles.finishedTitle}>Buổi phỏng vấn đã hoàn thành!</h2>
+            <p className={styles.finishedDesc}>
+              Cảm ơn bạn đã tham gia buổi phỏng vấn giả lập trực tuyến. Bạn có thể lưu trữ video ghi hình buổi phỏng vấn (bao gồm webcam và mic của bạn) dưới đây để phục vụ tự đánh giá.
+            </p>
+
+            {recordedBlob && (
+              <div className={styles.downloadRow}>
+                <button className={styles.secondaryBtn} onClick={handleDownloadVideo}>
+                  <Download size={18} />
+                  <span>Tải video cuộc phỏng vấn</span>
+                </button>
+
+                {showInfoBanner && (
+                  <div className={styles.infoBanner}>
+                    <Info size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <span>
+                      Video chỉ chứa hình ảnh và giọng nói của bạn. Cuộc trò chuyện với AI không được ghi lại trong file video.
+                    </span>
+                    <button className={styles.infoBannerBtnDismiss} onClick={() => setShowInfoBanner(false)}>
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <button
+              className={styles.primaryBtn}
+              style={{ marginTop: '1.5rem', backgroundColor: '#4f46e5' }}
+              onClick={handleGoToResults}
+            >
+              <span>Xem báo cáo kết quả đánh giá ➔</span>
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.container}>
+      {/* Shortcut Warning Banner */}
+      {showShortcutTip && (
+        <div className={styles.shortcutToast}>
+          <Keyboard size={16} />
+          <span>Mẹo: Nhấn phím Space để bật/tắt ghi âm câu trả lời khi đến lượt của bạn.</span>
+        </div>
+      )}
+
       {/* Header */}
       <header className={styles.header}>
         <div className={styles.headerLeft}>
-          <h1>Phỏng vấn Kỹ thuật Mock</h1>
+          <h1>Phỏng vấn Kỹ thuật</h1>
           <p>
             {session ? `Vị trí: ${session.roleTitle}` : 'Đang thiết lập...'}
           </p>
-        </div>
-
-        <div className={styles.headerRight}>
-          <span className={styles.progressLabel}>Câu hỏi {questionCount} / 5</span>
-          
-          <div className={`${styles.timerBox} ${isTimerUrgent ? styles.timerWarning : ''}`}>
-            <span>⏱</span>
-            <span>{formatTime(timeLeft)}</span>
-          </div>
-
-          <button className={styles.endButton} onClick={() => setShowExitModal(true)}>
-            Kết thúc phỏng vấn
-          </button>
         </div>
       </header>
 
@@ -647,134 +896,133 @@ export default function InterviewSessionPage() {
         </span>
       </div>
 
-      {/* Main Grid: User Feed vs Avatar Feed */}
+      {/* Main Grid Layout */}
       <main className={styles.mainGrid}>
-        {/* Left Column: User Webcam */}
-        <section className={styles.sessionCard}>
-          <div className={styles.cardTitle}>
-            <span>ỨNG VIÊN (BẠN)</span>
-            <span style={{ fontSize: '0.75rem', color: '#10b981' }}>● LIVE</span>
-          </div>
+        
+        {/* Two-Video Panels Section */}
+        <div className={styles.panelsContainer}>
           
-          <div className={styles.webcamBox}>
-            {permissionError ? (
-              <div className={styles.webcamError}>
-                <span>🚫</span>
-                <h4>Quyền truy cập Camera/Mic bị từ chối</h4>
-                <p>
-                  Ditto cần quyền truy cập webcam và microphone của bạn để tiến hành buổi phỏng vấn trực tiếp. 
-                  Hãy cho phép trong cài đặt trình duyệt của bạn và thử lại.
-                </p>
-                <button className={styles.webcamErrorBtn} onClick={startMediaCapture}>
-                  Cho phép lại
-                </button>
-              </div>
-            ) : (
-              <>
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className={styles.videoElement}
-                  style={{ display: cameraEnabled ? 'block' : 'none' }}
-                />
-                {!cameraEnabled && (
-                  <div className={styles.webcamFallback}>
-                    <span>📷 CAMERA OFF</span>
-                  </div>
-                )}
-                
-                {/* Audio Waves Recording HUD */}
-                {recording && (
-                  <div className={styles.recordingDot}>
-                    <div className={styles.pulseRed} />
-                    <span>ĐANG GHI ÂM</span>
-                  </div>
-                )}
+          {/* Left Panel: User Webcam */}
+          <section className={styles.sessionCard}>
+            <div className={styles.cornerChip}>
+              <Radio size={16} className={styles.dotLive} />
+              <span>ỨNG VIÊN (BẠN)</span>
+            </div>
 
-                {/* Media Capture Toggle Toggles */}
-                <div className={styles.overlayControls}>
-                  <button
-                    className={`${styles.controlBtn} ${!cameraEnabled ? styles.controlBtnMuted : styles.controlBtnActive}`}
-                    onClick={toggleCamera}
-                    title={cameraEnabled ? 'Tắt Camera' : 'Bật Camera'}
-                  >
-                    {cameraEnabled ? '📹' : '❌'}
-                  </button>
-                  <button
-                    className={`${styles.controlBtn} ${!micEnabled ? styles.controlBtnMuted : styles.controlBtnActive}`}
-                    onClick={toggleMic}
-                    title={micEnabled ? 'Tắt Mic' : 'Bật Mic'}
-                  >
-                    {micEnabled ? '🎙️' : '🔇'}
+            <div className={styles.webcamBox}>
+              {permissionError ? (
+                <div className={styles.webcamError}>
+                  <Info size={32} style={{ color: '#ef4444' }} />
+                  <h4>Quyền truy cập Camera/Mic bị từ chối</h4>
+                  <p>
+                    Hệ thống cần quyền truy cập webcam và microphone của bạn để tiến hành buổi phỏng vấn trực tiếp.
+                    Hãy cho phép trong cài đặt trình duyệt của bạn và thử lại.
+                  </p>
+                  <button className={styles.webcamErrorBtn} onClick={startMediaCapture}>
+                    Cho phép lại
                   </button>
                 </div>
-              </>
-            )}
-          </div>
-        </section>
+              ) : (
+                <>
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className={styles.videoElement}
+                    style={{ display: cameraEnabled ? 'block' : 'none' }}
+                  />
+                  {!cameraEnabled && (
+                    <div className={styles.webcamFallback}>
+                      <CameraOff size={32} />
+                      <span>CAMERA OFF</span>
+                    </div>
+                  )}
 
-        {/* Right Column: AI Avatar Stage */}
-        <section className={styles.sessionCard}>
-          <div className={styles.cardTitle}>
-            <span>NGƯỜI PHỎNG VẤN (AI)</span>
-            {avatarPlaying && <span style={{ fontSize: '0.75rem', color: '#8b5cf6' }}>🔊 Đang nói</span>}
-            {sessionState === 'LISTENING' && <span style={{ fontSize: '0.75rem', color: '#06b6d4' }}>👂 Đang lắng nghe</span>}
-            {sessionState === 'AI_THINKING' && <span style={{ fontSize: '0.75rem', color: '#eab308' }}>⌛ Đang xử lý</span>}
-          </div>
-
-          <div
-            className={`${styles.avatarBox} ${
-              sessionState === 'LISTENING' ? styles.avatarBoxListening :
-              sessionState === 'AI_THINKING' ? styles.avatarBoxThinking : ''
-            }`}
-          >
-            {avatarConnected ? (
-              <DittoAvatarModule
-                controlled={true}
-                analyser={avatarAnalyser}
-                isConnected={socketConnected || ttsMode === 'mock'}
-                isPlaying={avatarPlaying}
-                isListening={sessionState === 'LISTENING'}
-                isThinking={sessionState === 'AI_THINKING'}
-              />
-            ) : (
-              <div className={styles.webcamFallback} style={{ color: '#cbd5e1' }}>
-                <span>🤖 Đang kết nối mô hình 3D...</span>
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* Dynamic Chat Transcript Board */}
-        <section className={styles.transcriptCard}>
-          <div className={styles.cardTitle}>
-            <span>BẢN GHI HỘI THOẠI TRỰC TIẾP</span>
-          </div>
-          
-          <div className={styles.transcriptScroll}>
-            {chatLog.length === 0 ? (
-              <div className={styles.transcriptEmpty}>
-                <span>💬</span>
-                <p>Nội dung phỏng vấn sẽ xuất hiện tại đây.</p>
-              </div>
-            ) : (
-              chatLog.map((log, index) => (
-                <div key={index} className={`${styles.messageRow} ${log.sender === 'AI' ? styles.messageRowAi : styles.messageRowUser}`}>
-                  <div className={`${styles.bubble} ${log.sender === 'AI' ? styles.bubbleAi : styles.bubbleUser}`}>
-                    {log.isDeepDive && (
-                      <span className={styles.bubbleDeepDiveBadge}>Hỏi sâu (Deep dive)</span>
+                  {/* Overlaid recording pill toggler button */}
+                  <button
+                    className={`${styles.recordOverlayBtn} ${isRecording ? styles.recordOverlayBtnActive : ''}`}
+                    onClick={handleToggleSessionRecording}
+                  >
+                    {isRecording ? (
+                      <>
+                        <VideoOff size={16} />
+                        <Circle size={12} className={styles.pulseRed} fill="currentColor" />
+                        <span>Đang ghi... ({formatDuration(recordingDurationMs)})</span>
+                      </>
+                    ) : (
+                      <>
+                        <Video size={16} />
+                        <span>Ghi lại</span>
+                      </>
                     )}
-                    <p style={{ margin: 0 }}>{log.text}</p>
-                    <span className={styles.bubbleTime}>{log.time}</span>
-                  </div>
+                  </button>
+                </>
+              )}
+            </div>
+          </section>
+
+          {/* Right Panel: AI Avatar Stage */}
+          <section className={styles.sessionCard}>
+            {getAiStatusChip()}
+
+            <div className={styles.avatarBox}>
+              {avatarConnected ? (
+                <InterviewerAvatar
+                  controlled={true}
+                  analyser={avatarAnalyser}
+                  isConnected={socketConnected || ttsMode === 'mock'}
+                  isPlaying={avatarPlaying}
+                  isListening={sessionState === 'LISTENING'}
+                  isThinking={sessionState === 'AI_THINKING'}
+                />
+              ) : (
+                <div className={styles.webcamFallback} style={{ color: '#cbd5e1' }}>
+                  <Info size={32} />
+                  <span>Đang kết nối mô hình 3D...</span>
                 </div>
-              ))
-            )}
-            <div ref={transcriptEndRef} />
+              )}
+            </div>
+          </section>
+        </div>
+
+        {/* Controls Bar Row */}
+        <div className={styles.controlsBar}>
+          <div className={styles.barMetric}>
+            <Timer size={16} />
+            <span className={getTimerClass()}>{formatTime(timeLeft)}</span>
           </div>
-        </section>
+          <div className={styles.barMetric}>
+            <ListOrdered size={16} />
+            <span>Câu {questionCount} / 5</span>
+          </div>
+
+          <div className={styles.barSpacer} />
+
+          {/* Mic Track Switcher */}
+          <button
+            className={`${styles.actionButton} ${micEnabled ? styles.actionButtonActive : styles.actionButtonMuted}`}
+            onClick={toggleMic}
+            title={micEnabled ? 'Tắt Mic' : 'Bật Mic'}
+          >
+            {micEnabled ? <Mic size={18} /> : <MicOff size={18} />}
+          </button>
+
+          {/* Camera Track Switcher */}
+          <button
+            className={`${styles.actionButton} ${cameraEnabled ? styles.actionButtonActive : styles.actionButtonMuted}`}
+            onClick={toggleCamera}
+            title={cameraEnabled ? 'Tắt Camera' : 'Bật Camera'}
+          >
+            {cameraEnabled ? <Camera size={18} /> : <CameraOff size={18} />}
+          </button>
+
+          {/* End session call button */}
+          <button className={styles.endSessionBtn} onClick={() => setShowExitModal(true)}>
+            <PhoneOff size={18} />
+            <span>Kết thúc</span>
+          </button>
+        </div>
 
         {/* State Controls Actions Area */}
         <section className={styles.controlsPanel}>
@@ -811,7 +1059,7 @@ export default function InterviewSessionPage() {
                 </>
               )}
             </div>
-            
+
             {recording && (
               <div className={styles.waveform}>
                 <div className={styles.waveBar} />
@@ -823,29 +1071,46 @@ export default function InterviewSessionPage() {
             )}
           </div>
 
+          {/* Inline warning banner when mic is turned off inside LISTENING state */}
+          {sessionState === 'LISTENING' && !micEnabled && (
+            <div className={styles.warningBanner}>
+              <div className={styles.warningLeft}>
+                <MicOff size={16} />
+                <span>Mic của bạn đang tắt. Bật mic để có thể trả lời câu hỏi.</span>
+              </div>
+              <button className={styles.warningActionBtn} onClick={toggleMic}>
+                Bật mic
+              </button>
+            </div>
+          )}
+
           {/* Caption Overlay / Edit Areas */}
           {sessionState === 'INITIALIZING' && (
             <div style={{ display: 'flex', justifyContent: 'center', padding: '1rem 0' }}>
               <button className={styles.primaryBtn} style={{ padding: '0.8rem 2.5rem', fontSize: '1rem' }} onClick={handleStartInterview}>
-                Bắt đầu ngay ➔
+                <Play size={18} />
+                <span>Bắt đầu ngay</span>
               </button>
             </div>
           )}
 
           {sessionState === 'AI_SPEAKING' && (
             <div className={styles.captionArea}>
-              <p style={{ margin: 0 }}><strong>Ditto:</strong> &ldquo;{currentQuestion}&rdquo;</p>
+              <p style={{ margin: 0 }}><strong>Người phỏng vấn (AI):</strong> &ldquo;{currentQuestion}&rdquo;</p>
             </div>
           )}
 
           {sessionState === 'LISTENING' && (
             <div className={styles.confirmBox}>
               <div className={styles.captionArea} style={{ minHeight: '100px', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center' }}>
-                {recording ? (
+                {recording || isRevealing ? (
                   <>
-                    <p style={{ margin: 0, color: '#0284c7', fontWeight: 600 }}>[Mic đang ghi âm. Nói rõ ràng...]</p>
+                    <p style={{ margin: 0, color: '#0284c7', fontWeight: 600 }}>
+                      {recording ? '[Mic đang ghi âm. Nói rõ ràng...]' : '[Đang phân tích và hiển thị kết quả...]'}
+                    </p>
                     <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.95rem', color: '#1e293b' }}>
                       {userAnswerDraft || <span className={styles.captionHint}>Chưa có âm thanh được thu nhận...</span>}
+                      {(recording || isRevealing) && <span className={styles.cursor} />}
                     </p>
                   </>
                 ) : (
@@ -855,11 +1120,13 @@ export default function InterviewSessionPage() {
               <div className={styles.confirmActions}>
                 {recording ? (
                   <button className={styles.dangerBtn} onClick={handleStopRecording}>
-                    Tôi đã nói xong 🛑
+                    <MicOff size={18} />
+                    <span>Tôi đã nói xong</span>
                   </button>
                 ) : (
-                  <button className={styles.primaryBtn} onClick={handleStartRecording} disabled={permissionError}>
-                    🎙️ Ghi âm câu trả lời
+                  <button className={styles.primaryBtn} onClick={handleStartRecording} disabled={permissionError || isRevealing}>
+                    <Mic size={18} />
+                    <span>Ghi âm câu trả lời</span>
                   </button>
                 )}
               </div>
@@ -876,10 +1143,12 @@ export default function InterviewSessionPage() {
               />
               <div className={styles.confirmActions}>
                 <button className={styles.secondaryBtn} onClick={handleStartRecording}>
-                  🎙️ Thu âm lại
+                  <Mic size={18} />
+                  <span>Thu âm lại</span>
                 </button>
                 <button className={styles.primaryBtn} onClick={handleSubmitAnswer} disabled={!userAnswerDraft.trim()}>
-                  Gửi câu trả lời ➔
+                  <Send size={18} />
+                  <span>Gửi câu trả lời</span>
                 </button>
               </div>
             </div>
@@ -887,9 +1156,56 @@ export default function InterviewSessionPage() {
 
           {sessionState === 'AI_THINKING' && (
             <div className={styles.captionArea} style={{ justifyContent: 'center', backgroundColor: '#faf5ff' }}>
-              <span className={styles.captionHint} style={{ color: '#7c3aed' }}>Ditto đang cân nhắc câu hỏi tiếp theo dựa trên câu trả lời của bạn...</span>
+              <span className={styles.captionHint} style={{ color: '#7c3aed' }}>Người phỏng vấn đang cân nhắc câu hỏi tiếp theo dựa trên câu trả lời của bạn...</span>
             </div>
           )}
+        </section>
+
+        {/* Dynamic Chat Transcript Board */}
+        <section className={styles.transcriptCard}>
+          <div className={styles.cardTitle}>
+            <div className={styles.cardTitleLeft}>
+              <MessageSquare size={16} />
+              <span>BẢN GHI HỘI THOẠI TRỰC TIẾP</span>
+            </div>
+            {/* Copy placeholder button */}
+            <button className={styles.cardTitleRightBtn} disabled>
+              <Copy size={14} />
+              <span>Sao chép</span>
+              {/* TODO: implement transcript copy to clipboard */}
+            </button>
+          </div>
+
+          <div className={styles.transcriptScroll}>
+            {chatLog.length === 0 ? (
+              <div className={styles.transcriptEmpty}>
+                <MessageSquare size={32} />
+                <p>Nội dung phỏng vấn sẽ xuất hiện tại đây.</p>
+              </div>
+            ) : (
+              chatLog.map((log, index) => {
+                const isAi = log.sender === 'AI';
+                return (
+                  <div key={index} className={`${styles.messageRow} ${isAi ? styles.messageRowAi : styles.messageRowUser}`}>
+                    <span className={styles.speakerLabel}>
+                      {isAi ? 'Người phỏng vấn' : 'Bạn'}
+                    </span>
+                    <div className={`${styles.bubble} ${isAi ? styles.bubbleAi : styles.bubbleUser}`}>
+                      {isAi && log.isDeepDive && (
+                        <div className={styles.bubbleDeepDiveContainer}>
+                          <CornerDownRight size={14} />
+                          <span>Đào sâu</span>
+                        </div>
+                      )}
+                      <p style={{ margin: 0 }}>{log.text}</p>
+                      <span className={styles.bubbleTime}>{log.time}</span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+            <div ref={transcriptEndRef} />
+          </div>
         </section>
       </main>
 
@@ -899,8 +1215,8 @@ export default function InterviewSessionPage() {
           <div className={styles.modal}>
             <h3>Kết thúc phỏng vấn sớm?</h3>
             <p>
-              Bạn đang ở trong buổi phỏng vấn trực tiếp. Nếu kết thúc sớm, 
-              kết quả sẽ chỉ được tính cho các câu hỏi bạn đã hoàn thành. 
+              Bạn đang ở trong buổi phỏng vấn trực tiếp. Nếu kết thúc sớm,
+              kết quả sẽ chỉ được tính cho các câu hỏi bạn đã hoàn thành.
               Bạn có chắc chắn muốn thoát?
             </p>
             <div className={styles.modalActions}>

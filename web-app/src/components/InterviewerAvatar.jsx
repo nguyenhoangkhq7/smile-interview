@@ -4,8 +4,8 @@ import { useState, useRef, useCallback, Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Environment, ContactShadows } from '@react-three/drei';
 import { useAudioLipSync } from '@/hooks/useAudioLipSync';
-import { DittoModel } from '@/components/DittoModel';
-import styles from '@/components/DittoAvatarModule.module.css';
+import { InterviewerModel } from '@/components/InterviewerModel';
+import styles from '@/components/InterviewerAvatar.module.css';
 
 /**
  * AvatarFallback — shown while the GLB model is loading
@@ -20,16 +20,16 @@ function AvatarFallback() {
 }
 
 /**
- * DittoAvatarModule
+ * InterviewerAvatar
  *
  * Top-level wrapper that:
  *  1. Manages AudioContext initialisation (requires a user gesture).
  *  2. Renders the WebSocket / lip-sync hook.
  *  3. Renders the Three.js Canvas with lighting, orbit controls, and the
- *     DittoModel avatar.
+ *     InterviewerModel avatar.
  *  4. Shows a status overlay with connection / playback indicators.
  */
-export function DittoAvatarModule({
+export function InterviewerAvatar({
   controlled = false,
   analyser: propsAnalyser = null,
   isConnected: propsIsConnected = false,
@@ -38,7 +38,7 @@ export function DittoAvatarModule({
   isThinking = false
 } = {}) {
   const [audioInitialized, setAudioInitialized] = useState(false);
-  const [testText, setTestText] = useState('Xin chào, tôi là Ditto.');
+  const [testText, setTestText] = useState('Xin chào, tôi là trợ lý ảo.');
   const audioElRef = useRef(null);
 
   // Initialize hook only if NOT in controlled mode (avoids dead socket connections on session screens)
@@ -115,7 +115,7 @@ export function DittoAvatarModule({
 
         {/* Avatar with Suspense fallback while GLB is loading */}
         <Suspense fallback={<AvatarFallback />}>
-          <DittoModel analyser={analyser} isListening={isListening} isThinking={isThinking} />
+          <InterviewerModel analyser={analyser} isListening={isListening} isThinking={isThinking} />
         </Suspense>
 
         {/* Camera controls — face-level lock, T-pose body cropped out */}

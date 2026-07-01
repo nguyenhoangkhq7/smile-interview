@@ -125,7 +125,7 @@ services:
         condition: service_healthy
 
   # ─────────────────────────────────────────────────────────────────
-  # Next.js Frontend — 3D Avatar (Ditto)
+  # Next.js Frontend — 3D Interviewer Avatar
   # ─────────────────────────────────────────────────────────────────
   web-app:
     build:

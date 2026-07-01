@@ -9,7 +9,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'Ditto — AI Interview Avatar',
+  title: 'Interviewer — AI Interview Avatar',
   description:
     'Real-time 3D AI interview avatar powered by Next.js, Three.js, and WebSockets.',
   keywords: ['AI', 'interview', 'avatar', '3D', 'WebSockets', 'lip-sync'],
