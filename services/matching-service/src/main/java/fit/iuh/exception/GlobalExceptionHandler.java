@@ -23,6 +23,7 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
  *   <li>{@link LlmApiException}              → 502 Bad Gateway</li>
  *   <li>{@link EmbeddingException}           → 502 Bad Gateway</li>
  *   <li>{@link MaxUploadSizeExceededException} → 413 Payload Too Large</li>
+ *   <li>{@link QuestionBankException}         → 422 Unprocessable Entity</li>
  *   <li>{@link Exception} (catch-all)        → 500 Internal Server Error</li>
  * </ul>
  */
@@ -127,7 +128,30 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.builder()
                         .status(HttpStatus.BAD_GATEWAY.value())
                         .errorCode("EMBEDDING_ERROR")
-                        .message("Failed to generate embedding vectors via OpenAI API. Please retry.")
+                        .message("Failed to generate embedding vectors via local/configured Embeddings API. Please retry.")
+                        .detail(ex.getMessage())
+                        .path(request.getRequestURI())
+                        .build());
+    }
+
+    // -------------------------------------------------------------------------
+    // 422 Unprocessable Entity — question bank generation errors
+    // -------------------------------------------------------------------------
+
+    /**
+     * Handles failures during question bank generation (invalid LLM JSON output,
+     * missing prerequisite data, validation errors in generated questions).
+     */
+    @ExceptionHandler(QuestionBankException.class)
+    public ResponseEntity<ErrorResponse> handleQuestionBankException(
+            QuestionBankException ex, HttpServletRequest request) {
+
+        log.error("[QUESTION_BANK_ERROR] path={} | {}", request.getRequestURI(), ex.getMessage(), ex);
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
+                .body(ErrorResponse.builder()
+                        .status(HttpStatus.UNPROCESSABLE_ENTITY.value())
+                        .errorCode("QUESTION_BANK_ERROR")
+                        .message("Failed to generate question bank. Please retry.")
                         .detail(ex.getMessage())
                         .path(request.getRequestURI())
                         .build());

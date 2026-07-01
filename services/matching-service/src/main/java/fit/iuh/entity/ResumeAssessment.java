@@ -74,21 +74,39 @@ public class ResumeAssessment {
     @Column(name = "competency_fit_score")
     private Integer competencyFitScore;
 
+    @Column(name = "technical_depth_score")
+    private Integer technicalDepthScore;
+
+    @Column(name = "match_level", length = 64)
+    private String matchLevel;
+
+    @Column(name = "role_type_detected", length = 64)
+    private String roleTypeDetected;
+
+    @Column(name = "candidate_level", length = 64)
+    private String candidateLevel;
+
+    @Column(name = "years_of_experience_estimate", length = 64)
+    private String yearsOfExperienceEstimate;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "strong_areas", columnDefinition = "jsonb")
+    private List<String> strongAreas;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "gap_areas", columnDefinition = "jsonb")
+    private List<String> gapAreas;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "critical_missing_skills", columnDefinition = "jsonb")
+    private List<String> criticalMissingSkills;
+
     // -------------------------------------------------------------------------
     // SimInterview Output 2 — Section-wise feedback (JSONB)
     // -------------------------------------------------------------------------
 
     /**
      * The structured section-wise feedback object from the LLM, stored as PostgreSQL {@code jsonb}.
-     *
-     * <p>The nested {@code critical_missing_skills} array is the primary input for Module 3
-     * (Question Bank Generation). It can be queried natively in PostgreSQL:
-     * <pre>{@code
-     * SELECT session_id,
-     *        section_wise_feedback -> 'skills_evaluation' -> 'critical_missing_skills' AS missing
-     * FROM resume_assessments
-     * WHERE session_id = 'abc-001';
-     * }</pre>
      */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "section_wise_feedback", nullable = false, columnDefinition = "jsonb")

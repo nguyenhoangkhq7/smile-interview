@@ -64,7 +64,7 @@ public class IngestionController {
             produces = MediaType.APPLICATION_JSON_VALUE
     )
     public ResponseEntity<IngestionResponse> ingest(
-            @PathVariable("sessionId") String sessionId,
+            @PathVariable String sessionId,
             @RequestPart("cvFile") MultipartFile cvFile,
             @RequestPart(value = "jdFile",  required = false) MultipartFile jdFile,
             @RequestPart(value = "jdText",  required = false) String jdText) {

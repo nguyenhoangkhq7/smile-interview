@@ -44,14 +44,37 @@ public class AssessmentResponse {
     @JsonProperty("competency_fit_score")
     private Integer competencyFitScore;
 
+    @JsonProperty("technical_depth_score")
+    private Integer technicalDepthScore;
+
+    @JsonProperty("match_level")
+    private String matchLevel;
+
+    @JsonProperty("candidate_level")
+    private String candidateLevel;
+
+    @JsonProperty("role_type_detected")
+    private String roleTypeDetected;
+
+    @JsonProperty("years_of_experience_estimate")
+    private String yearsOfExperienceEstimate;
+
+    @JsonProperty("strong_areas")
+    private List<String> strongAreas;
+
+    @JsonProperty("gap_areas")
+    private List<String> gapAreas;
+
+    @JsonProperty("critical_missing_skills")
+    private List<String> criticalMissingSkills;
+
     // -------------------------------------------------------------------------
     // SimInterview Output 2
     // -------------------------------------------------------------------------
 
     /**
-     * Structured section-wise feedback containing skill, experience, and project
-     * evaluations. The nested {@code critical_missing_skills} is key input for
-     * Module 3 (Question Bank Generation).
+     * Structured section-wise feedback containing CS fundamentals, tech stack alignment,
+     * project technical depth, and software engineering practices.
      */
     @JsonProperty("section_wise_feedback")
     private AssessmentResponseDto.SectionWiseFeedback sectionWiseFeedback;

@@ -133,10 +133,14 @@ public class AssessmentService {
         String fullCvText = cvDoc.getMarkdownContent();
         String aggregatedJdText = jdDoc.getMarkdownContent();
 
-        log.info("[Assessment] Full CV: {} chars | JD: {} chars → sending to LLM.",
-                fullCvText.length(), aggregatedJdText.length());
+        List<DocumentChunk> cvChunks = documentChunkRepository.findBySessionIdAndDocumentType(sessionId, DocumentType.CV);
+        List<DocumentChunk> jdChunks = documentChunkRepository.findBySessionIdAndDocumentType(sessionId, DocumentType.JD);
+        String filteredCvText = matchAndAggregateCv(cvChunks, jdChunks);
 
-        String userContent = buildUserContent(fullCvText, aggregatedJdText);
+        log.info("[Assessment] Semantic matching CV: {} chars (down from {} chars) | JD: {} chars → sending to LLM.",
+                filteredCvText.length(), fullCvText.length(), aggregatedJdText.length());
+
+        String userContent = buildUserContent(filteredCvText, aggregatedJdText);
         String llmJsonResponse = callLlmBlocking(userContent);
 
         // ── Parse JSON → DTO → Entity → Persist ──────────────────────────────
@@ -188,6 +192,16 @@ public class AssessmentService {
             if (response == null || response.getFirstChoiceContent() == null) {
                 throw new LlmApiException("LLM API returned an empty assessment response.");
             }
+
+            if (response.getUsage() != null) {
+                LlmChatResponse.Usage usage = response.getUsage();
+                log.info("[LLM_USAGE] Model: {} | Prompt (Input): {} | Completion (Output): {} | Total: {}",
+                        response.getModel(),
+                        usage.getPromptTokens(),
+                        usage.getCompletionTokens(),
+                        usage.getTotalTokens());
+            }
+
             return response.getFirstChoiceContent().strip();
 
         } catch (WebClientResponseException e) {
@@ -229,9 +243,9 @@ public class AssessmentService {
             AssessmentResponseDto dto = objectMapper.readValue(json, AssessmentResponseDto.class);
 
             // Validate required fields are present
-            if (dto.competencyFitScore() == null) {
+            if (dto.overallFit() == null || dto.overallFit().competencyFitScore() == null) {
                 throw new LlmApiException(
-                        "LLM response missing 'competency_fit_score' for sessionId=" + sessionId);
+                        "LLM response missing 'competency_fit_score' inside 'overall_fit' for sessionId=" + sessionId);
             }
             if (dto.sectionWiseFeedback() == null) {
                 throw new LlmApiException(
@@ -243,10 +257,10 @@ public class AssessmentService {
                         "LLM response missing 'actionable_improvement_suggestions' for sessionId=" + sessionId);
             }
 
-            log.info("[Assessment] Parsed LLM JSON: score={}, missingSkills={}, suggestions={}",
-                    dto.competencyFitScore(),
-                    dto.sectionWiseFeedback().skillsEvaluation() != null
-                            ? dto.sectionWiseFeedback().skillsEvaluation().criticalMissingSkills() : "[]",
+            log.info("[Assessment] Parsed LLM JSON: score={}, candidateLevel={}, roleType={}, suggestions={}",
+                    dto.overallFit().competencyFitScore(),
+                    dto.candidateLevel(),
+                    dto.roleTypeDetected(),
                     dto.actionableImprovementSuggestions().size());
 
             return dto;
@@ -267,10 +281,6 @@ public class AssessmentService {
      * Maps the parsed {@link AssessmentResponseDto} to a {@link ResumeAssessment} entity,
      * persists it to PostgreSQL, and returns the saved entity.
      *
-     * <p>Hibernate 6 automatically serializes the {@link AssessmentResponseDto.SectionWiseFeedback}
-     * record and the {@code List<String>} into {@code jsonb} columns — no manual
-     * {@code ObjectMapper.writeValueAsString()} call is needed.
-     *
      * @param sessionId the unique interview session identifier
      * @param dto       the fully populated DTO from LLM response parsing
      * @return the saved {@link ResumeAssessment} entity (with generated id and createdAt)
@@ -279,7 +289,15 @@ public class AssessmentService {
     protected ResumeAssessment buildAndPersistEntity(String sessionId, AssessmentResponseDto dto) {
         ResumeAssessment entity = ResumeAssessment.builder()
                 .sessionId(sessionId)
-                .competencyFitScore(dto.competencyFitScore())
+                .competencyFitScore(dto.overallFit().competencyFitScore())
+                .technicalDepthScore(dto.overallFit().technicalDepthScore())
+                .matchLevel(dto.overallFit().matchLevel())
+                .candidateLevel(dto.candidateLevel())
+                .roleTypeDetected(dto.roleTypeDetected())
+                .yearsOfExperienceEstimate(dto.yearsOfExperienceEstimate())
+                .strongAreas(dto.strongAreas())
+                .gapAreas(dto.gapAreas())
+                .criticalMissingSkills(dto.criticalMissingSkills())
                 .sectionWiseFeedback(dto.sectionWiseFeedback())
                 .actionableSuggestions(dto.actionableImprovementSuggestions())
                 .build();
@@ -293,10 +311,6 @@ public class AssessmentService {
     /**
      * Converts a persisted {@link ResumeAssessment} entity to the {@link AssessmentResponse} API DTO.
      *
-     * <p>Hibernate reads the {@code jsonb} columns back into their Java types automatically —
-     * the {@link AssessmentResponseDto.SectionWiseFeedback} record is hydrated by Jackson
-     * through Hibernate's JSON type handling.
-     *
      * @param entity the persisted entity (from DB or fresh save)
      * @param cached {@code true} if the result was served from the DB cache
      * @return the fully populated API response DTO
@@ -306,6 +320,14 @@ public class AssessmentService {
                 .id(entity.getId())
                 .sessionId(entity.getSessionId())
                 .competencyFitScore(entity.getCompetencyFitScore())
+                .technicalDepthScore(entity.getTechnicalDepthScore())
+                .matchLevel(entity.getMatchLevel())
+                .candidateLevel(entity.getCandidateLevel())
+                .roleTypeDetected(entity.getRoleTypeDetected())
+                .yearsOfExperienceEstimate(entity.getYearsOfExperienceEstimate())
+                .strongAreas(entity.getStrongAreas())
+                .gapAreas(entity.getGapAreas())
+                .criticalMissingSkills(entity.getCriticalMissingSkills())
                 .sectionWiseFeedback(entity.getSectionWiseFeedback())
                 .actionableImprovementSuggestions(entity.getActionableSuggestions())
                 .cached(cached)
