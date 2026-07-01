@@ -18,8 +18,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Orchestrates the full Question Bank generation pipeline: loading data,
@@ -37,6 +39,8 @@ public class QuestionBankService {
     private final DocumentChunkRepository documentChunkRepository;
     private final QuestionBankRepository questionBankRepo;
     private final ObjectMapper objectMapper;
+    private final SemanticCacheKeyGenerator cacheKeyGenerator;
+    private final SemanticCacheService cacheService;
 
     /**
      * Generates a personalized question bank for a session.
@@ -68,8 +72,7 @@ public class QuestionBankService {
         // Load CV & JD chunks to identify semantic matched pairs
         List<DocumentChunk> cvChunks = documentChunkRepository.findBySessionIdAndDocumentType(sessionId, DocumentType.CV);
         List<DocumentChunk> jdChunks = documentChunkRepository.findBySessionIdAndDocumentType(sessionId, DocumentType.JD);
-        List<String> matchedPairs = findMatchedPairs(cvChunks, jdChunks);
-        String matchedPairsText = matchedPairs.isEmpty() ? "No direct semantic matches found." : String.join("\n", matchedPairs);
+        List<ExperienceRequirementPair> matchedPairs = findMatchedPairs(cvChunks, jdChunks);
 
         log.info("[QuestionBank] Semantic matching completed. Found {} matched pairs for session {}.", matchedPairs.size(), sessionId);
 
@@ -142,25 +145,124 @@ public class QuestionBankService {
                     context.getCandidateLevel(), context.getOverallMatch(), config.getSystemDesign()));
         }
 
-        // Step 3: Question Generation (parallel loop in sequence to avoid LLM rate limits/tokens)
+        // Step 3: Question Generation (with Redis Cache-Aside)
         List<QuestionDto> allQuestions = new ArrayList<>();
         int typeIndex = 0;
         for (var entry : distributions.entrySet()) {
             typeIndex++;
-            if (typeIndex > 1 || context != null) {
-                // Introduce a 5-second delay between LLM calls to prevent TPM rate limits
-                try {
-                    log.info("[QuestionBank] Pacing LLM calls: sleeping for 5 seconds before generating next type...");
-                    Thread.sleep(5000);
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                    throw new QuestionBankException("Question generation pacing interrupted", ie);
+            String type = entry.getKey();
+            Map<String, Integer> originalDist = entry.getValue();
+
+            // Make a copy of the distribution to adjust as we get cache hits
+            Map<String, Integer> remainingDist = new LinkedHashMap<>(originalDist);
+            List<QuestionDto> typeQuestions = new ArrayList<>();
+            List<ExperienceRequirementPair> missedPairs = new ArrayList<>();
+            Map<String, String> cacheKeyMap = new HashMap<>(); // pair_index -> cacheKey
+
+            // Step 3.1: Check Cache for each pair
+            for (int i = 0; i < matchedPairs.size(); i++) {
+                ExperienceRequirementPair pair = matchedPairs.get(i);
+                String cacheKey = cacheKeyGenerator.generateKey(pair.jdChunkText(), pair.cvChunkText());
+                List<QuestionDto> cachedList = cacheService.get(cacheKey);
+
+                if (cachedList != null && !cachedList.isEmpty()) {
+                    // Filter cached questions of this type
+                    List<QuestionDto> matchingCached = cachedList.stream()
+                            .filter(q -> type.equalsIgnoreCase(q.getType()))
+                            .collect(Collectors.toList());
+
+                    if (!matchingCached.isEmpty()) {
+                        // Re-use matching cached questions if they fit the difficulty distribution
+                        for (QuestionDto q : matchingCached) {
+                            String diff = q.getDifficulty() != null ? q.getDifficulty().toLowerCase().strip() : "medium";
+                            int remainingCount = remainingDist.getOrDefault(diff, 0);
+                            if (remainingCount > 0) {
+                                remainingDist.put(diff, remainingCount - 1);
+                                typeQuestions.add(q);
+                                log.info("[QuestionBank] Cache HIT reused: {} question for topic '{}'", diff, q.getTopic());
+                            }
+                        }
+                    } else {
+                        // Cache hit for other types, but miss for this type
+                        missedPairs.add(pair);
+                        cacheKeyMap.put("pair_" + (missedPairs.size() - 1), cacheKey);
+                    }
+                } else {
+                    // Cache miss
+                    missedPairs.add(pair);
+                    cacheKeyMap.put("pair_" + (missedPairs.size() - 1), cacheKey);
                 }
             }
-            String type = entry.getKey();
-            Map<String, Integer> dist = entry.getValue();
-            List<QuestionDto> typeQuestions = questionGenerationService.generateForType(
-                    type, context, cvDoc.getMarkdownContent(), jdDoc.getMarkdownContent(), matchedPairsText, dist);
+
+            int totalRemaining = remainingDist.values().stream().mapToInt(Integer::intValue).sum();
+            log.info("[QuestionBank] Type '{}' distribution: requested={}, remaining to generate={}", 
+                    type, originalDist, remainingDist);
+
+            // Step 3.2: Generate remaining questions from LLM using missed pairs
+            if (totalRemaining > 0) {
+                if (typeIndex > 1) {
+                    // Introduce a 5-second delay to prevent rate limits
+                    try {
+                        log.info("[QuestionBank] Pacing LLM calls: sleeping for 5 seconds...");
+                        Thread.sleep(5000);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new QuestionBankException("Question generation pacing interrupted", ie);
+                    }
+                }
+
+                // Format missed pairs with explicit Pair IDs for the LLM mapping
+                StringBuilder sb = new StringBuilder();
+                for (int i = 0; i < missedPairs.size(); i++) {
+                    ExperienceRequirementPair pair = missedPairs.get(i);
+                    sb.append(String.format(
+                            "### Pair ID: pair_%d\n- **Required Job Description segment**: %s\n- **Matched Candidate Experience segment**: %s\n\n",
+                            i, pair.jdChunkText(), pair.cvChunkText()
+                    ));
+                }
+                String missedPairsText = sb.toString();
+
+                List<QuestionDto> generatedQs = questionGenerationService.generateForType(
+                        type, context, cvDoc.getMarkdownContent(), jdDoc.getMarkdownContent(), missedPairsText, remainingDist);
+
+                typeQuestions.addAll(generatedQs);
+
+                // Group generated questions by the Pair ID returned by the LLM (in the id field)
+                Map<String, List<QuestionDto>> newQuestionsByPair = new HashMap<>();
+                for (QuestionDto q : generatedQs) {
+                    String pairId = q.getId(); // e.g. "pair_0"
+                    if (pairId != null && pairId.startsWith("pair_")) {
+                        newQuestionsByPair.computeIfAbsent(pairId, k -> new ArrayList<>()).add(q);
+                    } else {
+                        // Fallback: associate with the first missed pair
+                        newQuestionsByPair.computeIfAbsent("pair_0", k -> new ArrayList<>()).add(q);
+                    }
+                }
+
+                // Step 3.3: Write new questions to Redis (merge with existing types)
+                newQuestionsByPair.forEach((pairId, newQs) -> {
+                    String cacheKey = cacheKeyMap.get(pairId);
+                    if (cacheKey != null) {
+                        List<QuestionDto> existing = cacheService.get(cacheKey);
+                        List<QuestionDto> merged = new ArrayList<>();
+                        if (existing != null) {
+                            merged.addAll(existing);
+                        }
+                        for (QuestionDto nq : newQs) {
+                            nq.setType(type); // Force type to match current generation context
+                            boolean duplicate = merged.stream().anyMatch(eq ->
+                                    Objects.equals(eq.getType(), nq.getType()) &&
+                                    Objects.equals(eq.getQuestion(), nq.getQuestion())
+                            );
+                            if (!duplicate) {
+                                merged.add(nq);
+                            }
+                        }
+                        cacheService.put(cacheKey, merged, Duration.ofDays(7));
+                    }
+                });
+            }
+
             allQuestions.addAll(typeQuestions);
         }
 
@@ -318,7 +420,7 @@ public class QuestionBankService {
                 .build();
     }
 
-    private List<String> findMatchedPairs(List<DocumentChunk> cvChunks, List<DocumentChunk> jdChunks) {
+    private List<ExperienceRequirementPair> findMatchedPairs(List<DocumentChunk> cvChunks, List<DocumentChunk> jdChunks) {
         final double SIMILARITY_THRESHOLD = 0.65;
         final int GLOBAL_LIMIT = 7;
 
@@ -340,13 +442,16 @@ public class QuestionBankService {
         // Sort globally by similarity score descending
         allMatches.sort((a, b) -> Double.compare(b.score(), a.score()));
 
-        List<String> matchedPairs = new ArrayList<>();
+        List<ExperienceRequirementPair> matchedPairs = new ArrayList<>();
         int pairCount = 0;
         for (ChunkMatch match : allMatches) {
             pairCount++;
-            matchedPairs.add(String.format(
-                    "### Match Pair %d:\n- **Required Job Description segment**: %s\n- **Matched Candidate Experience segment**: %s\n",
-                    pairCount, match.jdChunk().getChunkText(), match.cvChunk().getChunkText()
+            matchedPairs.add(new ExperienceRequirementPair(
+                    match.jdChunk().getChunkText(),
+                    match.cvChunk().getChunkText(),
+                    match.jdChunk().getEmbedding(),
+                    match.cvChunk().getEmbedding(),
+                    match.score()
             ));
             if (pairCount >= GLOBAL_LIMIT) {
                 break;

@@ -111,6 +111,9 @@ public class QuestionGenerationService {
                 %s
 
                 Generate the requested questions for this candidate.
+
+                CRITICAL MAPPING RULE:
+                For each question generated, you MUST set the "id" field to the exact Pair ID (e.g., "pair_0", "pair_1") of the matched experience segment that inspired the question. This is required for internal mapping.
                 """.formatted(matchedPairsText);
 
         int attempts = 0;
