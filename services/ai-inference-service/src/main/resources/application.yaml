@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: ai-inference-service
+  threads:
+    virtual:
+      enabled: true
+  ai:
+    openai:
+      base-url: ${LLM_API_URL:https://api.groq.com}/openai
+      api-key: ${LLM_API_KEY}
+      chat:
+        options:
+          model: ${LLM_MODEL:llama-3.3-70b-versatile}
+grpc:
+  server:
+    port: 9091
