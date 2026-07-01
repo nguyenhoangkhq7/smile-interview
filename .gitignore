@@ -35,3 +35,9 @@ logs/
 # Docker/Compose
 .docker/
 docker-compose.override.yml
+
+# Node.js dependencies
+node_modules/
+dist/
+.npm
+npm-debug.log*

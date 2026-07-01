@@ -69,6 +69,84 @@ services:
       redis:
         condition: service_healthy
 
+  ai-inference-service:
+    # Speaches: OpenAI-compatible STT/TTS server powered by faster-whisper
+    # Docs: https://speaches.ai | Repo: https://github.com/fedirz/faster-whisper-server
+    image: ghcr.io/speaches-ai/speaches:latest-cpu
+    container_name: ai_inference_service
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      # Force CPU execution (no GPU required)
+      WHISPER__INFERENCE_DEVICE: cpu
+      # int8 quantization — best latency/quality tradeoff on CPU
+      WHISPER__COMPUTE_TYPE: int8
+      
+      # [TỐI ƯU TỐC ĐỘ 1] Cắt bỏ khoảng lặng (silence) cực kỳ quan trọng
+      WHISPER__ENABLE_VAD: "true"
+      # [TỐI ƯU TỐC ĐỘ 2] Dùng đa nhân CPU (Thay bằng số nhân thực tế nếu máy bạn mạnh)
+      WHISPER__CPU_THREADS: 4
+      
+      # [ĐÃ SỬA] Thêm tiền tố SPEACHES__ để biến này thực sự có tác dụng
+      SPEACHES__STT_MODEL_TTL: -1
+    volumes:
+      # Persist downloaded HuggingFace models on the host for ubuntu user
+      - whisper_models:/home/ubuntu/.cache/huggingface
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  streaming-service:
+    build:
+      context: ./services/streaming-service
+      dockerfile: Dockerfile
+    container_name: streaming_service
+    restart: always
+    ports:
+      - "${STREAMING_SERVICE_PORT:-8001}:8001"
+    environment:
+      PORT: 8001
+      REDIS_URL: redis://redis:6379
+      WHISPER_API_URL: http://ai-inference-service:8000/v1/audio/transcriptions
+      WHISPER_API_KEY: dummy_key_for_local
+      # Sử dụng model 'small' để nâng cao độ chính xác nhận diện từ viết tắt & thuật ngữ IT
+      WHISPER_MODEL: ${WHISPER_MODEL:-Systran/faster-whisper-small}
+      # TTS — OpenAI-compatible /v1/audio/speech endpoint served by Speaches
+      TTS_API_URL: http://ai-inference-service:8000/v1/audio/speech
+      TTS_MODEL: ${TTS_MODEL:-speaches-ai/piper-vi_VN-vais1000-medium}
+    depends_on:
+      redis:
+        condition: service_healthy
+      ai-inference-service:
+        condition: service_healthy
+
+  # ─────────────────────────────────────────────────────────────────
+  # Next.js Frontend — 3D Interviewer Avatar
+  # ─────────────────────────────────────────────────────────────────
+  web-app:
+    build:
+      context: ./web-app
+      dockerfile: Dockerfile
+    container_name: web_app
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    depends_on:
+      - streaming-service
+
 volumes:
   postgres_data:
   redis_data:
+  # Named volume for HuggingFace model cache — survives container restarts/rebuilds
+  whisper_models:

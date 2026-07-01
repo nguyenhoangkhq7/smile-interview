@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+/* globals.css — base reset for the interviewer avatar app */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --font-inter: 'Inter', system-ui, -apple-system, sans-serif;
+  color-scheme: dark;
+}
+
+html {
+  font-family: var(--font-inter);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background: #07050f;
+  color: #f5f3ff;
+  min-height: 100svh;
+}
+
+/* Remove default button / input styles */
+button, input, select, textarea {
+  font-family: inherit;
+}
+
+/* Scrollbar theming for WebKit */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.3);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.5);
+}
