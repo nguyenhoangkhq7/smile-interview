@@ -9,6 +9,8 @@ export interface IngestResponse {
   sessionId: string;
   totalChunksCount: number;
   success: boolean;
+  resumeId?: number;
+  jdId?: number;
 }
 
 export interface AssessmentResponse {
@@ -40,17 +42,27 @@ export const cvJdMatchingService = {
    */
   async ingestCvJd(
     sessionId: string,
-    cvFile: File,
+    cvFile: File | null,
     jdFile: File | null,
-    jdText: string | null
+    jdText: string | null,
+    resumeId?: number | null,
+    jdId?: number | null
   ): Promise<IngestResponse> {
     const formData = new FormData();
-    formData.append('cvFile', cvFile);
+    if (cvFile) {
+      formData.append('cvFile', cvFile);
+    }
     if (jdFile) {
       formData.append('jdFile', jdFile);
     }
     if (jdText) {
       formData.append('jdText', jdText);
+    }
+    if (resumeId) {
+      formData.append('resumeId', String(resumeId));
+    }
+    if (jdId) {
+      formData.append('jdId', String(jdId));
     }
 
     const res = await fetch(`${getBaseUrl()}/ingest/${sessionId}`, {

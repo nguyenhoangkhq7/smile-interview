@@ -1,17 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 
+// GET: List all sessions
 export async function GET() {
   try {
-    // 1. Get all sessions
     const sessionsRes = await query('SELECT * FROM sessions ORDER BY date DESC');
     const sessions = sessionsRes.rows;
 
-    if (sessions.length === 0) {
-      return NextResponse.json([]);
-    }
-
-    // 2. Fetch turns for each session
     const fullSessions = await Promise.all(
       sessions.map(async (sess) => {
         const turnsRes = await query('SELECT * FROM session_turns WHERE session_id = $1 ORDER BY id ASC', [sess.id]);
@@ -54,11 +49,12 @@ export async function GET() {
 
     return NextResponse.json(fullSessions);
   } catch (error: any) {
-    console.error('[API History] Error fetching history:', error);
+    console.error('[API Sessions] Error fetching sessions:', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }
 }
 
+// POST: Save/Upsert a session
 export async function POST(request: NextRequest) {
   try {
     const session = await request.json();
@@ -67,7 +63,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Session details with id are required' }, { status: 400 });
     }
 
-    // 1. Upsert session info
     const upsertSessionSql = `
       INSERT INTO sessions (
         id, date, interview_type, role_title, cv_filename, jd_filename,
@@ -125,7 +120,6 @@ export async function POST(request: NextRequest) {
       session.jdId !== undefined ? session.jdId : null,
     ]);
 
-    // 2. Replace turns only when explicitly requested.
     if (session.replaceQuestions === true) {
       await query('DELETE FROM session_turns WHERE session_id = $1', [session.id]);
 
@@ -153,7 +147,25 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, session });
   } catch (error: any) {
-    console.error('[API History] Error saving history:', error);
+    console.error('[API Sessions] Error saving session:', error);
+    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+  }
+}
+
+// DELETE: Delete a session
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ error: 'id is required' }, { status: 400 });
+    }
+
+    await query('DELETE FROM sessions WHERE id = $1', [id]);
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error('[API Sessions] Error deleting session:', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }
 }

@@ -85,7 +85,7 @@ export const transcribeAudio = async (fileBuffer, originalName) => {
 
   const data = await response.json();
 
-  if (!data?.text) {
+  if (data?.text === undefined) {
     throw new Error(
       'Whisper API returned an unexpected response format (missing "text" field).'
     );

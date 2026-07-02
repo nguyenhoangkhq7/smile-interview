@@ -31,6 +31,28 @@ const pool = globalWithPool.postgresPool;
 let dbInitialized = false;
 
 export async function initDb() {
+  const createResumesTable = `
+    CREATE TABLE IF NOT EXISTS resumes (
+      id SERIAL PRIMARY KEY,
+      user_id VARCHAR(255),
+      file_name VARCHAR(255) NOT NULL,
+      extracted_text TEXT,
+      file_content BYTEA,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+  `;
+
+  const createJdsTable = `
+    CREATE TABLE IF NOT EXISTS job_descriptions (
+      id SERIAL PRIMARY KEY,
+      user_id VARCHAR(255),
+      title VARCHAR(255) NOT NULL,
+      extracted_text TEXT,
+      file_content BYTEA,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+  `;
+
   const createSessionsTable = `
     CREATE TABLE IF NOT EXISTS sessions (
       id VARCHAR(255) PRIMARY KEY,
@@ -71,8 +93,32 @@ export async function initDb() {
     );
   `;
 
+  await pool.query(createResumesTable);
+  await pool.query(createJdsTable);
   await pool.query(createSessionsTable);
   await pool.query(createTurnsTable);
+
+  // Alter sessions to add resume_id, jd_id, and all assessment columns if they do not exist
+  const alterColumns = [
+    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS resume_id INT REFERENCES resumes(id) ON DELETE SET NULL;',
+    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS jd_id INT REFERENCES job_descriptions(id) ON DELETE SET NULL;',
+    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS competency_fit_score INT;',
+    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS technical_depth_score INT;',
+    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS match_level VARCHAR(50);',
+    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS candidate_level VARCHAR(50);',
+    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS role_type_detected VARCHAR(100);',
+    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS years_of_experience_estimate VARCHAR(50);',
+    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS strong_areas JSONB;',
+    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS gap_areas JSONB;',
+    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS critical_missing_skills JSONB;',
+    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS section_wise_feedback JSONB;',
+    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS actionable_suggestions JSONB;'
+  ];
+
+  for (const sql of alterColumns) {
+    await pool.query(sql);
+  }
+
   console.log('[DB] Database tables initialized successfully');
 }
 

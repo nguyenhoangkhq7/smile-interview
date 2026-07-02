@@ -29,13 +29,16 @@ export async function GET(request: NextRequest) {
       id: data.id,
       sessionId: data.session_id,
       competencyFitScore: data.competency_fit_score || 0,
-      skillsAnalysis: {
-        analysis: data.section_wise_feedback?.skills_evaluation?.analysis || '',
-        criticalMissingSkills: data.section_wise_feedback?.skills_evaluation?.critical_missing_skills || []
-      },
-      experienceEvaluation: data.section_wise_feedback?.experience_evaluation || '',
-      projectEvaluation: data.section_wise_feedback?.project_evaluation || '',
-      actionableSuggestions: data.actionable_improvement_suggestions || [],
+      technicalDepthScore: data.technical_depth_score || 0,
+      matchLevel: data.match_level || '',
+      candidateLevel: data.candidate_level || '',
+      roleTypeDetected: data.role_type_detected || '',
+      yearsOfExperienceEstimate: data.years_of_experience_estimate || '',
+      strongAreas: data.strong_areas || [],
+      gapAreas: data.gap_areas || [],
+      criticalMissingSkills: data.critical_missing_skills || [],
+      sectionWiseFeedback: data.section_wise_feedback || {},
+      actionableImprovementSuggestions: data.actionable_improvement_suggestions || [],
       cached: data.cached || false,
       createdAt: data.created_at || ''
     });
