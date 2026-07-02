@@ -101,6 +101,14 @@ public class IngestionService {
         // ────────────────────────────────────────────────────────────────────
         log.info("[Step 2/4] Standardizing documents via Groq LLM (this may take ~10-30s)...");
         String markdownCv = standardizationService.standardizeCv(rawCvText);
+
+        log.info("[Step 2/4] Waiting 25 seconds to avoid Groq Free Tier Rate Limit (429) before processing JD...");
+        try {
+            Thread.sleep(25000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
         String markdownJd = standardizationService.standardizeJd(rawJdText);
         log.info("[Step 2/4] Done. CV Markdown: {} chars | JD Markdown: {} chars",
                 markdownCv.length(), markdownJd.length());

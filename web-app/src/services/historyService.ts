@@ -29,12 +29,25 @@ export interface SessionHistoryItem {
   overallFeedback?: string;
   competencyFitScore?: number;
   skillsAnalysis?: {
-    analysis: string;
-    criticalMissingSkills: string[];
+    analysis?: string;
+    criticalMissingSkills?: string[];
   };
   experienceEvaluation?: string;
   projectEvaluation?: string;
+  technicalDepthScore?: number;
+  matchLevel?: string;
+  candidateLevel?: string;
+  roleTypeDetected?: string;
+  yearsOfExperienceEstimate?: string;
+  strongAreas?: string[];
+  gapAreas?: string[];
+  criticalMissingSkills?: string[];
+  sectionWiseFeedback?: Record<string, string>;
   actionableSuggestions?: string[];
+}
+
+export interface SessionSavePayload extends SessionHistoryItem {
+  replaceQuestions?: boolean;
 }
 
 export const historyService = {
@@ -74,7 +87,7 @@ export const historyService = {
   /**
    * Save or update an interview session in history
    */
-  async saveSession(session: SessionHistoryItem): Promise<SessionHistoryItem> {
+  async saveSession(session: SessionSavePayload): Promise<SessionHistoryItem> {
     try {
       const res = await fetch('/api/history', {
         method: 'POST',
@@ -99,16 +112,23 @@ export const historyService = {
   /**
    * Create an initial blank session
    */
-  async createSession(id: string, roleTitle: string, cvFilename: string, jdFilename: string): Promise<SessionHistoryItem> {
-    const newSession: SessionHistoryItem = {
+  async createSession(
+    id: string,
+    roleTitle: string,
+    cvFilename: string,
+    jdFilename: string,
+    status: SessionHistoryItem['status'] = 'Not started'
+  ): Promise<SessionHistoryItem> {
+    const newSession: SessionSavePayload = {
       id,
       date: new Date().toISOString(),
       interviewType: 'Technical',
       roleTitle,
       cvFilename,
       jdFilename,
-      status: 'Not started',
-      questions: []
+      status,
+      questions: [],
+      replaceQuestions: false
     };
 
     return this.saveSession(newSession);

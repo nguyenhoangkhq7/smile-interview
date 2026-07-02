@@ -1,12 +1,21 @@
 'use client';
 
-import React, { useState, useRef, DragEvent, ChangeEvent } from 'react';
+import React, { useEffect, useState, useRef, DragEvent, ChangeEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { cvJdMatchingService, AssessmentResponse } from '@/services/cvJdMatching';
 import { historyService } from '@/services/historyService';
 import { FolderOpen, FileText, Briefcase, CheckCircle, XCircle, Brain, Lightbulb, X, AlertTriangle } from 'lucide-react';
 import styles from './new.module.css';
+
+type ActiveSessionState = {
+  sessionId: string;
+  roleTitle: string;
+  cvFilename: string;
+  jdFilename: string;
+  status: string;
+  date: string;
+};
 
 export default function NewInterviewPage() {
   const router = useRouter();
@@ -32,9 +41,45 @@ export default function NewInterviewPage() {
 
   // Result state
   const [assessment, setAssessment] = useState<AssessmentResponse | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [ingested, setIngested] = useState(false);
+  const [activeSessions, setActiveSessions] = useState<ActiveSessionState[]>([]);
 
   const fileInputCvRef = useRef<HTMLInputElement>(null);
   const fileInputJdRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadActiveSessions() {
+      try {
+        const sessions = await historyService.getHistory();
+        if (!mounted) return;
+
+        const inProgressSessions = sessions
+          .filter((item) => item.status !== 'Completed')
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+          .map((item) => ({
+            sessionId: item.id,
+            roleTitle: item.roleTitle,
+            cvFilename: item.cvFilename,
+            jdFilename: item.jdFilename,
+            status: item.status,
+            date: item.date
+          }));
+
+        setActiveSessions(inProgressSessions);
+      } catch (error) {
+        console.error('[NewInterviewPage] Failed to load active sessions:', error);
+      }
+    }
+
+    loadActiveSessions();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // ── Drag & Drop Handlers ──
   const handleDragOver = (e: DragEvent<HTMLDivElement>, zone: 'cv' | 'jd') => {
@@ -107,7 +152,11 @@ export default function NewInterviewPage() {
     else fileInputJdRef.current?.click();
   };
 
-  const handleStartAnalysis = async () => {
+  const handleResumeSession = (resumeSessionId: string) => {
+    router.push(`/interview/session/${resumeSessionId}`);
+  };
+
+  const handleUploadAndIngest = async () => {
     if (!cvFile || (jdInputType === 'file' && !jdFile) || (jdInputType === 'text' && !jdText.trim())) {
       return;
     }
@@ -127,22 +176,29 @@ export default function NewInterviewPage() {
         setTimeout(async () => {
           setUploading(false);
           setAnalyzing(true);
-          const sessionId = `session-${Date.now()}`;
+          const newSessionId = `session-${Date.now()}`;
           try {
+            await historyService.createSession(
+              newSessionId,
+              roleTitle,
+              cvFile.name,
+              jdInputType === 'file' && jdFile ? jdFile.name : 'JD_Pasted_Text.txt',
+              'In progress'
+            );
+
             // Step 1: Ingestion
             await cvJdMatchingService.ingestCvJd(
-              sessionId,
+              newSessionId,
               cvFile,
               jdInputType === 'file' ? jdFile : null,
               jdInputType === 'text' ? jdText : null
             );
-
-            // Step 2: Assessment Analysis
-            const result = await cvJdMatchingService.getAssessment(sessionId);
-            setAssessment(result);
+            
+            setSessionId(newSessionId);
+            setIngested(true);
           } catch (err: any) {
-            console.error('Analysis error:', err);
-            setApiError('Đã xảy ra lỗi khi kết nối với máy chủ AI. Vui lòng thử lại sau.');
+            console.error('Ingestion error:', err);
+            setApiError('Đã xảy ra lỗi khi tải lên tài liệu. Vui lòng thử lại sau.');
           } finally {
             setAnalyzing(false);
           }
@@ -153,25 +209,47 @@ export default function NewInterviewPage() {
     }, 100);
   };
 
+  const handleRunAssessment = async () => {
+    if (!sessionId) return;
+    setAnalyzing(true);
+    setApiError(null);
+    try {
+      const result = await cvJdMatchingService.getAssessment(sessionId);
+      setAssessment(result);
+    } catch (err: any) {
+      console.error('Assessment error:', err);
+      setApiError('Đã xảy ra lỗi khi kết nối với máy chủ AI. Vui lòng thử lại sau.');
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
   const handleContinueToSelection = async () => {
     if (!assessment) return;
     try {
-      // Create session history entry in localStorage as "Not started"
+      // Persist the assessment result to the existing session draft
       await historyService.createSession(
         assessment.sessionId,
         roleTitle,
         cvFile ? cvFile.name : 'CV_Upload.pdf',
-        jdInputType === 'file' && jdFile ? jdFile.name : 'JD_Pasted_Text.txt'
+        jdInputType === 'file' && jdFile ? jdFile.name : 'JD_Pasted_Text.txt',
+        'In progress'
       );
 
       // Store full assessment evaluation context into history (so Result page can view it later)
       const currentSession = await historyService.getSessionById(assessment.sessionId);
       if (currentSession) {
         currentSession.competencyFitScore = assessment.competencyFitScore;
-        currentSession.skillsAnalysis = assessment.skillsAnalysis;
-        currentSession.experienceEvaluation = assessment.experienceEvaluation;
-        currentSession.projectEvaluation = assessment.projectEvaluation;
-        currentSession.actionableSuggestions = assessment.actionableSuggestions;
+        currentSession.technicalDepthScore = assessment.technicalDepthScore;
+        currentSession.matchLevel = assessment.matchLevel;
+        currentSession.candidateLevel = assessment.candidateLevel;
+        currentSession.roleTypeDetected = assessment.roleTypeDetected;
+        currentSession.yearsOfExperienceEstimate = assessment.yearsOfExperienceEstimate;
+        currentSession.strongAreas = assessment.strongAreas;
+        currentSession.gapAreas = assessment.gapAreas;
+        currentSession.criticalMissingSkills = assessment.criticalMissingSkills;
+        currentSession.sectionWiseFeedback = assessment.sectionWiseFeedback;
+        currentSession.actionableSuggestions = assessment.actionableImprovementSuggestions;
         await historyService.saveSession(currentSession);
       }
 
@@ -188,6 +266,8 @@ export default function NewInterviewPage() {
     setJdText('');
     setUploadProgress(0);
     setApiError(null);
+    setIngested(false);
+    setSessionId(null);
   };
 
   // SVG Circular progress values
@@ -220,6 +300,59 @@ export default function NewInterviewPage() {
           <p className={styles.subtitle}>Tải lên CV và Mô tả công việc (JD) để AI phân tích mức độ tương thích</p>
         </div>
 
+        {activeSessions.length > 0 && !assessment && !uploading && !analyzing && (
+          <section className={styles.formSection} style={{ marginBottom: '1.5rem' }}>
+            <div className={styles.titleSection} style={{ marginBottom: '1rem' }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '1.25rem' }}>Phiên đang thực hiện</h2>
+                <p className={styles.subtitle} style={{ marginTop: '0.35rem' }}>
+                  Các phiên này đang được quản lý trong PostgreSQL, bạn có thể tiếp tục ngay từ đây.
+                </p>
+              </div>
+              <Link href="/history" className={styles.secondaryButton}>
+                Mở toàn bộ lịch sử
+              </Link>
+            </div>
+
+            <div style={{ display: 'grid', gap: '0.75rem' }}>
+              {activeSessions.slice(0, 3).map((session) => (
+                <div
+                  key={session.sessionId}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '1rem',
+                    padding: '1rem 1.1rem',
+                    borderRadius: '0.9rem',
+                    background: 'linear-gradient(135deg, rgba(79,70,229,0.06), rgba(14,165,233,0.04))',
+                    border: '1px solid rgba(99,102,241,0.12)'
+                  }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <strong style={{ color: '#0f172a' }}>{session.roleTitle}</strong>
+                      <span style={{ fontSize: '0.72rem', padding: '0.18rem 0.45rem', borderRadius: '999px', backgroundColor: '#e0e7ff', color: '#3730a3', fontWeight: 700 }}>
+                        {session.status}
+                      </span>
+                    </div>
+                    <p style={{ margin: '0.35rem 0 0', fontSize: '0.86rem', color: '#64748b' }}>
+                      {session.cvFilename} • {session.jdFilename}
+                    </p>
+                    <p style={{ margin: '0.25rem 0 0', fontSize: '0.78rem', color: '#94a3b8' }}>
+                      Cập nhật: {new Date(session.date).toLocaleString('vi-VN')}
+                    </p>
+                  </div>
+
+                  <button className={styles.primaryButton} onClick={() => handleResumeSession(session.sessionId)}>
+                    Tiếp tục phiên này
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         {apiError && (
           <div className={styles.errorBanner}>
             <span>⚠️ {apiError}</span>
@@ -228,7 +361,7 @@ export default function NewInterviewPage() {
         )}
 
         {/* ── State 1: Ready to Upload ── */}
-        {!uploading && !analyzing && !assessment && (
+        {!uploading && !analyzing && !assessment && !ingested && (
           <div className={styles.formSection}>
             <div className={styles.inputGroup}>
               <label htmlFor="roleTitle">Vị trí phỏng vấn mong muốn</label>
@@ -367,9 +500,9 @@ export default function NewInterviewPage() {
                   (jdInputType === 'file' && !jdFile) ||
                   (jdInputType === 'text' && !jdText.trim())
                 }
-                onClick={handleStartAnalysis}
+                onClick={handleUploadAndIngest}
               >
-                Phân tích CV &amp; JD
+                Tải lên CV &amp; JD
               </button>
             </div>
           </div>
@@ -389,18 +522,42 @@ export default function NewInterviewPage() {
           </div>
         )}
 
-        {/* ── State 3: AI Analyzing ── */}
+        {/* ── State 3: AI Analyzing (Ingesting or Assessing) ── */}
         {analyzing && (
           <div className={styles.loadingOverlay}>
             <div className={styles.spinner} style={{ borderTopColor: '#8b5cf6' }} />
             <div>
-              <h3>AI đang phân tích tài liệu của bạn...</h3>
-              <p className={styles.subtitle} style={{ marginTop: '0.25rem' }}>Quá trình này có thể mất tới 10-15 giây đối với tài liệu mới</p>
+              <h3>AI đang xử lý tài liệu của bạn...</h3>
+              <p className={styles.subtitle} style={{ marginTop: '0.25rem' }}>Quá trình này có thể mất tới 10-35 giây đối với tài liệu mới</p>
             </div>
             <div className={styles.loadingSteps}>
-              <p>✓ Trích xuất nội dung văn bản từ PDF...</p>
-              <p>✓ Chuẩn hóa định dạng kỹ năng bằng mô hình ngôn ngữ LLM...</p>
-              <p>➜ Đối chiếu và chấm điểm mức độ tương thích kỹ năng...</p>
+              {!ingested ? (
+                <>
+                  <p>✓ Trích xuất nội dung văn bản từ PDF...</p>
+                  <p>➜ Chuẩn hóa định dạng tài liệu...</p>
+                </>
+              ) : (
+                <p>➜ Đối chiếu và chấm điểm mức độ tương thích kỹ năng...</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── State 3.5: Ingested Successfully, Ready for Assessment ── */}
+        {ingested && !analyzing && !assessment && (
+          <div className={styles.formSection} style={{ textAlign: 'center', padding: '3rem' }}>
+            <CheckCircle size={64} style={{ color: '#10b981', margin: '0 auto 1.5rem auto' }} />
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 600, color: '#1e293b', marginBottom: '0.5rem' }}>Tải lên thành công!</h2>
+            <p style={{ color: '#64748b', marginBottom: '2rem' }}>
+              Tài liệu của bạn đã được chuẩn hóa và lưu trữ. Hệ thống đã sẵn sàng để phân tích độ tương thích.
+            </p>
+            <div className={styles.formActions} style={{ justifyContent: 'center' }}>
+              <button className={styles.secondaryButton} onClick={handleReset}>
+                Tải lại tài liệu khác
+              </button>
+              <button className={styles.primaryButton} onClick={handleRunAssessment}>
+                Tiến hành Đánh giá (Assessment)
+              </button>
             </div>
           </div>
         )}
@@ -444,9 +601,8 @@ export default function NewInterviewPage() {
                   <span>Kỹ năng phù hợp</span>
                 </h3>
                 <div className={styles.skillsList}>
-                  {assessment.skillsAnalysis.analysis ? (
-                    // In a real database we have specific fields, let's extract keywords or use mock
-                    ['React', 'Next.js', 'Typescript', 'State Management', 'Asynchronous JS'].map((skill, index) => (
+                  {assessment.strongAreas && assessment.strongAreas.length > 0 ? (
+                    assessment.strongAreas.map((skill, index) => (
                       <span key={index} className={`${styles.skillBadge} ${styles.skillMatched}`}>
                         {skill}
                       </span>
@@ -464,7 +620,7 @@ export default function NewInterviewPage() {
                   <span>Kỹ năng còn thiếu (Cần cải thiện)</span>
                 </h3>
                 <div className={styles.skillsList}>
-                  {assessment.skillsAnalysis.criticalMissingSkills.map((skill, index) => (
+                  {assessment.criticalMissingSkills && assessment.criticalMissingSkills.map((skill, index) => (
                     <span key={index} className={`${styles.skillBadge} ${styles.skillMissing}`}>
                       {skill}
                     </span>
@@ -479,7 +635,12 @@ export default function NewInterviewPage() {
                 <Brain size={18} style={{ color: '#4f46e5' }} />
                 <span>Nhận xét chi tiết từ AI</span>
               </h3>
-              <p>{assessment.skillsAnalysis.analysis}</p>
+              {assessment.sectionWiseFeedback && Object.entries(assessment.sectionWiseFeedback).map(([section, feedback], idx) => (
+                <div key={idx} style={{ marginBottom: '1rem' }}>
+                  <h4 style={{ fontSize: '1rem', color: '#1e293b', marginBottom: '0.25rem' }}>{section}</h4>
+                  <p>{feedback}</p>
+                </div>
+              ))}
             </div>
 
             {/* Suggestions for interview */}
@@ -489,7 +650,7 @@ export default function NewInterviewPage() {
                 <span>Lời khuyên chuẩn bị phỏng vấn</span>
               </h3>
               <ul className={styles.suggestionsList}>
-                {assessment.actionableSuggestions.map((suggestion, index) => (
+                {assessment.actionableImprovementSuggestions && assessment.actionableImprovementSuggestions.map((suggestion, index) => (
                   <li key={index}>{suggestion}</li>
                 ))}
               </ul>

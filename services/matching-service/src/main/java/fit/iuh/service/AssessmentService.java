@@ -181,37 +181,50 @@ public class AssessmentService {
                 ))
                 .build();
 
-        try {
-            LlmChatResponse response = llmWebClient.post()
-                    .uri(CHAT_COMPLETIONS_PATH)
-                    .bodyValue(request)
-                    .retrieve()
-                    .bodyToMono(LlmChatResponse.class)
-                    .block();
+        int maxRetries = 1;
+        for (int i = 0; i <= maxRetries; i++) {
+            try {
+                LlmChatResponse response = llmWebClient.post()
+                        .uri(CHAT_COMPLETIONS_PATH)
+                        .bodyValue(request)
+                        .retrieve()
+                        .bodyToMono(LlmChatResponse.class)
+                        .block();
 
-            if (response == null || response.getFirstChoiceContent() == null) {
-                throw new LlmApiException("LLM API returned an empty assessment response.");
+                if (response == null || response.getFirstChoiceContent() == null) {
+                    throw new LlmApiException("LLM API returned an empty assessment response.");
+                }
+
+                if (response.getUsage() != null) {
+                    LlmChatResponse.Usage usage = response.getUsage();
+                    log.info("[LLM_USAGE] Model: {} | Prompt (Input): {} | Completion (Output): {} | Total: {}",
+                            response.getModel(),
+                            usage.getPromptTokens(),
+                            usage.getCompletionTokens(),
+                            usage.getTotalTokens());
+                }
+
+                return response.getFirstChoiceContent().strip();
+
+            } catch (WebClientResponseException e) {
+                if (e.getStatusCode().value() == 429 && i < maxRetries) {
+                    log.warn("[LLM] 429 Too Many Requests. Retrying after 35 seconds...");
+                    try {
+                        Thread.sleep(35000);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                    }
+                    continue; // try again
+                }
+                throw new LlmApiException(
+                        "LLM API HTTP " + e.getStatusCode() + ": " + e.getResponseBodyAsString(), e);
+            } catch (LlmApiException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new LlmApiException("Unexpected error calling LLM API: " + e.getMessage(), e);
             }
-
-            if (response.getUsage() != null) {
-                LlmChatResponse.Usage usage = response.getUsage();
-                log.info("[LLM_USAGE] Model: {} | Prompt (Input): {} | Completion (Output): {} | Total: {}",
-                        response.getModel(),
-                        usage.getPromptTokens(),
-                        usage.getCompletionTokens(),
-                        usage.getTotalTokens());
-            }
-
-            return response.getFirstChoiceContent().strip();
-
-        } catch (WebClientResponseException e) {
-            throw new LlmApiException(
-                    "LLM API HTTP " + e.getStatusCode() + ": " + e.getResponseBodyAsString(), e);
-        } catch (LlmApiException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new LlmApiException("Unexpected error calling LLM API: " + e.getMessage(), e);
         }
+        throw new LlmApiException("Max retries exceeded");
     }
 
     // -------------------------------------------------------------------------

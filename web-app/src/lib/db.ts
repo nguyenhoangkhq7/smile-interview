@@ -43,9 +43,15 @@ export async function initDb() {
       status VARCHAR(50),
       overall_feedback TEXT,
       competency_fit_score INT,
-      skills_analysis JSONB,
-      experience_evaluation TEXT,
-      project_evaluation TEXT,
+      technical_depth_score INT,
+      match_level VARCHAR(50),
+      candidate_level VARCHAR(50),
+      role_type_detected VARCHAR(100),
+      years_of_experience_estimate VARCHAR(50),
+      strong_areas JSONB,
+      gap_areas JSONB,
+      critical_missing_skills JSONB,
+      section_wise_feedback JSONB,
       actionable_suggestions JSONB
     );
   `;
