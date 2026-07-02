@@ -1,6 +1,9 @@
 import redisClient from '../config/redis.js';
 import { transcribeAudio } from '../services/audio.service.js';
 import { synthesizeSpeech } from '../services/tts.service.js';
+import { createSession, getSession, updateSession } from '../services/session.service.js';
+import { evaluateCandidateResponse } from '../services/engine.client.js';
+import { generateAvatarAction } from '../services/mockAvatar.service.js';
 
 export const handleConnection = (io, socket) => {
   console.log(`Client connected: ${socket.id}`);
@@ -23,20 +26,143 @@ export const handleConnection = (io, socket) => {
         joinedAt: new Date().toISOString()
       });
       
-      // Also add user to the interview session set in Redis
       await redisClient.sAdd(`interview:${interviewId}:participants`, userId);
-      
-      // Join the Socket.io room matching the interview ID
       socket.join(interviewId);
       
-      // Notify other participants in the room
+      // Initialize or get orchestration session
+      let session = await getSession(interviewId);
+      if (!session) {
+        session = await createSession(interviewId, userId);
+      }
+
       socket.to(interviewId).emit('peer-joined', { userId, socketId: socket.id });
-      
-      // Acknowledge successful join
       socket.emit('joined-room', { interviewId, userId });
+      
+      // Emit initial orchestration state to the user who joined
+      socket.emit('orchestration-event', {
+        type: 'STATE_UPDATE',
+        payload: {
+          status: session.status,
+          questionState: session.questionState
+        }
+      });
+
+      // Optionally, push the first base question to start the interview if INIT
+      if (session.status === 'INIT' && session.questions.length > 0) {
+        const firstQuestion = session.questions[0];
+        const avatarAction = await generateAvatarAction(firstQuestion, 'NEUTRAL');
+
+        // Update state to IN_PROGRESS
+        await updateSession(interviewId, { status: 'IN_PROGRESS' });
+
+        io.to(interviewId).emit('orchestration-event', {
+          type: 'INTERVIEWER_ACTION',
+          payload: {
+            actionId: `base-q-0`,
+            actionType: 'BASE_QUESTION',
+            text: firstQuestion,
+            audioUrl: null,
+            avatarTriggers: avatarAction
+          }
+        });
+      }
+
     } catch (error) {
       console.error('Error in join-interview:', error);
       socket.emit('error', { message: 'Failed to join interview room' });
+    }
+  });
+
+  // Handle Orchestration Events from the Frontend
+  socket.on('orchestration-event', async (data) => {
+    try {
+      const socketInfo = await redisClient.hGetAll(`socket:${socket.id}`);
+      if (!socketInfo || !socketInfo.interviewId) {
+        socket.emit('error', { message: 'Not joined in any session' });
+        return;
+      }
+      
+      const sessionId = socketInfo.interviewId;
+
+      if (data.type === 'CANDIDATE_TEXT_SUBMIT') {
+        const candidateText = data.payload.text;
+        
+        // 1. Get Session State
+        const session = await getSession(sessionId);
+        if (!session) throw new Error('Session not found');
+
+        const qState = session.questionState;
+        
+        // Determine the current question context for the engine
+        // If we are currently following up, we'd ideally pass the previous follow-up. 
+        // For simplicity, we pass the base question from the list.
+        const currentQuestion = session.questions[qState.baseQuestionIndex];
+
+        // 2. Call Java AI Inference Service via gRPC
+        const engineResponse = await evaluateCandidateResponse({
+          sessionId: sessionId,
+          currentQuestion: currentQuestion,
+          candidateAnswer: candidateText,
+          currentFollowUpCount: qState.currentFollowUpDepth,
+          targetJobTitle: "IT Engineer",
+          previousQaContext: [] // Can be populated from a full history list if maintained
+        });
+        
+        let nextQuestionText = "";
+        let actionType = engineResponse.decision; // e.g. "FOLLOW_UP" or "NEXT_TOPIC"
+        let nextQState = { ...qState };
+
+        if (actionType === 'FOLLOW_UP') {
+          nextQuestionText = engineResponse.generatedFollowUpQuestion;
+          nextQState.currentFollowUpDepth += 1;
+        } else {
+          // Transition to Next Topic
+          nextQState.baseQuestionIndex += 1;
+          nextQState.currentFollowUpDepth = 0;
+          
+          if (nextQState.baseQuestionIndex < session.questions.length) {
+            nextQuestionText = session.questions[nextQState.baseQuestionIndex];
+            actionType = 'TRANSITION';
+          } else {
+            nextQuestionText = "Thank you. That concludes our technical questions.";
+            actionType = 'CONCLUDING';
+          }
+        }
+
+        // 3. Update Session State
+        const updatedSession = await updateSession(sessionId, {
+          questionState: nextQState,
+          status: actionType === 'CONCLUDING' ? 'COMPLETED' : 'IN_PROGRESS'
+        });
+
+        // 4. Broadcast State Update
+        io.to(sessionId).emit('orchestration-event', {
+          type: 'STATE_UPDATE',
+          payload: { 
+            status: updatedSession.status, 
+            questionState: updatedSession.questionState 
+          }
+        });
+
+        // 5. Generate Mock Avatar Triggers
+        const emotionHint = engineResponse.score > 7 ? 'HAPPY' : 'CURIOUS';
+        const avatarAction = await generateAvatarAction(nextQuestionText, emotionHint);
+        
+        // 6. Broadcast INTERVIEWER_ACTION
+        io.to(sessionId).emit('orchestration-event', {
+          type: 'INTERVIEWER_ACTION',
+          payload: {
+            actionId: `action-${Date.now()}`,
+            actionType: actionType,
+            text: nextQuestionText,
+            reasoning: engineResponse.reasoning,
+            audioUrl: null,
+            avatarTriggers: avatarAction
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error in orchestration event:', error);
     }
   });
 
@@ -44,112 +170,57 @@ export const handleConnection = (io, socket) => {
   socket.on('signal', async (data) => {
     try {
       const { targetSocketId, signal } = data;
-      
-      // Retrieve sender info from Redis
       const senderInfo = await redisClient.hGetAll(`socket:${socket.id}`);
-      if (!senderInfo || !senderInfo.userId) {
-        socket.emit('error', { message: 'Not joined in any session' });
-        return;
-      }
+      if (!senderInfo || !senderInfo.userId) return;
       
       if (targetSocketId) {
-        // Route signal to a specific socket ID
-        io.to(targetSocketId).emit('signal', {
-          senderSocketId: socket.id,
-          senderUserId: senderInfo.userId,
-          signal
-        });
+        io.to(targetSocketId).emit('signal', { senderSocketId: socket.id, senderUserId: senderInfo.userId, signal });
       } else if (senderInfo.interviewId) {
-        // Broadcast signal to everyone else in the interview room
-        socket.to(senderInfo.interviewId).emit('signal', {
-          senderSocketId: socket.id,
-          senderUserId: senderInfo.userId,
-          signal
-        });
+        socket.to(senderInfo.interviewId).emit('signal', { senderSocketId: socket.id, senderUserId: senderInfo.userId, signal });
       }
-    } catch (error) {
-      console.error('Error in signaling routing:', error);
-    }
+    } catch (error) {}
   });
 
   // Handle streaming audio chunk routing
   socket.on('audio-chunk', async (data) => {
     try {
-      const { chunk } = data; // audio data chunk (buffer or base64 string)
-      
-      // Retrieve session info from Redis
+      const { chunk } = data; 
       const socketInfo = await redisClient.hGetAll(`socket:${socket.id}`);
-      if (!socketInfo || !socketInfo.interviewId) {
-        return;
-      }
-
-      const { interviewId, userId } = socketInfo;
-
-      // Broadcast the audio chunk to other participants in the interview room
-      socket.to(interviewId).emit('audio-chunk', {
-        userId,
-        chunk,
-        timestamp: Date.now()
-      });
-    } catch (error) {
-      console.error('Error handling audio chunk:', error);
-    }
+      if (!socketInfo || !socketInfo.interviewId) return;
+      socket.to(socketInfo.interviewId).emit('audio-chunk', { userId: socketInfo.userId, chunk, timestamp: Date.now() });
+    } catch (error) {}
   });
 
-  // Handle STT: receive raw audio buffer → return transcribed text
+  // STT / TTS Handlers
   socket.on('process-stt', async (audioBuffer) => {
     try {
-      // Simulate a multer req.file object so the service signature is satisfied
-      const mockFile = {
-        buffer: audioBuffer,
-        originalname: 'stream.webm',
-        mimetype: 'audio/webm',
-      };
-
+      const mockFile = { buffer: audioBuffer, originalname: 'stream.webm', mimetype: 'audio/webm' };
       const resultText = await transcribeAudio(mockFile.buffer, mockFile.originalname);
-
       socket.emit('stt-result', { status: 'success', text: resultText });
     } catch (error) {
-      console.error('[STT] Error processing audio:', error);
       socket.emit('stt-error', { status: 'error', message: error.message });
     }
   });
 
-  // Handle TTS: receive text string → return MP3 audio buffer
   socket.on('process-tts', async (text) => {
     try {
       const audioArrayBuffer = await synthesizeSpeech(text);
-
-      // Convert ArrayBuffer → Node.js Buffer for binary-safe Socket.io transmission
-      const audioBuffer = Buffer.from(audioArrayBuffer);
-
-      socket.emit('tts-result', audioBuffer);
+      socket.emit('tts-result', Buffer.from(audioArrayBuffer));
     } catch (error) {
-      console.error('[TTS] Error synthesizing speech:', error);
       socket.emit('tts-error', { status: 'error', message: error.message });
     }
   });
 
-  // Handle client disconnection
   socket.on('disconnect', async () => {
     console.log(`Client disconnected: ${socket.id}`);
     try {
-      // Fetch user and interview info before deleting
       const socketInfo = await redisClient.hGetAll(`socket:${socket.id}`);
       if (socketInfo && socketInfo.interviewId && socketInfo.userId) {
         const { interviewId, userId } = socketInfo;
-        
-        // Remove user from the interview participants set
         await redisClient.sRem(`interview:${interviewId}:participants`, userId);
-        
-        // Notify others in the room
         socket.to(interviewId).emit('peer-left', { userId, socketId: socket.id });
       }
-      
-      // Clean up socket mapping in Redis
       await redisClient.del(`socket:${socket.id}`);
-    } catch (error) {
-      console.error('Error during client disconnect cleanup:', error);
-    }
+    } catch (error) {}
   });
 };

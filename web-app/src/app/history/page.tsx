@@ -52,6 +52,9 @@ export default function HistoryPage() {
     }
   };
 
+  const activeSessions = sessions.filter((item) => item.status !== 'Completed');
+  const completedSessions = sessions.filter((item) => item.status === 'Completed');
+
   return (
     <div className={styles.container}>
       <header className={styles.header}>
@@ -108,52 +111,101 @@ export default function HistoryPage() {
             </Link>
           </div>
         ) : (
-          /* History List */
-          <div className={styles.historyList}>
-            {sessions.map((item) => (
-              <div key={item.id} className={styles.card}>
-                <div className={styles.cardMain}>
-                  <div className={styles.cardHeader}>
-                    <span className={styles.roleTitle}>{item.roleTitle}</span>
-                    <span className={styles.typeBadge}>Kỹ thuật (Technical)</span>
-                  </div>
-                  <div className={styles.cardMeta}>
-                    <div className={styles.metaItem} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-                      <Calendar size={14} style={{ color: '#64748b' }} />
-                      <span>{formatDate(item.date)}</span>
-                    </div>
-                    {item.cvFilename && (
-                      <div className={styles.metaItem} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-                        <FileText size={14} style={{ color: '#64748b' }} />
-                        <span>CV: {item.cvFilename}</span>
+          <div style={{ display: 'grid', gap: '2rem' }}>
+            {activeSessions.length > 0 && (
+              <section>
+                <div style={{ marginBottom: '0.75rem' }}>
+                  <h2 style={{ margin: 0, fontSize: '1.1rem' }}>Phiên đang thực hiện</h2>
+                  <p className={styles.subtitle} style={{ marginTop: '0.25rem' }}>
+                    Những phiên này còn trạng thái mở trong PostgreSQL và có thể tiếp tục ngay.
+                  </p>
+                </div>
+                <div className={styles.historyList}>
+                  {activeSessions.map((item) => (
+                    <div key={item.id} className={styles.card}>
+                      <div className={styles.cardMain}>
+                        <div className={styles.cardHeader}>
+                          <span className={styles.roleTitle}>{item.roleTitle}</span>
+                          <span className={styles.typeBadge}>Kỹ thuật (Technical)</span>
+                        </div>
+                        <div className={styles.cardMeta}>
+                          <div className={styles.metaItem} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <Calendar size={14} style={{ color: '#64748b' }} />
+                            <span>{formatDate(item.date)}</span>
+                          </div>
+                          {item.cvFilename && (
+                            <div className={styles.metaItem} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                              <FileText size={14} style={{ color: '#64748b' }} />
+                              <span>CV: {item.cvFilename}</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    )}
-                  </div>
-                </div>
 
-                <div className={styles.cardAction}>
-                  {item.status === 'Completed' && item.overallScore !== undefined && (
-                    <div className={styles.scoreWrapper}>
-                      <span className={styles.scoreNum}>{item.overallScore}</span>
-                      <span className={styles.scoreLabel}>ĐIỂM SỐ</span>
+                      <div className={styles.cardAction}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
+                          {getStatusBadge(item.status)}
+                          <Link href={`/interview/session/${item.id}`} className={styles.primaryButton} style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>
+                            Tiếp tục ➔
+                          </Link>
+                        </div>
+                      </div>
                     </div>
-                  )}
-                  
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
-                    {getStatusBadge(item.status)}
-                    {item.status === 'Completed' ? (
-                      <Link href={`/interview/session/${item.id}/result`} className={styles.secondaryButton}>
-                        Xem kết quả ➔
-                      </Link>
-                    ) : (
-                      <Link href={`/interview/session/${item.id}`} className={styles.primaryButton} style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>
-                        Tiếp tục ➔
-                      </Link>
-                    )}
-                  </div>
+                  ))}
                 </div>
-              </div>
-            ))}
+              </section>
+            )}
+
+            {completedSessions.length > 0 && (
+              <section>
+                <div style={{ marginBottom: '0.75rem' }}>
+                  <h2 style={{ margin: 0, fontSize: '1.1rem' }}>Phiên đã hoàn thành</h2>
+                  <p className={styles.subtitle} style={{ marginTop: '0.25rem' }}>
+                    Các session đã lưu đầy đủ kết quả đánh giá và câu hỏi trả lời.
+                  </p>
+                </div>
+                <div className={styles.historyList}>
+                  {completedSessions.map((item) => (
+                    <div key={item.id} className={styles.card}>
+                      <div className={styles.cardMain}>
+                        <div className={styles.cardHeader}>
+                          <span className={styles.roleTitle}>{item.roleTitle}</span>
+                          <span className={styles.typeBadge}>Kỹ thuật (Technical)</span>
+                        </div>
+                        <div className={styles.cardMeta}>
+                          <div className={styles.metaItem} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <Calendar size={14} style={{ color: '#64748b' }} />
+                            <span>{formatDate(item.date)}</span>
+                          </div>
+                          {item.cvFilename && (
+                            <div className={styles.metaItem} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                              <FileText size={14} style={{ color: '#64748b' }} />
+                              <span>CV: {item.cvFilename}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className={styles.cardAction}>
+                        {item.overallScore !== undefined && (
+                          <div className={styles.scoreWrapper}>
+                            <span className={styles.scoreNum}>{item.overallScore}</span>
+                            <span className={styles.scoreLabel}>ĐIỂM SỐ</span>
+                          </div>
+                        )}
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
+                          {getStatusBadge(item.status)}
+                          <Link href={`/interview/session/${item.id}/result`} className={styles.secondaryButton}>
+                            Xem kết quả ➔
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
           </div>
         )}
       </main>

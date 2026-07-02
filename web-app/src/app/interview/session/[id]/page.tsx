@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { io, Socket } from 'socket.io-client';
 import { InterviewerAvatar } from '@/components/InterviewerAvatar';
 import { historyService, SessionHistoryItem, QuestionFeedback } from '@/services/historyService';
-import { questionService } from '@/services/questionService';
+// Removed questionService
 import { useSessionRecorder } from '@/hooks/useSessionRecorder';
 import styles from './session.module.css';
 import {
@@ -56,8 +56,8 @@ export default function InterviewSessionPage() {
 
   // Audio / Socket / Engine Service Status
   const [socketConnected, setSocketConnected] = useState(false);
-  const [ttsMode, setTtsMode] = useState<'online' | 'mock'>('mock');
-  const [sttMode, setSttMode] = useState<'online' | 'mock'>('mock');
+  const [ttsMode, setTtsMode] = useState<'online' | 'mock'>('online');
+  const [sttMode, setSttMode] = useState<'online' | 'mock'>('online');
   const socketRef = useRef<Socket | null>(null);
 
   // Persistent Audio Pipeline Refs (Prevents browser autoplay blockages)
@@ -99,6 +99,7 @@ export default function InterviewSessionPage() {
 
   // Simulated streaming STT state
   const [isRevealing, setIsRevealing] = useState(false);
+  const autoStartMicRef = useRef(false);
 
   const formatCurrentTime = () => {
     const d = new Date();
@@ -143,6 +144,7 @@ export default function InterviewSessionPage() {
         audio.addEventListener('ended', () => {
           setAvatarPlaying(false);
           // Transition to LISTENING when speech ends
+          autoStartMicRef.current = true;
           setSessionState('LISTENING');
         });
 
@@ -178,7 +180,10 @@ export default function InterviewSessionPage() {
           currentSession.overallScore = 60; // baseline if empty
         }
 
-        await historyService.saveSession(currentSession);
+        await historyService.saveSession({
+          ...currentSession,
+          replaceQuestions: true
+        });
       }
     } catch (err) {
       console.error('Error completing session:', err);
@@ -227,6 +232,7 @@ export default function InterviewSessionPage() {
         setAvatarPlaying(false);
         setAvatarAnalyser(null);
         if (mockAnalyserIntervalRef.current) clearInterval(mockAnalyserIntervalRef.current);
+        autoStartMicRef.current = true;
         setSessionState('LISTENING');
       };
 
@@ -234,6 +240,7 @@ export default function InterviewSessionPage() {
         console.error('SpeechSynthesis error:', e);
         setAvatarPlaying(false);
         setAvatarAnalyser(null);
+        autoStartMicRef.current = false;
         setSessionState('LISTENING');
       };
 
@@ -250,56 +257,21 @@ export default function InterviewSessionPage() {
     setUserAnswerDraft('');
     setSessionState('AI_THINKING');
 
-    try {
-      const nextQ = await questionService.getNextQuestion(id, answer);
-
-      // Save evaluated QA pair to history database
-      const currentSession = await historyService.getSessionById(id);
-      if (currentSession && session) {
-        const evalItem: QuestionFeedback = {
-          question: currentQuestion,
-          answer,
-          score: nextQ.score,
-          strengths: nextQ.strengths,
-          improvements: nextQ.improvements,
-          suggestedAnswer: nextQ.suggestedAnswer,
-          topicTag: topicTag,
-          isDeepDive: isDeepDive
-        };
-        if (!currentSession.questions) {
-          currentSession.questions = [];
-        }
-        currentSession.questions.push(evalItem);
-        await historyService.saveSession(currentSession);
-      }
-
-      if (nextQ.isFinished) {
-        handleInterviewFinish(false);
-      } else {
-        // Switch back to speaking the next question
-        setCurrentQuestion(nextQ.questionText);
-        setTopicTag(nextQ.topicTag);
-        setIsDeepDive(nextQ.isDeepDive);
-        setQuestionCount((prev) => prev + 1);
-
-        setChatLog((prev) => [
-          ...prev,
-          { sender: 'AI', text: nextQ.questionText, time: formatCurrentTime(), isDeepDive: nextQ.isDeepDive }
-        ]);
-
-        setSessionState('AI_SPEAKING');
-        speakQuestion(nextQ.questionText);
-      }
-    } catch (err) {
-      console.error('Error transitioning question state:', err);
-      // Fail-safe end interview
-      handleInterviewFinish(false);
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('orchestration-event', {
+        type: 'CANDIDATE_TEXT_SUBMIT',
+        payload: { text: answer }
+      });
+    } else {
+      console.error('Socket not connected to send answer');
+      setSessionState('LISTENING');
     }
-  }, [id, currentQuestion, topicTag, isDeepDive, session, handleInterviewFinish, speakQuestion]);
+  }, []);
 
   // ── Server-Sent Events (SSE) streaming reveal for online STT ──
   const streamTranscript = useCallback((fullText: string) => {
     setRecording(false);
+    autoStartMicRef.current = false;
     setIsRevealing(true);
     setUserAnswerDraft('');
     setSessionState('LISTENING');
@@ -375,6 +347,7 @@ export default function InterviewSessionPage() {
       console.error('[Session] Ingestion fallback failed:', err);
       setUserAnswerDraft('[Lỗi kết nối. Không thể nhận diện. Vui lòng ghi âm lại.]');
       setRecording(false);
+      autoStartMicRef.current = false;
       setSessionState('LISTENING');
     }
   }, [streamTranscript]);
@@ -411,6 +384,7 @@ export default function InterviewSessionPage() {
 
         recorder.onstop = async () => {
           setSessionState('AI_THINKING');
+          autoStartMicRef.current = false;
           const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
 
           const buffer = await audioBlob.arrayBuffer();
@@ -456,6 +430,7 @@ export default function InterviewSessionPage() {
 
         rec.onend = () => {
           setRecording(false);
+          autoStartMicRef.current = false;
           const finalizedAnswer = finalTranscriptRef.current.trim() || userAnswerDraft.trim();
           if (finalizedAnswer) {
             submitFinalAnswer(finalizedAnswer);
@@ -485,6 +460,7 @@ export default function InterviewSessionPage() {
 
   const handleStopRecording = useCallback(() => {
     setRecording(false);
+    autoStartMicRef.current = false;
     if (sttMode === 'online') {
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         mediaRecorderRef.current.stop();
@@ -550,10 +526,6 @@ export default function InterviewSessionPage() {
       const data = await historyService.getSessionById(id);
       if (data) {
         setSession(data);
-      } else {
-        // Fallback create
-        const newSession = await historyService.createSession(id, 'React Frontend Engineer', 'CV_Preview.pdf', 'JD_Preview.pdf');
-        setSession(newSession);
       }
     }
     initSession();
@@ -625,6 +597,17 @@ export default function InterviewSessionPage() {
     initAudioOnUserGestureRef.current = initAudioOnUserGesture;
   }, [initAudioOnUserGesture]);
 
+  const handleInterviewFinishRef = useRef(handleInterviewFinish);
+  const speakQuestionRef = useRef(speakQuestion);
+
+  useEffect(() => {
+    handleInterviewFinishRef.current = handleInterviewFinish;
+  }, [handleInterviewFinish]);
+
+  useEffect(() => {
+    speakQuestionRef.current = speakQuestion;
+  }, [speakQuestion]);
+
   // ── 2. Socket Connection & TTS/STT Engine Health Checks ──
   useEffect(() => {
     const streamingUrl = process.env.NEXT_PUBLIC_STREAMING_SERVICE_URL || 'http://localhost:8001';
@@ -645,16 +628,42 @@ export default function InterviewSessionPage() {
       setTtsMode('online');
       setSttMode('online');
 
-      // Join interview room
-      socket.emit('join-interview', { interviewId: id, userId: 'candidate-user' });
+      // We will join-interview manually via handleStartInterview to ensure user gesture
+    });
+
+    socket.on('orchestration-event', (data: any) => {
+      console.log('[Session] Received orchestration event:', data);
+      if (data.type === 'INTERVIEWER_ACTION') {
+        const { actionType, text } = data.payload;
+        if (actionType === 'CONCLUDING') {
+          handleInterviewFinishRef.current(false);
+          return;
+        }
+
+        setCurrentQuestion(text);
+        setQuestionCount((prev) => prev + 1);
+        setIsDeepDive(actionType === 'FOLLOW_UP');
+
+        setChatLog((prev) => [
+          ...prev,
+          { sender: 'AI', text, time: formatCurrentTime(), isDeepDive: actionType === 'FOLLOW_UP' }
+        ]);
+
+        setSessionState('AI_SPEAKING');
+        speakQuestionRef.current(text);
+      } else if (data.type === 'STATE_UPDATE') {
+        if (data.payload.status === 'COMPLETED') {
+          handleInterviewFinishRef.current(false);
+        } else if (data.payload.status === 'INIT') {
+           setSessionState('INITIALIZING');
+        }
+      }
     });
 
     socket.on('connect_error', () => {
-      console.warn('[Session] Connection to streaming service failed. Falling back to native browser Speech APIs.');
+      console.warn('[Session] Connection to streaming service failed.');
       setSocketConnected(false);
-      setAvatarConnected(true); // Keep 3D avatar scene alive in visual fallback mode
-      setTtsMode('mock');
-      setSttMode('mock');
+      setAvatarConnected(true);
     });
 
     // Handle incoming audio transcriptions from server-side STT
@@ -720,24 +729,26 @@ export default function InterviewSessionPage() {
   // ── 3. Start First Question ──
   const handleStartInterview = async () => {
     initAudioOnUserGesture();
-    await questionService.resetSession(id);
     setSessionState('AI_THINKING');
     startTimer();
 
-    setTimeout(async () => {
-      const nextQ = await questionService.getNextQuestion(id);
-      setCurrentQuestion(nextQ.questionText);
-      setTopicTag(nextQ.topicTag);
-      setIsDeepDive(nextQ.isDeepDive);
-      setQuestionCount(1);
-
-      // Save question to transcript chat board
-      setChatLog([{ sender: 'AI', text: nextQ.questionText, time: formatCurrentTime(), isDeepDive: nextQ.isDeepDive }]);
-
-      setSessionState('AI_SPEAKING');
-      speakQuestion(nextQ.questionText);
-    }, 1200);
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('join-interview', { interviewId: id, userId: 'candidate-user' });
+    }
   };
+
+  useEffect(() => {
+    if (sessionState !== 'LISTENING') return;
+    if (!autoStartMicRef.current) return;
+    if (recording || isRevealing || permissionError || !micEnabled) return;
+
+    autoStartMicRef.current = false;
+    const timerId = window.setTimeout(() => {
+      handleStartRecording();
+    }, 150);
+
+    return () => window.clearTimeout(timerId);
+  }, [sessionState, recording, isRevealing, permissionError, micEnabled, handleStartRecording]);
 
   const handleEndEarlyConfirm = () => {
     setShowExitModal(false);

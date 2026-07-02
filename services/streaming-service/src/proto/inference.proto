@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package ai.inference;
+
+option java_multiple_files = true;
+option java_package = "fit.iuh.grpc.inference";
+option java_outer_classname = "InferenceProto";
+
+service InferenceService {
+  rpc EvaluateResponse(InferenceRequest) returns (InferenceResponse);
+}
+
+message InferenceRequest {
+  string session_id = 1;
+  string current_question = 2;
+  string candidate_answer = 3;
+  int32 current_follow_up_count = 4;
+  string target_job_title = 5;
+  repeated string previous_qa_context = 6;
+}
+
+message InferenceResponse {
+  string decision = 1; // "FOLLOW_UP" or "NEXT_TOPIC"
+  string reasoning = 2;
+  string generated_follow_up_question = 3;
+  int32 score = 4; // 1-10
+}
