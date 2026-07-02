@@ -44,6 +44,8 @@ export interface SessionHistoryItem {
   criticalMissingSkills?: string[];
   sectionWiseFeedback?: Record<string, string>;
   actionableSuggestions?: string[];
+  resumeId?: number;
+  jdId?: number;
 }
 
 export interface SessionSavePayload extends SessionHistoryItem {

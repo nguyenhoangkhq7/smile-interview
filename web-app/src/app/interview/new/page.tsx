@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { cvJdMatchingService, AssessmentResponse } from '@/services/cvJdMatching';
 import { historyService } from '@/services/historyService';
-import { FolderOpen, FileText, Briefcase, CheckCircle, XCircle, Brain, Lightbulb, X, AlertTriangle } from 'lucide-react';
+import { FolderOpen, FileText, Briefcase, CheckCircle, XCircle, Brain, Lightbulb, X, AlertTriangle, Check, AlertCircle, TrendingUp, UserCheck, Award, ShieldCheck } from 'lucide-react';
 import styles from './new.module.css';
 
 type ActiveSessionState = {
@@ -21,11 +21,19 @@ export default function NewInterviewPage() {
   const router = useRouter();
   const [roleTitle, setRoleTitle] = useState('React Frontend Engineer');
 
-  // Files
+  // Files & Sources
   const [cvFile, setCvFile] = useState<File | null>(null);
   const [jdFile, setJdFile] = useState<File | null>(null);
   const [jdText, setJdText] = useState('');
-  const [jdInputType, setJdInputType] = useState<'file' | 'text'>('file');
+  const [jdInputType, setJdInputType] = useState<'file' | 'text'>('file'); // Note: we'll use jdSource for detailed tabs, keeping this for backward compatibility
+
+  // Saved database entities
+  const [savedResumes, setSavedResumes] = useState<any[]>([]);
+  const [savedJds, setSavedJds] = useState<any[]>([]);
+  const [selectedResumeId, setSelectedResumeId] = useState<number | null>(null);
+  const [selectedJdId, setSelectedJdId] = useState<number | null>(null);
+  const [cvSource, setCvSource] = useState<'upload' | 'saved'>('upload');
+  const [jdSource, setJdSource] = useState<'upload' | 'text' | 'saved'>('upload');
 
   // Drag states
   const [dragOverCv, setDragOverCv] = useState(false);
@@ -74,7 +82,25 @@ export default function NewInterviewPage() {
       }
     }
 
+    async function loadSavedEntities() {
+      try {
+        const resumesRes = await fetch('/api/resumes');
+        if (resumesRes.ok && mounted) {
+          const resumes = await resumesRes.json();
+          setSavedResumes(resumes);
+        }
+        const jdsRes = await fetch('/api/jds');
+        if (jdsRes.ok && mounted) {
+          const jds = await jdsRes.json();
+          setSavedJds(jds);
+        }
+      } catch (error) {
+        console.error('[NewInterviewPage] Failed to load saved resumes/JDs:', error);
+      }
+    }
+
     loadActiveSessions();
+    loadSavedEntities();
 
     return () => {
       mounted = false;
@@ -157,9 +183,14 @@ export default function NewInterviewPage() {
   };
 
   const handleUploadAndIngest = async () => {
-    if (!cvFile || (jdInputType === 'file' && !jdFile) || (jdInputType === 'text' && !jdText.trim())) {
-      return;
-    }
+    // Validate CV selection
+    if (cvSource === 'upload' && !cvFile) return;
+    if (cvSource === 'saved' && !selectedResumeId) return;
+
+    // Validate JD selection
+    if (jdSource === 'upload' && !jdFile) return;
+    if (jdSource === 'text' && !jdText.trim()) return;
+    if (jdSource === 'saved' && !selectedJdId) return;
 
     setUploading(true);
     setApiError(null);
@@ -167,7 +198,7 @@ export default function NewInterviewPage() {
     // Simulate upload progress
     let progress = 0;
     const interval = setInterval(() => {
-      progress += 15;
+      progress += 20;
       if (progress >= 100) {
         clearInterval(interval);
         setUploadProgress(100);
@@ -178,27 +209,48 @@ export default function NewInterviewPage() {
           setAnalyzing(true);
           const newSessionId = `session-${Date.now()}`;
           try {
-            await historyService.createSession(
-              newSessionId,
+            const displayCvName = cvSource === 'upload' && cvFile 
+              ? cvFile.name 
+              : (savedResumes.find(r => r.id === selectedResumeId)?.file_name || 'Saved_CV.pdf');
+            
+            const displayJdName = jdSource === 'upload' && jdFile 
+              ? jdFile.name 
+              : (jdSource === 'text' 
+                  ? 'JD_Pasted_Text.txt' 
+                  : (savedJds.find(j => j.id === selectedJdId)?.title || 'Saved_JD.pdf'));
+
+            await historyService.saveSession({
+              id: newSessionId,
+              date: new Date().toISOString(),
+              interviewType: 'Technical',
               roleTitle,
-              cvFile.name,
-              jdInputType === 'file' && jdFile ? jdFile.name : 'JD_Pasted_Text.txt',
-              'In progress'
-            );
+              cvFilename: displayCvName,
+              jdFilename: displayJdName,
+              status: 'In progress',
+              questions: [],
+              resumeId: cvSource === 'saved' ? (selectedResumeId || undefined) : undefined,
+              jdId: jdSource === 'saved' ? (selectedJdId || undefined) : undefined
+            });
 
             // Step 1: Ingestion
-            await cvJdMatchingService.ingestCvJd(
+            const ingestRes = await cvJdMatchingService.ingestCvJd(
               newSessionId,
-              cvFile,
-              jdInputType === 'file' ? jdFile : null,
-              jdInputType === 'text' ? jdText : null
+              cvSource === 'upload' ? cvFile : null,
+              jdSource === 'upload' ? jdFile : null,
+              jdSource === 'text' ? jdText : null,
+              cvSource === 'saved' ? selectedResumeId : null,
+              jdSource === 'saved' ? selectedJdId : null
             );
             
+            // If new files were uploaded and saved, update the IDs
+            if (ingestRes.resumeId) setSelectedResumeId(ingestRes.resumeId);
+            if (ingestRes.jdId) setSelectedJdId(ingestRes.jdId);
+
             setSessionId(newSessionId);
             setIngested(true);
           } catch (err: any) {
             console.error('Ingestion error:', err);
-            setApiError('Đã xảy ra lỗi khi tải lên tài liệu. Vui lòng thử lại sau.');
+            setApiError('Đã xảy ra lỗi khi tải lên và xử lý tài liệu. Vui lòng thử lại sau.');
           } finally {
             setAnalyzing(false);
           }
@@ -227,31 +279,40 @@ export default function NewInterviewPage() {
   const handleContinueToSelection = async () => {
     if (!assessment) return;
     try {
-      // Persist the assessment result to the existing session draft
-      await historyService.createSession(
-        assessment.sessionId,
-        roleTitle,
-        cvFile ? cvFile.name : 'CV_Upload.pdf',
-        jdInputType === 'file' && jdFile ? jdFile.name : 'JD_Pasted_Text.txt',
-        'In progress'
-      );
+      const displayCvName = cvSource === 'upload' && cvFile 
+        ? cvFile.name 
+        : (savedResumes.find(r => r.id === selectedResumeId)?.file_name || 'Saved_CV.pdf');
+      
+      const displayJdName = jdSource === 'upload' && jdFile 
+        ? jdFile.name 
+        : (jdSource === 'text' 
+            ? 'JD_Pasted_Text.txt' 
+            : (savedJds.find(j => j.id === selectedJdId)?.title || 'Saved_JD.pdf'));
 
-      // Store full assessment evaluation context into history (so Result page can view it later)
-      const currentSession = await historyService.getSessionById(assessment.sessionId);
-      if (currentSession) {
-        currentSession.competencyFitScore = assessment.competencyFitScore;
-        currentSession.technicalDepthScore = assessment.technicalDepthScore;
-        currentSession.matchLevel = assessment.matchLevel;
-        currentSession.candidateLevel = assessment.candidateLevel;
-        currentSession.roleTypeDetected = assessment.roleTypeDetected;
-        currentSession.yearsOfExperienceEstimate = assessment.yearsOfExperienceEstimate;
-        currentSession.strongAreas = assessment.strongAreas;
-        currentSession.gapAreas = assessment.gapAreas;
-        currentSession.criticalMissingSkills = assessment.criticalMissingSkills;
-        currentSession.sectionWiseFeedback = assessment.sectionWiseFeedback;
-        currentSession.actionableSuggestions = assessment.actionableImprovementSuggestions;
-        await historyService.saveSession(currentSession);
-      }
+      // Persist the assessment result to the existing session draft
+      await historyService.saveSession({
+        id: assessment.sessionId,
+        date: new Date().toISOString(),
+        interviewType: 'Technical',
+        roleTitle,
+        cvFilename: displayCvName,
+        jdFilename: displayJdName,
+        resumeId: selectedResumeId || undefined,
+        jdId: selectedJdId || undefined,
+        status: 'In progress',
+        questions: [],
+        competencyFitScore: assessment.competencyFitScore,
+        technicalDepthScore: assessment.technicalDepthScore,
+        matchLevel: assessment.matchLevel,
+        candidateLevel: assessment.candidateLevel,
+        roleTypeDetected: assessment.roleTypeDetected,
+        yearsOfExperienceEstimate: assessment.yearsOfExperienceEstimate,
+        strongAreas: assessment.strongAreas,
+        gapAreas: assessment.gapAreas,
+        criticalMissingSkills: assessment.criticalMissingSkills,
+        sectionWiseFeedback: assessment.sectionWiseFeedback,
+        actionableSuggestions: assessment.actionableImprovementSuggestions
+      });
 
       router.push(`/interview/new/type?sessionId=${assessment.sessionId}`);
     } catch (err) {
@@ -264,6 +325,8 @@ export default function NewInterviewPage() {
     setCvFile(null);
     setJdFile(null);
     setJdText('');
+    setSelectedResumeId(null);
+    setSelectedJdId(null);
     setUploadProgress(0);
     setApiError(null);
     setIngested(false);
@@ -276,6 +339,28 @@ export default function NewInterviewPage() {
   const strokeDashoffset = assessment
     ? circumference - (assessment.competencyFitScore / 100) * circumference
     : circumference;
+  const depthStrokeDashoffset = assessment
+    ? circumference - (assessment.technicalDepthScore / 100) * circumference
+    : circumference;
+
+  const renderFeedbackValue = (val: any) => {
+    if (val && typeof val === 'object') {
+      return val.analysis || JSON.stringify(val);
+    }
+    return String(val || '');
+  };
+
+  const getSectionName = (key: string) => {
+    const SECTION_NAMES: Record<string, string> = {
+      cs_fundamentals: "Kiến thức Khoa học Máy tính cốt lõi (CS Fundamentals)",
+      tech_stack_alignment: "Mức độ tương thích Tech Stack",
+      project_technical_depth: "Chiều sâu kỹ thuật trong các dự án",
+      engineering_practices: "Quy trình và Thực hành Kỹ nghệ",
+      experience_evaluation: "Đánh giá kinh nghiệm làm việc",
+      education_and_certifications: "Đánh giá học vấn & chứng chỉ"
+    };
+    return SECTION_NAMES[key] || key.replace(/_/g, ' ').toUpperCase();
+  };
 
   return (
     <div className={styles.container}>
@@ -379,37 +464,75 @@ export default function NewInterviewPage() {
               {/* CV Upload */}
               <div className={styles.uploadCol}>
                 <label className={styles.uploadLabel}>Hồ sơ cá nhân (CV)</label>
-                {!cvFile ? (
-                  <div
-                    className={`${styles.dropzone} ${dragOverCv ? styles.dropzoneActive : ''}`}
-                    onDragOver={(e) => handleDragOver(e, 'cv')}
-                    onDragLeave={() => handleDragLeave('cv')}
-                    onDrop={(e) => handleDrop(e, 'cv')}
-                    onClick={() => triggerFileSelect('cv')}
+                 <div className={styles.tabButtons} style={{ marginBottom: '1rem' }}>
+                  <button
+                    type="button"
+                    className={`${styles.tabButton} ${cvSource === 'upload' ? styles.tabButtonActive : ''}`}
+                    onClick={() => setCvSource('upload')}
                   >
-                    <FolderOpen size={48} className={styles.uploadIcon} style={{ color: '#6366f1', marginBottom: '1rem' }} />
-                    <p className={styles.dropzoneText}>
-                      Kéo thả CV hoặc <span className={styles.browseLink}>chọn tệp</span>
-                    </p>
-                    <p className={styles.dropzoneHint}>Hỗ trợ định dạng PDF. Tối đa 10MB.</p>
-                    <input
-                      ref={fileInputCvRef}
-                      type="file"
-                      style={{ display: 'none' }}
-                      accept=".pdf"
-                      onChange={(e) => handleFileChange(e, 'cv')}
-                    />
-                  </div>
-                ) : (
-                  <div className={styles.fileCard}>
-                    <div className={styles.fileInfo}>
-                      <FileText size={24} className={styles.fileIcon} style={{ color: '#6366f1', marginRight: '8px' }} />
-                      <div>
-                        <p className={styles.fileName}>{cvFile.name}</p>
-                        <p className={styles.fileSize}>{(cvFile.size / 1024 / 1024).toFixed(2)} MB</p>
-                      </div>
+                    Tải CV mới
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.tabButton} ${cvSource === 'saved' ? styles.tabButtonActive : ''}`}
+                    onClick={() => setCvSource('saved')}
+                  >
+                    Chọn CV đã lưu
+                  </button>
+                </div>
+
+                {cvSource === 'upload' ? (
+                  !cvFile ? (
+                    <div
+                      className={`${styles.dropzone} ${dragOverCv ? styles.dropzoneActive : ''}`}
+                      onDragOver={(e) => handleDragOver(e, 'cv')}
+                      onDragLeave={() => handleDragLeave('cv')}
+                      onDrop={(e) => handleDrop(e, 'cv')}
+                      onClick={() => triggerFileSelect('cv')}
+                    >
+                      <FolderOpen size={48} className={styles.uploadIcon} style={{ color: '#6366f1', marginBottom: '1rem' }} />
+                      <p className={styles.dropzoneText}>
+                        Kéo thả CV hoặc <span className={styles.browseLink}>chọn tệp</span>
+                      </p>
+                      <p className={styles.dropzoneHint}>Hỗ trợ định dạng PDF. Tối đa 10MB.</p>
+                      <input
+                        ref={fileInputCvRef}
+                        type="file"
+                        style={{ display: 'none' }}
+                        accept=".pdf"
+                        onChange={(e) => handleFileChange(e, 'cv')}
+                      />
                     </div>
-                    <button className={styles.removeBtn} onClick={() => setCvFile(null)}><X size={14} /></button>
+                  ) : (
+                    <div className={styles.fileCard}>
+                      <div className={styles.fileInfo}>
+                        <FileText size={24} className={styles.fileIcon} style={{ color: '#6366f1', marginRight: '8px' }} />
+                        <div>
+                          <p className={styles.fileName}>{cvFile.name}</p>
+                          <p className={styles.fileSize}>{(cvFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                        </div>
+                      </div>
+                      <button className={styles.removeBtn} onClick={() => setCvFile(null)}><X size={14} /></button>
+                    </div>
+                  )
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <select
+                      className={styles.textInput}
+                      style={{ width: '100%', cursor: 'pointer' }}
+                      value={selectedResumeId || ''}
+                      onChange={(e) => setSelectedResumeId(e.target.value ? parseInt(e.target.value, 10) : null)}
+                    >
+                      <option value="">-- Chọn CV trong danh sách --</option>
+                      {savedResumes.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.file_name} ({new Date(r.created_at).toLocaleDateString('vi-VN')})
+                        </option>
+                      ))}
+                    </select>
+                    {savedResumes.length === 0 && (
+                      <p className="text-xs text-slate-400 mt-1">Không có CV nào được lưu trước đó.</p>
+                    )}
                   </div>
                 )}
                 {cvError && (
@@ -425,20 +548,26 @@ export default function NewInterviewPage() {
                 <div className={styles.jdTabContainer}>
                   <div className={styles.tabButtons}>
                     <button
-                      className={`${styles.tabButton} ${jdInputType === 'file' ? styles.tabButtonActive : ''}`}
-                      onClick={() => setJdInputType('file')}
+                      className={`${styles.tabButton} ${jdSource === 'upload' ? styles.tabButtonActive : ''}`}
+                      onClick={() => setJdSource('upload')}
                     >
                       Tải tệp JD
                     </button>
                     <button
-                      className={`${styles.tabButton} ${jdInputType === 'text' ? styles.tabButtonActive : ''}`}
-                      onClick={() => setJdInputType('text')}
+                      className={`${styles.tabButton} ${jdSource === 'text' ? styles.tabButtonActive : ''}`}
+                      onClick={() => setJdSource('text')}
                     >
                       Dán văn bản
                     </button>
+                    <button
+                      className={`${styles.tabButton} ${jdSource === 'saved' ? styles.tabButtonActive : ''}`}
+                      onClick={() => setJdSource('saved')}
+                    >
+                      Chọn JD đã lưu
+                    </button>
                   </div>
 
-                  {jdInputType === 'file' ? (
+                  {jdSource === 'upload' ? (
                     !jdFile ? (
                       <div
                         className={`${styles.dropzone} ${dragOverJd ? styles.dropzoneActive : ''}`}
@@ -472,13 +601,32 @@ export default function NewInterviewPage() {
                         <button className={styles.removeBtn} onClick={() => setJdFile(null)}><X size={14} /></button>
                       </div>
                     )
-                  ) : (
+                  ) : jdSource === 'text' ? (
                     <textarea
                       className={styles.textAreaJd}
                       value={jdText}
                       onChange={(e) => setJdText(e.target.value)}
                       placeholder="Dán toàn bộ nội dung bản mô tả công việc (JD) vào đây..."
                     />
+                  ) : (
+                    <div className="flex flex-col gap-2 mt-2">
+                      <select
+                        className={styles.textInput}
+                        style={{ width: '100%', cursor: 'pointer' }}
+                        value={selectedJdId || ''}
+                        onChange={(e) => setSelectedJdId(e.target.value ? parseInt(e.target.value, 10) : null)}
+                      >
+                        <option value="">-- Chọn JD trong danh sách --</option>
+                        {savedJds.map((j) => (
+                          <option key={j.id} value={j.id}>
+                            {j.title} ({new Date(j.created_at).toLocaleDateString('vi-VN')})
+                          </option>
+                        ))}
+                      </select>
+                      {savedJds.length === 0 && (
+                        <p className="text-xs text-slate-400 mt-1">Không có JD nào được lưu trước đó.</p>
+                      )}
+                    </div>
                   )}
                   {jdError && (
                     <span className={styles.errorText} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
@@ -496,9 +644,11 @@ export default function NewInterviewPage() {
               <button
                 className={styles.primaryButton}
                 disabled={
-                  !cvFile ||
-                  (jdInputType === 'file' && !jdFile) ||
-                  (jdInputType === 'text' && !jdText.trim())
+                  (cvSource === 'upload' && !cvFile) ||
+                  (cvSource === 'saved' && !selectedResumeId) ||
+                  (jdSource === 'upload' && !jdFile) ||
+                  (jdSource === 'text' && !jdText.trim()) ||
+                  (jdSource === 'saved' && !selectedJdId)
                 }
                 onClick={handleUploadAndIngest}
               >
@@ -565,98 +715,217 @@ export default function NewInterviewPage() {
         {/* ── State 4: Display Assessment Result ── */}
         {assessment && (
           <div className={styles.resultSection}>
-            <div className={styles.resultHeader}>
-              <div className={styles.scoreRing}>
-                <svg width="120" height="120" viewBox="0 0 120 120">
-                  <circle cx="60" cy="60" r={radius} fill="transparent" stroke="#f1f5f9" strokeWidth="10" />
-                  <circle
-                    cx="60"
-                    cy="60"
-                    r={radius}
-                    fill="transparent"
-                    stroke="#4f46e5"
-                    strokeWidth="10"
-                    strokeDasharray={circumference}
-                    strokeDashoffset={strokeDashoffset}
-                    strokeLinecap="round"
-                    transform="rotate(-90 60 60)"
-                  />
-                </svg>
-                <span className={styles.scoreVal}>{assessment.competencyFitScore}%</span>
-              </div>
-              <div className={styles.scoreText}>
-                <h2>Kết quả phân tích độ tương thích</h2>
-                <p>
-                  CV của bạn có độ khớp đạt <strong>{assessment.competencyFitScore}%</strong> đối với vị trí{' '}
-                  <strong>{roleTitle}</strong>. Bạn đã sẵn sàng để phỏng vấn.
+            
+            {/* Title & Cache Meta */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
+              <div>
+                <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                  Kết quả phân tích độ tương thích
+                </h2>
+                <p style={{ color: '#64748b', fontSize: '0.9rem', margin: '0.25rem 0 0 0' }}>
+                  Dành cho vị trí <strong>{roleTitle}</strong>
                 </p>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.78rem', padding: '0.35rem 0.75rem', borderRadius: '0.5rem', backgroundColor: '#f1f5f9', border: '1px solid #e2e8f0', color: '#475569' }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: assessment.cached ? '#10b981' : '#f59e0b' }}></span>
+                {assessment.cached ? 'Kết quả từ Cache' : 'Phân tích mới'}
               </div>
             </div>
 
+            {/* Dashboard: Circular rings & Badges panel */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
+              
+              {/* Ring 1: Competency Fit */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '1.5rem', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '0.75rem', textAlign: 'center' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#4f46e5', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>Tương thích Năng lực</span>
+                <div className={styles.scoreRing}>
+                  <svg width="110" height="110" viewBox="0 0 120 120">
+                    <circle cx="60" cy="60" r={radius} fill="transparent" stroke="#e2e8f0" strokeWidth="8" />
+                    <circle
+                      cx="60"
+                      cy="60"
+                      r={radius}
+                      fill="transparent"
+                      stroke="#4f46e5"
+                      strokeWidth="8"
+                      strokeDasharray={circumference}
+                      strokeDashoffset={strokeDashoffset}
+                      strokeLinecap="round"
+                      transform="rotate(-90 60 60)"
+                    />
+                  </svg>
+                  <span className={styles.scoreVal}>{assessment.competencyFitScore}%</span>
+                </div>
+                <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '1rem', maxWidth: '200px', marginInline: 'auto' }}>Độ khớp tổng quan của CV ứng viên với JD yêu cầu</p>
+              </div>
+
+              {/* Ring 2: Technical Depth */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '1.5rem', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '0.75rem', textAlign: 'center' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0ea5e9', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>Chiều sâu Kỹ thuật</span>
+                <div className={styles.scoreRing}>
+                  <svg width="110" height="110" viewBox="0 0 120 120">
+                    <circle cx="60" cy="60" r={radius} fill="transparent" stroke="#e2e8f0" strokeWidth="8" />
+                    <circle
+                      cx="60"
+                      cy="60"
+                      r={radius}
+                      fill="transparent"
+                      stroke="#0ea5e9"
+                      strokeWidth="8"
+                      strokeDasharray={circumference}
+                      strokeDashoffset={depthStrokeDashoffset}
+                      strokeLinecap="round"
+                      transform="rotate(-90 60 60)"
+                    />
+                  </svg>
+                  <span className={styles.scoreVal} style={{ color: '#0ea5e9' }}>{assessment.technicalDepthScore}%</span>
+                </div>
+                <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '1rem', maxWidth: '200px', marginInline: 'auto' }}>Độ sâu kinh nghiệm và khả năng làm chủ công nghệ cốt lõi</p>
+              </div>
+
+              {/* Classifications Badges Panel */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '1.5rem', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '0.75rem', justifyContent: 'center' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Phân loại Ứng viên</span>
+                
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>
+                  <span style={{ fontSize: '0.82rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <TrendingUp size={13} style={{ color: '#4f46e5' }} /> Mức độ khớp:
+                  </span>
+                  <span style={{
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    padding: '0.2rem 0.5rem',
+                    borderRadius: '0.25rem',
+                    backgroundColor: assessment.matchLevel?.toLowerCase().includes('high') || assessment.matchLevel?.toLowerCase().includes('rất tốt') ? '#ecfdf5' : assessment.matchLevel?.toLowerCase().includes('moderate') || assessment.matchLevel?.toLowerCase().includes('khớp') ? '#f0f9ff' : '#fffbeb',
+                    color: assessment.matchLevel?.toLowerCase().includes('high') || assessment.matchLevel?.toLowerCase().includes('rất tốt') ? '#047857' : assessment.matchLevel?.toLowerCase().includes('moderate') || assessment.matchLevel?.toLowerCase().includes('khớp') ? '#0369a1' : '#b45309',
+                    border: '1px solid currentColor'
+                  }}>
+                    {assessment.matchLevel || 'N/A'}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>
+                  <span style={{ fontSize: '0.82rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <Award size={13} style={{ color: '#8b5cf6' }} /> Định hướng:
+                  </span>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '0.2rem 0.5rem', borderRadius: '0.25rem', backgroundColor: '#f5f3ff', color: '#6d28d9' }}>
+                    {assessment.roleTypeDetected || 'N/A'}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>
+                  <span style={{ fontSize: '0.82rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <UserCheck size={13} style={{ color: '#0ea5e9' }} /> Cấp bậc:
+                  </span>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '0.2rem 0.5rem', borderRadius: '0.25rem', backgroundColor: '#f1f5f9', color: '#334155' }}>
+                    {assessment.candidateLevel || 'N/A'}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.82rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <ShieldCheck size={13} style={{ color: '#10b981' }} /> Kinh nghiệm:
+                  </span>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#334155' }}>
+                    {assessment.yearsOfExperienceEstimate || 'N/A'}
+                  </span>
+                </div>
+
+              </div>
+
+            </div>
+
+            {/* Skills & Gaps Alignment Matrix */}
             <div className={styles.skillsSection}>
-              {/* Matched Skills */}
-              <div className={styles.skillsCol}>
-                <h3 style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <CheckCircle size={18} style={{ color: '#10b981' }} />
-                  <span>Kỹ năng phù hợp</span>
+              
+              {/* Strong Areas */}
+              <div style={{ padding: '1.25rem', border: '1px solid #a7f3d0', backgroundColor: 'rgba(236, 253, 245, 0.4)', borderRadius: '0.5rem' }}>
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#047857', fontWeight: 700, fontSize: '0.95rem', marginBottom: '0.75rem' }}>
+                  <CheckCircle size={16} />
+                  <span>Điểm mạnh nổi bật</span>
                 </h3>
-                <div className={styles.skillsList}>
-                  {assessment.strongAreas && assessment.strongAreas.length > 0 ? (
-                    assessment.strongAreas.map((skill, index) => (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  {(assessment.strongAreas || []).length > 0 ? (
+                    (assessment.strongAreas || []).map((skill, index) => (
                       <span key={index} className={`${styles.skillBadge} ${styles.skillMatched}`}>
                         {skill}
                       </span>
                     ))
                   ) : (
-                    <span style={{ color: '#64748b', fontSize: '0.9rem' }}>Không phát hiện kỹ năng phù hợp nổi bật.</span>
+                    <span style={{ color: '#64748b', fontSize: '0.85rem', fontStyle: 'italic' }}>Không tìm thấy thế mạnh nổi bật.</span>
                   )}
                 </div>
               </div>
 
-              {/* Missing Skills */}
-              <div className={styles.skillsCol}>
-                <h3 style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <XCircle size={18} style={{ color: '#f59e0b' }} />
-                  <span>Kỹ năng còn thiếu (Cần cải thiện)</span>
+              {/* Missing & Gaps */}
+              <div style={{ padding: '1.25rem', border: '1px solid #fde68a', backgroundColor: 'rgba(255, 251, 235, 0.4)', borderRadius: '0.5rem' }}>
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#b45309', fontWeight: 700, fontSize: '0.95rem', marginBottom: '0.75rem' }}>
+                  <AlertCircle size={16} />
+                  <span>Điểm cần cải thiện</span>
                 </h3>
-                <div className={styles.skillsList}>
-                  {assessment.criticalMissingSkills && assessment.criticalMissingSkills.map((skill, index) => (
-                    <span key={index} className={`${styles.skillBadge} ${styles.skillMissing}`}>
-                      {skill}
-                    </span>
-                  ))}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  {(assessment.gapAreas || []).concat(assessment.criticalMissingSkills || []).length > 0 ? (
+                    (assessment.gapAreas || []).concat(assessment.criticalMissingSkills || []).map((skill, index) => (
+                      <span key={index} className={`${styles.skillBadge} ${styles.skillMissing}`}>
+                        {skill}
+                      </span>
+                    ))
+                  ) : (
+                    <span style={{ color: '#64748b', fontSize: '0.85rem', fontStyle: 'italic' }}>Không phát hiện thiếu hụt kỹ năng lớn.</span>
+                  )}
                 </div>
               </div>
+
             </div>
 
-            {/* In-depth Evaluation */}
-            <div className={styles.evaluationBox}>
-              <h3 style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-                <Brain size={18} style={{ color: '#4f46e5' }} />
-                <span>Nhận xét chi tiết từ AI</span>
-              </h3>
-              {assessment.sectionWiseFeedback && Object.entries(assessment.sectionWiseFeedback).map(([section, feedback], idx) => (
-                <div key={idx} style={{ marginBottom: '1rem' }}>
-                  <h4 style={{ fontSize: '1rem', color: '#1e293b', marginBottom: '0.25rem' }}>{section}</h4>
-                  <p>{feedback}</p>
+            {/* In-depth AI Evaluation Feedbacks */}
+            {assessment.sectionWiseFeedback && Object.keys(assessment.sectionWiseFeedback).length > 0 && (
+              <div className={styles.evaluationBox} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', margin: 0 }}>
+                  <Brain size={18} style={{ color: '#4f46e5' }} />
+                  <span>Phân tích chi tiết từ AI</span>
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {Object.entries(assessment.sectionWiseFeedback).map(([section, feedback], idx) => {
+                    const cleanText = renderFeedbackValue(feedback);
+                    if (!cleanText) return null;
+                    return (
+                      <div key={idx} style={{ borderLeft: '3px solid #818cf8', paddingLeft: '1rem' }}>
+                        <h4 style={{ fontSize: '0.82rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569', margin: '0 0 0.25rem 0' }}>
+                          {getSectionName(section)}
+                        </h4>
+                        <p style={{ margin: 0, fontSize: '0.88rem', color: '#334155', lineHeight: '1.5' }}>
+                          {cleanText}
+                        </p>
+                      </div>
+                    );
+                  })}
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
 
-            {/* Suggestions for interview */}
-            <div className={styles.evaluationBox} style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
-              <h3 style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+            {/* Actionable Suggestions */}
+            <div className={styles.evaluationBox}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1rem', fontWeight: 700, color: '#1e293b', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', margin: '0 0 1rem 0' }}>
                 <Lightbulb size={18} style={{ color: '#eab308' }} />
                 <span>Lời khuyên chuẩn bị phỏng vấn</span>
               </h3>
-              <ul className={styles.suggestionsList}>
-                {assessment.actionableImprovementSuggestions && assessment.actionableImprovementSuggestions.map((suggestion, index) => (
-                  <li key={index}>{suggestion}</li>
-                ))}
+              <ul className={styles.suggestionsList} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '0.75rem', paddingLeft: 0, listStyle: 'none' }}>
+                {(assessment.actionableImprovementSuggestions || []).length > 0 ? (
+                  (assessment.actionableImprovementSuggestions || []).map((suggestion, index) => (
+                    <li key={index} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start', margin: 0 }}>
+                      <span style={{ color: '#10b981', fontWeight: 'bold', fontSize: '1.1rem', lineHeight: '1' }}>✓</span>
+                      <span style={{ fontSize: '0.88rem', color: '#475569', lineHeight: '1.4' }}>{suggestion}</span>
+                    </li>
+                  ))
+                ) : (
+                  <p style={{ fontSize: '0.85rem', color: '#64748b', fontStyle: 'italic' }}>Không có đề xuất thêm.</p>
+                )}
               </ul>
             </div>
 
-            <div className={styles.formActions}>
+            {/* Navigation buttons */}
+            <div className={styles.formActions} style={{ borderTop: '1px solid #e2e8f0', paddingTop: '1.5rem', margin: 0 }}>
               <button className={styles.secondaryButton} onClick={handleReset}>
                 Quay lại
               </button>
@@ -664,6 +933,7 @@ export default function NewInterviewPage() {
                 Tiếp tục phỏng vấn ➔
               </button>
             </div>
+
           </div>
         )}
       </main>

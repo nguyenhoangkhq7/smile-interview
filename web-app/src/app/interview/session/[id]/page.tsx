@@ -57,7 +57,7 @@ export default function InterviewSessionPage() {
   // Audio / Socket / Engine Service Status
   const [socketConnected, setSocketConnected] = useState(false);
   const [ttsMode, setTtsMode] = useState<'online' | 'mock'>('online');
-  const [sttMode, setSttMode] = useState<'online' | 'mock'>('online');
+  const [sttMode, setSttMode] = useState<'online' | 'mock'>('mock');
   const socketRef = useRef<Socket | null>(null);
 
   // Persistent Audio Pipeline Refs (Prevents browser autoplay blockages)
@@ -89,6 +89,7 @@ export default function InterviewSessionPage() {
   const audioChunksRef = useRef<Blob[]>([]);
   const speechRecognitionRef = useRef<any>(null);
   const finalTranscriptRef = useRef<string>('');
+  const latestTranscriptRef = useRef<string>('');
 
   // Audio playing singletons for TTS Mock Mode
   const mockAnalyserIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -402,36 +403,52 @@ export default function InterviewSessionPage() {
         setRecording(false);
       }
     } else {
-      console.log('[Session] Starting webkitSpeechRecognition in mock mode...');
+      console.log('[Session] Starting webkitSpeechRecognition...');
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (SpeechRecognition) {
         const rec = new SpeechRecognition();
         rec.lang = 'vi-VN';
         rec.interimResults = true;
         rec.continuous = true;
+        
         finalTranscriptRef.current = '';
+        latestTranscriptRef.current = '';
         setUserAnswerDraft('');
 
         rec.onresult = (event: any) => {
+          console.log('[STT] onresult event received:', event);
           let interimTranscript = '';
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
+          let finalTranscript = '';
+          
+          for (let i = 0; i < event.results.length; ++i) {
+            const transcript = event.results[i][0].transcript;
             if (event.results[i].isFinal) {
-              finalTranscriptRef.current += event.results[i][0].transcript;
+              finalTranscript += transcript;
             } else {
-              interimTranscript += event.results[i][0].transcript;
+              interimTranscript += transcript;
             }
           }
-          setUserAnswerDraft(finalTranscriptRef.current + interimTranscript);
+          
+          finalTranscriptRef.current = finalTranscript;
+          const fullText = finalTranscript + interimTranscript;
+          latestTranscriptRef.current = fullText;
+          
+          console.log('[STT] Current accumulated text:', fullText);
+          setUserAnswerDraft(fullText);
         };
 
         rec.onerror = (e: any) => {
-          console.error('Speech recognition error:', e);
+          console.error('[STT] Speech recognition error:', e);
         };
 
         rec.onend = () => {
+          console.log('[STT] Speech recognition ended.');
           setRecording(false);
           autoStartMicRef.current = false;
-          const finalizedAnswer = finalTranscriptRef.current.trim() || userAnswerDraft.trim();
+          
+          const finalizedAnswer = latestTranscriptRef.current.trim() || finalTranscriptRef.current.trim();
+          console.log('[STT] Finalized text to submit:', finalizedAnswer);
+          
           if (finalizedAnswer) {
             submitFinalAnswer(finalizedAnswer);
           } else {
@@ -456,7 +473,7 @@ export default function InterviewSessionPage() {
         }, 30);
       }
     }
-  }, [sttMode, mediaStream, uploadAudioBlob, submitFinalAnswer, userAnswerDraft]);
+  }, [sttMode, mediaStream, uploadAudioBlob, submitFinalAnswer]);
 
   const handleStopRecording = useCallback(() => {
     setRecording(false);

@@ -117,7 +117,7 @@ export default function HistoryPage() {
                 <div style={{ marginBottom: '0.75rem' }}>
                   <h2 style={{ margin: 0, fontSize: '1.1rem' }}>Phiên đang thực hiện</h2>
                   <p className={styles.subtitle} style={{ marginTop: '0.25rem' }}>
-                    Những phiên này còn trạng thái mở trong PostgreSQL và có thể tiếp tục ngay.
+                    Những phiên này còn trạng thái mở trong cơ sở dữ liệu và có thể tiếp tục ngay.
                   </p>
                 </div>
                 <div className={styles.historyList}>

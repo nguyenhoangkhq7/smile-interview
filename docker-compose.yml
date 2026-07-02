@@ -140,6 +140,8 @@ services:
       # TTS — OpenAI-compatible /v1/audio/speech endpoint served by Speaches
       TTS_API_URL: http://speaches:8000/v1/audio/speech
       TTS_MODEL: ${TTS_MODEL:-speaches-ai/piper-vi_VN-vais1000-medium}
+      # Cấu hình chính xác tới container ai-inference-service
+      INFERENCE_GRPC_SERVER: ai-inference-service:9091
     depends_on:
       redis:
         condition: service_healthy
