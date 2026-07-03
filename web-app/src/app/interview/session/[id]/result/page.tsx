@@ -17,18 +17,45 @@ export default function InterviewResultPage() {
   const [expandedIndexes, setExpandedIndexes] = useState<number[]>([0]); // Open first item by default
 
   useEffect(() => {
+    let active = true;
+    let pollCount = 0;
+    const maxPolls = 25; // 50 seconds max
+    let timerId: NodeJS.Timeout;
+
     async function loadSession() {
       if (!id) return;
       try {
         const data = await historyService.getSessionById(id);
-        setSession(data);
+        if (!active) return;
+
+        if (data) {
+          const hasQuestions = data.questions && data.questions.length > 0;
+          const isEvaluated = !hasQuestions || (data.overallFeedback !== undefined && data.overallFeedback !== null && data.overallFeedback.trim() !== '');
+
+          if (isEvaluated || pollCount >= maxPolls) {
+            setSession(data);
+            setLoading(false);
+          } else {
+            pollCount++;
+            setLoading(true);
+            timerId = setTimeout(loadSession, 2000);
+          }
+        } else {
+          setSession(null);
+          setLoading(false);
+        }
       } catch (err) {
         console.error('Lỗi khi tải kết quả phỏng vấn:', err);
-      } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     }
+
     loadSession();
+
+    return () => {
+      active = false;
+      if (timerId) clearTimeout(timerId);
+    };
   }, [id]);
 
   const toggleAccordion = (index: number) => {
@@ -367,7 +394,9 @@ export default function InterviewResultPage() {
                   (session.actionableSuggestions || []).map((suggestion, index) => (
                     <li key={index} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start', margin: 0 }}>
                       <span style={{ color: '#10b981', fontWeight: 'bold', fontSize: '1.1rem', lineHeight: '1' }}>✓</span>
-                      <span style={{ fontSize: '0.88rem', color: '#475569', lineHeight: '1.4' }}>{suggestion}</span>
+                      <span style={{ fontSize: '0.88rem', color: '#475569', lineHeight: '1.4' }}>
+                        {typeof suggestion === 'object' && suggestion !== null ? ((suggestion as any).question || JSON.stringify(suggestion)) : String(suggestion)}
+                      </span>
                     </li>
                   ))
                 ) : (

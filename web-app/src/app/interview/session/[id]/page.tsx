@@ -198,6 +198,12 @@ export default function InterviewSessionPage() {
           ...currentSession,
           replaceQuestions: true
         });
+
+        // Trigger background evaluation on the backend immediately!
+        console.log(`[Session Finish] Triggering background evaluation for session: ${id}`);
+        fetch(`/api/sessions/${id}/evaluate`, { method: 'POST' }).catch((evalErr) => {
+          console.error('[Session Finish] Background evaluation trigger failed:', evalErr);
+        });
       }
     } catch (err) {
       console.error('Error completing session:', err);
