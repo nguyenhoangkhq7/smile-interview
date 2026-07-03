@@ -52,6 +52,7 @@ app:
   llm:
     api-key: ${LLM_API_KEY}
     api-url: ${LLM_API_URL:https://api.groq.com}
+    chat-path: ${LLM_CHAT_PATH:/openai/v1/chat/completions}
     model: ${LLM_MODEL:llama-3.3-70b-versatile}
     # Timeout in seconds for LLM API calls
     timeout-seconds: ${LLM_TIMEOUT_SECONDS:60}

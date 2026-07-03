@@ -50,6 +50,8 @@ public class WebClientConfig {
                         HttpHeaders.AUTHORIZATION,
                         "Bearer " + appProperties.getLlm().getApiKey()
                 )
+                .defaultHeader("HTTP-Referer", "https://github.com/nguyenhoangkhq7/smile-interview")
+                .defaultHeader("X-Title", "Smile Interview App")
                 .exchangeStrategies(largeBufferStrategy())
                 .build();
     }

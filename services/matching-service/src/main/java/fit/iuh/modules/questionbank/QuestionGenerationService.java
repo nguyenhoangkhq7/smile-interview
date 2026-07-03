@@ -30,7 +30,6 @@ import java.util.stream.Collectors;
 @Service
 public class QuestionGenerationService {
 
-    private static final String CHAT_COMPLETIONS_PATH = "/openai/v1/chat/completions";
     private static final Map<String, String> JSON_RESPONSE_FORMAT = Map.of("type", "json_object");
 
     private final WebClient llmWebClient;
@@ -137,7 +136,7 @@ public class QuestionGenerationService {
                 Duration timeout = Duration.ofSeconds(props.getLlm().getTimeoutSeconds());
 
                 LlmChatResponse response = llmWebClient.post()
-                        .uri(CHAT_COMPLETIONS_PATH)
+                        .uri(props.getLlm().getChatPath())
                         .bodyValue(request)
                         .retrieve()
                         .bodyToMono(LlmChatResponse.class)
@@ -323,7 +322,7 @@ public class QuestionGenerationService {
             attempts++;
             try {
                 LlmChatResponse response = llmWebClient.post()
-                        .uri(CHAT_COMPLETIONS_PATH)
+                        .uri(props.getLlm().getChatPath())
                         .bodyValue(request)
                         .retrieve()
                         .bodyToMono(LlmChatResponse.class)
