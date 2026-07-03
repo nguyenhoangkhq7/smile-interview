@@ -4,6 +4,7 @@ import fit.iuh.grpc.inference.InferenceRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -16,37 +17,38 @@ public class InterviewEvaluationService {
     private static final Logger log = LoggerFactory.getLogger(InterviewEvaluationService.class);
     
     private final ChatClient chatClient;
+    private final int timeoutSeconds;
 
-    public InterviewEvaluationService(ChatClient.Builder chatClientBuilder) {
+    public InterviewEvaluationService(ChatClient.Builder chatClientBuilder,
+                                      @Value("${LLM_TIMEOUT_SECONDS:20}") int timeoutSeconds) {
         this.chatClient = chatClientBuilder.build();
+        this.timeoutSeconds = timeoutSeconds;
     }
 
     private static final String SYSTEM_PROMPT = """
-        You are an expert IT Interviewer (LLM-as-a-judge). Evaluate the candidate's answer based on:
-        1. response_length (conciseness)
-        2. keyword_coverage (tech stack matching)
-        3. demonstrated_competency (STAR examples)
+        You are an expert IT Interviewer (LLM-as-a-judge). Your role is to perform a deep, rigorous, and detailed technical evaluation of the candidate's answer.
         
-        Provide a real-time SCORE from 1 to 10 for their answer based on the 3 criteria above.
-        Provide a detailed EVALUATION explaining your score and pointing out strengths and weaknesses.
+        Evaluate the candidate's answer based on:
+        1. Technical Accuracy & Depth: Does the candidate explain concepts correctly? Do they demonstrate deep engineering knowledge or just surface-level definitions?
+        2. Relevance & Coverage: How completely does the answer address the question? Are key tech stack keywords covered?
+        3. Practical Application: Does the candidate mention real-world scenarios, challenges, best practices, or STAR methodology examples?
         
-        DECISION RULES:
-        - If the answer is lacking or needs clarification, return "FOLLOW_UP" and generate a follow-up question.
-        - If the answer is sufficient or completely off-topic, return "NEXT_TOPIC".
-        
-        CONTEXT AWARENESS:
-        You must look at the 'Previous QA Context' provided by the user. Do NOT ask a follow-up question that is identical or too similar to previously asked questions.
-        
-        Your output MUST be a JSON object mapping to the following fields: decision, reasoning, followUpQuestion, score, evaluation.
-        CRITICAL: Keep your 'reasoning' extremely concise (max 1 sentence) to ensure low latency!
+        OUTPUT FORMAT REQUIREMENTS:
+        Your response must be a valid JSON object mapping to these fields:
+        - decision: Decide dynamically based on these rules:
+          * Output "FOLLOW_UP" if the candidate's answer is partially correct, incomplete, lacking depth, or requires clarification.
+          * Output "NEXT_TOPIC" if the candidate's answer is completely correct, sufficient, or if the candidate explicitly states they do not know the answer (e.g. "I don't know", "Tôi không biết", "không biết" - as there is no point in probing further).
+        - reasoning: A very concise, 1-sentence technical reason for your decision.
+        - followUpQuestion: Always output an empty string "". Do NOT generate any follow-up question text here (the platform will pull from pre-generated follow-up questions).
+        - score: An integer score from 1 to 10 based on the quality of their answer.
+        - evaluation: A detailed, professional, and thorough analysis of their answer in Vietnamese. 
+                      Break it down clearly into:
+                      - Điểm mạnh (Strengths: what they got right, key technologies correctly explained).
+                      - Điểm yếu/Hạn chế (Weaknesses/Gaps: what they missed, incorrect assumptions, or lack of depth).
+                      - Gợi ý bổ sung (Suggestions: how they could improve their answer).
         """;
 
     public EvaluationResult evaluate(InferenceRequest request) {
-        if (request.getCurrentFollowUpCount() >= 2) {
-            log.info("Hard limit reached for follow-ups (count: {}). Routing to NEXT_TOPIC.", request.getCurrentFollowUpCount());
-            return new EvaluationResult("NEXT_TOPIC", "Hard limit reached for follow-ups.", "", 0, "Candidate reached maximum follow-ups for this question.");
-        }
-
         String userPrompt = buildUserPrompt(request);
 
         try {
@@ -57,11 +59,11 @@ public class InterviewEvaluationService {
                     .user(userPrompt)
                     .call()
                     .entity(EvaluationResult.class)
-            ).get(8, TimeUnit.SECONDS);
+            ).get(timeoutSeconds, TimeUnit.SECONDS);
 
         } catch (Exception e) {
             log.error("Inference failed or timed out. Falling back to NEXT_TOPIC.", e);
-            return new EvaluationResult("NEXT_TOPIC", "Fallback due to inference error or timeout.", "", 0, "Evaluation failed due to timeout.");
+            return new EvaluationResult("NEXT_TOPIC", "Fallback due to inference error or timeout.", "", 0, "Không thể đánh giá câu trả lời do lỗi hệ thống hoặc quá thời gian phản hồi.");
         }
     }
 

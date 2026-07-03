@@ -54,7 +54,8 @@ export const handleConnection = (io, socket) => {
 
       // Optionally, push the first base question to start the interview if INIT
       if (session.status === 'INIT' && session.questions.length > 0) {
-        const firstQuestion = session.questions[session.questionState?.baseQuestionIndex || 0];
+        const firstQuestionObj = session.questions[session.questionState?.baseQuestionIndex || 0];
+        const firstQuestion = typeof firstQuestionObj === 'object' && firstQuestionObj !== null ? firstQuestionObj.question : firstQuestionObj;
         console.log(`[Signaling] Session status is INIT. Broadcasting first question: "${firstQuestion}"`);
         const avatarAction = await generateAvatarAction(firstQuestion, 'NEUTRAL');
 
@@ -107,9 +108,8 @@ export const handleConnection = (io, socket) => {
         const qState = session.questionState;
         
         // Determine the current question context for the engine
-        // If we are currently following up, we'd ideally pass the previous follow-up. 
-        // For simplicity, we pass the base question from the list.
-        const currentQuestion = session.questions[qState.baseQuestionIndex];
+        const currentQuestionObj = session.questions[qState.baseQuestionIndex];
+        const currentQuestion = typeof currentQuestionObj === 'object' && currentQuestionObj !== null ? currentQuestionObj.question : currentQuestionObj;
 
         // 2. Call Java AI Inference Service via gRPC
         const engineResponse = await evaluateCandidateResponse({
@@ -126,15 +126,38 @@ export const handleConnection = (io, socket) => {
         let nextQState = { ...qState };
 
         if (actionType === 'FOLLOW_UP') {
-          nextQuestionText = engineResponse.generatedFollowUpQuestion;
-          nextQState.currentFollowUpDepth += 1;
+          // Select from pre-generated follow-up questions
+          if (typeof currentQuestionObj === 'object' && 
+              currentQuestionObj !== null &&
+              currentQuestionObj.follow_up_questions && 
+              qState.currentFollowUpDepth < currentQuestionObj.follow_up_questions.length) {
+            
+            nextQuestionText = currentQuestionObj.follow_up_questions[qState.currentFollowUpDepth];
+            nextQState.currentFollowUpDepth += 1;
+            console.log(`[Signaling] Selecting pre-generated follow-up: "${nextQuestionText}" (depth: ${nextQState.currentFollowUpDepth})`);
+          } else {
+            // Out of follow-ups, fallback to transition to next main question
+            console.log(`[Signaling] Out of pre-generated follow-ups for this question. Transitioning to next topic.`);
+            nextQState.baseQuestionIndex += 1;
+            nextQState.currentFollowUpDepth = 0;
+            actionType = 'TRANSITION';
+            
+            if (nextQState.baseQuestionIndex < session.questions.length) {
+              const nextQuestionObj = session.questions[nextQState.baseQuestionIndex];
+              nextQuestionText = typeof nextQuestionObj === 'object' && nextQuestionObj !== null ? nextQuestionObj.question : nextQuestionObj;
+            } else {
+              nextQuestionText = "Thank you. That concludes our technical questions.";
+              actionType = 'CONCLUDING';
+            }
+          }
         } else {
           // Transition to Next Topic
           nextQState.baseQuestionIndex += 1;
           nextQState.currentFollowUpDepth = 0;
           
           if (nextQState.baseQuestionIndex < session.questions.length) {
-            nextQuestionText = session.questions[nextQState.baseQuestionIndex];
+            const nextQuestionObj = session.questions[nextQState.baseQuestionIndex];
+            nextQuestionText = typeof nextQuestionObj === 'object' && nextQuestionObj !== null ? nextQuestionObj.question : nextQuestionObj;
             actionType = 'TRANSITION';
           } else {
             nextQuestionText = "Thank you. That concludes our technical questions.";

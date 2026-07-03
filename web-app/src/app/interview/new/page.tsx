@@ -345,9 +345,8 @@ export default function NewInterviewPage() {
       }
 
       const qbData = await qbRes.json();
-      const generatedQuestions = (qbData.question_bank || []).map((q: any) => q.question);
 
-      // Persist the assessment result and generated questions to the existing session draft
+      // Persist the assessment result and generated questions (including follow-ups) to the existing session draft
       await historyService.saveSession({
         id: assessment.sessionId,
         date: new Date().toISOString(),
@@ -370,7 +369,7 @@ export default function NewInterviewPage() {
         gapAreas: assessment.gapAreas,
         criticalMissingSkills: assessment.criticalMissingSkills,
         sectionWiseFeedback: assessment.sectionWiseFeedback,
-        actionableSuggestions: generatedQuestions
+        actionableSuggestions: qbData.question_bank || []
       });
 
       // Navigate directly to the interview session room

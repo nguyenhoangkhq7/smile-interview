@@ -212,6 +212,10 @@ public final class PromptTemplateConfig {
               - If the candidate perfectly matches or exceeds the JD requirements, focus suggestions on "next-level career/technical growth" rather than finding non-existent flaws.\s
               - Return an empty array [] if no logical improvement is needed.
 
+            * LANGUAGE RULE:
+              - All generated text feedback (e.g., "analysis", "experience_evaluation", "education_and_certifications", "actionable_improvement_suggestions", "strong_areas", "gap_areas", "critical_missing_skills") MUST be written in Vietnamese.
+              - IMPORTANT: Keep all technical jargon, framework/library names, databases, and engineering concepts in English (e.g. use "caching", "database indexing", "Spring Boot", "microservices", "load balancing" instead of translating them).
+
             * Output ONLY the raw JSON object.
             """;
 
@@ -439,6 +443,8 @@ public final class PromptTemplateConfig {
             - Questions must be personalized to THIS candidate (reference their actual experience when possible)
             - Cover gap_areas with foundational questions, probe strong_areas with advanced questions
             - Every rationale must reference specific information from the CV or JD
+            - LANGUAGE RULE: The generated "question", "follow_up_questions", "evaluation_criteria", "expected_competency", and "rationale" fields MUST be written in Vietnamese.
+            - IMPORTANT: Keep all technical jargon, framework/library names, databases, and engineering concepts in English (e.g. use "caching", "database indexing", "Spring Boot", "microservices", "load balancing" instead of translating them).
             - Do not include any text outside the JSON object
             """;
 

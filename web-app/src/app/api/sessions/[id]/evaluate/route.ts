@@ -88,25 +88,28 @@ export async function POST(
       ]
     );
 
-    // Update turns table with granular evaluation
+    // Update turns table with granular evaluation using index to avoid minor question text mismatches from the LLM
     if (evalResult.evaluatedQuestions && evalResult.evaluatedQuestions.length > 0) {
-      for (const eq of evalResult.evaluatedQuestions) {
-        await query(
-          `UPDATE session_turns SET 
-            score = $1,
-            strengths = $2,
-            improvements = $3,
-            suggested_answer = $4
-           WHERE session_id = $5 AND question = $6`,
-          [
-            eq.score || 0,
-            eq.strengths || '',
-            eq.improvements || '',
-            eq.suggestedAnswer || '',
-            id,
-            eq.question
-          ]
-        );
+      for (let i = 0; i < evalResult.evaluatedQuestions.length; i++) {
+        const eq = evalResult.evaluatedQuestions[i];
+        if (i < turns.length) {
+          const turnId = turns[i].id;
+          await query(
+            `UPDATE session_turns SET 
+              score = $1,
+              strengths = $2,
+              improvements = $3,
+              suggested_answer = $4
+             WHERE id = $5`,
+            [
+              eq.score || 0,
+              eq.strengths || '',
+              eq.improvements || '',
+              eq.suggestedAnswer || '',
+              turnId
+            ]
+          );
+        }
       }
     }
 
