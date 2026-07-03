@@ -1,7 +1,7 @@
 package fit.iuh.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import fit.iuh.dto.questionbank.QuestionDto;
+import fit.iuh.modules.questionbank.QuestionDto;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
