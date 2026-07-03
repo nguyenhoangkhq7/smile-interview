@@ -54,9 +54,6 @@ import java.util.stream.Collectors;
 @Service
 public class AssessmentService {
 
-    /** Path on the LLM provider's base URL for chat completions (OpenAI-compatible). */
-    private static final String CHAT_COMPLETIONS_PATH = "/openai/v1/chat/completions";
-
     /**
      * {@code response_format} payload for Groq/OpenAI JSON mode.
      * Instructs the model to return a valid JSON object (no Markdown wrapping).
@@ -187,7 +184,7 @@ public class AssessmentService {
         for (int i = 0; i <= maxRetries; i++) {
             try {
                 LlmChatResponse response = llmWebClient.post()
-                        .uri(CHAT_COMPLETIONS_PATH)
+                        .uri(appProperties.getLlm().getChatPath())
                         .bodyValue(request)
                         .retrieve()
                         .bodyToMono(LlmChatResponse.class)
@@ -506,7 +503,7 @@ public class AssessmentService {
                 .build();
 
         LlmChatResponse response = llmWebClient.post()
-                .uri(CHAT_COMPLETIONS_PATH)
+                .uri(appProperties.getLlm().getChatPath())
                 .bodyValue(llmRequest)
                 .retrieve()
                 .bodyToMono(LlmChatResponse.class)

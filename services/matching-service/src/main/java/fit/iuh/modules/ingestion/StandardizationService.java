@@ -36,9 +36,6 @@ public class StandardizationService {
         this.llmWebClient = llmWebClient;
     }
 
-    /** Path on the LLM provider's base URL for chat completions. */
-    private static final String CHAT_COMPLETIONS_PATH = "/openai/v1/chat/completions";
-
     // -------------------------------------------------------------------------
     // Public API
     // -------------------------------------------------------------------------
@@ -111,7 +108,7 @@ public class StandardizationService {
 
         try {
             LlmChatResponse response = llmWebClient.post()
-                    .uri(CHAT_COMPLETIONS_PATH)
+                    .uri(appProperties.getLlm().getChatPath())
                     .bodyValue(request)
                     .retrieve()
                     .bodyToMono(LlmChatResponse.class)

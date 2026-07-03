@@ -35,6 +35,9 @@ public class AppProperties {
         /** API base URL. */
         private String apiUrl;
 
+        /** Endpoint path for chat completions. */
+        private String chatPath = "/openai/v1/chat/completions";
+
         /** LLM model identifier. */
         private String model;
 

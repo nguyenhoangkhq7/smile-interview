@@ -97,7 +97,7 @@ public class GlobalExceptionHandler {
     // -------------------------------------------------------------------------
 
     /**
-     * Handles failures when communicating with the Groq LLM API
+     * Handles failures when communicating with the LLM API
      * (timeout, rate limit, invalid API key, malformed response).
      */
     @ExceptionHandler(LlmApiException.class)
@@ -109,7 +109,7 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.builder()
                         .status(HttpStatus.BAD_GATEWAY.value())
                         .errorCode("LLM_API_ERROR")
-                        .message("Failed to communicate with the Groq LLM API. Please retry.")
+                        .message("Failed to communicate with the LLM API. Please retry.")
                         .detail(ex.getMessage())
                         .path(request.getRequestURI())
                         .build());
