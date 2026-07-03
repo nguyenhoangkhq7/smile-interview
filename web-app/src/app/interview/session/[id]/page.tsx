@@ -57,7 +57,7 @@ export default function InterviewSessionPage() {
   // Audio / Socket / Engine Service Status
   const [socketConnected, setSocketConnected] = useState(false);
   const [ttsMode, setTtsMode] = useState<'online' | 'mock'>('online');
-  const [sttMode, setSttMode] = useState<'online' | 'mock'>('mock');
+  const [sttMode, setSttMode] = useState<'online' | 'mock'>('online');
   const socketRef = useRef<Socket | null>(null);
 
   // Persistent Audio Pipeline Refs (Prevents browser autoplay blockages)
@@ -85,9 +85,11 @@ export default function InterviewSessionPage() {
   // Recording & STT Audio buffers
   const [recording, setRecording] = useState(false);
   const [userAnswerDraft, setUserAnswerDraft] = useState('');
+  const [baseQuestionIndex, setBaseQuestionIndex] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const speechRecognitionRef = useRef<any>(null);
+  const isExitingRef = useRef(false);
   const finalTranscriptRef = useRef<string>('');
   const latestTranscriptRef = useRef<string>('');
 
@@ -97,6 +99,7 @@ export default function InterviewSessionPage() {
   // Video recording hook & Finished screen states
   const { startRecording, stopRecording, isRecording, recordedBlob, recordingDurationMs } = useSessionRecorder(mediaStream);
   const [showInfoBanner, setShowInfoBanner] = useState(true);
+  const currentQuestionRef = useRef<string>('');
 
   // Simulated streaming STT state
   const [isRevealing, setIsRevealing] = useState(false);
@@ -162,8 +165,18 @@ export default function InterviewSessionPage() {
 
   // ── End Interview Execution ──
   const handleInterviewFinish = useCallback(async (isTimeout = false) => {
+    isExitingRef.current = true;
     setSessionState('FINISHED');
     if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    
+    // Stop recording first
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try { mediaRecorderRef.current.stop(); } catch {}
+    }
+    if (speechRecognitionRef.current) {
+      try { speechRecognitionRef.current.stop(); } catch {}
+    }
+
     if (mediaStream) {
       mediaStream.getTracks().forEach((track) => track.stop());
     }
@@ -192,8 +205,8 @@ export default function InterviewSessionPage() {
   }, [id, mediaStream]);
 
   // ── Speak Question (TTS Interface & Fallback) ──
-  const speakQuestion = useCallback((text: string) => {
-    if (ttsMode === 'online' && socketRef.current?.connected) {
+  const speakQuestion = useCallback((text: string, forceOffline: boolean = false) => {
+    if (!forceOffline && ttsMode === 'online' && socketRef.current?.connected) {
       console.log('[Session] Sending TTS to server:', text);
       socketRef.current.emit('process-tts', text);
     } else {
@@ -263,6 +276,25 @@ export default function InterviewSessionPage() {
         type: 'CANDIDATE_TEXT_SUBMIT',
         payload: { text: answer }
       });
+
+      // Save user answer to session history
+      if (id) {
+        historyService.getSessionById(id).then(session => {
+          if (session && session.questions && session.questions.length > 0) {
+            const updatedQuestions = [...session.questions];
+            const lastIndex = updatedQuestions.length - 1;
+            updatedQuestions[lastIndex] = {
+              ...updatedQuestions[lastIndex],
+              answer: answer
+            };
+            historyService.saveSession({
+              ...session,
+              questions: updatedQuestions,
+              replaceQuestions: true
+            });
+          }
+        });
+      }
     } else {
       console.error('Socket not connected to send answer');
       setSessionState('LISTENING');
@@ -384,6 +416,10 @@ export default function InterviewSessionPage() {
         };
 
         recorder.onstop = async () => {
+          if (isExitingRef.current) {
+            console.log('[Session] Exiting. Ignoring onstop event.');
+            return;
+          }
           setSessionState('AI_THINKING');
           autoStartMicRef.current = false;
           const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
@@ -446,6 +482,11 @@ export default function InterviewSessionPage() {
           setRecording(false);
           autoStartMicRef.current = false;
           
+          if (isExitingRef.current) {
+            console.log('[Session] Exiting. Ignoring SpeechRecognition onend event.');
+            return;
+          }
+          
           const finalizedAnswer = latestTranscriptRef.current.trim() || finalTranscriptRef.current.trim();
           console.log('[STT] Finalized text to submit:', finalizedAnswer);
           
@@ -463,6 +504,10 @@ export default function InterviewSessionPage() {
         let i = 0;
         const targetText = 'Tôi nghĩ useMemo và useCallback dùng để tối ưu hóa hiệu năng render trong React. useMemo giúp lưu giữ giá trị của phép tính phức tạp, còn useCallback giúp lưu giữ tham chiếu của callback function nhằm tránh re-render.';
         const typingInterval = setInterval(() => {
+          if (isExitingRef.current) {
+            clearInterval(typingInterval);
+            return;
+          }
           setUserAnswerDraft((prev) => prev + targetText.charAt(i));
           i++;
           if (i >= targetText.length) {
@@ -536,13 +581,37 @@ export default function InterviewSessionPage() {
     }
   };
 
-  // ── 1. Init Session Data & Media Permissions ──
   useEffect(() => {
     async function initSession() {
       if (!id) return;
+      console.log('[Session] Fetching session detail for ID:', id);
       const data = await historyService.getSessionById(id);
+      console.log('[Session] Fetched session data:', data);
       if (data) {
         setSession(data);
+        
+        // Resume state from history
+        if (data.questions && data.questions.length > 0) {
+          const initialChatLog: any[] = [];
+          let baseAnsweredCount = 0;
+          data.questions.forEach((q: any) => {
+            if (q.question) {
+               initialChatLog.push({ sender: 'AI', text: q.question, time: formatCurrentTime(), isDeepDive: q.isDeepDive });
+            }
+            if (q.answer) {
+               initialChatLog.push({ sender: 'User', text: q.answer, time: formatCurrentTime() });
+               if (!q.isDeepDive) {
+                 baseAnsweredCount++;
+               }
+            }
+          });
+          console.log('[Session] Reconstructed chatLog:', initialChatLog, 'baseAnsweredCount:', baseAnsweredCount);
+          if (initialChatLog.length > 0) {
+             setChatLog(initialChatLog);
+             setQuestionCount(initialChatLog.filter(log => log.sender === 'AI').length);
+             setBaseQuestionIndex(baseAnsweredCount);
+          }
+        }
       }
     }
     initSession();
@@ -651,13 +720,54 @@ export default function InterviewSessionPage() {
     socket.on('orchestration-event', (data: any) => {
       console.log('[Session] Received orchestration event:', data);
       if (data.type === 'INTERVIEWER_ACTION') {
-        const { actionType, text } = data.payload;
+        const { actionType, text, score, evaluation } = data.payload;
         if (actionType === 'CONCLUDING') {
           handleInterviewFinishRef.current(false);
           return;
         }
 
+        // Save evaluation for the previous question if available
+        if (evaluation && score !== undefined) {
+          historyService.getSessionById(id).then(session => {
+             if (session && session.questions) {
+                // Find the first question that doesn't have a score yet or update the latest one
+                // Actually, the answer is just pushed to chatLog, but the question was already there.
+                // Let's just find the last question and update it.
+                const updatedQuestions = [...session.questions];
+                if (updatedQuestions.length > 0) {
+                   const lastIndex = updatedQuestions.length - 1;
+                   updatedQuestions[lastIndex] = {
+                      ...updatedQuestions[lastIndex],
+                      score: score,
+                      strengths: evaluation, // Mapping evaluation string to strengths or a combined field
+                      improvements: actionType === 'FOLLOW_UP' ? 'Needs more detail' : '',
+                   };
+                   
+                   // If it's a transition to a NEW topic, we might want to add the new question to the list.
+                   // If it's FOLLOW_UP, we also add the new follow-up question.
+                   updatedQuestions.push({
+                      question: text,
+                      answer: '',
+                      score: 0,
+                      strengths: '',
+                      improvements: '',
+                      suggestedAnswer: '',
+                      topicTag: '',
+                      isDeepDive: actionType === 'FOLLOW_UP'
+                   });
+
+                   historyService.saveSession({
+                      ...session,
+                      questions: updatedQuestions,
+                      replaceQuestions: true
+                   });
+                }
+             }
+          });
+        }
+
         setCurrentQuestion(text);
+        currentQuestionRef.current = text;
         setQuestionCount((prev) => prev + 1);
         setIsDeepDive(actionType === 'FOLLOW_UP');
 
@@ -673,6 +783,9 @@ export default function InterviewSessionPage() {
           handleInterviewFinishRef.current(false);
         } else if (data.payload.status === 'INIT') {
            setSessionState('INITIALIZING');
+        } else if (data.payload.status === 'IN_PROGRESS') {
+           // User rejoined an in-progress session, let them continue speaking
+           setSessionState('LISTENING');
         }
       }
     });
@@ -699,6 +812,17 @@ export default function InterviewSessionPage() {
       setUserAnswerDraft('[Lỗi xử lý âm thanh. Vui lòng ghi âm lại.]');
       setRecording(false);
       setSessionState('LISTENING');
+    });
+
+    socket.on('tts-error', (err: any) => {
+      console.error('[Session] TTS Socket Error:', err);
+      // Fallback to offline TTS
+      setTtsMode('mock');
+      if (currentQuestionRef.current && speakQuestionRef.current) {
+        speakQuestionRef.current(currentQuestionRef.current, true);
+      } else {
+        setSessionState('LISTENING');
+      }
     });
 
     socket.on('tts-result', async (bufferData: any) => {
@@ -729,7 +853,11 @@ export default function InterviewSessionPage() {
           audio.src = url;
           audio.addEventListener('ended', () => {
             URL.revokeObjectURL(url);
+            setAvatarPlaying(false);
+            autoStartMicRef.current = true;
+            setSessionState('LISTENING');
           }, { once: true });
+          setAvatarPlaying(true);
           await audio.play();
         }
       } catch (err) {
@@ -745,12 +873,32 @@ export default function InterviewSessionPage() {
 
   // ── 3. Start First Question ──
   const handleStartInterview = async () => {
+    console.log('[Session] handleStartInterview clicked. sessionState:', sessionState, 'socket connected:', socketRef.current?.connected);
     initAudioOnUserGesture();
     setSessionState('AI_THINKING');
     startTimer();
 
     if (socketRef.current?.connected) {
-      socketRef.current.emit('join-interview', { interviewId: id, userId: 'candidate-user' });
+      let initialQuestions = [];
+      try {
+        if (session?.actionableSuggestions) {
+          initialQuestions = typeof session.actionableSuggestions === 'string' 
+            ? JSON.parse(session.actionableSuggestions) 
+            : session.actionableSuggestions;
+        }
+      } catch (e) {
+        console.error('Failed to parse initialQuestions from actionableSuggestions', e);
+      }
+      
+      console.log('[Session] Emitting join-interview with initialQuestions:', initialQuestions, 'baseQuestionIndex:', baseQuestionIndex);
+      socketRef.current.emit('join-interview', { 
+        interviewId: id, 
+        userId: 'candidate-user', 
+        initialQuestions,
+        baseQuestionIndex
+      });
+    } else {
+      console.warn('[Session] Cannot emit join-interview, socket is disconnected!');
     }
   };
 

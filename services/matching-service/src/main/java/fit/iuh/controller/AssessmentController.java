@@ -1,6 +1,7 @@
 package fit.iuh.controller;
 
 import fit.iuh.dto.AssessmentResponse;
+import fit.iuh.dto.InterviewEvaluationRequest;
 import fit.iuh.service.AssessmentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -74,6 +75,13 @@ public class AssessmentController {
 
         log.info("Assessment request: sessionId={}, forceRefresh={}", sessionId, forceRefresh);
         AssessmentResponse response = assessmentService.assessResumeBlocking(sessionId, forceRefresh);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping(value = "/evaluate-session", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<String> evaluateSession(@RequestBody InterviewEvaluationRequest request) {
+        log.info("Received interview evaluation request for sessionId={}", request.sessionId());
+        String response = assessmentService.evaluateSession(request);
         return ResponseEntity.ok(response);
     }
 }

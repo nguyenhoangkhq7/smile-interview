@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { cvJdMatchingService, AssessmentResponse } from '@/services/cvJdMatching';
 import { historyService } from '@/services/historyService';
-import { FolderOpen, FileText, Briefcase, CheckCircle, XCircle, Brain, Lightbulb, X, AlertTriangle, Check, AlertCircle, TrendingUp, UserCheck, Award, ShieldCheck } from 'lucide-react';
+import { Calendar, FileText, UploadCloud, FolderOpen, Briefcase, CheckCircle, XCircle, Brain, Lightbulb, X, AlertTriangle, Check, AlertCircle, TrendingUp, UserCheck, Award, ShieldCheck, RefreshCw } from 'lucide-react';
 import styles from './new.module.css';
 
 type ActiveSessionState = {
@@ -45,6 +45,7 @@ export default function NewInterviewPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [analyzing, setAnalyzing] = useState(false);
+  const [isCloning, setIsCloning] = useState<string | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
 
   // Result state
@@ -178,7 +179,38 @@ export default function NewInterviewPage() {
     else fileInputJdRef.current?.click();
   };
 
-  const handleResumeSession = (resumeSessionId: string) => {
+  const handleResumeSession = async (resumeSessionId: string) => {
+    try {
+      const session = await historyService.getSessionById(resumeSessionId);
+      if (session) {
+        // If the session has assessment info and hasn't started (no questions yet), we can load the assessment page
+        if (session.competencyFitScore !== undefined && session.questions.length === 0) {
+          setAssessment({
+            id: '',
+            sessionId: session.id,
+            competencyFitScore: session.competencyFitScore || 0,
+            technicalDepthScore: session.technicalDepthScore || 0,
+            matchLevel: session.matchLevel || '',
+            candidateLevel: session.candidateLevel || '',
+            roleTypeDetected: session.roleTypeDetected || '',
+            yearsOfExperienceEstimate: session.yearsOfExperienceEstimate || '',
+            strongAreas: session.strongAreas || [],
+            gapAreas: session.gapAreas || [],
+            criticalMissingSkills: session.criticalMissingSkills || [],
+            sectionWiseFeedback: session.sectionWiseFeedback || {},
+            actionableImprovementSuggestions: session.actionableSuggestions || [],
+            cached: true,
+            createdAt: session.date
+          });
+          setSessionId(session.id);
+          setRoleTitle(session.roleTitle);
+          setIngested(true);
+          return;
+        }
+      }
+    } catch (err) {
+      console.error('Error resuming session:', err);
+    }
     router.push(`/interview/session/${resumeSessionId}`);
   };
 
@@ -276,8 +308,12 @@ export default function NewInterviewPage() {
     }
   };
 
+  const [generating, setGenerating] = useState(false);
+
   const handleContinueToSelection = async () => {
-    if (!assessment) return;
+    if (!assessment || !sessionId) return;
+    setGenerating(true);
+    setApiError(null);
     try {
       const displayCvName = cvSource === 'upload' && cvFile 
         ? cvFile.name 
@@ -289,7 +325,29 @@ export default function NewInterviewPage() {
             ? 'JD_Pasted_Text.txt' 
             : (savedJds.find(j => j.id === selectedJdId)?.title || 'Saved_JD.pdf'));
 
-      // Persist the assessment result to the existing session draft
+      // Generate Question Bank
+      const qbRes = await fetch('/api/question-banks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: assessment.sessionId,
+          questionConfig: {
+            behavioural: 1,
+            technical: 3,
+            coding: 1,
+            systemDesign: 0
+          }
+        })
+      });
+
+      if (!qbRes.ok) {
+        throw new Error('Failed to generate question bank');
+      }
+
+      const qbData = await qbRes.json();
+      const generatedQuestions = (qbData.question_bank || []).map((q: any) => q.question);
+
+      // Persist the assessment result and generated questions to the existing session draft
       await historyService.saveSession({
         id: assessment.sessionId,
         date: new Date().toISOString(),
@@ -301,6 +359,7 @@ export default function NewInterviewPage() {
         jdId: selectedJdId || undefined,
         status: 'In progress',
         questions: [],
+        replaceQuestions: true,
         competencyFitScore: assessment.competencyFitScore,
         technicalDepthScore: assessment.technicalDepthScore,
         matchLevel: assessment.matchLevel,
@@ -311,17 +370,34 @@ export default function NewInterviewPage() {
         gapAreas: assessment.gapAreas,
         criticalMissingSkills: assessment.criticalMissingSkills,
         sectionWiseFeedback: assessment.sectionWiseFeedback,
-        actionableSuggestions: assessment.actionableImprovementSuggestions
+        actionableSuggestions: generatedQuestions
       });
 
-      router.push(`/interview/new/type?sessionId=${assessment.sessionId}`);
+      // Navigate directly to the interview session room
+      router.push(`/interview/session/${assessment.sessionId}`);
     } catch (err) {
       console.error('Error creating interview session:', err);
+      setApiError('Đã xảy ra lỗi khi tạo ngân hàng câu hỏi. Vui lòng thử lại sau.');
+      setGenerating(false);
+    }
+  };
+
+  const handleRestart = async (id: string) => {
+    try {
+      setIsCloning(id);
+      const newSessionId = await historyService.cloneSession(id);
+      router.push(`/interview/session/${newSessionId}`);
+    } catch (err) {
+      console.error('Lỗi khi thực hiện lại phiên:', err);
+      alert('Không thể thực hiện lại phiên này. Vui lòng thử lại sau.');
+      setIsCloning(null);
     }
   };
 
   const handleReset = () => {
-    setAssessment(null);
+    if (assessment) {
+      setAssessment(null);
+    }
     setCvFile(null);
     setJdFile(null);
     setJdText('');
@@ -429,9 +505,20 @@ export default function NewInterviewPage() {
                     </p>
                   </div>
 
-                  <button className={styles.primaryButton} onClick={() => handleResumeSession(session.sessionId)}>
-                    Tiếp tục phiên này
-                  </button>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
+                    <button 
+                      onClick={() => handleRestart(session.sessionId)}
+                      disabled={isCloning === session.sessionId}
+                      className={styles.secondaryButton} 
+                      style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                    >
+                      {isCloning === session.sessionId ? <RefreshCw size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                      Thực hiện lại
+                    </button>
+                    <button className={styles.primaryButton} onClick={() => handleResumeSession(session.sessionId)}>
+                      Tiếp tục phiên này
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -934,6 +1021,20 @@ export default function NewInterviewPage() {
               </button>
             </div>
 
+          </div>
+        )}
+        {/* ── State 5: Generating Question Bank ── */}
+        {generating && (
+          <div className={styles.loadingOverlay}>
+            <div className={styles.spinner} style={{ borderTopColor: '#f59e0b' }} />
+            <div>
+              <h3>Đang tạo bộ câu hỏi phỏng vấn...</h3>
+              <p className={styles.subtitle} style={{ marginTop: '0.25rem' }}>AI đang thiết kế câu hỏi dựa trên CV và JD của bạn</p>
+            </div>
+            <div className={styles.loadingSteps}>
+              <p>➜ Phân tích kỹ năng cốt lõi...</p>
+              <p>➜ Lên danh sách câu hỏi phù hợp...</p>
+            </div>
           </div>
         )}
       </main>

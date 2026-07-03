@@ -24,4 +24,5 @@ message InferenceResponse {
   string reasoning = 2;
   string generated_follow_up_question = 3;
   int32 score = 4; // 1-10
+  string evaluation = 5;
 }

@@ -6,6 +6,8 @@ import fit.iuh.config.AppProperties;
 import fit.iuh.config.PromptTemplateConfig;
 import fit.iuh.dto.AssessmentResponse;
 import fit.iuh.dto.AssessmentResponseDto;
+import fit.iuh.dto.InterviewEvaluationRequest;
+import fit.iuh.dto.QuestionAnswerDto;
 import fit.iuh.dto.chat.LlmChatRequest;
 import fit.iuh.dto.chat.LlmChatResponse;
 import fit.iuh.entity.DocumentChunk;
@@ -442,5 +444,78 @@ public class AssessmentService {
                 ====== JOB DESCRIPTION (JD) ======
                 %s
                 """.formatted(cvText, jdText);
+    }
+
+    public static final String SYSTEM_PROMPT_INTERVIEW_EVALUATION =
+            """
+            Bạn là một chuyên gia đánh giá phỏng vấn nhân sự IT (Technical Recruiter & Senior Engineer). 
+            Nhiệm vụ của bạn là đánh giá toàn bộ kết quả buổi phỏng vấn giả lập của ứng viên dựa trên danh sách câu hỏi và câu trả lời thực tế.
+
+            Hãy phân tích kỹ các câu trả lời của ứng viên đối với từng câu hỏi và tổng hợp thành một báo cáo đánh giá hoàn chỉnh bằng tiếng Việt.
+
+            Yêu cầu định dạng đầu ra phải là một đối tượng JSON có cấu trúc chính xác như sau:
+            {
+              "overallScore": <điểm số tổng quan từ 0 đến 100 dựa trên chất lượng các câu trả lời>,
+              "overallFeedback": "<tổng hợp nhận xét chung về ứng viên, điểm mạnh lớn nhất và điểm cần cải thiện, viết bằng tiếng Việt, khoảng 3-4 câu ngắn gọn, súc tích>",
+              "strongAreas": [<danh sách 3-5 thế mạnh/kỹ năng nổi bật ứng viên thể hiện tốt>],
+              "gapAreas": [<danh sách 3-5 kỹ năng/lỗ hổng kiến thức cần cải thiện>],
+              "actionableSuggestions": [<danh sách 3-4 lời khuyên cụ thể để ứng viên chuẩn bị tốt hơn cho phỏng vấn thật, bằng tiếng Việt>],
+              "evaluatedQuestions": [
+                {
+                  "question": "<nội dung câu hỏi>",
+                  "answer": "<câu trả lời của ứng viên>",
+                  "score": <điểm số của câu hỏi này, số nguyên từ 1 đến 10>,
+                  "strengths": "<phân tích điểm tốt trong câu trả lời này, bằng tiếng Việt, ngắn gọn>",
+                  "improvements": "<phân tích điểm thiếu sót/chưa tốt, bằng tiếng Việt, ngắn gọn>",
+                  "suggestedAnswer": "<mẫu câu trả lời gợi ý chuẩn mực và đầy đủ cho câu hỏi này, bằng tiếng Việt>"
+                }
+              ]
+            }
+
+            Chú ý:
+            - Tất cả nhận xét, đề xuất và câu trả lời mẫu phải viết bằng tiếng Việt tự nhiên, chuyên nghiệp.
+            - Giữ cấu trúc JSON hợp lệ.
+            """;
+
+    public String evaluateSession(InterviewEvaluationRequest request) {
+        StringBuilder userPrompt = new StringBuilder();
+        userPrompt.append("Vị trí ứng tuyển: ").append(request.roleTitle()).append("\n");
+        userPrompt.append("Thể loại phỏng vấn: ").append(request.interviewType()).append("\n\n");
+        userPrompt.append("Dưới đây là chi tiết các câu hỏi và câu trả lời trong buổi phỏng vấn:\n");
+        
+        List<QuestionAnswerDto> turns = request.turns();
+        for (int i = 0; i < turns.size(); i++) {
+            QuestionAnswerDto t = turns.get(i);
+            userPrompt.append("CÂU HỎI ").append(i + 1).append(":\n");
+            userPrompt.append("Hỏi: ").append(t.question()).append("\n");
+            userPrompt.append("Trả lời của ứng viên: ").append(t.answer() != null && !t.answer().trim().isEmpty() ? t.answer() : "[Ứng viên không trả lời hoặc bỏ qua]").append("\n");
+            userPrompt.append("Điểm số sơ bộ: ").append(t.score() != null ? t.score() : 0).append("/10\n");
+            userPrompt.append("Đánh giá sơ bộ: ").append(t.strengths() != null ? t.strengths() : "N/A").append("\n\n");
+        }
+
+        LlmChatRequest llmRequest = LlmChatRequest.builder()
+                .model(appProperties.getLlm().getModel())
+                .maxTokens(appProperties.getLlm().getMaxTokens())
+                .temperature(0.3)
+                .stream(false)
+                .responseFormat(JSON_RESPONSE_FORMAT)
+                .messages(List.of(
+                        LlmChatRequest.Message.system(SYSTEM_PROMPT_INTERVIEW_EVALUATION),
+                        LlmChatRequest.Message.user(userPrompt.toString())
+                ))
+                .build();
+
+        LlmChatResponse response = llmWebClient.post()
+                .uri(CHAT_COMPLETIONS_PATH)
+                .bodyValue(llmRequest)
+                .retrieve()
+                .bodyToMono(LlmChatResponse.class)
+                .block();
+
+        if (response == null || response.getFirstChoiceContent() == null) {
+            throw new LlmApiException("LLM API returned an empty evaluation response.");
+        }
+
+        return response.getFirstChoiceContent().strip();
     }
 }

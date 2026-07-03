@@ -2,13 +2,16 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Calendar, FileText, FolderOpen, Plus } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Calendar, FileText, FolderOpen, Plus, RefreshCw } from 'lucide-react';
 import { historyService, SessionHistoryItem } from '@/services/historyService';
 import styles from './history.module.css';
 
 export default function HistoryPage() {
+  const router = useRouter();
   const [sessions, setSessions] = useState<SessionHistoryItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [isCloning, setIsCloning] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadHistory() {
@@ -36,6 +39,18 @@ export default function HistoryPage() {
       });
     } catch {
       return dateStr;
+    }
+  };
+
+  const handleRestart = async (id: string) => {
+    try {
+      setIsCloning(id);
+      const newSessionId = await historyService.cloneSession(id);
+      router.push(`/interview/session/${newSessionId}`);
+    } catch (err) {
+      console.error('Lỗi khi thực hiện lại phiên:', err);
+      alert('Không thể thực hiện lại phiên này. Vui lòng thử lại sau.');
+      setIsCloning(null);
     }
   };
 
@@ -145,9 +160,20 @@ export default function HistoryPage() {
                       <div className={styles.cardAction}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
                           {getStatusBadge(item.status)}
-                          <Link href={`/interview/session/${item.id}`} className={styles.primaryButton} style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>
-                            Tiếp tục ➔
-                          </Link>
+                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <button 
+                              onClick={() => handleRestart(item.id)}
+                              disabled={isCloning === item.id}
+                              className={styles.secondaryButton} 
+                              style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                            >
+                              {isCloning === item.id ? <RefreshCw size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                              Thực hiện lại
+                            </button>
+                            <Link href={`/interview/session/${item.id}`} className={styles.primaryButton} style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>
+                              Tiếp tục ➔
+                            </Link>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -196,9 +222,20 @@ export default function HistoryPage() {
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
                           {getStatusBadge(item.status)}
-                          <Link href={`/interview/session/${item.id}/result`} className={styles.secondaryButton}>
-                            Xem kết quả ➔
-                          </Link>
+                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <button 
+                              onClick={() => handleRestart(item.id)}
+                              disabled={isCloning === item.id}
+                              className={styles.primaryButton} 
+                              style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', backgroundColor: '#4f46e5' }}
+                            >
+                              {isCloning === item.id ? <RefreshCw size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                              Thực hiện lại
+                            </button>
+                            <Link href={`/interview/session/${item.id}/result`} className={styles.secondaryButton} style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>
+                              Xem kết quả ➔
+                            </Link>
+                          </div>
                         </div>
                       </div>
                     </div>

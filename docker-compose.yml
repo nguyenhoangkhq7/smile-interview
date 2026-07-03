@@ -112,6 +112,19 @@ services:
       
       # [ĐÃ SỬA] Thêm tiền tố SPEACHES__ để biến này thực sự có tác dụng
       SPEACHES__STT_MODEL_TTL: -1
+    command: >
+      bash -c "
+      (
+        sleep 5 &&
+        /home/ubuntu/speaches/.venv/bin/python -c \"
+        from speaches.executors.whisper.utils import model_registry as whisper;
+        from speaches.executors.piper.utils import model_registry as piper;
+        whisper.download_model_files_if_not_exist('Systran/faster-whisper-small');
+        piper.download_model_files_if_not_exist('speaches-ai/piper-vi_VN-vais1000-medium');
+        \"
+      ) &
+      /home/ubuntu/speaches/.venv/bin/uvicorn --factory speaches.main:create_app --host 0.0.0.0 --port 8000
+      "
     volumes:
       # Persist downloaded HuggingFace models on the host for ubuntu user
       - whisper_models:/home/ubuntu/.cache/huggingface
