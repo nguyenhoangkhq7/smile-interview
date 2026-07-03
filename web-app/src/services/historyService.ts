@@ -134,5 +134,19 @@ export const historyService = {
     };
 
     return this.saveSession(newSession);
+  },
+
+  /**
+   * Clone a session to restart interview
+   */
+  async cloneSession(sessionId: string): Promise<string> {
+    const res = await fetch(`/api/history/${sessionId}/clone`, {
+      method: 'POST',
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to clone session: ${res.statusText}`);
+    }
+    const data = await res.json();
+    return data.newSessionId;
   }
 };

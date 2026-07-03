@@ -29,6 +29,7 @@ public class InterviewEvaluationService {
         3. demonstrated_competency (STAR examples)
         
         Provide a real-time SCORE from 1 to 10 for their answer based on the 3 criteria above.
+        Provide a detailed EVALUATION explaining your score and pointing out strengths and weaknesses.
         
         DECISION RULES:
         - If the answer is lacking or needs clarification, return "FOLLOW_UP" and generate a follow-up question.
@@ -37,14 +38,14 @@ public class InterviewEvaluationService {
         CONTEXT AWARENESS:
         You must look at the 'Previous QA Context' provided by the user. Do NOT ask a follow-up question that is identical or too similar to previously asked questions.
         
-        Your output MUST be a JSON object mapping to the following fields: decision, reasoning, followUpQuestion, score.
+        Your output MUST be a JSON object mapping to the following fields: decision, reasoning, followUpQuestion, score, evaluation.
         CRITICAL: Keep your 'reasoning' extremely concise (max 1 sentence) to ensure low latency!
         """;
 
     public EvaluationResult evaluate(InferenceRequest request) {
         if (request.getCurrentFollowUpCount() >= 2) {
             log.info("Hard limit reached for follow-ups (count: {}). Routing to NEXT_TOPIC.", request.getCurrentFollowUpCount());
-            return new EvaluationResult("NEXT_TOPIC", "Hard limit reached for follow-ups.", "", 0);
+            return new EvaluationResult("NEXT_TOPIC", "Hard limit reached for follow-ups.", "", 0, "Candidate reached maximum follow-ups for this question.");
         }
 
         String userPrompt = buildUserPrompt(request);
@@ -61,7 +62,7 @@ public class InterviewEvaluationService {
 
         } catch (Exception e) {
             log.error("Inference failed or timed out. Falling back to NEXT_TOPIC.", e);
-            return new EvaluationResult("NEXT_TOPIC", "Fallback due to inference error or timeout.", "", 0);
+            return new EvaluationResult("NEXT_TOPIC", "Fallback due to inference error or timeout.", "", 0, "Evaluation failed due to timeout.");
         }
     }
 

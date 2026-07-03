@@ -4,5 +4,6 @@ public record EvaluationResult(
     String decision,
     String reasoning,
     String followUpQuestion,
-    int score
+    int score,
+    String evaluation
 ) {}

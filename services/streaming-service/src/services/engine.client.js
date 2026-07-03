@@ -59,7 +59,8 @@ export const evaluateCandidateResponse = (request) => {
         decision: response.decision,
         reasoning: response.reasoning,
         generatedFollowUpQuestion: response.generated_follow_up_question,
-        score: response.score
+        score: response.score,
+        evaluation: response.evaluation
       });
     });
   });

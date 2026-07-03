@@ -28,6 +28,7 @@ public class InferenceGrpcServiceImpl extends InferenceServiceGrpc.InferenceServ
                 .setReasoning(result.reasoning() != null ? result.reasoning() : "")
                 .setGeneratedFollowUpQuestion(result.followUpQuestion() != null ? result.followUpQuestion() : "")
                 .setScore(result.score())
+                .setEvaluation(result.evaluation() != null ? result.evaluation() : "")
                 .build();
                 
         responseObserver.onNext(response);

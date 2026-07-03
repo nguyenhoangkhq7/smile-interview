@@ -11,13 +11,13 @@ export const handleConnection = (io, socket) => {
   // Handle joining an interview session
   socket.on('join-interview', async (data) => {
     try {
-      const { interviewId, userId } = data;
+      const { interviewId, userId, initialQuestions, baseQuestionIndex = 0 } = data;
       if (!interviewId || !userId) {
         socket.emit('error', { message: 'interviewId and userId are required' });
         return;
       }
 
-      console.log(`User ${userId} joined interview ${interviewId} on socket ${socket.id}`);
+      console.log(`User ${userId} joined interview ${interviewId} on socket ${socket.id}, baseIndex: ${baseQuestionIndex}`);
       
       // Save socket-to-user/interview mapping in Redis for session management
       await redisClient.hSet(`socket:${socket.id}`, {
@@ -28,12 +28,16 @@ export const handleConnection = (io, socket) => {
       
       await redisClient.sAdd(`interview:${interviewId}:participants`, userId);
       socket.join(interviewId);
+      console.log(`[Signaling] Socket ${socket.id} joined room ${interviewId}`);
       
       // Initialize or get orchestration session
       let session = await getSession(interviewId);
+      console.log(`[Signaling] Fetched existing session from Redis:`, session ? 'Found' : 'Null');
       if (!session) {
-        session = await createSession(interviewId, userId);
+        console.log(`[Signaling] Creating new session in Redis with initialQuestions:`, initialQuestions);
+        session = await createSession(interviewId, userId, initialQuestions, baseQuestionIndex);
       }
+      console.log(`[Signaling] Session state status: ${session?.status}, questions length: ${session?.questions?.length}`);
 
       socket.to(interviewId).emit('peer-joined', { userId, socketId: socket.id });
       socket.emit('joined-room', { interviewId, userId });
@@ -46,25 +50,34 @@ export const handleConnection = (io, socket) => {
           questionState: session.questionState
         }
       });
+      console.log(`[Signaling] Emitted STATE_UPDATE to client`);
 
       // Optionally, push the first base question to start the interview if INIT
       if (session.status === 'INIT' && session.questions.length > 0) {
-        const firstQuestion = session.questions[0];
+        const firstQuestion = session.questions[session.questionState?.baseQuestionIndex || 0];
+        console.log(`[Signaling] Session status is INIT. Broadcasting first question: "${firstQuestion}"`);
         const avatarAction = await generateAvatarAction(firstQuestion, 'NEUTRAL');
 
         // Update state to IN_PROGRESS
         await updateSession(interviewId, { status: 'IN_PROGRESS' });
+        console.log(`[Signaling] Updated Redis session to IN_PROGRESS`);
 
         io.to(interviewId).emit('orchestration-event', {
           type: 'INTERVIEWER_ACTION',
           payload: {
-            actionId: `base-q-0`,
-            actionType: 'BASE_QUESTION',
+            actionId: `action-${Date.now()}`,
+            actionType: 'TRANSITION',
             text: firstQuestion,
+            reasoning: 'Starting the interview.',
+            score: 0,
+            evaluation: '',
             audioUrl: null,
             avatarTriggers: avatarAction
           }
         });
+        console.log(`[Signaling] Emitted INTERVIEWER_ACTION to room ${interviewId}`);
+      } else {
+        console.log(`[Signaling] Skip INIT questions broadcast. Status: ${session.status}, questions length: ${session.questions.length}`);
       }
 
     } catch (error) {
@@ -156,6 +169,8 @@ export const handleConnection = (io, socket) => {
             actionType: actionType,
             text: nextQuestionText,
             reasoning: engineResponse.reasoning,
+            score: engineResponse.score,
+            evaluation: engineResponse.evaluation,
             audioUrl: null,
             avatarTriggers: avatarAction
           }

@@ -4,15 +4,15 @@ import redisClient from '../config/redis.js';
  * Initializes a new interview session state in Redis.
  * Assumes the Question Bank has been generated and cached by ai-inference-service.
  */
-export const createSession = async (sessionId, candidateId) => {
+export const createSession = async (sessionId, candidateId, initialQuestions = null, baseQuestionIndex = 0) => {
   // Try to fetch pre-generated questions from Redis (created by ai-inference-service)
-  // If not found, use a fallback list for the IT domain
+  // If not found, use a fallback list for the IT domain, or the provided initialQuestions
   let cachedQuestions = await redisClient.get(`interview:${sessionId}:questions`);
-  let questionsList = cachedQuestions ? JSON.parse(cachedQuestions) : [
+  let questionsList = cachedQuestions ? JSON.parse(cachedQuestions) : (initialQuestions && initialQuestions.length > 0 ? initialQuestions : [
     "Could you walk me through your experience with microservices architecture?",
     "How do you handle database scaling for high-traffic applications?",
     "Can you describe a challenging bug you fixed recently?"
-  ];
+  ]);
 
   const sessionData = {
     sessionId,
@@ -21,7 +21,7 @@ export const createSession = async (sessionId, candidateId) => {
     currentTopicId: 'topic-0',
     questions: JSON.stringify(questionsList),
     questionState: JSON.stringify({
-      baseQuestionIndex: 0,
+      baseQuestionIndex: baseQuestionIndex,
       currentFollowUpDepth: 0,
       maxFollowUpDepth: 3,
       isTransitioning: false
