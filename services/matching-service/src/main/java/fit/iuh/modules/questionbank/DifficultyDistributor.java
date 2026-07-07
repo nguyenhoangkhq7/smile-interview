@@ -1,5 +1,6 @@
 package fit.iuh.modules.questionbank;
 
+import fit.iuh.modules.assessment.SeniorityLevel;
 import org.springframework.stereotype.Component;
 import java.util.*;
 
@@ -26,12 +27,30 @@ public class DifficultyDistributor {
     /**
      * Calculates the difficulty distribution for a given total number of questions.
      *
-     * @param candidateLevel senior | mid | junior | lead
-     * @param overallMatch low | medium | high
-     * @param totalCount total number of questions required for a type
-     * @return map mapping easy/medium/hard to their respective count
+     * @param seniorityLevel {@link SeniorityLevel} ENUM (type-safe, replaces free-string overload)
+     * @param overallMatch   low | medium | high
+     * @param totalCount     total number of questions required for a type
+     * @return map of easy/medium/hard to their respective counts
+     */
+    public Map<String, Integer> distribute(SeniorityLevel seniorityLevel, String overallMatch, int totalCount) {
+        // Delegate to string-based internal method, using ENUM.name() for normalisation
+        String levelKey = seniorityLevel != null ? seniorityLevel.name().toLowerCase() : "mid";
+        return distributeInternal(levelKey, overallMatch, totalCount);
+    }
+
+    /**
+     * String-based overload kept for backward compatibility with any existing callers.
+     * Prefer the {@link #distribute(SeniorityLevel, String, int)} overload for new code.
+     *
+     * @param candidateLevel free-string level (e.g., "junior", "mid") — normalised to lowercase
+     * @param overallMatch   low | medium | high
+     * @param totalCount     total number of questions required for a type
      */
     public Map<String, Integer> distribute(String candidateLevel, String overallMatch, int totalCount) {
+        return distributeInternal(candidateLevel, overallMatch, totalCount);
+    }
+
+    private Map<String, Integer> distributeInternal(String candidateLevel, String overallMatch, int totalCount) {
         if (totalCount <= 0) {
             return Map.of("easy", 0, "medium", 0, "hard", 0);
         }

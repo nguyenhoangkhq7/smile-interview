@@ -1,6 +1,5 @@
 package fit.iuh.modules.assessment;
 
-import fit.iuh.modules.assessment.AssessmentResponseDto;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -14,32 +13,31 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * JPA Entity persisting the SimInterview 3-part assessment result for an interview session.
+ * JPA Entity persisting the refactored assessment result for an interview session.
  *
- * <h3>SimInterview Outputs (Academic Paper Alignment)</h3>
- * <ol>
- *   <li><strong>Competency-level fit score</strong> — {@link #competencyFitScore} (integer column,
- *       fast for dashboard sorting and threshold filtering).
- *   <li><strong>Section-wise feedback</strong> — {@link #sectionWiseFeedback} (PostgreSQL {@code jsonb},
- *       allows native JSON operators: {@code section_wise_feedback -> 'skills_evaluation'
- *       -> 'critical_missing_skills'} for Module 3 question generation).
- *   <li><strong>Actionable improvement suggestions</strong> — {@link #actionableSuggestions}
- *       (PostgreSQL {@code jsonb} array of strings).
- * </ol>
+ * <h3>Architecture Changes (V3 Migration)</h3>
+ * <ul>
+ *   <li>{@code jobCategory} — replaces free-string {@code roleTypeDetected}; maps to {@link JobCategory} ENUM.</li>
+ *   <li>{@code seniorityLevel} — replaces free-string {@code candidateLevel}; maps to {@link SeniorityLevel} ENUM.</li>
+ *   <li>{@code overallMatchScore} — computed by {@link ScoringService} (Java math), never set by LLM.</li>
+ *   <li>{@code evidenceItems} — flat JSONB array of {@link AssessmentResponseDto.EvidenceItem} objects from LLM.</li>
+ *   <li>{@code topPriorityImprovements} — ordered improvement suggestions from LLM.</li>
+ *   <li>All old LLM-scored fields ({@code competencyFitScore}, {@code technicalDepthScore},
+ *       {@code matchLevel}, {@code sectionWiseFeedback}, etc.) removed.</li>
+ * </ul>
  *
  * <h3>Cache-Aside Pattern</h3>
  * The unique index on {@code session_id} ensures that subsequent calls for the same session
- * return the cached record instantly without re-invoking the LLM API.
- *
- * <h3>Schema Note</h3>
- * Hibernate 6's {@link JdbcTypeCode} with {@link SqlTypes#JSON} maps Java objects/collections
- * directly to PostgreSQL {@code jsonb} — no external Hibernate Types library is required.
+ * return the cached result instantly without re-invoking any LLM.
  */
 @Entity
 @Table(
         name = "resume_assessments",
         indexes = {
-                @Index(name = "idx_resume_assessment_session_id", columnList = "session_id", unique = true)
+                @Index(name = "idx_resume_assessment_session_id", columnList = "session_id", unique = true),
+                @Index(name = "idx_ra_job_category",    columnList = "job_category"),
+                @Index(name = "idx_ra_seniority_level", columnList = "seniority_level"),
+                @Index(name = "idx_ra_overall_score",   columnList = "overall_match_score")
         }
 )
 @Data
@@ -56,84 +54,72 @@ public class ResumeAssessment {
 
     /**
      * Links this assessment to a specific interview session.
-     * Must be unique — only one assessment result is stored per session.
-     * The unique constraint + index enables O(1) cache-aside lookups.
+     * Unique constraint enables O(1) cache-aside lookups.
      */
     @Column(name = "session_id", nullable = false, unique = true, length = 128)
     private String sessionId;
 
     // -------------------------------------------------------------------------
-    // SimInterview Output 1 — Competency-level fit score
+    // Metadata — from MetadataExtractionService (Step 2, ENUM-typed)
     // -------------------------------------------------------------------------
 
     /**
-     * The holistic competency fit score (0–100) from the LLM.
-     * Stored as a plain integer column for fast SQL sorting ({@code ORDER BY competency_fit_score DESC})
-     * and threshold filtering ({@code WHERE competency_fit_score >= 70}) without parsing JSONB.
+     * Engineering domain of the JD, mapped from {@link JobCategory} ENUM.
+     * Extracted by {@code MetadataExtractionService} — never inferred by the assessment LLM.
      */
-    @Column(name = "competency_fit_score")
-    private Integer competencyFitScore;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "job_category", length = 50)
+    private JobCategory jobCategory;
 
-    @Column(name = "technical_depth_score")
-    private Integer technicalDepthScore;
-
-    @Column(name = "match_level", length = 64)
-    private String matchLevel;
-
-    @Column(name = "role_type_detected", length = 64)
-    private String roleTypeDetected;
-
-    @Column(name = "candidate_level", length = 64)
-    private String candidateLevel;
-
-    @Column(name = "years_of_experience_estimate", length = 64)
-    private String yearsOfExperienceEstimate;
-
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "strong_areas", columnDefinition = "jsonb")
-    private List<String> strongAreas;
-
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "gap_areas", columnDefinition = "jsonb")
-    private List<String> gapAreas;
-
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "critical_missing_skills", columnDefinition = "jsonb")
-    private List<String> criticalMissingSkills;
+    /**
+     * Required seniority level from the JD, mapped from {@link SeniorityLevel} ENUM.
+     * Extracted by {@code MetadataExtractionService} — never inferred by the assessment LLM.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "seniority_level", length = 20)
+    private SeniorityLevel seniorityLevel;
 
     // -------------------------------------------------------------------------
-    // SimInterview Output 2 — Section-wise feedback (JSONB)
+    // Score — computed by ScoringService (Java math, NOT the LLM)
     // -------------------------------------------------------------------------
 
     /**
-     * The structured section-wise feedback object from the LLM, stored as PostgreSQL {@code jsonb}.
+     * Overall match score (0–100) calculated by {@link ScoringService} using the formula:
+     * <pre>
+     *   score = SUM(weight_i * points_i) / SUM(weight_i) * 100
+     *   where: matched=1.0, weak=0.5, missing=0.0
+     * </pre>
+     * Stored as a plain integer for fast SQL sorting and threshold filtering.
      */
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "section_wise_feedback", nullable = false, columnDefinition = "jsonb")
-    private AssessmentResponseDto.SectionWiseFeedback sectionWiseFeedback;
+    @Column(name = "overall_match_score")
+    private Integer overallMatchScore;
 
     // -------------------------------------------------------------------------
-    // SimInterview Output 3 — Actionable improvement suggestions (JSONB)
+    // LLM Evidence Output (Step 4) — evidence only, no scores
     // -------------------------------------------------------------------------
 
     /**
-     * The ordered list of actionable improvement suggestions, stored as a PostgreSQL {@code jsonb} array.
-     *
-     * <p>Stored as JSONB (rather than a {@code text} column with comma-separated values) to preserve
-     * proper array semantics and enable future array-level queries (e.g., {@code jsonb_array_length}).
+     * Flat JSONB array of {@link AssessmentResponseDto.EvidenceItem} objects.
+     * Populated entirely by the LLM evidence-matching call. Contains no computed scores.
+     * Schema: [{criteria_id, criteria_name, jd_requirement, cv_evidence, status}]
      */
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "actionable_suggestions", nullable = false, columnDefinition = "jsonb")
-    private List<String> actionableSuggestions;
+    @Column(name = "evidence_items", columnDefinition = "jsonb")
+    private List<AssessmentResponseDto.EvidenceItem> evidenceItems;
+
+    /**
+     * Ordered list of actionable improvement suggestions returned by the LLM.
+     * Stored as a JSONB array for native array semantics and future query support.
+     */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "top_priority_improvements", columnDefinition = "jsonb")
+    private List<String> topPriorityImprovements;
 
     // -------------------------------------------------------------------------
     // Audit field
     // -------------------------------------------------------------------------
 
-    /**
-     * Timestamp when this assessment was first persisted.
-     * Set automatically in the {@link PrePersist} lifecycle callback; never updated.
-     */
+    /** Timestamp when this assessment was first persisted. Never updated. */
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

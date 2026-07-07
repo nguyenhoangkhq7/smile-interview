@@ -2,6 +2,8 @@ package fit.iuh.modules.questionbank;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import fit.iuh.modules.assessment.JobCategory;
+import fit.iuh.modules.assessment.SeniorityLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -10,10 +12,18 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 
 /**
- * Structured context extracted by the LLM from CV + JD + Assessment.
+ * Structured context used to drive interview question generation.
  *
- * <p>Used to determine difficulty distribution and personalize question
- * generation for a specific candidate.
+ * <p>Populated programmatically from {@link fit.iuh.modules.assessment.ResumeAssessment}
+ * (no extra LLM call required). The fields {@link #candidateLevel} and {@link #roleType}
+ * are now typed as {@link SeniorityLevel} and {@link JobCategory} ENUMs respectively,
+ * enforcing type safety across the pipeline.
+ *
+ * <h3>ENUM Serialization</h3>
+ * Jackson serializes ENUMs to their {@code .name()} string (e.g., {@code "FRESHER"})
+ * when stored as JSONB in the DB. The LLM prompt receives {@code enum.name()} via explicit
+ * {@code .name()} calls in {@link QuestionBankService} — ensuring the LLM gets a clean
+ * uppercase string rather than an enum reference.
  */
 @Data
 @Builder
@@ -22,9 +32,12 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class CandidateContextDto {
 
-    /** Inferred seniority level: junior | mid | senior | lead */
+    /**
+     * Inferred seniority level from the JD, mapped from {@link SeniorityLevel} ENUM.
+     * JSON property kept as "candidate_level" for backward compat with stored JSONB.
+     */
     @JsonProperty("candidate_level")
-    private String candidateLevel;
+    private SeniorityLevel candidateLevel;
 
     /** Overall CV-JD match quality: low | medium | high */
     @JsonProperty("overall_match")
@@ -54,7 +67,10 @@ public class CandidateContextDto {
     @JsonProperty("target_domain")
     private String targetDomain;
 
-    /** Role type: backend | frontend | fullstack | devops | data_engineer | ML_engineer | security | mobile | other */
+    /**
+     * Role type mapped from {@link JobCategory} ENUM.
+     * JSON property kept as "role_type" for backward compat with stored JSONB.
+     */
     @JsonProperty("role_type")
-    private String roleType;
+    private JobCategory roleType;
 }

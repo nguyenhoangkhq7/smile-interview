@@ -4,11 +4,11 @@ services:
     container_name: postgres_db
     restart: always
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: smile_interview_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     ports:
-      - "${POSTGRES_PORT}:5432"
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -23,7 +23,7 @@ services:
     container_name: redis_cache
     restart: always
     ports:
-      - "${REDIS_PORT}:6379"
+      - "6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -38,41 +38,24 @@ services:
       dockerfile: Dockerfile
     container_name: matching_service
     restart: always
-    ports:
-      - "${MATCHING_SERVICE_PORT}:8081"
+    # ── Per-service .env — NO global root .env ──────────────────────────────
+    env_file:
+      - ./services/matching-service/.env
     environment:
-      # Application
-      SERVER_PORT: ${SERVER_PORT}
-      # Database
-      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL}
-      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
-      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
-      SPRING_JPA_HIBERNATE_DDL_AUTO: ${SPRING_JPA_HIBERNATE_DDL_AUTO}
-      # Redis
+      # Override local DB/Redis URLs with Docker service names
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/smile_interview_db
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
-      # AI APIs
-      LLM_API_KEY: ${LLM_API_KEY}
-      LLM_API_URL: ${LLM_API_URL}
-      LLM_CHAT_PATH: ${LLM_CHAT_PATH}
-      LLM_MODEL: ${LLM_MODEL}
-      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS}
-      LLM_MAX_TOKENS: ${LLM_MAX_TOKENS}
-      OLLAMA_EMBEDDING_URL: ${OLLAMA_EMBEDDING_URL}
-      OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL}
-      OLLAMA_EMBEDDING_TIMEOUT_SECONDS: ${OLLAMA_EMBEDDING_TIMEOUT_SECONDS}
-      # Chunking
-      CHUNKING_MAX_TOKENS: ${CHUNKING_MAX_TOKENS}
-      CHUNKING_OVERLAP_TOKENS: ${CHUNKING_OVERLAP_TOKENS}
-      # Question Bank
-      QUESTION_BANK_MAX_TOKENS: ${QUESTION_BANK_MAX_TOKENS}
-      QUESTION_BANK_TEMPERATURE: ${QUESTION_BANK_TEMPERATURE}
-      QUESTION_BANK_MAX_RETRIES: ${QUESTION_BANK_MAX_RETRIES}
+      OLLAMA_EMBEDDING_URL: http://ollama:11434
+    ports:
+      - "8081:8081"
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      ollama:
+        condition: service_started
 
   ai-inference-service:
     build:
@@ -80,19 +63,11 @@ services:
       dockerfile: Dockerfile
     container_name: ai_inference_service
     restart: always
+    # ── Per-service .env — NO global root .env ──────────────────────────────
+    env_file:
+      - ./services/ai-inference-service/.env
     ports:
-      - "${AI_INFERENCE_PORT:-9091}:9091"
-    environment:
-      # Application
-      SERVER_PORT: 8080
-      # gRPC
-      GRPC_SERVER_PORT: 9091
-      # AI APIs
-      LLM_API_KEY: ${LLM_API_KEY}
-      LLM_API_URL: ${LLM_API_URL}
-      SPRING_AI_OPENAI_BASE_URL: ${SPRING_AI_OPENAI_BASE_URL}
-      LLM_MODEL: ${LLM_MODEL}
-      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS}
+      - "9091:9091"
 
   speaches:
     # Speaches: OpenAI-compatible STT/TTS server powered by faster-whisper
@@ -107,13 +82,8 @@ services:
       WHISPER__INFERENCE_DEVICE: cpu
       # int8 quantization — best latency/quality tradeoff on CPU
       WHISPER__COMPUTE_TYPE: int8
-      
-      # [TỐI ƯU TỐC ĐỘ 1] Cắt bỏ khoảng lặng (silence) cực kỳ quan trọng
       WHISPER__ENABLE_VAD: "true"
-      # [TỐI ƯU TỐC ĐỘ 2] Dùng đa nhân CPU (Thay bằng số nhân thực tế nếu máy bạn mạnh)
       WHISPER__CPU_THREADS: 4
-      
-      # [ĐÃ SỬA] Thêm tiền tố SPEACHES__ để biến này thực sự có tác dụng
       SPEACHES__STT_MODEL_TTL: -1
     command: >
       bash -c "
@@ -129,7 +99,6 @@ services:
       /home/ubuntu/speaches/.venv/bin/uvicorn --factory speaches.main:create_app --host 0.0.0.0 --port 8000
       "
     volumes:
-      # Persist downloaded HuggingFace models on the host for ubuntu user
       - whisper_models:/home/ubuntu/.cache/huggingface
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
@@ -144,20 +113,16 @@ services:
       dockerfile: Dockerfile
     container_name: streaming_service
     restart: always
-    ports:
-      - "${STREAMING_SERVICE_PORT:-8001}:8001"
+    # ── Per-service .env (already existed) ──────────────────────────────────
+    env_file:
+      - ./services/streaming-service/.env
     environment:
-      PORT: 8001
+      # Override local URLs with Docker service names
       REDIS_URL: redis://redis:6379
-      WHISPER_API_URL: ${WHISPER_API_URL}
-      WHISPER_API_KEY: ${GROQ_API_KEY}
-      # Sử dụng model 'small' hoặc whisper-large-v3 của Groq
-      WHISPER_MODEL: ${WHISPER_MODEL}
-      # TTS — OpenAI-compatible /v1/audio/speech endpoint served by Speaches
       TTS_API_URL: http://speaches:8000/v1/audio/speech
-      TTS_MODEL: ${TTS_MODEL:-speaches-ai/piper-vi_VN-vais1000-medium}
-      # Cấu hình chính xác tới container ai-inference-service
       INFERENCE_GRPC_SERVER: ai-inference-service:9091
+    ports:
+      - "8001:8001"
     depends_on:
       redis:
         condition: service_healthy
@@ -179,15 +144,47 @@ services:
       NODE_ENV: production
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: smile_interview_db
       MATCHING_SERVICE_URL: http://matching-service:8081
     depends_on:
       - streaming-service
+
+  # ─────────────────────────────────────────────────────────────────
+  # Local Embeddings Engine (Ollama)
+  # ─────────────────────────────────────────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: always
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # Sidecar helper to pull the embedding model on startup
+  ollama-model-prepull:
+    image: ollama/ollama:latest
+    container_name: ollama_model_prepull
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    depends_on:
+      - ollama
+    entrypoint: [ "sh", "-c", "until ollama list >/dev/null 2>&1; do sleep 2; done; ollama pull qwen3-embedding:4b" ]
 
 volumes:
   postgres_data:
   redis_data:
   # Named volume for HuggingFace model cache — survives container restarts/rebuilds
   whisper_models:
+  # Named volume for Ollama models cache
+  ollama_data:
+
