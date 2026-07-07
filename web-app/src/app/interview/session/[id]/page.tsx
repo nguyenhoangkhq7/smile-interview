@@ -4,7 +4,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { io, Socket } from 'socket.io-client';
-import { InterviewerAvatar } from '@/components/InterviewerAvatar';
+import { InterviewerAvatar } from '@/components/interview/InterviewerAvatar/InterviewerAvatar';
 import { historyService, SessionHistoryItem, QuestionFeedback } from '@/services/historyService';
 // Removed questionService
 import { useSessionRecorder } from '@/hooks/useSessionRecorder';

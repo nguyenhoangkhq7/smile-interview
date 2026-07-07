@@ -439,19 +439,6 @@ export default function NewInterviewPage() {
 
   return (
     <div className={styles.container}>
-      <header className={styles.header}>
-        <Link href="/history" className={styles.logo}>
-          <img src="/logo.png" alt="Smile Interview Logo" className={styles.logoImg} />
-        </Link>
-        <nav className={styles.navLinks}>
-          <Link href="/history" className={styles.navLink}>
-            Lịch sử
-          </Link>
-          <span className={`${styles.navLink} ${styles.browseLink}`} style={{ cursor: 'default' }}>
-            Phỏng vấn mới
-          </span>
-        </nav>
-      </header>
 
       {/* Main Content */}
       <main className={styles.content}>
@@ -462,9 +449,10 @@ export default function NewInterviewPage() {
 
         {activeSessions.length > 0 && !assessment && !uploading && !analyzing && (
           <section className={styles.formSection} style={{ marginBottom: '1.5rem' }}>
-            <div className={styles.titleSection} style={{ marginBottom: '1rem' }}>
-              <div>
-                <h2 style={{ margin: 0, fontSize: '1.25rem' }}>Phiên đang thực hiện</h2>
+            <div className={styles.sectionHeader} style={{ marginBottom: '1rem' }}>
+              <div className={styles.sectionHeaderContent}>
+                <span className={styles.sectionEyebrow}>Phiên đang hoạt động</span>
+                <h2 className={styles.sectionTitle}>Phiên đang thực hiện</h2>
                 <p className={styles.subtitle} style={{ marginTop: '0.35rem' }}>
                   Các phiên này đang được quản lý trong PostgreSQL, bạn có thể tiếp tục ngay từ đây.
                 </p>
@@ -474,42 +462,23 @@ export default function NewInterviewPage() {
               </Link>
             </div>
 
-            <div style={{ display: 'grid', gap: '0.75rem' }}>
+            <div className={styles.sessionList}>
               {activeSessions.slice(0, 3).map((session) => (
-                <div
-                  key={session.sessionId}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '1rem',
-                    padding: '1rem 1.1rem',
-                    borderRadius: '0.9rem',
-                    background: 'linear-gradient(135deg, rgba(79,70,229,0.06), rgba(14,165,233,0.04))',
-                    border: '1px solid rgba(99,102,241,0.12)'
-                  }}
-                >
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                      <strong style={{ color: '#0f172a' }}>{session.roleTitle}</strong>
-                      <span style={{ fontSize: '0.72rem', padding: '0.18rem 0.45rem', borderRadius: '999px', backgroundColor: '#e0e7ff', color: '#3730a3', fontWeight: 700 }}>
-                        {session.status}
-                      </span>
+                <div key={session.sessionId} className={styles.sessionCard}>
+                  <div className={styles.sessionMain}>
+                    <div className={styles.sessionTitleRow}>
+                      <strong className={styles.sessionTitle}>{session.roleTitle}</strong>
+                      <span className={styles.statusPill}>{session.status}</span>
                     </div>
-                    <p style={{ margin: '0.35rem 0 0', fontSize: '0.86rem', color: '#64748b' }}>
-                      {session.cvFilename} • {session.jdFilename}
-                    </p>
-                    <p style={{ margin: '0.25rem 0 0', fontSize: '0.78rem', color: '#94a3b8' }}>
-                      Cập nhật: {new Date(session.date).toLocaleString('vi-VN')}
-                    </p>
+                    <p className={styles.sessionMeta}>{session.cvFilename} • {session.jdFilename}</p>
+                    <p className={styles.sessionDate}>Cập nhật: {new Date(session.date).toLocaleString('vi-VN')}</p>
                   </div>
 
-                  <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
-                    <button 
+                  <div className={styles.sessionActions}>
+                    <button
                       onClick={() => handleRestart(session.sessionId)}
                       disabled={isCloning === session.sessionId}
-                      className={styles.secondaryButton} 
-                      style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                      className={styles.secondaryButton}
                     >
                       {isCloning === session.sessionId ? <RefreshCw size={14} className="animate-spin" /> : <RefreshCw size={14} />}
                       Thực hiện lại
@@ -576,7 +545,7 @@ export default function NewInterviewPage() {
                       onDrop={(e) => handleDrop(e, 'cv')}
                       onClick={() => triggerFileSelect('cv')}
                     >
-                      <FolderOpen size={48} className={styles.uploadIcon} style={{ color: '#6366f1', marginBottom: '1rem' }} />
+                      <FolderOpen size={48} className={styles.uploadIcon} />
                       <p className={styles.dropzoneText}>
                         Kéo thả CV hoặc <span className={styles.browseLink}>chọn tệp</span>
                       </p>
@@ -592,7 +561,7 @@ export default function NewInterviewPage() {
                   ) : (
                     <div className={styles.fileCard}>
                       <div className={styles.fileInfo}>
-                        <FileText size={24} className={styles.fileIcon} style={{ color: '#6366f1', marginRight: '8px' }} />
+                        <FileText size={24} className={styles.fileIcon} />
                         <div>
                           <p className={styles.fileName}>{cvFile.name}</p>
                           <p className={styles.fileSize}>{(cvFile.size / 1024 / 1024).toFixed(2)} MB</p>
@@ -662,7 +631,7 @@ export default function NewInterviewPage() {
                         onDrop={(e) => handleDrop(e, 'jd')}
                         onClick={() => triggerFileSelect('jd')}
                       >
-                        <Briefcase size={48} className={styles.uploadIcon} style={{ color: '#6366f1', marginBottom: '1rem' }} />
+                        <Briefcase size={48} className={styles.uploadIcon} />
                         <p className={styles.dropzoneText}>
                           Kéo thả JD hoặc <span className={styles.browseLink}>chọn tệp</span>
                         </p>
@@ -678,7 +647,7 @@ export default function NewInterviewPage() {
                     ) : (
                       <div className={styles.fileCard}>
                         <div className={styles.fileInfo}>
-                          <FileText size={24} className={styles.fileIcon} style={{ color: '#3b82f6', marginRight: '8px' }} />
+                          <FileText size={24} className={styles.fileIcon} />
                           <div>
                             <p className={styles.fileName}>{jdFile.name}</p>
                             <p className={styles.fileSize}>{(jdFile.size / 1024 / 1024).toFixed(2)} MB</p>
@@ -724,7 +693,7 @@ export default function NewInterviewPage() {
             </div>
 
             <div className={styles.formActions}>
-              <Link href="/history" className={styles.secondaryButton}>
+              <Link href="/" className={styles.secondaryButton}>
                 Hủy bỏ
               </Link>
               <button
@@ -1038,9 +1007,6 @@ export default function NewInterviewPage() {
         )}
       </main>
 
-      <footer className={styles.footer}>
-        <img src="/footer.png" alt="Smile Interview Footer" className={styles.footerImg} />
-      </footer>
     </div>
   );
 }

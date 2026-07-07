@@ -1,0 +1,263 @@
+/* src/components/navbar.module.css */
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  width: 100%;
+  border-bottom: 1px solid #e2e8f0;
+  background-color: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: flex;
+  height: 4rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.5rem;
+}
+
+/* ── Logo ── */
+.logo {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.logoImg {
+  height: 110px;
+  width: auto;
+  object-fit: contain;
+  display: block;
+}
+
+/* ── Nav Links ── */
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+@media (max-width: 640px) {
+  .nav {
+    display: none;
+  }
+}
+
+.navLink {
+  position: relative;
+  padding: 0.5rem 0.875rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #475569;
+  text-decoration: none;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.navLink:hover {
+  color: #0f172a;
+  background-color: #f1f5f9;
+}
+
+.navLinkActive {
+  color: #166534;
+  font-weight: 700;
+}
+
+.navLinkActive svg {
+  color: #166534;
+}
+
+/* ── Auth Buttons ── */
+.authButtons {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btnLogin {
+  display: none;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #475569;
+  background-color: #ffffff;
+  border: 1px solid #d1d5db;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+@media (min-width: 640px) {
+  .btnLogin {
+    display: inline-flex;
+  }
+}
+
+.btnLogin:hover {
+  background-color: #f8fafc;
+  border-color: #9ca3af;
+  color: #0f172a;
+}
+
+.btnRegister {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #ffffff;
+  background-color: #ea580c;
+  text-decoration: none;
+  box-shadow: 0 2px 8px rgba(234, 88, 12, 0.3);
+  transition: all 0.15s ease;
+}
+
+.btnRegister:hover {
+  background-color: #c2410c;
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.4);
+}
+
+/* ── User Dropdown ── */
+.profileSection {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  user-select: none;
+}
+
+.dropdownTrigger {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.875rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #334155;
+  background-color: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dropdownTrigger:hover {
+  background-color: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.dropdownIconUser {
+  color: #15803d;
+}
+
+.dropdownIconChevron {
+  color: #94a3b8;
+}
+
+.dropdownMenu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 0.5rem;
+  width: 15rem;
+  background-color: #ffffff;
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+  border: 1px solid #f1f5f9;
+  padding: 0.375rem 0;
+  z-index: 100;
+  animation: dropdownFadeIn 0.15s ease-out;
+}
+
+@keyframes dropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dropdownHeader {
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid #f1f5f9;
+  margin-bottom: 0.25rem;
+}
+
+.dropdownName {
+  font-weight: 700;
+  color: #1e293b;
+  font-size: 0.75rem;
+}
+
+.dropdownEmail {
+  color: #94a3b8;
+  font-size: 0.625rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dropdownItem {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.75rem;
+  color: #475569;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color 0.15s ease;
+}
+
+.dropdownItem:hover {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+.dropdownItemBlue {
+  color: #3b82f6;
+}
+
+.dropdownItemGreen {
+  color: #10b981;
+}
+
+.dropdownDivider {
+  border-top: 1px solid #f1f5f9;
+  margin: 0.25rem 0;
+}
+
+.logoutButton {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  width: 100%;
+  border: none;
+  background: none;
+  text-align: left;
+  padding: 0.5rem 1rem;
+  font-size: 0.75rem;
+  color: #dc2626;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.logoutButton:hover {
+  background-color: #fef2f2;
+}
