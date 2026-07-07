@@ -76,22 +76,36 @@ public class QuestionBankService {
         log.info("[QuestionBank] Semantic matching completed. Found {} matched pairs for session {}.", matchedPairs.size(), sessionId);
 
         // Step 1: Programmatic Context Extraction from Assessment (saves LLM call & costs 0 tokens!)
-        List<String> strongAreas = assessment.getStrongAreas() != null ? assessment.getStrongAreas() : Collections.emptyList();
-        List<String> gapAreas = assessment.getGapAreas() != null ? assessment.getGapAreas() : Collections.emptyList();
+        // Use ENUM .name() for strong_areas/gap_areas are still plain String lists from evidenceItems
+        List<String> strongAreas = new ArrayList<>();
+        List<String> gapAreas = new ArrayList<>();
 
+        // Derive strong/gap areas from evidence_items (matched = strong, missing = gap)
+        if (assessment.getEvidenceItems() != null) {
+            for (var item : assessment.getEvidenceItems()) {
+                if ("matched".equalsIgnoreCase(item.status())) {
+                    strongAreas.add(item.criteriaName());
+                } else if ("missing".equalsIgnoreCase(item.status())) {
+                    gapAreas.add(item.criteriaName());
+                }
+            }
+        }
+
+        // Derive tech stacks from evidence items (matched/weak = possessed, missing = required gap)
         List<String> techStackRequired = new ArrayList<>();
         List<String> techStackPossessed = new ArrayList<>();
-        if (assessment.getSectionWiseFeedback() != null && assessment.getSectionWiseFeedback().techStackAlignment() != null) {
-            var alignment = assessment.getSectionWiseFeedback().techStackAlignment();
-            if (alignment.matched() != null) {
-                techStackRequired.addAll(alignment.matched());
-                techStackPossessed.addAll(alignment.matched());
-            }
-            if (alignment.missing() != null) {
-                techStackRequired.addAll(alignment.missing());
-            }
-            if (alignment.weakEvidence() != null) {
-                techStackPossessed.addAll(alignment.weakEvidence());
+        if (assessment.getEvidenceItems() != null) {
+            for (var item : assessment.getEvidenceItems()) {
+                if (item.criteriaName() != null
+                        && item.criteriaName().toLowerCase().contains("tech stack")) {
+                    if ("matched".equalsIgnoreCase(item.status())
+                            || "weak".equalsIgnoreCase(item.status())) {
+                        if (item.cvEvidence() != null) techStackPossessed.add(item.cvEvidence());
+                    }
+                    if ("missing".equalsIgnoreCase(item.status())) {
+                        if (item.jdRequirement() != null) techStackRequired.add(item.jdRequirement());
+                    }
+                }
             }
         }
 
@@ -114,19 +128,24 @@ public class QuestionBankService {
         }
 
         CandidateContextDto context = CandidateContextDto.builder()
-                .candidateLevel(assessment.getCandidateLevel())
-                .overallMatch(assessment.getMatchLevel())
-                .yearsOfExperience(assessment.getYearsOfExperienceEstimate())
+                // Use ENUM directly — type-safe, no string variance
+                .candidateLevel(assessment.getSeniorityLevel())
+                .overallMatch(assessment.getOverallMatchScore() != null
+                        ? (assessment.getOverallMatchScore() >= 80 ? "high"
+                           : assessment.getOverallMatchScore() >= 50 ? "medium" : "low")
+                        : "medium")
+                .yearsOfExperience(null) // Not stored in new schema; LLM will infer
                 .strongAreas(strongAreas)
                 .gapAreas(gapAreas)
                 .techStackRequired(techStackRequired)
                 .techStackPossessed(techStackPossessed)
                 .targetDomain(targetDomain)
-                .roleType(assessment.getRoleTypeDetected())
+                .roleType(assessment.getJobCategory())
                 .build();
 
         // Step 2: Difficulty Distribution Calculation
         Map<String, Map<String, Integer>> distributions = new LinkedHashMap<>();
+        // Use the SeniorityLevel ENUM overload of DifficultyDistributor
         if (config.getBehavioural() > 0) {
             distributions.put("behavioural", difficultyDistributor.distribute(
                     context.getCandidateLevel(), context.getOverallMatch(), config.getBehavioural()));
@@ -293,18 +312,22 @@ public class QuestionBankService {
 
         String generationRationale = String.format(
                 "%s-level %s candidate with %s CV-JD match. Strong areas: %s. Gap areas: %s.",
-                context.getCandidateLevel() != null ? context.getCandidateLevel() : "mid",
-                context.getRoleType() != null ? context.getRoleType() : "backend",
+                // Use ENUM .name() for clean uppercase strings in rationale
+                context.getCandidateLevel() != null ? context.getCandidateLevel().name() : "MID",
+                context.getRoleType() != null ? context.getRoleType().name() : "BACKEND",
                 context.getOverallMatch() != null ? context.getOverallMatch() : "medium",
                 context.getStrongAreas() != null ? String.join(", ", context.getStrongAreas()) : "None",
                 context.getGapAreas() != null ? String.join(", ", context.getGapAreas()) : "None"
         );
 
         QuestionBankMetadataDto metadata = QuestionBankMetadataDto.builder()
-                .candidateLevel(context.getCandidateLevel())
+                // Convert ENUM → String via .name() for the outgoing API DTO
+                .candidateLevel(context.getCandidateLevel() != null
+                        ? context.getCandidateLevel().name() : "MID")
                 .overallMatch(context.getOverallMatch())
                 .yearsOfExperience(context.getYearsOfExperience())
-                .roleType(context.getRoleType())
+                .roleType(context.getRoleType() != null
+                        ? context.getRoleType().name() : "OTHER")
                 .targetDomain(context.getTargetDomain())
                 .strongAreas(context.getStrongAreas())
                 .gapAreas(context.getGapAreas())

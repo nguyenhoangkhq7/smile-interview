@@ -99,11 +99,20 @@ public class IngestionService {
         // ────────────────────────────────────────────────────────────────────
         // STEP 2 — Standardize to Markdown via Groq LLM
         // ────────────────────────────────────────────────────────────────────
-        log.info("[Step 2/4] Standardizing documents via Groq LLM (this may take ~10-30s)...");
-        String markdownCv = standardizationService.standardizeCv(rawCvText);
+        log.info("[Step 2/4] Standardizing documents via Groq LLM (Running parallel on Virtual Threads)...");
+        String markdownCv;
+        String markdownJd;
 
+        try (var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+            java.util.concurrent.CompletableFuture<String> futureCv = java.util.concurrent.CompletableFuture.supplyAsync(
+                    () -> standardizationService.standardizeCv(rawCvText), executor);
 
-        String markdownJd = standardizationService.standardizeJd(rawJdText);
+            java.util.concurrent.CompletableFuture<String> futureJd = java.util.concurrent.CompletableFuture.supplyAsync(
+                    () -> standardizationService.standardizeJd(rawJdText), executor);
+
+            markdownCv = futureCv.join();
+            markdownJd = futureJd.join();
+        }
         log.info("[Step 2/4] Done. CV Markdown: {} chars | JD Markdown: {} chars",
                 markdownCv.length(), markdownJd.length());
 

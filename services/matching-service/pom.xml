@@ -79,6 +79,20 @@
             <version>${pgvector.version}</version>
         </dependency>
 
+        <!-- ===== Database Migration ===== -->
+        <!-- Flyway: version-controlled schema migrations (replaces Hibernate DDL auto) -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+            <!-- Version managed by Spring Boot parent BOM -->
+        </dependency>
+        <!-- Flyway Database support for PostgreSQL 17+ -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+            <!-- Version managed by Spring Boot parent BOM -->
+        </dependency>
+
         <!-- ===== PDF Parsing ===== -->
         <!-- Apache PDFBox 3.x for extracting text from PDF files -->
         <dependency>

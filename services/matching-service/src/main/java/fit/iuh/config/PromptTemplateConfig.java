@@ -7,6 +7,10 @@ public final class PromptTemplateConfig {
         throw new UnsupportedOperationException("PromptTemplateConfig is a utility class");
     }
 
+    // =========================================================================
+    // STEP 1: Ingestion & Standardization Prompts
+    // =========================================================================
+
     public static final String SYSTEM_PROMPT_CV =
             """
             Role: Senior Technical Recruiter & ATS Expert (Software Engineering).
@@ -91,108 +95,172 @@ public final class PromptTemplateConfig {
             * Interview Stages: [Sequential list of interview rounds, if provided]
             """;
 
-    public static final String SYSTEM_PROMPT_ASSESSMENT =
+    // =========================================================================
+    // STEP 2: Metadata Extraction Prompt
+    // Zero-shot schema prompt — extracts ONLY 2 fields. No scoring, no analysis.
+    // =========================================================================
+
+    public static final String SYSTEM_PROMPT_METADATA_EXTRACTION =
             """
-            Role: Senior Technical Recruiter & Engineering Manager.
-            Task: Evaluate a candidate's CV against a Job Description (JD) using rigorous evidence-based matching.
-    
+            Role: IT Job Classification Engine.
+            Task: Extract exactly two metadata fields from the provided Job Description.
+            
             RULES:
-            1. ZERO HALLUCINATION: Base analysis strictly on provided texts. Do not invent skills, metrics, or projects.
-            2. SEMANTIC MATCHING: Look for contextual equivalents (e.g., if JD asks for "distributed systems" and CV explicitly mentions "Microservices architecture with API Gateway", mark it as matched).
-            3. STRICT JSON ONLY: Output ONLY a valid JSON object. No Markdown wrappers (```json), no conversational text.
-    
-            REQUIRED JSON SCHEMA:
+            1. STRICT JSON ONLY: Output ONLY the JSON object below. No explanations, no markdown wrappers.
+            2. ENUM CONSTRAINT: Values MUST be one of the allowed options listed.
+            3. ZERO HALLUCINATION: Base classification strictly on explicit JD content.
+            4. JD TITLE & TOP LINES PRIORITY: Chỉ tìm thông tin cấp bậc và lĩnh vực ở 10 dòng đầu tiên của JD. Nếu JD có chữ 'Fresher', bắt buộc trả về 'FRESHER'.
+            
+            OUTPUT SCHEMA:
             {
-              "metadata": {
-                "role_category": "backend|frontend|fullstack|devops|data|ml|mobile|other",
-                "candidate_level": "intern|fresher|junior|mid|senior|lead",
-                "overall_match_score": <integer 0-100>
-              },
-              "evidence_based_assessment": {
-                "tech_stack": [
-                  {
-                    "jd_requirement": "<Specific JD by language/framework/database required>",
-                    "cv_evidence": "<Concrete CV. Use absent completely evidence extracted from if null>",
-                    "status": "matched|weak|missing"
-                  }
-                ],
-                "system_architecture_and_projects": [
-                  {
-                    "jd_requirement": "<Specific complexity, design, optimization or regarding requirement system>",
-                    "cv_evidence": "<Concrete 'Designed 'Optimized C4 CV, Use X%'. absent by e.g., evidence from if model', null query>",
-                    "status": "matched|weak|missing"
-                  }
-                ],
-                "engineering_workflow": [
-                  {
-                    "jd_requirement": "<Requirements Agile CI/CD, Git, SDLC, regarding teamwork,>",
-                    "cv_evidence": "<Concrete CV. Use absent evidence from if null>",
-                    "status": "matched|weak|missing"
-                  }
-                ]
-              },
-              "top_priority_improvements": [
-                "<Actionable, 'Quantify (e.g., 1 X') database in metric optimization project specific suggestion>",
-                "<Actionable, 2 specific suggestion>"
-              ]
+              "category": "<BACKEND|FRONTEND|FULLSTACK|DEVOPS|DATA_ENGINEERING|ML_ENGINEERING|MOBILE|SECURITY|QA|OTHER>",
+              "level": "<INTERN|FRESHER|JUNIOR|MID|SENIOR|LEAD>"
             }
-    
-            EVALUATION CRITERIA:
-            * status = "matched": CV has strong, direct, or semantic evidence proving the JD requirement.
-            * status = "weak": Skill is merely listed in a "Skills" section without context, or project complexity does not fully align with JD expectations.
-            * status = "missing": Requirement is completely absent from the CV.
-            * overall_match_score: 90-100 (Exceptional), 70-89 (Strong), 50-69 (Partial), <50 (Poor).
-    
-            LANGUAGE RULE:
-            * Keep "jd_requirement", "cv_evidence", and "top_priority_improvements" values in Vietnamese.
-            * ALWAYS retain technical jargon (e.g., "Java", "Spring Boot", "Microservices", "PostgreSQL", "CI/CD") in English.
+            
+            CLASSIFICATION RULES:
+            category:
+              - BACKEND: server-side APIs, databases, microservices, Java/Go/Python/Node.js backend
+              - FRONTEND: React/Vue/Angular, browser UI, CSS, SPAs
+              - FULLSTACK: both frontend AND backend responsibilities explicitly stated
+              - DEVOPS: CI/CD, Kubernetes, Docker, infrastructure, SRE, cloud ops
+              - DATA_ENGINEERING: ETL/ELT, Spark, Kafka, data warehouses, pipelines
+              - ML_ENGINEERING: model training, MLOps, feature engineering, model serving
+              - MOBILE: iOS, Android, React Native, Flutter
+              - SECURITY: penetration testing, SAST/DAST, secure coding
+              - QA: test automation, QA frameworks, performance testing
+              - OTHER: none of the above clearly applies
+            
+            level:
+              - INTERN: internship, student, 0 experience required
+              - FRESHER: 0-1 year, entry level, fresh graduate
+              - JUNIOR: 1-2 years
+              - MID: 2-5 years
+              - SENIOR: 5-8 years, senior-level stated
+              - LEAD: 8+ years, tech lead, principal, architect, manager
             """;
 
-    // ── Context Extraction Prompt ──
+    // =========================================================================
+    // STEP 4: Assessment Prompt — Evidence-Matching Engine
+    // The LLM is an evidence extractor ONLY. No scoring. No overall judgment.
+    // Scoring is performed by Java ScoringService.
+    // =========================================================================
+
+    /**
+     * Builds the full assessment system prompt by injecting dynamically fetched
+     * criteria instructions from the Rule Engine (Step 3 output).
+     *
+     * @param criteriaInstructions formatted string of numbered criteria instructions from DB
+     * @return complete zero-shot system prompt for the assessment LLM call
+     */
+    public static String buildAssessmentSystemPrompt(String criteriaInstructions) {
+        return """
+                Role: Evidence-Matching Engine.
+                Task: For each evaluation criterion listed below, search the CV for evidence that matches the JD requirement.
+                
+                RULES:
+                1. ZERO HALLUCINATION (CRITICAL): EXTRACT EXACT QUOTES ONLY. IF IT IS NOT EXPLICITLY WRITTEN IN THE CV, YOU MUST RETURN STATUS 'MISSING'. Do not invent, interpolate, or assume tech stacks like caching or streaming unless explicitly present.
+                2. SEMANTIC MATCHING: Contextual equivalents are valid matches, provided the underlying proof exists literally in the text.
+                3. STRICT JSON ONLY: Output ONLY a valid JSON object. No markdown wrappers, no explanations.
+                4. LANGUAGE: Keep "jd_requirement" and "cv_evidence" in Vietnamese for human readability. ALWAYS retain technical terms (Java, Spring Boot, Kubernetes, PostgreSQL, CI/CD) in English.
+                5. STRICT SCHEMA: The "status" field MUST BE exactly one of: "matched", "weak", or "missing". You must NEVER return null.
+                
+                EVALUATION CRITERIA (fetch from Rule Engine):
+                %s
+                
+                OUTPUT SCHEMA:
+                {
+                  "evidence_items": [
+                    {
+                      "criteria_id": <long — must match the ID from the criteria list above>,
+                      "criteria_name": "<string — exact criteria name from the list above>",
+                      "jd_requirement": "<specific requirement extracted from the JD for this criterion>",
+                      "cv_evidence": "<concrete evidence from the CV, or null if absent>",
+                      "status": "<matched|weak|missing>"
+                    }
+                  ],
+                  "top_priority_improvements": [
+                    "<Actionable, specific improvement suggestion 1>",
+                    "<Actionable, specific improvement suggestion 2>",
+                    "<Actionable, specific improvement suggestion 3>"
+                  ]
+                }
+                
+                STATUS DEFINITIONS:
+                - "matched": CV has strong, direct, explicit evidence demonstrating real-world depth (e.g., "Deployed on AWS with secure .env variable isolation per service" or "Agile process with clear Jira ticket conventions").
+                - "weak": Skill is listed in a Skills section without project context, or lacks practical depth (e.g., just mentioning "Jira" without showing process standardization, or just "AWS" without secure configurations).
+                - "missing": Requirement is completely absent from the CV. Look carefully across all sections, including "Infrastructure & Tools" (e.g., if Git is clearly listed there, it is NOT missing).
+                """.formatted(criteriaInstructions);
+    }
+
+    /**
+     * Builds the user-role message for the assessment call.
+     * Uses FULL Markdown documents — never chunk subsets.
+     *
+     * @param fullCvMarkdown  the complete CV Markdown from session_documents
+     * @param fullJdMarkdown  the complete JD Markdown from session_documents
+     * @return formatted user prompt string
+     */
+    public static String buildAssessmentUserPrompt(String fullCvMarkdown, String fullJdMarkdown) {
+        return """
+                ====== CANDIDATE RESUME (CV) — FULL DOCUMENT ======
+                %s
+                
+                ====== JOB DESCRIPTION (JD) — FULL DOCUMENT ======
+                %s
+                
+                Evaluate the CV against the JD using the criteria defined in the system prompt. Output ONLY the JSON object.
+                """.formatted(fullCvMarkdown, fullJdMarkdown);
+    }
+
+    // =========================================================================
+    // Question Bank: Context Extraction (kept — valid zero-shot prompt)
+    // =========================================================================
+
     public static final String SYSTEM_PROMPT_CONTEXT_EXTRACTION =
             """
-            You are an expert IT recruiter and technical interviewer.
-            Analyze the provided CV, Job Description, and Assessment Result.
-            Extract structured context for interview question generation.
-
-            Return ONLY a valid JSON object with this exact schema:
+            Role: IT Recruiter Context Extractor.
+            Task: Extract specific domain and experience metadata from the candidate's CV and the Job Description.
+            
+            OUTPUT SCHEMA (STRICT JSON ONLY):
             {
-              "candidate_level": "junior|mid|senior|lead",
-              "overall_match": "low|medium|high",
-              "years_of_experience": "0-1|1-3|3-5|5-10|10+",
-              "strong_areas": ["list of skills/domains candidate demonstrates well"],
-              "gap_areas": ["list of skills/domains JD requires but CV lacks"],
-              "tech_stack_required": ["technologies required by JD"],
-              "tech_stack_possessed": ["technologies candidate has"],
-              "target_domain": "fintech|e-commerce|healthcare|SaaS|enterprise|startup|other",
-              "role_type": "backend|frontend|fullstack|devops|data_engineer|ML_engineer|security|mobile|other"
+              "years_of_experience": "<0-1|1-3|3-5|5-10|10+>",
+              "target_domain": "<fintech|e-commerce|healthcare|SaaS|enterprise|startup|other>"
             }
-
-            Rules:
-            - candidate_level: infer from years of experience AND JD seniority level
-              * junior: 0-2 years experience, or JD says Junior/Entry-level
-              * mid: 2-5 years, or JD says Mid-level/Intermediate
-              * senior: 5-8 years, or JD says Senior
-              * lead: 8+ years, or JD says Lead/Principal/Staff/Manager
-            - overall_match: based on the assessment competency_fit_score
-              * low: score < 50
-              * medium: score 50-79
-              * high: score >= 80
-            - Be specific in strong_areas and gap_areas (concrete skills, not vague categories)
-            - tech_stack_required: extract from JD technical requirements
-            - tech_stack_possessed: extract from CV skills and project technologies
-            - Do not include any text outside the JSON object
+            
+            RULES:
+            - target_domain: Infer the primary business domain from the Job Description.
+            - years_of_experience: Estimate the candidate's total professional IT experience from the CV.
+            - Output ONLY the JSON object.
             """;
 
-    // ── Behavioural Instructions ──
+    /**
+     * Builds the user prompt for context extraction.
+     */
+    public static String buildContextExtractionUserPrompt(
+            String cvMarkdown, String jdMarkdown, String assessmentJson) {
+        return """
+                ====== CANDIDATE RESUME (CV) ======
+                %s
+                
+                ====== JOB DESCRIPTION (JD) ======
+                %s
+                
+                ====== ASSESSMENT RESULT ======
+                %s
+                """.formatted(cvMarkdown, jdMarkdown, assessmentJson);
+    }
+
+    // =========================================================================
+    // Question Generation — Type-specific instructions (unchanged)
+    // =========================================================================
+
     public static final String BEHAVIOURAL_TYPE_INSTRUCTIONS =
             """
-            1. STYLE: Start with "Hãy kể về một lần..." (Tell me about a time when...) or "Mô tả một tình huống...".
+            1. STYLE: Start with "Hãy kể về một lần..." or "Mô tả một tình huống...".
             2. FOCUS: Base on target domain. If gap_areas exist in soft skills, target those.
-            3. SCHEMA ADDITION: Add exactly this key to each question object: "star_format_prompt": "Khuyến khích ứng viên trả lời theo mô hình S.T.A.R (Situation - Task - Action - Result)."
+            3. SCHEMA ADDITION: Add exactly this key: "star_format_prompt": "Khuyến khích ứng viên trả lời theo mô hình S.T.A.R (Situation - Task - Action - Result)."
             """;
 
-    // ── Technical Instructions ──
     public static final String TECHNICAL_TYPE_INSTRUCTIONS =
             """
             1. STRATEGY: Probe "Strong Areas" with deep architecture/internal questions. Check "Gap Areas" with foundational concepts.
@@ -200,23 +268,20 @@ public final class PromptTemplateConfig {
             3. DEPTH: Medium/Hard questions MUST include realistic constraints (e.g., handling 10k requests, specific latency limits).
             """;
 
-    // ── Coding Instructions ──
     public static final String CODING_TYPE_INSTRUCTIONS =
             """
             1. FORMAT: Embed code snippets directly within the "question" string using Markdown (```language).
             2. SCOPE: Use languages from the candidate's stack. Focus on logic bugs, refactoring (e.g., N+1 queries), or specific algorithmic constraints.
-            3. SCHEMA ADDITION: Add this key to each question object: "hints": ["<Hint 1>", "<Hint 2>"].
+            3. SCHEMA ADDITION: Add this key: "hints": ["<Hint 1>", "<Hint 2>"].
             """;
 
-    // ── System Design Instructions ──
     public static final String SYSTEM_DESIGN_TYPE_INSTRUCTIONS =
             """
             1. SCOPE: Must match the candidate's level (e.g., single service for Junior, multi-region platform for Lead).
             2. DOMAIN: Contextualize the system to the "Target Domain".
-            3. SCHEMA ADDITION: Add this key to each question object: "components_to_cover": ["<Component 1, e.g., API Gateway>", "<Component 2, e.g., Database Sharding>"].
+            3. SCHEMA ADDITION: Add this key: "components_to_cover": ["<Component 1, e.g., API Gateway>", "<Component 2, e.g., Database Sharding>"].
             """;
 
-    // ── Main Question Generation Template ──
     public static final String SYSTEM_PROMPT_QUESTION_GENERATION =
             """
             Role: Senior IT Interviewer.
@@ -233,7 +298,7 @@ public final class PromptTemplateConfig {
             GENERATION REQUIREMENTS:
             - Question Type: %s
             - Difficulties to generate: %s
-            
+            \s
             RULES:
             1. ZERO HALLUCINATION: Base questions explicitly on the candidate's actual projects, tech stack, or gap areas.
             2. NO FLUFF: Output ONLY the JSON array. Do not explain your reasoning.
@@ -261,41 +326,58 @@ public final class PromptTemplateConfig {
             }
             """;
 
+    // =========================================================================
+    // Interview Session Evaluation — Zero-Shot Schema (refactored)
+    // =========================================================================
+
     /**
-     * Builds the user prompt for context extraction from CV, JD, and assessment.
+     * Zero-shot system prompt for evaluating a completed mock interview session.
+     * All conversational framing removed; strict JSON schema only.
      */
-    public static String buildContextExtractionUserPrompt(
-            String cvMarkdown, String jdMarkdown, String assessmentJson) {
-        return """
-                ====== CANDIDATE RESUME (CV) ======
-                %s
+    public static final String SYSTEM_PROMPT_INTERVIEW_EVALUATION =
+            """
+            Role: IT Interview Evaluator.
+            Task: Evaluate a mock interview session based on a list of questions and candidate answers.
+            
+            RULES:
+            1. STRICT JSON ONLY: Output ONLY the valid JSON object below. No markdown, no conversational text.
+            2. ZERO HALLUCINATION: Base evaluation strictly on the provided Q&A content.
+            3. LANGUAGE: All feedback fields ("overallFeedback", "strengths", "improvements", "suggestedAnswer",
+               "actionableSuggestions") MUST be in Vietnamese. Keep technical terms in English.
+            
+            OUTPUT SCHEMA:
+            {
+              "overallScore": <integer 0-100>,
+              "overallFeedback": "<3-4 sentence summary: strongest area + biggest weakness + hiring recommendation>",
+              "strongAreas": ["<skill 1>", "<skill 2>", "<skill 3>"],
+              "gapAreas": ["<gap 1>", "<gap 2>", "<gap 3>"],
+              "actionableSuggestions": ["<suggestion 1>", "<suggestion 2>", "<suggestion 3>"],
+              "evaluatedQuestions": [
+                {
+                  "question": "<question text>",
+                  "answer": "<candidate's answer>",
+                  "score": <integer 1-10>,
+                  "strengths": "<what was good about this answer>",
+                  "improvements": "<what was lacking or incorrect>",
+                  "suggestedAnswer": "<model answer for this question>"
+                }
+              ]
+            }
+            """;
 
-                ====== JOB DESCRIPTION (JD) ======
-                %s
-
-                ====== ASSESSMENT RESULT ======
-                %s
-
-                Analyze the above and extract the structured candidate context as specified.
-                """.formatted(cvMarkdown, jdMarkdown, assessmentJson);
-    }
+    // =========================================================================
+    // Utility methods for Question Generation (unchanged)
+    // =========================================================================
 
     /**
-     * Returns the type-specific additional output field instructions
-     * to be appended to the question generation system prompt.
+     * Returns the type-specific additional output field instructions.
      */
     public static String getTypeSpecificOutputFields(String type) {
         return switch (type) {
-            case "behavioural" -> """
-                    - "star_prompt": string (STAR framework guidance for the candidate)
-                    """;
-            case "coding" -> """
-                    - "hints": string (hint or approach suggestion for the candidate)
-                    """;
-            case "system_design" -> """
-                    - "components_to_cover": array of strings (system components to discuss)
-                    """;
-            default -> "";
+            case "behavioural"   -> "- \"star_prompt\": string (STAR framework guidance for the candidate)";
+            case "coding"        -> "- \"hints\": string (hint or approach suggestion for the candidate)";
+            case "system_design" -> "- \"components_to_cover\": array of strings (system components to discuss)";
+            default              -> "";
         };
     }
 
@@ -304,11 +386,11 @@ public final class PromptTemplateConfig {
      */
     public static String getTypeInstructions(String type) {
         return switch (type) {
-            case "behavioural" -> BEHAVIOURAL_TYPE_INSTRUCTIONS;
-            case "technical" -> TECHNICAL_TYPE_INSTRUCTIONS;
-            case "coding" -> CODING_TYPE_INSTRUCTIONS;
+            case "behavioural"   -> BEHAVIOURAL_TYPE_INSTRUCTIONS;
+            case "technical"     -> TECHNICAL_TYPE_INSTRUCTIONS;
+            case "coding"        -> CODING_TYPE_INSTRUCTIONS;
             case "system_design" -> SYSTEM_DESIGN_TYPE_INSTRUCTIONS;
-            default -> "";
+            default              -> "";
         };
     }
 }

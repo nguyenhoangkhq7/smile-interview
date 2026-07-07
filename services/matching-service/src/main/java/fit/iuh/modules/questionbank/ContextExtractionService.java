@@ -1,5 +1,7 @@
 package fit.iuh.modules.questionbank;
 
+import fit.iuh.modules.assessment.SeniorityLevel;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fit.iuh.config.AppProperties;
@@ -129,16 +131,15 @@ public class ContextExtractionService {
         try {
             CandidateContextDto dto = objectMapper.readValue(cleanJson, CandidateContextDto.class);
 
-            // Simple validation of required fields
+            // Null-safe fallback to safe ENUM default
             if (dto.getCandidateLevel() == null) {
-                dto.setCandidateLevel("mid");
+                dto.setCandidateLevel(SeniorityLevel.MID);
             }
             if (dto.getOverallMatch() == null) {
                 dto.setOverallMatch("medium");
             }
-            
-            // Normalize values
-            dto.setCandidateLevel(dto.getCandidateLevel().toLowerCase().strip());
+
+            // Normalize overallMatch string only (SeniorityLevel is already an ENUM)
             dto.setOverallMatch(dto.getOverallMatch().toLowerCase().strip());
 
             return dto;
