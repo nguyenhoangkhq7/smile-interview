@@ -1,255 +1,177 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Calendar, FileText, FolderOpen, Plus, RefreshCw } from 'lucide-react';
-import { historyService, SessionHistoryItem } from '@/services/historyService';
+import { useState } from 'react';
 import styles from './history.module.css';
 
+interface HistoryItem {
+  id: string;
+  filename: string;
+  badge: string;
+  badgeClass: string;
+  score: string;
+  level: string;
+  category: string;
+  date: string;
+}
+
 export default function HistoryPage() {
-  const router = useRouter();
-  const [sessions, setSessions] = useState<SessionHistoryItem[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [isCloning, setIsCloning] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [timeFilter, setTimeFilter] = useState('all');
+  const [scoreFilter, setScoreFilter] = useState('all');
 
-  useEffect(() => {
-    async function loadHistory() {
-      try {
-        const data = await historyService.getHistory();
-        setSessions(data);
-      } catch (err) {
-        console.error('Lỗi khi tải lịch sử luyện tập:', err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadHistory();
-  }, []);
-
-  const formatDate = (dateStr: string) => {
-    try {
-      const date = new Date(dateStr);
-      return date.toLocaleDateString('vi-VN', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch {
-      return dateStr;
-    }
-  };
-
-  const handleRestart = async (id: string) => {
-    try {
-      setIsCloning(id);
-      const newSessionId = await historyService.cloneSession(id);
-      router.push(`/interview/session/${newSessionId}`);
-    } catch (err) {
-      console.error('Lỗi khi thực hiện lại phiên:', err);
-      alert('Không thể thực hiện lại phiên này. Vui lòng thử lại sau.');
-      setIsCloning(null);
-    }
-  };
-
-  const getStatusBadge = (status: SessionHistoryItem['status']) => {
-    switch (status) {
-      case 'Completed':
-        return <span className={`${styles.badge} ${styles.badgeSuccess}`}>Đã hoàn thành</span>;
-      case 'In progress':
-        return <span className={`${styles.badge} ${styles.badgeWarning}`}>Đang thực hiện</span>;
-      case 'Not started':
-        return <span className={`${styles.badge} ${styles.badgeDanger}`}>Chưa bắt đầu</span>;
-      default:
-        return null;
-    }
-  };
-
-  const activeSessions = sessions.filter((item) => item.status !== 'Completed');
-  const completedSessions = sessions.filter((item) => item.status === 'Completed');
+  const historyData: HistoryItem[] = [
+    {
+      id: '1',
+      filename: 'Cao Thanh Dong - CV.pdf',
+      badge: 'Tốt',
+      badgeClass: styles.badgeGreen,
+      score: '70.2/100',
+      level: 'Intern/Fresher',
+      category: 'IT',
+      date: '23:53 24 thg 6, 2026',
+    },
+    {
+      id: '2',
+      filename: 'Cao Thanh Dong - CV (Original).pdf',
+      badge: 'Khá',
+      badgeClass: styles.badgeAmber,
+      score: '65/100',
+      level: 'Intern/Fresher',
+      category: 'IT',
+      date: '15:17 24 thg 6, 2026',
+    },
+  ];
 
   return (
-    <div className={styles.container}>
-      <header className={styles.header}>
-        <Link href="/history" className={styles.logo}>
-          <img src="/logo.png" alt="Smile Interview Logo" className={styles.logoImg} />
-        </Link>
-        <nav className={styles.navLinks}>
-          <Link href="/history" className={`${styles.navLink} ${styles.navLinkActive}`}>
-            Lịch sử
-          </Link>
-          <Link href="/interview/new" className={styles.navLink}>
-            Phỏng vấn mới
-          </Link>
-        </nav>
-      </header>
-
-      {/* Main Content */}
-      <main className={styles.content}>
-        <div className={styles.titleSection}>
-          <div>
-            <h1>Lịch sử luyện tập</h1>
-            <p className={styles.subtitle}>Danh sách các buổi phỏng vấn giả lập của bạn với trợ lý AI</p>
+    <div className={styles.page}>
+      <div className={styles.inner}>
+        
+        {/* Header Icon + Title */}
+        <div className={styles.header}>
+          <div className={styles.headerIcon}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
           </div>
-          <Link href="/interview/new" className={styles.primaryButton} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-            <Plus size={16} /> Bắt đầu phỏng vấn mới
-          </Link>
+          <h1 className={styles.title}>Lịch sử phân tích</h1>
+          <p className={styles.subtitle}>Xem lại tất cả CV đã phân tích và kết quả đánh giá</p>
         </div>
 
-        {loading ? (
-          /* Loading Skeleton */
-          <div className={styles.historyList}>
-            {[1, 2].map((i) => (
-              <div key={i} className={styles.card} style={{ opacity: 0.6, animation: 'pulse 1.5s infinite' }}>
-                <div className={styles.cardMain}>
-                  <div style={{ height: '20px', width: '250px', backgroundColor: '#e2e8f0', borderRadius: '4px', marginBottom: '8px' }} />
-                  <div style={{ height: '14px', width: '180px', backgroundColor: '#f1f5f9', borderRadius: '4px' }} />
+        {/* Filters Card */}
+        <div className={styles.filterCard}>
+          {/* Search Box */}
+          <div className={styles.searchWrap}>
+            <span className={styles.searchIcon}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+            </span>
+            <input
+              type="text"
+              placeholder="Tìm kiếm theo tên file, level, category..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className={styles.searchInput}
+            />
+          </div>
+
+          {/* Filter Selectors */}
+          <div className={styles.filterActions}>
+            <div className={styles.selectWrap}>
+              <select
+                value={timeFilter}
+                onChange={(e) => setTimeFilter(e.target.value)}
+                className={styles.select}
+              >
+                <option value="all">Tất cả thời gian</option>
+                <option value="month">Tháng này</option>
+                <option value="week">Tuần này</option>
+              </select>
+              <div className={styles.selectIcon}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+              </div>
+            </div>
+
+            <div className={styles.selectWrap}>
+              <select
+                value={scoreFilter}
+                onChange={(e) => setScoreFilter(e.target.value)}
+                className={styles.select}
+              >
+                <option value="all">Tất cả điểm số</option>
+                <option value="high">Trên 80</option>
+                <option value="medium">60 - 80</option>
+                <option value="low">Dưới 60</option>
+              </select>
+              <div className={styles.selectIcon}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* List Card Container */}
+        <div className={styles.listCard}>
+          <div className={styles.listHead}>
+            <h2 className={styles.listTitle}>Lịch sử phân tích CV</h2>
+            <span className={styles.listCount}>Tổng cộng: {historyData.length}</span>
+          </div>
+
+          <div className={styles.listItems}>
+            {historyData.map((item) => (
+              <div
+                key={item.id}
+                className={styles.itemCard}
+              >
+                {/* Content Details */}
+                <div className={styles.itemMain}>
+                  <div className={styles.itemTitleRow}>
+                    <span className={styles.itemTitle}>{item.filename}</span>
+                    <span className={`${styles.itemBadge} ${item.badgeClass}`}>
+                      {item.badge}
+                    </span>
+                  </div>
+
+                  {/* Meta items */}
+                  <div className={styles.itemMeta}>
+                    <div>
+                      <span className={styles.metaLabel}>Điểm số:</span>
+                      <span className={styles.metaScore}>{item.score}</span>
+                    </div>
+                    <div>
+                      <span className={styles.metaLabel}>Cấp độ:</span>
+                      <span className={styles.metaVal}>"{item.level}"</span>
+                    </div>
+                    <div>
+                      <span className={styles.metaLabel}>Ngành nghề:</span>
+                      <span className={styles.metaVal}>"{item.category}"</span>
+                    </div>
+                    <div>
+                      <span className={styles.metaLabel}>Ngày tạo:</span>
+                      <span className={styles.metaVal}>{item.date}</span>
+                    </div>
+                  </div>
                 </div>
-                <div style={{ height: '38px', width: '120px', backgroundColor: '#e2e8f0', borderRadius: '6px' }} />
+
+                {/* Action button */}
+                <div>
+                  <button className={styles.btnMatching}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" />
+                      <circle cx="12" cy="12" r="6" />
+                      <circle cx="12" cy="12" r="2" />
+                    </svg>
+                    Matching JD
+                  </button>
+                </div>
               </div>
             ))}
           </div>
-        ) : sessions.length === 0 ? (
-          /* Empty State */
-          <div className={styles.emptyState}>
-            <div className={styles.emptyIcon}>
-              <FolderOpen size={48} style={{ color: '#94a3b8' }} />
-            </div>
-            <h2>Chưa có lịch sử phỏng vấn</h2>
-            <p>
-              Hãy tải lên CV và Mô tả công việc (JD) của bạn để AI phân tích mức độ phù hợp và bắt đầu buổi phỏng vấn đầu tiên.
-            </p>
-            <Link href="/interview/new" className={styles.primaryButton}>
-              Bắt đầu luyện tập ngay
-            </Link>
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gap: '2rem' }}>
-            {activeSessions.length > 0 && (
-              <section>
-                <div style={{ marginBottom: '0.75rem' }}>
-                  <h2 style={{ margin: 0, fontSize: '1.1rem' }}>Phiên đang thực hiện</h2>
-                  <p className={styles.subtitle} style={{ marginTop: '0.25rem' }}>
-                    Những phiên này còn trạng thái mở trong cơ sở dữ liệu và có thể tiếp tục ngay.
-                  </p>
-                </div>
-                <div className={styles.historyList}>
-                  {activeSessions.map((item) => (
-                    <div key={item.id} className={styles.card}>
-                      <div className={styles.cardMain}>
-                        <div className={styles.cardHeader}>
-                          <span className={styles.roleTitle}>{item.roleTitle}</span>
-                          <span className={styles.typeBadge}>Kỹ thuật (Technical)</span>
-                        </div>
-                        <div className={styles.cardMeta}>
-                          <div className={styles.metaItem} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-                            <Calendar size={14} style={{ color: '#64748b' }} />
-                            <span>{formatDate(item.date)}</span>
-                          </div>
-                          {item.cvFilename && (
-                            <div className={styles.metaItem} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-                              <FileText size={14} style={{ color: '#64748b' }} />
-                              <span>CV: {item.cvFilename}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
+        </div>
 
-                      <div className={styles.cardAction}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
-                          {getStatusBadge(item.status)}
-                          <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            <button 
-                              onClick={() => handleRestart(item.id)}
-                              disabled={isCloning === item.id}
-                              className={styles.secondaryButton} 
-                              style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
-                            >
-                              {isCloning === item.id ? <RefreshCw size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                              Thực hiện lại
-                            </button>
-                            <Link href={`/interview/session/${item.id}`} className={styles.primaryButton} style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>
-                              Tiếp tục ➔
-                            </Link>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {completedSessions.length > 0 && (
-              <section>
-                <div style={{ marginBottom: '0.75rem' }}>
-                  <h2 style={{ margin: 0, fontSize: '1.1rem' }}>Phiên đã hoàn thành</h2>
-                  <p className={styles.subtitle} style={{ marginTop: '0.25rem' }}>
-                    Các session đã lưu đầy đủ kết quả đánh giá và câu hỏi trả lời.
-                  </p>
-                </div>
-                <div className={styles.historyList}>
-                  {completedSessions.map((item) => (
-                    <div key={item.id} className={styles.card}>
-                      <div className={styles.cardMain}>
-                        <div className={styles.cardHeader}>
-                          <span className={styles.roleTitle}>{item.roleTitle}</span>
-                          <span className={styles.typeBadge}>Kỹ thuật (Technical)</span>
-                        </div>
-                        <div className={styles.cardMeta}>
-                          <div className={styles.metaItem} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-                            <Calendar size={14} style={{ color: '#64748b' }} />
-                            <span>{formatDate(item.date)}</span>
-                          </div>
-                          {item.cvFilename && (
-                            <div className={styles.metaItem} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-                              <FileText size={14} style={{ color: '#64748b' }} />
-                              <span>CV: {item.cvFilename}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className={styles.cardAction}>
-                        {item.overallScore !== undefined && (
-                          <div className={styles.scoreWrapper}>
-                            <span className={styles.scoreNum}>{item.overallScore}</span>
-                            <span className={styles.scoreLabel}>ĐIỂM SỐ</span>
-                          </div>
-                        )}
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
-                          {getStatusBadge(item.status)}
-                          <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            <button 
-                              onClick={() => handleRestart(item.id)}
-                              disabled={isCloning === item.id}
-                              className={styles.primaryButton} 
-                              style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', backgroundColor: '#4f46e5' }}
-                            >
-                              {isCloning === item.id ? <RefreshCw size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                              Thực hiện lại
-                            </button>
-                            <Link href={`/interview/session/${item.id}/result`} className={styles.secondaryButton} style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>
-                              Xem kết quả ➔
-                            </Link>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-          </div>
-        )}
-      </main>
-
-      <footer className={styles.footer}>
-        <img src="/footer.png" alt="Smile Interview Footer" className={styles.footerImg} />
-      </footer>
+      </div>
     </div>
   );
 }

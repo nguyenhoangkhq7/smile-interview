@@ -10,35 +10,21 @@ import { io } from 'socket.io-client';
  * events (raw ArrayBuffer audio), feeds the audio through the Web Audio API
  * AnalyserNode, and exposes the analyser for real-time lip-sync in the 3D
  * canvas.
- *
- * KEY INVARIANTS (required to avoid silent audio on repeat plays):
- *   1. AudioContext       — created exactly once on initAudio().
- *   2. HTML Audio element — created exactly once on initAudio().
- *   3. MediaElementSourceNode — created exactly once (immediately after the
- *      Audio element), permanently wired: Audio → AnalyserNode → destination.
- *      Never disconnected or recreated. This is the critical fix for the
- *      "silent on 2nd play" bug: Chrome/Firefox forbid calling
- *      createMediaElementSource() twice on the same element.
- *   4. On each new tts-result: set audio.src = new ObjectURL, resume ctx,
- *      then play(). No audio.load() — that would reset the source node graph.
- *
- * @param {string} [serverUrl='http://localhost:8001'] - Socket.IO server URL.
- * @returns {{ analyser, audioUrl, isPlaying, isConnected, initAudio, sendTTS }}
  */
-export function useAudioLipSync(serverUrl = 'http://localhost:8001') {
-  const [analyser, setAnalyser]       = useState(null);
-  const [audioUrl, setAudioUrl]       = useState(null);
-  const [isPlaying, setIsPlaying]     = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
+export function useAudioLipSync(serverUrl: string = 'http://localhost:8001') {
+  const [analyser, setAnalyser]       = useState<AnalyserNode | null>(null);
+  const [audioUrl, setAudioUrl]       = useState<string | null>(null);
+  const [isPlaying, setIsPlaying]     = useState<boolean>(false);
+  const [isConnected, setIsConnected] = useState<boolean>(false);
 
   // Refs — mutated without triggering re-renders
-  const socketRef        = useRef(null);
-  const audioContextRef  = useRef(null);
-  const analyserRef      = useRef(null);
-  const audioRef         = useRef(null);       // singleton <audio> element
-  const sourceNodeRef    = useRef(null);       // singleton MediaElementSourceNode
-  const currentUrlRef    = useRef(null);       // last Object URL (for revocation)
-  const isInitializedRef = useRef(false);
+  const socketRef        = useRef<any>(null);
+  const audioContextRef  = useRef<AudioContext | null>(null);
+  const analyserRef      = useRef<AnalyserNode | null>(null);
+  const audioRef         = useRef<HTMLAudioElement | null>(null);       // singleton <audio> element
+  const sourceNodeRef    = useRef<MediaElementAudioSourceNode | null>(null);       // singleton MediaElementSourceNode
+  const currentUrlRef    = useRef<string | null>(null);       // last Object URL (for revocation)
+  const isInitializedRef = useRef<boolean>(false);
 
   // ── initAudio ─────────────────────────────────────────────────────────────
   // Must be called from a user-gesture handler so the browser permits
@@ -49,7 +35,8 @@ export function useAudioLipSync(serverUrl = 'http://localhost:8001') {
     isInitializedRef.current = true;
 
     // 1. AudioContext (singleton)
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    const ctx = new AudioContextClass();
     audioContextRef.current = ctx;
 
     // 2. AnalyserNode (singleton), connected straight to speakers
@@ -89,9 +76,9 @@ export function useAudioLipSync(serverUrl = 'http://localhost:8001') {
   // ── handleTTSResult ────────────────────────────────────────────────────────
   // Called each time the server streams back a TTS audio buffer.
   // ──────────────────────────────────────────────────────────────────────────
-  const handleTTSResult = useCallback(async (data) => {
+  const handleTTSResult = useCallback(async (data: any) => {
     // Normalise incoming data to ArrayBuffer (Socket.IO may deliver Buffer)
-    let buffer;
+    let buffer: ArrayBuffer;
     if (data instanceof ArrayBuffer) {
       buffer = data;
     } else if (data?.buffer instanceof ArrayBuffer) {
@@ -184,7 +171,7 @@ export function useAudioLipSync(serverUrl = 'http://localhost:8001') {
   }, [serverUrl, handleTTSResult]);
 
   // ── sendTTS ────────────────────────────────────────────────────────────────
-  const sendTTS = useCallback((text) => {
+  const sendTTS = useCallback((text: string) => {
     if (socketRef.current?.connected) {
       socketRef.current.emit('process-tts', text);
     } else {

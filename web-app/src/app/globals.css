@@ -1,7 +1,29 @@
 @import "tailwindcss";
+@source "../";
 
-/* globals.css — base reset for the interviewer avatar app */
 
+/* ── Design Tokens ── */
+@theme {
+  --color-brand-orange: #ea580c;
+  --color-brand-orange-light: #fb923c;
+  --color-brand-orange-hover: #c2410c;
+  --color-brand-green: #166534;
+  --color-brand-green-mid: #15803d;
+  --color-brand-green-light: #ecfdf5;
+  --color-bg-cream: #fdfbf7;
+  --color-surface: #ffffff;
+  --color-border: #e2e8f0;
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-muted: #94a3b8;
+
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+
+  --shadow-card: 0 8px 30px rgb(0 0 0 / 0.04);
+  --shadow-card-hover: 0 16px 40px rgb(0 0 0 / 0.08);
+}
+
+/* ── Base Reset ── */
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -9,28 +31,27 @@
 }
 
 :root {
-  --font-inter: 'Inter', system-ui, -apple-system, sans-serif;
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 html {
-  font-family: var(--font-inter);
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 body {
-  background: #07050f;
-  color: #f5f3ff;
+  background-color: var(--color-bg-cream);
+  color: var(--color-text-primary);
   min-height: 100svh;
 }
 
-/* Remove default button / input styles */
+/* ── Form Elements ── */
 button, input, select, textarea {
   font-family: inherit;
 }
 
-/* Scrollbar theming for WebKit */
+/* ── Scrollbar ── */
 ::-webkit-scrollbar {
   width: 6px;
 }
@@ -38,9 +59,9 @@ button, input, select, textarea {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(139, 92, 246, 0.3);
+  background: rgba(234, 88, 12, 0.3);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(139, 92, 246, 0.5);
+  background: rgba(234, 88, 12, 0.55);
 }

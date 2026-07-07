@@ -1,0 +1,278 @@
+/* src/app/login/login.module.css */
+
+.page {
+  display: flex;
+  min-height: calc(100vh - 8rem);
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1rem;
+  position: relative;
+}
+
+/* Background blobs */
+.bgBlob1 {
+  pointer-events: none;
+  position: fixed;
+  top: -10rem;
+  right: 0;
+  height: 24rem;
+  width: 24rem;
+  border-radius: 9999px;
+  background-color: rgba(255, 237, 213, 0.5);
+  filter: blur(64px);
+  z-index: 0;
+}
+
+.bgBlob2 {
+  pointer-events: none;
+  position: fixed;
+  bottom: 0;
+  left: -5rem;
+  height: 18rem;
+  width: 18rem;
+  border-radius: 9999px;
+  background-color: rgba(209, 250, 229, 0.4);
+  filter: blur(64px);
+  z-index: 0;
+}
+
+.wrap {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 440px;
+}
+
+/* ── Card ── */
+.card {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 1.25rem;
+  padding: 2.5rem 2rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+}
+
+.cardHead {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.cardIcon {
+  display: inline-flex;
+  height: 3.5rem;
+  width: 3.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1rem;
+  background-color: #ea580c;
+  color: #ffffff;
+  box-shadow: 0 6px 18px rgba(234, 88, 12, 0.35);
+  margin-bottom: 1rem;
+}
+
+.cardIcon svg {
+  display: block;
+}
+
+.cardTitle {
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: #0f172a;
+  margin: 0 0 0.375rem;
+}
+
+.cardSub {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin: 0;
+}
+
+/* ── Form ── */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.fieldLabelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.forgotLink {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #ea580c;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.forgotLink:hover {
+  color: #c2410c;
+}
+
+.inputWrap {
+  position: relative;
+}
+
+.inputIcon {
+  position: absolute;
+  left: 0.875rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  pointer-events: none;
+  display: flex;
+}
+
+.input {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.625rem;
+  background-color: #f8fafc;
+  padding: 0.75rem 1rem 0.75rem 2.5rem;
+  font-size: 0.9rem;
+  color: #1e293b;
+  outline: none;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.input:focus {
+  border-color: #ea580c;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.12);
+}
+
+.input::placeholder {
+  color: #94a3b8;
+}
+
+.eyeBtn {
+  position: absolute;
+  right: 0.875rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s;
+}
+
+.eyeBtn:hover {
+  color: #475569;
+}
+
+.inputWithEye {
+  padding-right: 2.75rem;
+}
+
+/* ── Submit btn ── */
+.submitBtn {
+  margin-top: 0.25rem;
+  display: inline-flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.625rem;
+  background-color: #ea580c;
+  border: none;
+  padding: 0.875rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #ffffff;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(234, 88, 12, 0.3);
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.submitBtn:hover:not(:disabled) {
+  background-color: #c2410c;
+  box-shadow: 0 6px 18px rgba(234, 88, 12, 0.4);
+  transform: translateY(-1px);
+}
+
+.submitBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ── Divider ── */
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.5rem 0;
+}
+
+.dividerLine {
+  flex: 1;
+  height: 1px;
+  background-color: #e2e8f0;
+}
+
+.dividerText {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+/* ── Footer link ── */
+.footerText {
+  text-align: center;
+  font-size: 0.875rem;
+  color: #475569;
+}
+
+.footerLink {
+  font-weight: 700;
+  color: #ea580c;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.footerLink:hover {
+  color: #c2410c;
+}
+
+.backLink {
+  display: block;
+  text-align: center;
+  margin-top: 1.5rem;
+  font-size: 0.75rem;
+  color: #94a3b8;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.backLink:hover {
+  color: #ea580c;
+}
+
+/* ── Spinner ── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.spinner {
+  animation: spin 0.75s linear infinite;
+}

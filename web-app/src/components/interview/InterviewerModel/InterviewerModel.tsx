@@ -5,28 +5,25 @@ import { useFrame } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 
+interface InterviewerModelProps {
+  analyser?: AnalyserNode | null;
+  position?: [number, number, number];
+  scale?: [number, number, number];
+  rotation?: [number, number, number];
+  isListening?: boolean;
+  isThinking?: boolean;
+}
+
+interface MorphTargetRef {
+  mesh: any;
+  index: number;
+  name: string;
+}
+
 /**
  * InterviewerModel
  *
- * Loads a ReadyPlayerMe-compatible GLB avatar and drives:
- *   1. Multi-band lip-sync  — 3 frequency bands → 3 mouth shape categories.
- *      Capped at natural max influences (jaw/mouth open ≤ 0.40, others ≤ 0.45)
- *      to prevent exaggerated "screaming" facial distortions.
- *   2. Corrected head posture — applies a slight default downward pitch tilt (~9°)
- *      so the avatar gazes straight at the camera, blended with micro-nods.
- *   3. Eyebrow micro-expressions — volume envelope raises brows on emphasis.
- *   4. Head-nod micro-movement  — subtle bone rotation tied to speech energy.
- *   5. Randomised eye blinking  — 3-phase state machine.
- *   6. Idle breathing           — sine-wave vertical bob on the group.
- *
- * All animations gracefully degrade when specific morph targets or bones are
- * absent from the loaded GLB (no errors, just skipped).
- *
- * @param {Object}            props
- * @param {AnalyserNode|null} props.analyser  - Web Audio API AnalyserNode.
- * @param {number[]}          [props.position]
- * @param {number[]}          [props.scale]
- * @param {number[]}          [props.rotation]
+ * Loads a ReadyPlayerMe-compatible GLB avatar and drives animations.
  */
 export function InterviewerModel({
   analyser,
@@ -35,34 +32,34 @@ export function InterviewerModel({
   rotation = [0, 0, 0],
   isListening = false,
   isThinking = false,
-}) {
-  const { scene } = useGLTF('/models/avatar.glb');
+}: InterviewerModelProps) {
+  const { scene } = useGLTF('/models/avatar.glb') as any;
 
   // ── All animation state lives in refs — zero re-renders ─────────────────
-  const groupRef = useRef(null);
+  const groupRef = useRef<THREE.Group | null>(null);
 
   // Per-band morph target buckets
-  const jawTargetsRef  = useRef([]); // Low band  → jaw/open vowels (A, O, U)
-  const midTargetsRef  = useRef([]); // Mid band  → E-vowels, consonants (CH, E)
-  const highTargetsRef = useRef([]); // High band → sibilants (S, I, FF)
-  const browTargetsRef = useRef([]); // Eyebrow raise targets
-  const blinkTargetsRef = useRef([]); // Eyelid blink targets
+  const jawTargetsRef  = useRef<MorphTargetRef[]>([]); // Low band  → jaw/open vowels (A, O, U)
+  const midTargetsRef  = useRef<MorphTargetRef[]>([]); // Mid band  → E-vowels, consonants (CH, E)
+  const highTargetsRef = useRef<MorphTargetRef[]>([]); // High band → sibilants (S, I, FF)
+  const browTargetsRef = useRef<MorphTargetRef[]>([]); // Eyebrow raise targets
+  const blinkTargetsRef = useRef<MorphTargetRef[]>([]); // Eyelid blink targets
 
   // Head / Neck bone for nodding
-  const headBoneRef = useRef(null);
-  const originalHeadRotationXRef = useRef(0);
+  const headBoneRef = useRef<any>(null);
+  const originalHeadRotationXRef = useRef<number>(0);
 
   // Frequency data buffer (lazily allocated)
-  const freqDataRef = useRef(null);
+  const freqDataRef = useRef<Uint8Array | null>(null);
 
   // Smoothed influence values per animation channel
-  const inf = useRef({ jaw: 0, mid: 0, high: 0, brow: 0 });
+  const inf = useRef<{ jaw: number; mid: number; high: number; brow: number }>({ jaw: 0, mid: 0, high: 0, brow: 0 });
 
   // Slow volume envelope (for brow raise and head nod) — exponential smoothing
-  const volumeEnvRef = useRef(0);
+  const volumeEnvRef = useRef<number>(0);
 
   // Blink state machine
-  const blink = useRef({ phase: 'idle', timer: 0, nextTime: 2.0, value: 0 });
+  const blink = useRef<{ phase: string; timer: number; nextTime: number; value: number }>({ phase: 'idle', timer: 0, nextTime: 2.0, value: 0 });
 
   // ── Scene traversal — run once when GLB loads ────────────────────────────
   useEffect(() => {
@@ -107,24 +104,30 @@ export function InterviewerModel({
       'Eye_Blink',
     ];
 
-    const found = { jaw: [], mid: [], high: [], brow: [], blink: [] };
+    const found: {
+      jaw: MorphTargetRef[];
+      mid: MorphTargetRef[];
+      high: MorphTargetRef[];
+      brow: MorphTargetRef[];
+      blink: MorphTargetRef[];
+    } = { jaw: [], mid: [], high: [], brow: [], blink: [] };
 
-    scene.traverse((node) => {
+    scene.traverse((node: any) => {
       if (!node.isMesh || !node.morphTargetDictionary || !node.morphTargetInfluences) return;
 
       const dict = node.morphTargetDictionary;
 
       console.log('👉 TARGET MESH FOUND:', node.name, dict);
 
-      const findFirst = (names) => {
+      const findFirst = (names: string[]): MorphTargetRef | null => {
         for (const name of names) {
           if (dict[name] !== undefined) return { mesh: node, index: dict[name], name };
         }
         return null;
       };
 
-      const findAll = (names) => {
-        const res = [];
+      const findAll = (names: string[]): MorphTargetRef[] => {
+        const res: MorphTargetRef[] = [];
         for (const name of names) {
           if (dict[name] !== undefined) res.push({ mesh: node, index: dict[name], name });
         }
@@ -146,7 +149,7 @@ export function InterviewerModel({
     blinkTargetsRef.current = found.blink;
 
     // ── Find head / neck bone for nodding & alignment ──────────────────────
-    scene.traverse((node) => {
+    scene.traverse((node: any) => {
       if (!headBoneRef.current && (node.isBone || node.type === 'Bone')) {
         const n = node.name.toLowerCase();
         if (n.includes('head') || n.includes('neck')) {
@@ -181,10 +184,10 @@ export function InterviewerModel({
       if (!freqDataRef.current || freqDataRef.current.length !== analyser.frequencyBinCount) {
         freqDataRef.current = new Uint8Array(analyser.frequencyBinCount);
       }
-      analyser.getByteFrequencyData(freqDataRef.current);
+      analyser.getByteFrequencyData(freqDataRef.current as any);
       const bins = freqDataRef.current;
 
-      const bandAvg = (from, to) => {
+      const bandAvg = (from: number, to: number) => {
         let sum = 0;
         const n = to - from + 1;
         for (let i = from; i <= to; i++) sum += (bins[i] || 0);
@@ -213,7 +216,7 @@ export function InterviewerModel({
       const FLOOR = 8;
 
       // Safe normalization helper with custom maximum influence clamps
-      const norm = (energy, maxClamp) =>
+      const norm = (energy: number, maxClamp: number) =>
         isSilent
           ? 0
           : THREE.MathUtils.clamp(((energy - FLOOR) / SENS) * AMP, 0, maxClamp);
@@ -233,7 +236,7 @@ export function InterviewerModel({
       inf.current.mid  = THREE.MathUtils.lerp(midInf,  midTarget,  midTarget  > midInf  ? fastLerp : slowLerp);
       inf.current.high = THREE.MathUtils.lerp(highInf, highTarget, highTarget > highInf ? fastLerp : slowLerp);
 
-      const applyMorphs = (targets, value) => {
+      const applyMorphs = (targets: MorphTargetRef[], value: number) => {
         for (const { mesh, index } of targets) {
           if (mesh.morphTargetInfluences) mesh.morphTargetInfluences[index] = value;
         }

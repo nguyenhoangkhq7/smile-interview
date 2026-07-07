@@ -4,8 +4,8 @@ import { useState, useRef, useCallback, Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Environment, ContactShadows } from '@react-three/drei';
 import { useAudioLipSync } from '@/hooks/useAudioLipSync';
-import { InterviewerModel } from '@/components/InterviewerModel';
-import styles from '@/components/InterviewerAvatar.module.css';
+import { InterviewerModel } from '@/components/interview/InterviewerModel/InterviewerModel';
+import styles from './InterviewerAvatar.module.css';
 
 /**
  * AvatarFallback — shown while the GLB model is loading
@@ -17,6 +17,15 @@ function AvatarFallback() {
       <meshStandardMaterial color="#7c3aed" wireframe />
     </mesh>
   );
+}
+
+interface InterviewerAvatarProps {
+  controlled?: boolean;
+  analyser?: AnalyserNode | null;
+  isConnected?: boolean;
+  isPlaying?: boolean;
+  isListening?: boolean;
+  isThinking?: boolean;
 }
 
 /**
@@ -36,10 +45,10 @@ export function InterviewerAvatar({
   isPlaying: propsIsPlaying = false,
   isListening = false,
   isThinking = false
-} = {}) {
+}: InterviewerAvatarProps) {
   const [audioInitialized, setAudioInitialized] = useState(false);
   const [testText, setTestText] = useState('Xin chào, tôi là trợ lý ảo.');
-  const audioElRef = useRef(null);
+  const audioElRef = useRef<HTMLAudioElement | null>(null);
 
   // Initialize hook only if NOT in controlled mode (avoids dead socket connections on session screens)
   const localHook = useAudioLipSync(
@@ -58,7 +67,7 @@ export function InterviewerAvatar({
     setAudioInitialized(true);
   }, [initAudio]);
 
-  const handleTestSpeak = useCallback((e) => {
+  const handleTestSpeak = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (testText.trim()) {
       sendTTS(testText.trim());
