@@ -44,8 +44,8 @@ public class MetadataExtractionService {
     /** Force JSON mode for deterministic output. */
     private static final Map<String, String> JSON_RESPONSE_FORMAT = Map.of("type", "json_object");
 
-    /** Minimal token budget — we expect only 2 fields in the response. */
-    private static final int METADATA_MAX_TOKENS = 128;
+    /** Max token budget — increased to 1024 to support reasoning models that generate reasoning tokens. */
+    private static final int METADATA_MAX_TOKENS = 1024;
 
     private final AppProperties appProperties;
     private final WebClient llmWebClient;
@@ -79,7 +79,7 @@ public class MetadataExtractionService {
         LlmChatRequest request = LlmChatRequest.builder()
                 .model(appProperties.getLlm().getModel())
                 .maxTokens(METADATA_MAX_TOKENS)
-                .temperature(0.0)
+                .temperature(0.1)
                 .stream(false)
                 .responseFormat(JSON_RESPONSE_FORMAT)
                 .messages(List.of(
@@ -93,22 +93,35 @@ public class MetadataExtractionService {
 
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
-                LlmChatResponse response = llmWebClient.post()
+                String responseBody = llmWebClient.post()
                         .uri(appProperties.getLlm().getChatPath())
                         .bodyValue(request)
                         .retrieve()
-                        .bodyToMono(LlmChatResponse.class)
+                        .bodyToMono(String.class)
                         .timeout(timeout,
                                 reactor.core.publisher.Mono.error(new LlmApiException(
                                         "Metadata extraction timed out after " + timeout.toSeconds() + "s")))
                         .block();
 
+                if (responseBody == null || responseBody.isBlank()) {
+                    throw new LlmApiException("LLM API returned empty HTTP body.");
+                }
+
+                log.debug("[MetadataExtraction] Raw HTTP response body: {}", responseBody);
+
+                // Check if the response is an OpenRouter/LLM error wrapped in JSON
+                if (responseBody.contains("\"error\"") && (responseBody.contains("\"message\"") || responseBody.contains("\"code\""))) {
+                    throw new LlmApiException("LLM API returned error JSON: " + responseBody);
+                }
+
+                LlmChatResponse response = objectMapper.readValue(responseBody, LlmChatResponse.class);
+
                 if (response == null || response.getFirstChoiceContent() == null) {
-                    throw new LlmApiException("LLM returned empty response during metadata extraction.");
+                    throw new LlmApiException("LLM returned empty choices or null content. Response: " + responseBody);
                 }
 
                 String rawJson = response.getFirstChoiceContent().strip();
-                log.debug("[MetadataExtraction] Raw LLM response: {}", rawJson);
+                log.info("[MetadataExtraction] Extracted raw content: {}", rawJson);
                 return parseAndMapToEnums(rawJson);
 
             } catch (WebClientResponseException e) {

@@ -1,8 +1,5 @@
 package fit.iuh.modules.assessment;
 
-import fit.iuh.modules.assessment.AssessmentResponse;
-import fit.iuh.modules.assessment.InterviewEvaluationRequest;
-import fit.iuh.modules.assessment.AssessmentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;

@@ -22,6 +22,7 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import fit.iuh.modules.assessment.ScoringService.ScoringResult;
 
 /**
  * Orchestrates the 4-step SimInterview assessment pipeline.
@@ -66,6 +67,7 @@ public class AssessmentService {
     private final MetadataExtractionService metadataExtractionService;
     private final JobCriteriaRepository jobCriteriaRepository;
     private final ScoringService scoringService;
+    private final SuggestedCriteriaService suggestedCriteriaService;
     private final ObjectMapper objectMapper;
 
     public AssessmentService(
@@ -76,6 +78,7 @@ public class AssessmentService {
             MetadataExtractionService metadataExtractionService,
             JobCriteriaRepository jobCriteriaRepository,
             ScoringService scoringService,
+            SuggestedCriteriaService suggestedCriteriaService,
             ObjectMapper objectMapper) {
         this.appProperties = appProperties;
         this.llmWebClient = llmWebClient;
@@ -84,6 +87,7 @@ public class AssessmentService {
         this.metadataExtractionService = metadataExtractionService;
         this.jobCriteriaRepository = jobCriteriaRepository;
         this.scoringService = scoringService;
+        this.suggestedCriteriaService = suggestedCriteriaService;
         this.objectMapper = objectMapper;
     }
 
@@ -178,13 +182,53 @@ public class AssessmentService {
                 dto.evidenceItems() != null ? dto.evidenceItems().size() : 0);
 
         // ── Step 4b: Java Scoring (ScoringService) ────────────────────────────
-        int overallMatchScore = scoringService.calculate(dto.evidenceItems(), criteriaList);
+        ScoringResult scoringResult = scoringService.calculateWithBreakdown(dto.evidenceItems(), criteriaList);
 
-        log.info("[Assessment] Step 4b complete — overall_match_score={}", overallMatchScore);
+        log.info("[Assessment] Step 4b complete — overall_match_score={}", scoringResult.score());
+
+        // Process Ad-Hoc criteria
+        suggestedCriteriaService.recordAdHocCriteria(metadata.category(), dto.additionalEvidenceItems());
+
+        // ── Step 4c: Improvement Advisor (Phase 2) ─────────────────────────────
+        List<Map<String, String>> weaknesses = new java.util.ArrayList<>();
+        if (scoringResult.evidenceItems() != null) {
+            for (var item : scoringResult.evidenceItems()) {
+                if ("weak".equalsIgnoreCase(item.status()) || "missing".equalsIgnoreCase(item.status())) {
+                    weaknesses.add(Map.of("criteria_name", item.criteriaName(), "status", item.status(), "cv_evidence", item.cvEvidence() == null ? "" : item.cvEvidence()));
+                }
+            }
+        }
+        if (dto.additionalEvidenceItems() != null) {
+             for (var item : dto.additionalEvidenceItems()) {
+                if ("weak".equalsIgnoreCase(item.status()) || "missing".equalsIgnoreCase(item.status())) {
+                    weaknesses.add(Map.of("criteria_name", item.criteriaName(), "status", item.status(), "cv_evidence", item.cvEvidence() == null ? "" : item.cvEvidence()));
+                }
+            }
+        }
+
+        List<ImprovementResponseDto.ImprovementItem> improvements = List.of();
+        if (!weaknesses.isEmpty()) {
+            try {
+                String weaknessJson = objectMapper.writeValueAsString(weaknesses);
+                String phase2SystemPrompt = PromptTemplateConfig.SYSTEM_PROMPT_IMPROVEMENT_ADVISOR;
+                String phase2UserPrompt = PromptTemplateConfig.buildImprovementUserPrompt(weaknessJson);
+                
+                log.info("[Assessment] Calling Phase 2 (Improvement Advisor) for {} weaknesses...", weaknesses.size());
+                String phase2Response = callLlmBlocking(phase2SystemPrompt, phase2UserPrompt);
+                
+                ImprovementResponseDto phase2Dto = parseImprovementDto(sessionId, phase2Response);
+                improvements = phase2Dto.topPriorityImprovements();
+                log.info("[Assessment] Phase 2 complete — generated {} improvements.", improvements != null ? improvements.size() : 0);
+            } catch (Exception e) {
+                log.warn("[Assessment] Phase 2 failed, falling back to empty improvements: {}", e.getMessage());
+            }
+        }
 
         // ── Persist and Return ─────────────────────────────────────────────────
-        ResumeAssessment entity = buildAndPersistEntity(sessionId, metadata, overallMatchScore, dto);
-        return toResponse(entity, false);
+        ResumeAssessment entity = buildAndPersistEntity(sessionId, metadata, scoringResult.score(), dto, scoringResult.evidenceItems(), improvements);
+        AssessmentResponse response = toResponse(entity, false);
+        response.setScoreBreakdown(scoringResult.breakdown());
+        return response;
     }
 
     // -------------------------------------------------------------------------
@@ -209,8 +253,7 @@ public class AssessmentService {
         for (int i = 0; i < criteria.size(); i++) {
             CriteriaWeightProjection c = criteria.get(i);
             sb.append(String.format(
-                    "Criterion %d (ID: %d, Weight: %.1f%%) — %s%n%s%n%n",
-                    i + 1,
+                    "- Criteria ID: %d (Weight: %.1f%%) — %s%n%s%n%n",
                     c.getCriteriaId(),
                     c.getWeightPercentage(),
                     c.getCriteriaName(),
@@ -228,7 +271,7 @@ public class AssessmentService {
         LlmChatRequest request = LlmChatRequest.builder()
                 .model(appProperties.getLlm().getModel())
                 .maxTokens(appProperties.getLlm().getMaxTokens())
-                .temperature(0.0)
+                .temperature(0.1) // Changed from 0.0 to 0.1 to avoid empty response bugs on some OpenRouter providers
                 .stream(false)
                 .responseFormat(JSON_RESPONSE_FORMAT)
                 .messages(List.of(
@@ -237,18 +280,30 @@ public class AssessmentService {
                 ))
                 .build();
 
-        int maxRetries = 1;
+        int maxRetries = 3;
         for (int i = 0; i <= maxRetries; i++) {
             try {
-                LlmChatResponse response = llmWebClient.post()
+                String responseBody = llmWebClient.post()
                         .uri(appProperties.getLlm().getChatPath())
                         .bodyValue(request)
                         .retrieve()
-                        .bodyToMono(LlmChatResponse.class)
+                        .bodyToMono(String.class)
                         .block();
 
+                if (responseBody == null || responseBody.isBlank()) {
+                    throw new LlmApiException("LLM API returned empty HTTP body during assessment.");
+                }
+
+                log.debug("[Assessment] Raw HTTP response body: {}", responseBody);
+
+                if (responseBody.contains("\"error\"") && (responseBody.contains("\"message\"") || responseBody.contains("\"code\""))) {
+                    throw new LlmApiException("LLM API returned error JSON during assessment: " + responseBody);
+                }
+
+                LlmChatResponse response = objectMapper.readValue(responseBody, LlmChatResponse.class);
+
                 if (response == null || response.getFirstChoiceContent() == null) {
-                    throw new LlmApiException("LLM API returned empty assessment response.");
+                    throw new LlmApiException("LLM API returned empty assessment response. Response: " + responseBody);
                 }
 
                 if (response.getUsage() != null) {
@@ -298,9 +353,8 @@ public class AssessmentService {
                         "LLM response missing 'evidence_items' for sessionId=" + sessionId);
             }
 
-            log.info("[Assessment] Parsed {} evidence items, {} improvements for sessionId={}",
+            log.info("[Assessment] Parsed {} evidence items for sessionId={}",
                     dto.evidenceItems().size(),
-                    dto.topPriorityImprovements() != null ? dto.topPriorityImprovements().size() : 0,
                     sessionId);
 
             return dto;
@@ -313,6 +367,24 @@ public class AssessmentService {
         }
     }
 
+    private ImprovementResponseDto parseImprovementDto(String sessionId, String llmJsonResponse) {
+        String json = llmJsonResponse
+                .replaceAll("(?s)^```json\\s*", "")
+                .replaceAll("(?s)\\s*```$", "")
+                .strip();
+
+        log.debug("[Assessment] Phase 2 Raw LLM JSON for sessionId={}: {}", sessionId, json);
+
+        try {
+            return objectMapper.readValue(json, ImprovementResponseDto.class);
+        } catch (JsonProcessingException e) {
+            log.error("[Assessment] Phase 2 failed to parse LLM JSON for sessionId={}: {}\nRaw: {}",
+                    sessionId, e.getMessage(), json);
+            throw new LlmApiException(
+                    "Phase 2 LLM returned invalid JSON for sessionId=" + sessionId + ": " + e.getMessage(), e);
+        }
+    }
+
     // -------------------------------------------------------------------------
     // Private — Persistence
     // -------------------------------------------------------------------------
@@ -322,15 +394,18 @@ public class AssessmentService {
             String sessionId,
             MetadataExtractionService.ExtractionResult metadata,
             int overallMatchScore,
-            AssessmentResponseDto dto) {
+            AssessmentResponseDto dto,
+            List<AssessmentResponseDto.EvidenceItem> populatedEvidenceItems,
+            List<ImprovementResponseDto.ImprovementItem> improvements) {
 
         ResumeAssessment entity = ResumeAssessment.builder()
                 .sessionId(sessionId)
                 .jobCategory(metadata.category())
                 .seniorityLevel(metadata.level())
                 .overallMatchScore(overallMatchScore)   // Java-computed
-                .evidenceItems(dto.evidenceItems())
-                .topPriorityImprovements(dto.topPriorityImprovements())
+                .evidenceItems(populatedEvidenceItems)
+                .additionalEvidenceItems(dto.additionalEvidenceItems())
+                .topPriorityImprovements(improvements)
                 .build();
 
         ResumeAssessment saved = resumeAssessmentRepository.save(entity);
@@ -347,6 +422,7 @@ public class AssessmentService {
                 .seniorityLevel(entity.getSeniorityLevel())
                 .overallMatchScore(entity.getOverallMatchScore())
                 .evidenceItems(entity.getEvidenceItems())
+                .additionalEvidenceItems(entity.getAdditionalEvidenceItems())
                 .topPriorityImprovements(entity.getTopPriorityImprovements())
                 .cached(cached)
                 .createdAt(entity.getCreatedAt())

@@ -19,7 +19,7 @@ public final class PromptTemplateConfig {
             RULES:
             1. ZERO HALLUCINATION: Preserve facts exactly. Never invent metrics, skills, or experience.
             2. OMIT MISSING DATA: If any section or field is missing in the input, omit it completely. DO NOT write "Not Provided".
-            3. TONE: Refine wording for professional clarity using action verbs. Focus on backend/architecture impact, but do not embellish.
+            3. TONE: Refine wording for professional clarity using action verbs. Focus on backend/architecture impact, but do not embellish. NEVER omit technical keywords (e.g., React, Node, AWS) when summarizing prose.
             4. OUTPUT: Output ONLY the Markdown code. No conversational text.
     
             OUTPUT SCHEMA:
@@ -162,7 +162,11 @@ public final class PromptTemplateConfig {
                 2. SEMANTIC MATCHING: Contextual equivalents are valid matches, provided the underlying proof exists literally in the text.
                 3. STRICT JSON ONLY: Output ONLY a valid JSON object. No markdown wrappers, no explanations.
                 4. LANGUAGE: Keep "jd_requirement" and "cv_evidence" in Vietnamese for human readability. ALWAYS retain technical terms (Java, Spring Boot, Kubernetes, PostgreSQL, CI/CD) in English.
-                5. STRICT SCHEMA: The "status" field MUST BE exactly one of: "matched", "weak", or "missing". You must NEVER return null.
+                5. STRICT SCHEMA: The "status" field MUST BE exactly one of: "matched", "weak", "missing", or "not_applicable". You must NEVER return null.
+                6. BREVITY (CRITICAL): To prevent token truncation, keep "jd_requirement", "cv_evidence", and "reasoning" under 15 words each. Be extremely concise.
+                7. WEAK STATUS FORMULA: When status is "weak", the `cv_evidence` MUST strictly follow this exact template to prevent hallucination: "Tìm thấy từ khóa '[X]' trong phần '[Y]'. Hoàn toàn không có minh chứng áp dụng thực tế trong phần mô tả dự án."
+                8. REASONING: Every evidence item MUST include a "reasoning" field with 1-2 concise sentences explaining the status.
+                9. AD-HOC CRITERIA: After evaluating the main criteria, EXHAUSTIVELY scan the JD for clear, distinct technical requirements NOT covered by the criteria list. Extract the most critical missing requirements (up to 4 items max). Do not stop at just 2-3 items, but do not exceed 4 to prevent truncation. Return them in the "additional_evidence_items" array. Keep reasoning to 1 short sentence.
                 
                 EVALUATION CRITERIA (fetch from Rule Engine):
                 %s
@@ -175,20 +179,26 @@ public final class PromptTemplateConfig {
                       "criteria_name": "<string — exact criteria name from the list above>",
                       "jd_requirement": "<specific requirement extracted from the JD for this criterion>",
                       "cv_evidence": "<concrete evidence from the CV, or null if absent>",
-                      "status": "<matched|weak|missing>"
+                      "status": "<matched|weak|missing>",
+                      "reasoning": "<1-2 sentences explaining why this status was chosen>"
                     }
                   ],
-                  "top_priority_improvements": [
-                    "<Actionable, specific improvement suggestion 1>",
-                    "<Actionable, specific improvement suggestion 2>",
-                    "<Actionable, specific improvement suggestion 3>"
+                  "additional_evidence_items": [
+                    {
+                      "criteria_name": "<Ad-hoc requirement name>",
+                      "jd_requirement": "<Extract from JD>",
+                      "cv_evidence": "<Extract from CV>",
+                      "status": "<matched|weak|missing>",
+                      "reasoning": "<1-2 sentences explaining status>"
+                    }
                   ]
                 }
                 
                 STATUS DEFINITIONS:
                 - "matched": CV has strong, direct, explicit evidence demonstrating real-world depth (e.g., "Deployed on AWS with secure .env variable isolation per service" or "Agile process with clear Jira ticket conventions").
                 - "weak": Skill is listed in a Skills section without project context, or lacks practical depth (e.g., just mentioning "Jira" without showing process standardization, or just "AWS" without secure configurations).
-                - "missing": Requirement is completely absent from the CV. Look carefully across all sections, including "Infrastructure & Tools" (e.g., if Git is clearly listed there, it is NOT missing).
+                - "missing": Requirement is completely absent from the CV. Look carefully across ALL sections, EXPLICITLY INCLUDING the "# Summary" prose paragraph and "Infrastructure & Tools" section. If a keyword is buried in the Summary, it is NOT missing.
+                - "not_applicable": The JD completely omits this requirement, AND it is not a strict industry necessity for the specific JD context. Use this instead of "missing" to avoid penalizing the candidate unfairly.
                 """.formatted(criteriaInstructions);
     }
 
@@ -210,6 +220,44 @@ public final class PromptTemplateConfig {
                 
                 Evaluate the CV against the JD using the criteria defined in the system prompt. Output ONLY the JSON object.
                 """.formatted(fullCvMarkdown, fullJdMarkdown);
+    }
+
+    // =========================================================================
+    // STEP 4c: Improvement Advisor Prompt (Phase 2)
+    // Generates detailed, actionable advice for missing/weak points.
+    // =========================================================================
+
+    public static final String SYSTEM_PROMPT_IMPROVEMENT_ADVISOR =
+            """
+            Role: Senior Engineering Manager & Career Advisor.
+            Task: Review the technical weaknesses of a candidate (missing or weak criteria) and provide highly detailed, actionable advice to help them pass the interview.
+            
+            RULES:
+            1. BE DETAILED: Do not hold back on tokens. Provide in-depth advice, learning paths, or concrete project implementation ideas.
+            2. ZERO HALLUCINATION: Base advice ONLY on the missing/weak criteria provided.
+            3. LANGUAGE: Write suggestions in Vietnamese for human readability. Keep technical terms in English.
+            4. STRICT JSON ONLY: Output ONLY a valid JSON object matching the schema below. No markdown wrappers.
+            
+            OUTPUT SCHEMA:
+            {
+              "top_priority_improvements": [
+                {
+                  "criteria_id": <long (optional) — the related criteria_id if applicable, otherwise null>,
+                  "criteria_name": "<string — the related criteria_name>",
+                  "suggestion": "<Highly detailed, actionable improvement suggestion (e.g., specific courses, project implementations, architectures)>",
+                  "priority_rank": <integer 1-3>
+                }
+              ]
+            }
+            """;
+
+    public static String buildImprovementUserPrompt(String missingAndWeakItemsJson) {
+        return """
+                ====== CANDIDATE WEAKNESSES ======
+                %s
+                
+                Based on these weaknesses, generate detailed and actionable improvement suggestions. Output ONLY the JSON object.
+                """.formatted(missingAndWeakItemsJson);
     }
 
     // =========================================================================

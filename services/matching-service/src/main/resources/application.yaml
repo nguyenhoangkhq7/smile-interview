@@ -69,7 +69,7 @@ app:
     # Timeout in seconds for LLM API calls
     timeout-seconds: ${LLM_TIMEOUT_SECONDS:60}
     # Max tokens in LLM response
-    max-tokens: ${LLM_MAX_TOKENS:4096}
+    max-tokens: ${LLM_MAX_TOKENS:8192}
 
   ollama:
     embedding-url: ${OLLAMA_EMBEDDING_URL:http://host.docker.internal:11434}

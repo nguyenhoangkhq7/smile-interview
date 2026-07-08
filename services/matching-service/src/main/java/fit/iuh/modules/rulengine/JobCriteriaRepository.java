@@ -62,21 +62,31 @@ public interface JobCriteriaRepository extends JpaRepository<JobCategoryEntity, 
                 SELECT jc.id, jc.name, jc.parent_id, ct.depth + 1
                 FROM job_categories jc
                 INNER JOIN category_tree ct ON jc.id = ct.parent_id
+            ),
+            mapped_criteria AS (
+                SELECT
+                    ec.id                  AS criteriaId,
+                    ec.criteria_name       AS criteriaName,
+                    ec.prompt_instruction  AS promptInstruction,
+                    ccm.weight_percentage  AS weightPercentage,
+                    ROW_NUMBER() OVER(
+                        PARTITION BY ec.id
+                        ORDER BY 
+                            CASE WHEN ccm.seniority_level = :seniorityLevel THEN 1 ELSE 2 END ASC,
+                            ct.depth ASC,
+                            ccm.weight_percentage DESC
+                    ) as rn
+                FROM category_tree ct
+                JOIN category_criteria_mapping ccm
+                    ON ccm.job_category_id = ct.id
+                    AND (ccm.seniority_level = :seniorityLevel OR ccm.seniority_level = 'ALL')
+                JOIN evaluation_criteria ec
+                    ON ec.id = ccm.criteria_id
             )
-            -- Join the tree path to mappings, keeping specific-level over ALL
-            SELECT
-                ec.id                  AS criteriaId,
-                ec.criteria_name       AS criteriaName,
-                ec.prompt_instruction  AS promptInstruction,
-                MAX(ccm.weight_percentage) AS weightPercentage
-            FROM category_tree ct
-            JOIN category_criteria_mapping ccm
-                ON ccm.job_category_id = ct.id
-                AND (ccm.seniority_level = :seniorityLevel OR ccm.seniority_level = 'ALL')
-            JOIN evaluation_criteria ec
-                ON ec.id = ccm.criteria_id
-            GROUP BY ec.id, ec.criteria_name, ec.prompt_instruction
-            ORDER BY MAX(ccm.weight_percentage) DESC
+            SELECT criteriaId, criteriaName, promptInstruction, weightPercentage
+            FROM mapped_criteria
+            WHERE rn = 1
+            ORDER BY weightPercentage DESC
             """,
             nativeQuery = true)
     List<CriteriaWeightProjection> findCriteriaTreeByCategory(

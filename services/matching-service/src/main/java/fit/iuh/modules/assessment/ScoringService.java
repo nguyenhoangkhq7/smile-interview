@@ -4,9 +4,10 @@ import fit.iuh.modules.rulengine.JobCriteriaRepository.CriteriaWeightProjection;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -44,6 +45,12 @@ public class ScoringService {
     private static final double POINTS_WEAK    = 0.3;
     private static final double POINTS_MISSING = 0.0;
 
+    public record ScoringResult(
+            int score,
+            AssessmentResponse.ScoreBreakdown breakdown,
+            List<AssessmentResponseDto.EvidenceItem> evidenceItems
+    ) {}
+
     /**
      * Calculates the overall match score from evidence items and DB weights.
      *
@@ -51,17 +58,17 @@ public class ScoringService {
      * @param criteriaWeights the criteria+weights fetched from the DB by {@code JobCriteriaRepository}
      * @return integer score in range [0, 100]
      */
-    public int calculate(
+    public ScoringResult calculateWithBreakdown(
             List<AssessmentResponseDto.EvidenceItem> evidenceItems,
             List<CriteriaWeightProjection> criteriaWeights) {
 
         if (evidenceItems == null || evidenceItems.isEmpty()) {
             log.warn("[Scoring] No evidence items provided — returning score 0.");
-            return 0;
+            return new ScoringResult(0, null, List.of());
         }
         if (criteriaWeights == null || criteriaWeights.isEmpty()) {
             log.warn("[Scoring] No criteria weights found in DB — returning score 0.");
-            return 0;
+            return new ScoringResult(0, null, evidenceItems);
         }
 
         // Build a lookup map: criteriaId → weightPercentage
@@ -75,10 +82,12 @@ public class ScoringService {
 
         double totalWeightUsed = 0.0;
         double weightedPointsSum = 0.0;
+        List<AssessmentResponseDto.EvidenceItem> updatedItems = new ArrayList<>();
 
         for (AssessmentResponseDto.EvidenceItem item : evidenceItems) {
             if (item.criteriaId() == null) {
                 log.debug("[Scoring] Skipping evidence item with null criteriaId: {}", item.criteriaName());
+                updatedItems.add(item);
                 continue;
             }
 
@@ -86,30 +95,61 @@ public class ScoringService {
             if (weight == null) {
                 log.debug("[Scoring] No weight found for criteriaId={} ('{}') — skipping.",
                         item.criteriaId(), item.criteriaName());
+                updatedItems.add(item);
                 continue;
             }
 
             double points = statusToPoints(item.status());
-            weightedPointsSum += weight * points;
-            totalWeightUsed += weight;
+            double scoreContribution = weight * points;
+            
+            if ("not_applicable".equalsIgnoreCase(item.status())) {
+                log.debug("[Scoring] JD-Driven logic: criteria='{}' is not_applicable. Excluding weight.", item.criteriaName());
+            } else {
+                weightedPointsSum += scoreContribution;
+                totalWeightUsed += weight;
+            }
 
             log.debug("[Scoring] criteria='{}' weight={} status='{}' points={} contribution={}",
-                    item.criteriaName(), weight, item.status(), points, weight * points);
+                    item.criteriaName(), weight, item.status(), points, scoreContribution);
+
+            AssessmentResponseDto.EvidenceItem updated = new AssessmentResponseDto.EvidenceItem(
+                    item.criteriaId(),
+                    item.criteriaName(),
+                    item.jdRequirement(),
+                    item.cvEvidence(),
+                    item.status(),
+                    item.reasoning(),
+                    weight,
+                    scoreContribution
+            );
+            updatedItems.add(updated);
         }
 
-        if (totalWeightUsed == 0.0) {
+        int score = 0;
+        AssessmentResponse.ScoreBreakdown breakdown = null;
+        if (totalWeightUsed > 0.0) {
+            score = (int) Math.round((weightedPointsSum / totalWeightUsed) * 100.0);
+            score = Math.max(0, Math.min(100, score));
+            
+            breakdown = new AssessmentResponse.ScoreBreakdown(
+                    weightedPointsSum,
+                    totalWeightUsed,
+                    "SUM(weight_i * points_i) / SUM(weight_i) * 100",
+                    Map.of("matched", POINTS_MATCHED, "weak", POINTS_WEAK, "missing", POINTS_MISSING)
+            );
+            log.info("[Scoring] overall_match_score={} (weighted_sum={:.2f} / total_weight={:.2f})",
+                    score, weightedPointsSum, totalWeightUsed);
+        } else {
             log.warn("[Scoring] Total weight used is 0 — no matching criteria found. Returning score 0.");
-            return 0;
         }
 
-        int score = (int) Math.round((weightedPointsSum / totalWeightUsed) * 100.0);
-        // Clamp to [0, 100] as a safety guard against floating-point edge cases
-        score = Math.max(0, Math.min(100, score));
+        return new ScoringResult(score, breakdown, updatedItems);
+    }
 
-        log.info("[Scoring] overall_match_score={} (weighted_sum={:.2f} / total_weight={:.2f})",
-                score, weightedPointsSum, totalWeightUsed);
-
-        return score;
+    public int calculate(
+            List<AssessmentResponseDto.EvidenceItem> evidenceItems,
+            List<CriteriaWeightProjection> criteriaWeights) {
+        return calculateWithBreakdown(evidenceItems, criteriaWeights).score();
     }
 
     // -------------------------------------------------------------------------

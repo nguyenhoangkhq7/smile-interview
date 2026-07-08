@@ -73,11 +73,17 @@ public class AssessmentResponse {
     @JsonProperty("evidence_items")
     private List<AssessmentResponseDto.EvidenceItem> evidenceItems;
 
+    @JsonProperty("additional_evidence_items")
+    private List<AssessmentResponseDto.AdHocEvidenceItem> additionalEvidenceItems;
+
+    @JsonProperty("score_breakdown")
+    private ScoreBreakdown scoreBreakdown;
+
     /**
      * Ordered list of actionable improvement suggestions from the LLM.
      */
     @JsonProperty("top_priority_improvements")
-    private List<String> topPriorityImprovements;
+    private List<ImprovementResponseDto.ImprovementItem> topPriorityImprovements;
 
     // -------------------------------------------------------------------------
     // Cache metadata
@@ -93,4 +99,18 @@ public class AssessmentResponse {
     /** Timestamp when the assessment was first persisted to the database. */
     @JsonProperty("created_at")
     private LocalDateTime createdAt;
+
+    public record ScoreBreakdown(
+            @JsonProperty("weighted_points_sum")
+            double weightedPointsSum,
+            
+            @JsonProperty("total_weight_used")
+            double totalWeightUsed,
+            
+            @JsonProperty("formula")
+            String formula,
+            
+            @JsonProperty("points_config")
+            java.util.Map<String, Double> pointsConfig
+    ) {}
 }

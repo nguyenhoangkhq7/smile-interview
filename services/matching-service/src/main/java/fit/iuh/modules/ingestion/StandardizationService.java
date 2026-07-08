@@ -97,7 +97,7 @@ public class StandardizationService {
         LlmChatRequest request = LlmChatRequest.builder()
                 .model(appProperties.getLlm().getModel())
                 .maxTokens(appProperties.getLlm().getMaxTokens())
-                .temperature(0.0)
+                .temperature(0.1) // Changed from 0.0 to 0.1 to prevent Groq Llama 3 empty response bug
                 .messages(List.of(
                         LlmChatRequest.Message.system(systemPrompt),
                         LlmChatRequest.Message.user(userContent)
@@ -106,49 +106,67 @@ public class StandardizationService {
 
         Duration timeout = Duration.ofSeconds(appProperties.getLlm().getTimeoutSeconds());
 
-        try {
-            LlmChatResponse response = llmWebClient.post()
-                    .uri(appProperties.getLlm().getChatPath())
-                    .bodyValue(request)
-                    .retrieve()
-                    .bodyToMono(LlmChatResponse.class)
-                    .timeout(
-                            timeout,
-                            Mono.error(new LlmApiException(
-                                    "LLM API call timed out after " +
-                                    appProperties.getLlm().getTimeoutSeconds() +
-                                    "s while standardizing " + documentLabel + "."))
-                    )
-                    .block(); // Convert reactive to blocking for the service layer
+        int maxRetries = 2;
+        int attempt = 0;
 
-            if (response == null) {
-                throw new LlmApiException("LLM API returned a null response for " + documentLabel + ".");
-            }
+        while (true) {
+            try {
+                LlmChatResponse response = llmWebClient.post()
+                        .uri(appProperties.getLlm().getChatPath())
+                        .bodyValue(request)
+                        .retrieve()
+                        .bodyToMono(LlmChatResponse.class)
+                        .timeout(
+                                timeout,
+                                Mono.error(new LlmApiException(
+                                        "LLM API call timed out after " +
+                                        appProperties.getLlm().getTimeoutSeconds() +
+                                        "s while standardizing " + documentLabel + "."))
+                        )
+                        .block(); // Convert reactive to blocking for the service layer
 
-            String content = response.getFirstChoiceContent();
-            if (content == null || content.isBlank()) {
+                if (response == null) {
+                    throw new LlmApiException("LLM API returned a null response for " + documentLabel + ".");
+                }
+
+                String content = response.getFirstChoiceContent();
+                if (content == null || content.isBlank()) {
+                    log.error("LLM returned empty content. Raw response: {}", response);
+                    throw new LlmApiException(
+                            "LLM API returned empty content for " + documentLabel + ". " +
+                            "Check that the system prompt is not malformed. Raw response was logged.");
+                }
+
+                log.info("LLM standardization OK for {}: {} chars generated (tokens={})",
+                        documentLabel,
+                        content.length(),
+                        response.getUsage() != null ? response.getUsage().getTotalTokens() : "N/A");
+
+                return content.strip();
+
+            } catch (LlmApiException | WebClientResponseException e) {
+                if (attempt >= maxRetries) {
+                    if (e instanceof WebClientResponseException wce) {
+                        throw new LlmApiException(
+                                "LLM API HTTP " + wce.getStatusCode() + " for " + documentLabel +
+                                ": " + wce.getResponseBodyAsString(), wce);
+                    }
+                    throw e; // re-throw LlmApiException
+                }
+                attempt++;
+                log.warn("Transient error calling LLM API for {} (attempt {}/{}). Retrying... Error: {}",
+                        documentLabel, attempt, maxRetries, e.getMessage());
+                try {
+                    Thread.sleep(1000 * attempt); // simple backoff
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw new LlmApiException("Interrupted during retry backoff", ie);
+                }
+            } catch (Exception e) {
                 throw new LlmApiException(
-                        "LLM API returned empty content for " + documentLabel + ". " +
-                        "Check that the system prompt is not malformed.");
+                        "Unexpected error calling LLM API for " + documentLabel +
+                        ": " + e.getMessage(), e);
             }
-
-            log.info("LLM standardization OK for {}: {} chars generated (tokens={})",
-                    documentLabel,
-                    content.length(),
-                    response.getUsage() != null ? response.getUsage().getTotalTokens() : "N/A");
-
-            return content.strip();
-
-        } catch (LlmApiException e) {
-            throw e; // re-throw without wrapping to preserve the specific message
-        } catch (WebClientResponseException e) {
-            throw new LlmApiException(
-                    "LLM API HTTP " + e.getStatusCode() + " for " + documentLabel +
-                    ": " + e.getResponseBodyAsString(), e);
-        } catch (Exception e) {
-            throw new LlmApiException(
-                    "Unexpected error calling LLM API for " + documentLabel +
-                    ": " + e.getMessage(), e);
         }
     }
 }
