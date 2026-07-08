@@ -8,8 +8,6 @@ import fit.iuh.config.AppProperties;
 import fit.iuh.config.PromptTemplateConfig;
 import fit.iuh.dto.chat.LlmChatRequest;
 import fit.iuh.dto.chat.LlmChatResponse;
-import fit.iuh.modules.questionbank.CandidateContextDto;
-import fit.iuh.modules.questionbank.QuestionDto;
 import fit.iuh.exception.LlmApiException;
 import fit.iuh.exception.QuestionBankException;
 import lombok.extern.slf4j.Slf4j;
@@ -46,38 +44,24 @@ public class QuestionGenerationService {
     }
 
     /**
-     * Generates a list of questions for a specific type and difficulty distribution.
+     * Generates a list of questions for a specific type and given question assignments.
      *
-     * @param type behavioural | technical | coding | system_design
-     * @param context candidate context details
-     * @param cvMarkdown candidates CV markdown text
-     * @param jdMarkdown JD markdown text
-     * @param difficultyDist map of difficulty level to count
+     * @param type            behavioural | technical | coding | system_design
+     * @param context         candidate context details
+     * @param assignments     list of question assignments containing target item and difficulty
      * @return list of question DTOs
      */
     public List<QuestionDto> generateForType(
             String type,
             CandidateContextDto context,
-            String cvMarkdown,
-            String jdMarkdown,
-            String matchedPairsText,
-            Map<String, Integer> difficultyDist) {
+            List<QuestionAssignment> assignments) {
 
-        int totalExpected = difficultyDist.values().stream().mapToInt(Integer::intValue).sum();
+        int totalExpected = assignments.size();
         if (totalExpected <= 0) {
             return Collections.emptyList();
         }
 
         log.info("[QuestionGen] Generating {} questions of type '{}'...", totalExpected, type);
-
-        // Build difficulty target string, e.g. "1 easy, 2 medium, 1 hard"
-        List<String> targetList = new ArrayList<>();
-        difficultyDist.forEach((diff, count) -> {
-            if (count > 0) {
-                targetList.add(count + " " + diff);
-            }
-        });
-        String difficultyTargets = String.join(", ", targetList);
 
         String typeFullName = switch (type) {
             case "behavioural" -> "Behavioural Interview";
@@ -87,33 +71,35 @@ public class QuestionGenerationService {
             default -> type;
         };
 
+        // New 10-arg format: level, roleType, targetDomain, strongAreas, gapAreas,
+        // techStackPossessed, techStackRequired, questionType,
+        // typeInstructions, typeSpecificOutputFields
         String systemPrompt = String.format(
                 PromptTemplateConfig.SYSTEM_PROMPT_QUESTION_GENERATION,
-                typeFullName,
-                context.getCandidateLevel(),
-                context.getOverallMatch(),
-                context.getYearsOfExperience(),
-                context.getRoleType(),
-                context.getTargetDomain(),
+                context.getCandidateLevel() != null ? context.getCandidateLevel().name() : "MID",
+                context.getRoleType() != null ? context.getRoleType().name() : "OTHER",
+                context.getTargetDomain() != null ? context.getTargetDomain() : "other",
                 context.getStrongAreas() != null ? String.join(", ", context.getStrongAreas()) : "None",
                 context.getGapAreas() != null ? String.join(", ", context.getGapAreas()) : "None",
-                context.getTechStackRequired() != null ? String.join(", ", context.getTechStackRequired()) : "None",
                 context.getTechStackPossessed() != null ? String.join(", ", context.getTechStackPossessed()) : "None",
-                difficultyTargets,
+                context.getTechStackRequired() != null ? String.join(", ", context.getTechStackRequired()) : "None",
+                typeFullName,
                 PromptTemplateConfig.getTypeInstructions(type),
-                type,
                 PromptTemplateConfig.getTypeSpecificOutputFields(type)
         );
 
+        // Build structured evidence items text for the user prompt
+        String evidenceItemsText = buildEvidenceAssignmentsText(assignments);
+
         String userPrompt = """
-                ====== SEMANTIC MATCHED EXPERIENCES ======
+                ====== ASSESSMENT EVIDENCE ITEMS ======
                 %s
 
                 Generate the requested questions for this candidate.
 
                 CRITICAL MAPPING RULE:
-                For each question generated, you MUST set the "id" field to the exact Pair ID (e.g., "pair_0", "pair_1") of the matched experience segment that inspired the question. This is required for internal mapping.
-                """.formatted(matchedPairsText);
+                For each question generated, you MUST set the "id" field to the exact Item ID (e.g., "item_0", "item_1") of the evidence item that inspired the question. This is required for internal mapping.
+                """.formatted(evidenceItemsText);
 
         int attempts = 0;
         int maxAttempts = props.getQuestionBank().getMaxRetries() + 1;
@@ -176,44 +162,6 @@ public class QuestionGenerationService {
                     }
                 }
 
-                // Verify difficulty distribution
-                Map<String, Integer> actualDist = new HashMap<>();
-                actualDist.put("easy", 0);
-                actualDist.put("medium", 0);
-                actualDist.put("hard", 0);
-                for (QuestionDto q : questions) {
-                    String diff = q.getDifficulty() != null ? q.getDifficulty().toLowerCase().strip() : "medium";
-                    actualDist.put(diff, actualDist.getOrDefault(diff, 0) + 1);
-                }
-
-                boolean distributionMatch = true;
-                for (String diff : difficultyDist.keySet()) {
-                    if (!Objects.equals(difficultyDist.get(diff), actualDist.get(diff))) {
-                        distributionMatch = false;
-                        break;
-                    }
-                }
-
-                if (!distributionMatch) {
-                    log.warn("[QuestionGen] Difficulty mismatch on attempt {} for type {}: expected {}, got {}",
-                            attempts, type, difficultyDist, actualDist);
-                    if (attempts >= maxAttempts) {
-                        // Force-align difficulty labels
-                        log.info("[QuestionGen] Out of retries. Force-balancing the difficulty distribution.");
-                        List<String> targetDiffs = new ArrayList<>();
-                        difficultyDist.forEach((diff, count) -> {
-                            for (int i = 0; i < count; i++) {
-                                targetDiffs.add(diff);
-                            }
-                        });
-                        for (int i = 0; i < questions.size() && i < targetDiffs.size(); i++) {
-                            questions.get(i).setDifficulty(targetDiffs.get(i));
-                        }
-                    } else {
-                        throw new QuestionBankException("Difficulty distribution does not match requested targets.");
-                    }
-                }
-
                 return questions;
 
             } catch (WebClientResponseException e) {
@@ -245,13 +193,18 @@ public class QuestionGenerationService {
     /**
      * Regenerates a single question with the same type and difficulty, avoiding topics
      * already present in existing questions.
+     *
+     * @param type              behavioural | technical | coding | system_design
+     * @param difficulty        easy | medium | hard
+     * @param context           candidate context details
+     * @param allEvidenceItems  all evidence items from the assessment (for context)
+     * @param existingQuestions currently generated questions (topics to avoid)
      */
     public QuestionDto regenerateSingle(
             String type,
             String difficulty,
             CandidateContextDto context,
-            String cvMarkdown,
-            String jdMarkdown,
+            List<EvidenceItemPair> allEvidenceItems,
             List<QuestionDto> existingQuestions) {
 
         log.info("[QuestionGen] Regenerating 1 question of type '{}' (difficulty: '{}')...", type, difficulty);
@@ -264,21 +217,18 @@ public class QuestionGenerationService {
             default -> type;
         };
 
+        // Same 10-arg format as generateForType
         String systemPrompt = String.format(
                 PromptTemplateConfig.SYSTEM_PROMPT_QUESTION_GENERATION,
-                typeFullName,
-                context.getCandidateLevel(),
-                context.getOverallMatch(),
-                context.getYearsOfExperience(),
-                context.getRoleType(),
-                context.getTargetDomain(),
+                context.getCandidateLevel() != null ? context.getCandidateLevel().name() : "MID",
+                context.getRoleType() != null ? context.getRoleType().name() : "OTHER",
+                context.getTargetDomain() != null ? context.getTargetDomain() : "other",
                 context.getStrongAreas() != null ? String.join(", ", context.getStrongAreas()) : "None",
                 context.getGapAreas() != null ? String.join(", ", context.getGapAreas()) : "None",
-                context.getTechStackRequired() != null ? String.join(", ", context.getTechStackRequired()) : "None",
                 context.getTechStackPossessed() != null ? String.join(", ", context.getTechStackPossessed()) : "None",
-                "1 " + difficulty,
+                context.getTechStackRequired() != null ? String.join(", ", context.getTechStackRequired()) : "None",
+                typeFullName,
                 PromptTemplateConfig.getTypeInstructions(type),
-                type,
                 PromptTemplateConfig.getTypeSpecificOutputFields(type)
         );
 
@@ -287,11 +237,10 @@ public class QuestionGenerationService {
                 .map(q -> "- " + q.getTopic())
                 .collect(Collectors.joining("\n"));
 
-        String userPrompt = """
-                ====== CANDIDATE RESUME (CV) ======
-                %s
+        String evidenceItemsText = buildEvidenceItemsText(allEvidenceItems);
 
-                ====== JOB DESCRIPTION (JD) ======
+        String userPrompt = """
+                ====== ASSESSMENT EVIDENCE ITEMS ======
                 %s
 
                 ====== EXISTING TOPICS TO AVOID ======
@@ -299,7 +248,7 @@ public class QuestionGenerationService {
 
                 Generate exactly 1 new question for this candidate of type '%s' and difficulty '%s'.
                 Do not generate any questions on the existing topics listed above.
-                """.formatted(cvMarkdown, jdMarkdown, existingTopics, type, difficulty);
+                """.formatted(evidenceItemsText, existingTopics, type, difficulty);
 
         LlmChatRequest request = LlmChatRequest.builder()
                 .model(props.getLlm().getModel())
@@ -382,6 +331,71 @@ public class QuestionGenerationService {
         throw new QuestionBankException("Failed to regenerate question after " + maxAttempts + " attempts due to rate limiting or timeouts.");
     }
 
+    /**
+     * Builds a structured, human-readable text block from evidence assignments to use as the
+     * user prompt body for question generation. Each item gets an "item_N" identifier
+     * that the LLM must reference in the "id" field of generated questions.
+     */
+    private String buildEvidenceAssignmentsText(List<QuestionAssignment> assignments) {
+        if (assignments == null || assignments.isEmpty()) {
+            return "(No evidence items available)";  
+        }
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < assignments.size(); i++) {
+            QuestionAssignment qa = assignments.get(i);
+            EvidenceItemPair item = qa.item();
+            sb.append(String.format(
+                    "### Item ID: item_%d [status: %s] [target_difficulty: %s]%n",
+                    i, 
+                    item != null && item.status() != null ? item.status() : "unknown",
+                    qa.difficulty()
+            ));
+            if (item != null) {
+                sb.append(String.format("- Criteria: %s%n", item.criteriaName() != null ? item.criteriaName() : "Ad-hoc"));
+                sb.append(String.format("- JD Requirement: %s%n", item.jdRequirement() != null ? item.jdRequirement() : "N/A"));
+                sb.append(String.format("- CV Evidence: %s%n",
+                        item.cvEvidence() != null ? item.cvEvidence() : "None (missing from CV)"));
+                if (item.reasoning() != null && !item.reasoning().isBlank()) {
+                    sb.append(String.format("- Reasoning: %s%n", item.reasoning()));
+                }
+            } else {
+                sb.append("- Criteria: General Behavioral / Catch-all\n");
+                sb.append("- JD Requirement: N/A\n");
+                sb.append("- CV Evidence: N/A\n");
+            }
+            sb.append("\n");
+        }
+        return sb.toString().strip();
+    }
+
+    /**
+     * Builds a structured, human-readable text block from evidence items to use as the
+     * user prompt body for question generation. Each item gets an "item_N" identifier
+     * that the LLM must reference in the "id" field of generated questions.
+     */
+    private String buildEvidenceItemsText(List<EvidenceItemPair> evidenceItems) {
+        if (evidenceItems == null || evidenceItems.isEmpty()) {
+            return "(No evidence items available)";  
+        }
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < evidenceItems.size(); i++) {
+            EvidenceItemPair item = evidenceItems.get(i);
+            sb.append(String.format(
+                    "### Item ID: item_%d [status: %s]%n",
+                    i, item.status() != null ? item.status() : "unknown"
+            ));
+            sb.append(String.format("- Criteria: %s%n", item.criteriaName() != null ? item.criteriaName() : "Ad-hoc"));
+            sb.append(String.format("- JD Requirement: %s%n", item.jdRequirement() != null ? item.jdRequirement() : "N/A"));
+            sb.append(String.format("- CV Evidence: %s%n",
+                    item.cvEvidence() != null ? item.cvEvidence() : "None (missing from CV)"));
+            if (item.reasoning() != null && !item.reasoning().isBlank()) {
+                sb.append(String.format("- Reasoning: %s%n", item.reasoning()));
+            }
+            sb.append("\n");
+        }
+        return sb.toString().strip();
+    }
+
     private List<QuestionDto> parseQuestionsJson(String rawJson, String type) {
         String cleanJson = rawJson
                 .replaceAll("(?s)^```json\\s*", "")
@@ -398,7 +412,7 @@ public class QuestionGenerationService {
             List<QuestionDto> list = objectMapper.convertValue(questionsNode, new TypeReference<List<QuestionDto>>() {});
             for (QuestionDto q : list) {
                 q.setType(type); // Ensure type is strictly set
-                
+
                 // Simple validation of required fields
                 if (q.getQuestion() == null || q.getQuestion().isBlank()) {
                     throw new QuestionBankException("Question text is empty in generated question object.");

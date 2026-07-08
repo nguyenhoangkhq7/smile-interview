@@ -18,21 +18,11 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class QuestionConfigDto {
 
-    @Min(0) @Max(10)
-    private int behavioural;
-
-    @Min(0) @Max(10)
-    private int technical;
-
-    @Min(0) @Max(10)
-    private int coding;
-
-    @JsonProperty("system_design")
-    @Min(0) @Max(10)
-    private int systemDesign;
+    @Min(1) @Max(50)
+    private int totalQuestions;
 
     /** Returns the total number of questions requested across all types. */
     public int total() {
-        return behavioural + technical + coding + systemDesign;
+        return totalQuestions;
     }
 }

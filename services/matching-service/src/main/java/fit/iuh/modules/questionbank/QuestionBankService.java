@@ -1,17 +1,13 @@
 package fit.iuh.modules.questionbank;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import fit.iuh.modules.questionbank.QuestionBank;
+import fit.iuh.modules.assessment.AssessmentResponseDto;
 import fit.iuh.modules.assessment.ResumeAssessment;
-import fit.iuh.modules.ingestion.SessionDocument;
-import fit.iuh.modules.ingestion.DocumentType;
-import fit.iuh.modules.ingestion.DocumentChunk;
-import fit.iuh.exception.QuestionBankException;
-import fit.iuh.modules.ingestion.DocumentChunkRepository;
-import fit.iuh.modules.questionbank.QuestionBankRepository;
 import fit.iuh.modules.assessment.ResumeAssessmentRepository;
+import fit.iuh.modules.ingestion.DocumentType;
+import fit.iuh.modules.ingestion.SessionDocument;
 import fit.iuh.modules.ingestion.SessionDocumentRepository;
+import fit.iuh.exception.QuestionBankException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -25,17 +21,32 @@ import java.util.stream.Collectors;
 /**
  * Orchestrates the full Question Bank generation pipeline: loading data,
  * extracting context, determining distribution, generating questions, and saving.
+ *
+ * <h3>Pipeline (v2 — evidence-item based)</h3>
+ * <ol>
+ *   <li><b>Bước 0:</b> Load {@link ResumeAssessment} and read {@code evidence_items} +
+ *       {@code additional_evidence_items} directly — no cosine similarity recalculation.</li>
+ *   <li><b>Bước 1:</b> Extract {@link CandidateContextDto} from structured evidence items
+ *       (strong/gap/tech stack) — no keyword heuristic on raw text.</li>
+ *   <li><b>Bước 2:</b> {@link DifficultyDistributor} calculates easy/medium/hard counts.</li>
+ *   <li><b>Bước 3:</b> Cache-aside with Redis. Keys are based on
+ *       {@code (criteria_id, status, seniority_level)} for stable cross-candidate hit rates.</li>
+ *   <li><b>Bước 4-5:</b> Assign sequential IDs (Q001...) and build metadata.</li>
+ *   <li><b>Bước 6:</b> Persist {@link QuestionBank} to DB.</li>
+ * </ol>
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class QuestionBankService {
 
+    /** Maximum number of evidence items to pass to the LLM per generation call. */
+    private static final int MAX_EVIDENCE_ITEMS = 15;
+
     private final QuestionGenerationService questionGenerationService;
     private final DifficultyDistributor difficultyDistributor;
     private final ResumeAssessmentRepository assessmentRepo;
     private final SessionDocumentRepository documentRepo;
-    private final DocumentChunkRepository documentChunkRepository;
     private final QuestionBankRepository questionBankRepo;
     private final ObjectMapper objectMapper;
     private final SemanticCacheKeyGenerator cacheKeyGenerator;
@@ -58,83 +69,66 @@ public class QuestionBankService {
 
         log.info("[QuestionBank] Starting generation for session={}, total questions={}", sessionId, config.total());
 
-        // Step 0: Load prerequisites from DB
+        // ── Bước 0: Load ResumeAssessment and extract evidence items ─────────
         ResumeAssessment assessment = assessmentRepo.findBySessionId(sessionId)
-                .orElseThrow(() -> new QuestionBankException("Resume assessment not found for session: " + sessionId + ". Please generate an assessment first."));
+                .orElseThrow(() -> new QuestionBankException(
+                        "Resume assessment not found for session: " + sessionId + ". Please generate an assessment first."));
 
+        // Build EvidenceItemPair list from structured assessment output — no vector DB needed.
+        List<EvidenceItemPair> allEvidencePairs = buildEvidencePairs(assessment);
+
+        log.info("[QuestionBank] Loaded {} evidence pairs from assessment for session {}.",
+                allEvidencePairs.size(), sessionId);
+
+        // ── Bước 1: Context Extraction from structured evidence items ─────────
+        // strongAreas: all items with status = "matched"
+        List<String> strongAreas = allEvidencePairs.stream()
+                .filter(p -> "matched".equalsIgnoreCase(p.status()))
+                .map(EvidenceItemPair::criteriaName)
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+
+        // gapAreas: items with status = "missing" or "weak"
+        List<String> gapAreas = allEvidencePairs.stream()
+                .filter(p -> "missing".equalsIgnoreCase(p.status()) || "weak".equalsIgnoreCase(p.status()))
+                .map(EvidenceItemPair::criteriaName)
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+
+        // techStackPossessed: cvEvidence of ALL matched/weak items (simple, no tech filtering)
+        // Rationale: all evidence fields are used as LLM context hints; minor non-tech items are harmless.
+        List<String> techStackPossessed = allEvidencePairs.stream()
+                .filter(p -> "matched".equalsIgnoreCase(p.status()) || "weak".equalsIgnoreCase(p.status()))
+                .map(EvidenceItemPair::cvEvidence)
+                .filter(s -> s != null && !s.isBlank())
+                .distinct()
+                .collect(Collectors.toList());
+
+        // techStackRequired: jdRequirement of ALL missing items
+        List<String> techStackRequired = allEvidencePairs.stream()
+                .filter(p -> "missing".equalsIgnoreCase(p.status()))
+                .map(EvidenceItemPair::jdRequirement)
+                .filter(s -> s != null && !s.isBlank())
+                .distinct()
+                .collect(Collectors.toList());
+
+        // targetDomain: keyword heuristic on CV/JD markdown (kept as-is until AssessmentService stores it)
         SessionDocument cvDoc = documentRepo.findBySessionIdAndDocumentType(sessionId, DocumentType.CV)
                 .orElseThrow(() -> new QuestionBankException("CV document not found for session: " + sessionId));
-
         SessionDocument jdDoc = documentRepo.findBySessionIdAndDocumentType(sessionId, DocumentType.JD)
                 .orElseThrow(() -> new QuestionBankException("JD document not found for session: " + sessionId));
 
-        // Load CV & JD chunks to identify semantic matched pairs
-        List<DocumentChunk> cvChunks = documentChunkRepository.findBySessionIdAndDocumentType(sessionId, DocumentType.CV);
-        List<DocumentChunk> jdChunks = documentChunkRepository.findBySessionIdAndDocumentType(sessionId, DocumentType.JD);
-        List<ExperienceRequirementPair> matchedPairs = findMatchedPairs(cvChunks, jdChunks);
-
-        log.info("[QuestionBank] Semantic matching completed. Found {} matched pairs for session {}.", matchedPairs.size(), sessionId);
-
-        // Step 1: Programmatic Context Extraction from Assessment (saves LLM call & costs 0 tokens!)
-        // Use ENUM .name() for strong_areas/gap_areas are still plain String lists from evidenceItems
-        List<String> strongAreas = new ArrayList<>();
-        List<String> gapAreas = new ArrayList<>();
-
-        // Derive strong/gap areas from evidence_items (matched = strong, missing = gap)
-        if (assessment.getEvidenceItems() != null) {
-            for (var item : assessment.getEvidenceItems()) {
-                if ("matched".equalsIgnoreCase(item.status())) {
-                    strongAreas.add(item.criteriaName());
-                } else if ("missing".equalsIgnoreCase(item.status())) {
-                    gapAreas.add(item.criteriaName());
-                }
-            }
-        }
-
-        // Derive tech stacks from evidence items (matched/weak = possessed, missing = required gap)
-        List<String> techStackRequired = new ArrayList<>();
-        List<String> techStackPossessed = new ArrayList<>();
-        if (assessment.getEvidenceItems() != null) {
-            for (var item : assessment.getEvidenceItems()) {
-                if (item.criteriaName() != null
-                        && item.criteriaName().toLowerCase().contains("tech stack")) {
-                    if ("matched".equalsIgnoreCase(item.status())
-                            || "weak".equalsIgnoreCase(item.status())) {
-                        if (item.cvEvidence() != null) techStackPossessed.add(item.cvEvidence());
-                    }
-                    if ("missing".equalsIgnoreCase(item.status())) {
-                        if (item.jdRequirement() != null) techStackRequired.add(item.jdRequirement());
-                    }
-                }
-            }
-        }
-
-        // Simple domain heuristic from CV and JD text to avoid calling LLM
-        String cvJdText = ((cvDoc.getMarkdownContent() != null ? cvDoc.getMarkdownContent() : "") + " " 
-                + (jdDoc.getMarkdownContent() != null ? jdDoc.getMarkdownContent() : "")).toLowerCase();
-        String targetDomain = "other";
-        if (cvJdText.contains("wallet") || cvJdText.contains("transaction") || cvJdText.contains("payment") || cvJdText.contains("bank") || cvJdText.contains("fintech")) {
-            targetDomain = "fintech";
-        } else if (cvJdText.contains("cart") || cvJdText.contains("shop") || cvJdText.contains("checkout") || cvJdText.contains("e-commerce") || cvJdText.contains("order")) {
-            targetDomain = "e-commerce";
-        } else if (cvJdText.contains("health") || cvJdText.contains("hospital") || cvJdText.contains("medical") || cvJdText.contains("patient")) {
-            targetDomain = "healthcare";
-        } else if (cvJdText.contains("saas") || cvJdText.contains("multi-tenant") || cvJdText.contains("billing")) {
-            targetDomain = "saas";
-        } else if (cvJdText.contains("enterprise") || cvJdText.contains("b2b")) {
-            targetDomain = "enterprise";
-        } else if (cvJdText.contains("startup") || cvJdText.contains("funding") || cvJdText.contains("mvp")) {
-            targetDomain = "startup";
-        }
+        String targetDomain = detectTargetDomain(cvDoc.getMarkdownContent(), jdDoc.getMarkdownContent());
 
         CandidateContextDto context = CandidateContextDto.builder()
-                // Use ENUM directly — type-safe, no string variance
                 .candidateLevel(assessment.getSeniorityLevel())
                 .overallMatch(assessment.getOverallMatchScore() != null
                         ? (assessment.getOverallMatchScore() >= 80 ? "high"
                            : assessment.getOverallMatchScore() >= 50 ? "medium" : "low")
                         : "medium")
-                .yearsOfExperience(null) // Not stored in new schema; LLM will infer
+                .yearsOfExperience(null) // Not stored in schema; LLM will infer from context
                 .strongAreas(strongAreas)
                 .gapAreas(gapAreas)
                 .techStackRequired(techStackRequired)
@@ -143,83 +137,68 @@ public class QuestionBankService {
                 .roleType(assessment.getJobCategory())
                 .build();
 
-        // Step 2: Difficulty Distribution Calculation
-        Map<String, Map<String, Integer>> distributions = new LinkedHashMap<>();
-        // Use the SeniorityLevel ENUM overload of DifficultyDistributor
-        if (config.getBehavioural() > 0) {
-            distributions.put("behavioural", difficultyDistributor.distribute(
-                    context.getCandidateLevel(), context.getOverallMatch(), config.getBehavioural()));
-        }
-        if (config.getTechnical() > 0) {
-            distributions.put("technical", difficultyDistributor.distribute(
-                    context.getCandidateLevel(), context.getOverallMatch(), config.getTechnical()));
-        }
-        if (config.getCoding() > 0) {
-            distributions.put("coding", difficultyDistributor.distribute(
-                    context.getCandidateLevel(), context.getOverallMatch(), config.getCoding()));
-        }
-        if (config.getSystemDesign() > 0) {
-            distributions.put("system_design", difficultyDistributor.distribute(
-                    context.getCandidateLevel(), context.getOverallMatch(), config.getSystemDesign()));
-        }
+        // ── Bước 2: Difficulty Distribution Calculation ───────────────────────
+        List<QuestionAssignment> assignments = difficultyDistributor.distribute(
+                config.getTotalQuestions(),
+                context.getCandidateLevel(),
+                assessment.getOverallMatchScore(),
+                allEvidencePairs
+        );
 
-        // Step 3: Question Generation (with Redis Cache-Aside)
+        Map<String, List<QuestionAssignment>> assignmentsByCategory = assignments.stream()
+                .collect(Collectors.groupingBy(QuestionAssignment::category, LinkedHashMap::new, Collectors.toList()));
+
+        // ── Bước 3: Question Generation with Redis Cache-Aside ────────────────
         List<QuestionDto> allQuestions = new ArrayList<>();
         int typeIndex = 0;
-        for (var entry : distributions.entrySet()) {
+        
+        for (var entry : assignmentsByCategory.entrySet()) {
             typeIndex++;
             String type = entry.getKey();
-            Map<String, Integer> originalDist = entry.getValue();
+            List<QuestionAssignment> typeAssignments = entry.getValue();
 
-            // Make a copy of the distribution to adjust as we get cache hits
-            Map<String, Integer> remainingDist = new LinkedHashMap<>(originalDist);
             List<QuestionDto> typeQuestions = new ArrayList<>();
-            List<ExperienceRequirementPair> missedPairs = new ArrayList<>();
-            Map<String, String> cacheKeyMap = new HashMap<>(); // pair_index -> cacheKey
-
-            // Step 3.1: Check Cache for each pair
-            for (int i = 0; i < matchedPairs.size(); i++) {
-                ExperienceRequirementPair pair = matchedPairs.get(i);
-                String cacheKey = cacheKeyGenerator.generateKey(pair.jdChunkText(), pair.cvChunkText());
-                List<QuestionDto> cachedList = cacheService.get(cacheKey);
-
-                if (cachedList != null && !cachedList.isEmpty()) {
-                    // Filter cached questions of this type
-                    List<QuestionDto> matchingCached = cachedList.stream()
-                            .filter(q -> type.equalsIgnoreCase(q.getType()))
-                            .collect(Collectors.toList());
-
-                    if (!matchingCached.isEmpty()) {
-                        // Re-use matching cached questions if they fit the difficulty distribution
-                        for (QuestionDto q : matchingCached) {
-                            String diff = q.getDifficulty() != null ? q.getDifficulty().toLowerCase().strip() : "medium";
-                            int remainingCount = remainingDist.getOrDefault(diff, 0);
-                            if (remainingCount > 0) {
-                                remainingDist.put(diff, remainingCount - 1);
-                                typeQuestions.add(q);
-                                log.info("[QuestionBank] Cache HIT reused: {} question for topic '{}'", diff, q.getTopic());
-                            }
-                        }
-                    } else {
-                        // Cache hit for other types, but miss for this type
-                        missedPairs.add(pair);
-                        cacheKeyMap.put("pair_" + (missedPairs.size() - 1), cacheKey);
+            List<QuestionAssignment> missedAssignments = new ArrayList<>();
+            
+            // Step 3.1: Check Cache for each assignment
+            for (QuestionAssignment qa : typeAssignments) {
+                String cacheKey = null;
+                if (qa.item() != null) {
+                    cacheKey = resolveCacheKey(qa.item(), assessment.getSeniorityLevel());
+                    if (qa.isFollowUp()) {
+                        cacheKey += "|followup:true";
                     }
-                } else {
-                    // Cache miss
-                    missedPairs.add(pair);
-                    cacheKeyMap.put("pair_" + (missedPairs.size() - 1), cacheKey);
+                }
+                
+                boolean hit = false;
+                if (cacheKey != null) {
+                    List<QuestionDto> cachedList = cacheService.get(cacheKey);
+                    if (cachedList != null && !cachedList.isEmpty()) {
+                        Optional<QuestionDto> match = cachedList.stream()
+                                .filter(q -> type.equalsIgnoreCase(q.getType()) && qa.difficulty().equalsIgnoreCase(q.getDifficulty()))
+                                .findFirst();
+                                
+                        if (match.isPresent()) {
+                            typeQuestions.add(match.get());
+                            hit = true;
+                            log.info("[QuestionBank] Cache HIT reused: {} '{}' question for criteria '{}' (followUp={})",
+                                    qa.difficulty(), type, qa.item().criteriaName(), qa.isFollowUp());
+                        }
+                    }
+                }
+                
+                if (!hit) {
+                    missedAssignments.add(qa);
                 }
             }
 
-            int totalRemaining = remainingDist.values().stream().mapToInt(Integer::intValue).sum();
-            log.info("[QuestionBank] Type '{}' distribution: requested={}, remaining to generate={}", 
-                    type, originalDist, remainingDist);
+            int totalRemaining = missedAssignments.size();
+            log.info("[QuestionBank] Type '{}' distribution: requested={}, remaining to generate={}",
+                    type, typeAssignments.size(), totalRemaining);
 
-            // Step 3.2: Generate remaining questions from LLM using missed pairs
+            // Step 3.2: Generate remaining questions from LLM using missed assignments
             if (totalRemaining > 0) {
                 if (typeIndex > 1) {
-                    // Introduce a 5-second delay to prevent rate limits
                     try {
                         log.info("[QuestionBank] Pacing LLM calls: sleeping for 5 seconds...");
                         Thread.sleep(5000);
@@ -229,54 +208,48 @@ public class QuestionBankService {
                     }
                 }
 
-                // Format missed pairs with explicit Pair IDs for the LLM mapping
-                StringBuilder sb = new StringBuilder();
-                for (int i = 0; i < missedPairs.size(); i++) {
-                    ExperienceRequirementPair pair = missedPairs.get(i);
-                    sb.append(String.format(
-                            "### Pair ID: pair_%d\n- **Required Job Description segment**: %s\n- **Matched Candidate Experience segment**: %s\n\n",
-                            i, pair.jdChunkText(), pair.cvChunkText()
-                    ));
-                }
-                String missedPairsText = sb.toString();
-
                 List<QuestionDto> generatedQs = questionGenerationService.generateForType(
-                        type, context, cvDoc.getMarkdownContent(), jdDoc.getMarkdownContent(), missedPairsText, remainingDist);
+                        type, context, missedAssignments);
 
                 typeQuestions.addAll(generatedQs);
 
-                // Group generated questions by the Pair ID returned by the LLM (in the id field)
-                Map<String, List<QuestionDto>> newQuestionsByPair = new HashMap<>();
+                // Group generated questions by the "item_N" id returned by LLM
+                Map<String, List<QuestionDto>> newQuestionsByItemId = new HashMap<>();
                 for (QuestionDto q : generatedQs) {
-                    String pairId = q.getId(); // e.g. "pair_0"
-                    if (pairId != null && pairId.startsWith("pair_")) {
-                        newQuestionsByPair.computeIfAbsent(pairId, k -> new ArrayList<>()).add(q);
+                    String itemId = q.getId(); // e.g. "item_0"
+                    if (itemId != null && itemId.startsWith("item_")) {
+                        newQuestionsByItemId.computeIfAbsent(itemId, k -> new ArrayList<>()).add(q);
                     } else {
-                        // Fallback: associate with the first missed pair
-                        newQuestionsByPair.computeIfAbsent("pair_0", k -> new ArrayList<>()).add(q);
+                        // Fallback: associate with the first missed assignment
+                        newQuestionsByItemId.computeIfAbsent("item_0", k -> new ArrayList<>()).add(q);
                     }
                 }
 
-                // Step 3.3: Write new questions to Redis (merge with existing types)
-                newQuestionsByPair.forEach((pairId, newQs) -> {
-                    String cacheKey = cacheKeyMap.get(pairId);
-                    if (cacheKey != null) {
-                        List<QuestionDto> existing = cacheService.get(cacheKey);
-                        List<QuestionDto> merged = new ArrayList<>();
-                        if (existing != null) {
-                            merged.addAll(existing);
-                        }
-                        for (QuestionDto nq : newQs) {
-                            nq.setType(type); // Force type to match current generation context
-                            boolean duplicate = merged.stream().anyMatch(eq ->
-                                    Objects.equals(eq.getType(), nq.getType()) &&
-                                    Objects.equals(eq.getQuestion(), nq.getQuestion())
-                            );
-                            if (!duplicate) {
-                                merged.add(nq);
+                // Step 3.3: Write new questions to Redis (merge with existing cache for this key)
+                newQuestionsByItemId.forEach((itemId, newQs) -> {
+                    int assignmentIdx = parseItemIndex(itemId);
+                    if (assignmentIdx >= 0 && assignmentIdx < missedAssignments.size()) {
+                        QuestionAssignment qa = missedAssignments.get(assignmentIdx);
+                        if (qa.item() != null) {
+                            String cacheKey = resolveCacheKey(qa.item(), assessment.getSeniorityLevel());
+                            if (qa.isFollowUp()) {
+                                cacheKey += "|followup:true";
                             }
+                            
+                            List<QuestionDto> existing = cacheService.get(cacheKey);
+                            List<QuestionDto> merged = new ArrayList<>();
+                            if (existing != null) merged.addAll(existing);
+                            
+                            for (QuestionDto nq : newQs) {
+                                nq.setType(type);
+                                boolean duplicate = merged.stream().anyMatch(eq ->
+                                        Objects.equals(eq.getType(), nq.getType()) &&
+                                        Objects.equals(eq.getQuestion(), nq.getQuestion())
+                                );
+                                if (!duplicate) merged.add(nq);
+                            }
+                            cacheService.put(cacheKey, merged, Duration.ofDays(7));
                         }
-                        cacheService.put(cacheKey, merged, Duration.ofDays(7));
                     }
                 });
             }
@@ -284,35 +257,30 @@ public class QuestionBankService {
             allQuestions.addAll(typeQuestions);
         }
 
-        // Step 4: Assembly & Sequencing
+        // ── Bước 4: Assembly & Sequencing ────────────────────────────────────
         for (int i = 0; i < allQuestions.size(); i++) {
             allQuestions.get(i).setId(String.format("Q%03d", i + 1));
         }
 
-        // Step 5: Build metadata
-        int totalEasy = 0;
-        int totalMedium = 0;
-        int totalHard = 0;
+        // ── Bước 5: Build metadata ────────────────────────────────────────────
+        int totalEasy = 0, totalMedium = 0, totalHard = 0;
         for (QuestionDto q : allQuestions) {
-            if ("easy".equalsIgnoreCase(q.getDifficulty())) totalEasy++;
+            if ("easy".equalsIgnoreCase(q.getDifficulty()))        totalEasy++;
             else if ("medium".equalsIgnoreCase(q.getDifficulty())) totalMedium++;
-            else if ("hard".equalsIgnoreCase(q.getDifficulty())) totalHard++;
+            else if ("hard".equalsIgnoreCase(q.getDifficulty()))   totalHard++;
         }
         int total = allQuestions.size();
         Map<String, String> diffDistMap = new LinkedHashMap<>();
         if (total > 0) {
-            diffDistMap.put("easy", Math.round((totalEasy * 100.0) / total) + "%");
+            diffDistMap.put("easy",   Math.round((totalEasy   * 100.0) / total) + "%");
             diffDistMap.put("medium", Math.round((totalMedium * 100.0) / total) + "%");
-            diffDistMap.put("hard", Math.round((totalHard * 100.0) / total) + "%");
+            diffDistMap.put("hard",   Math.round((totalHard   * 100.0) / total) + "%");
         } else {
-            diffDistMap.put("easy", "0%");
-            diffDistMap.put("medium", "0%");
-            diffDistMap.put("hard", "0%");
+            diffDistMap.put("easy", "0%"); diffDistMap.put("medium", "0%"); diffDistMap.put("hard", "0%");
         }
 
         String generationRationale = String.format(
                 "%s-level %s candidate with %s CV-JD match. Strong areas: %s. Gap areas: %s.",
-                // Use ENUM .name() for clean uppercase strings in rationale
                 context.getCandidateLevel() != null ? context.getCandidateLevel().name() : "MID",
                 context.getRoleType() != null ? context.getRoleType().name() : "BACKEND",
                 context.getOverallMatch() != null ? context.getOverallMatch() : "medium",
@@ -321,13 +289,10 @@ public class QuestionBankService {
         );
 
         QuestionBankMetadataDto metadata = QuestionBankMetadataDto.builder()
-                // Convert ENUM → String via .name() for the outgoing API DTO
-                .candidateLevel(context.getCandidateLevel() != null
-                        ? context.getCandidateLevel().name() : "MID")
+                .candidateLevel(context.getCandidateLevel() != null ? context.getCandidateLevel().name() : "MID")
                 .overallMatch(context.getOverallMatch())
                 .yearsOfExperience(context.getYearsOfExperience())
-                .roleType(context.getRoleType() != null
-                        ? context.getRoleType().name() : "OTHER")
+                .roleType(context.getRoleType() != null ? context.getRoleType().name() : "OTHER")
                 .targetDomain(context.getTargetDomain())
                 .strongAreas(context.getStrongAreas())
                 .gapAreas(context.getGapAreas())
@@ -336,7 +301,7 @@ public class QuestionBankService {
                 .generationRationale(generationRationale)
                 .build();
 
-        // Step 6: Persist
+        // ── Bước 6: Persist ───────────────────────────────────────────────────
         QuestionBank entity = QuestionBank.builder()
                 .sessionId(sessionId)
                 .metadata(metadata)
@@ -379,7 +344,7 @@ public class QuestionBankService {
      * Regenerates a single question in the bank.
      *
      * @param questionBankId ID of the question bank
-     * @param questionId sequential ID of the question (e.g. Q003)
+     * @param questionId     sequential ID of the question (e.g. Q003)
      * @return updated question bank DTO
      */
     @Transactional
@@ -401,35 +366,150 @@ public class QuestionBankService {
             throw new QuestionBankException("Question with ID " + questionId + " not found in bank " + questionBankId);
         }
 
+        // Load assessment to get evidence items for context
         final String sessionId = bank.getSessionId();
-        // Load CV/JD Markdown
-        SessionDocument cvDoc = documentRepo.findBySessionIdAndDocumentType(sessionId, DocumentType.CV)
-                .orElseThrow(() -> new QuestionBankException("CV document not found for session " + sessionId));
-        SessionDocument jdDoc = documentRepo.findBySessionIdAndDocumentType(sessionId, DocumentType.JD)
-                .orElseThrow(() -> new QuestionBankException("JD document not found for session " + sessionId));
+        ResumeAssessment assessment = assessmentRepo.findBySessionId(sessionId)
+                .orElseThrow(() -> new QuestionBankException(
+                        "Assessment not found for session " + sessionId + ". Cannot regenerate."));
+
+        List<EvidenceItemPair> allEvidencePairs = buildEvidencePairs(assessment);
 
         QuestionDto regenerated = questionGenerationService.regenerateSingle(
                 target.getType(),
                 target.getDifficulty(),
                 bank.getCandidateContext(),
-                cvDoc.getMarkdownContent(),
-                jdDoc.getMarkdownContent(),
+                allEvidencePairs,
                 questions
         );
 
-        // Keep same ID
+        // Keep same sequential ID
         regenerated.setId(questionId);
 
-        // Replace it in list
+        // Replace in list
         int index = questions.indexOf(target);
         questions.set(index, regenerated);
 
-        // Update database
         bank.setQuestionBankJson(questions);
         bank = questionBankRepo.save(bank);
 
         log.info("[QuestionBank] Question {} successfully regenerated in bank {}", questionId, questionBankId);
         return toResponseDto(bank);
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Private helpers
+    // ──────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Builds a flat list of {@link EvidenceItemPair} from a {@link ResumeAssessment}.
+     *
+     * <p>Standard {@code evidence_items} are sorted by {@code weight_used} descending so
+     * that the most important criteria come first. If the total exceeds
+     * {@link #MAX_EVIDENCE_ITEMS}, the lowest-weight items are dropped.
+     * Ad-hoc {@code additional_evidence_items} are appended after standard items
+     * (they have no weight to sort by) until the cap is reached.
+     */
+    private List<EvidenceItemPair> buildEvidencePairs(ResumeAssessment assessment) {
+        List<EvidenceItemPair> pairs = new ArrayList<>();
+
+        // 1. Standard evidence items — sorted by weight descending, capped at MAX
+        if (assessment.getEvidenceItems() != null) {
+            assessment.getEvidenceItems().stream()
+                    .filter(item -> !"not_applicable".equalsIgnoreCase(item.status()))
+                    .sorted(Comparator.comparingDouble(
+                            (AssessmentResponseDto.EvidenceItem item) ->
+                                    item.weightUsed() != null ? item.weightUsed() : 0.0
+                    ).reversed())
+                    .limit(MAX_EVIDENCE_ITEMS)
+                    .forEach(item -> pairs.add(new EvidenceItemPair(
+                            item.criteriaId(),
+                            item.criteriaName(),
+                            item.jdRequirement(),
+                            item.cvEvidence(),
+                            item.status(),
+                            item.reasoning(),
+                            item.weightUsed()
+                    )));
+        }
+
+        // 2. Ad-hoc evidence items — appended after standard items, up to cap
+        if (assessment.getAdditionalEvidenceItems() != null && pairs.size() < MAX_EVIDENCE_ITEMS) {
+            int remaining = MAX_EVIDENCE_ITEMS - pairs.size();
+            assessment.getAdditionalEvidenceItems().stream()
+                    .filter(item -> !"not_applicable".equalsIgnoreCase(item.status()))
+                    .limit(remaining)
+                    .forEach(item -> pairs.add(new EvidenceItemPair(
+                            null,           // no criteria_id for ad-hoc items
+                            item.criteriaName(),
+                            item.jdRequirement(),
+                            item.cvEvidence(),
+                            item.status(),
+                            item.reasoning(),
+                            null            // no weight for ad-hoc items
+                    )));
+        }
+
+        return pairs;
+    }
+
+    /**
+     * Resolves the Redis cache key for an evidence pair using the v2 key strategy:
+     * <ul>
+     *   <li>Standard items (have {@code criteriaId}): key = hash(criteriaId + status + level)</li>
+     *   <li>Ad-hoc items ({@code criteriaId = null}): key = hash(normalizedName + status + level)</li>
+     * </ul>
+     */
+    private String resolveCacheKey(EvidenceItemPair pair, fit.iuh.modules.assessment.SeniorityLevel level) {
+        if (pair.criteriaId() != null) {
+            return cacheKeyGenerator.generateKey(pair.criteriaId(), pair.status(), level);
+        } else {
+            return cacheKeyGenerator.generateKeyForAdHoc(pair.criteriaName(), pair.status(), level);
+        }
+    }
+
+    /**
+     * Parses the numeric index from an LLM-generated item ID string (e.g., "item_3" → 3).
+     * Returns 0 as fallback if parsing fails.
+     */
+    private int parseItemIndex(String itemId) {
+        if (itemId == null || !itemId.startsWith("item_")) return 0;
+        try {
+            return Integer.parseInt(itemId.substring("item_".length()));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    /**
+     * Detects target business domain from CV and JD markdown using keyword heuristics.
+     * This logic is kept here until {@code AssessmentService} stores the domain as a
+     * typed field in {@link ResumeAssessment}.
+     */
+    private String detectTargetDomain(String cvMarkdown, String jdMarkdown) {
+        String combined = ((cvMarkdown != null ? cvMarkdown : "") + " "
+                + (jdMarkdown != null ? jdMarkdown : "")).toLowerCase();
+
+        if (combined.contains("wallet") || combined.contains("transaction")
+                || combined.contains("payment") || combined.contains("bank")
+                || combined.contains("fintech")) {
+            return "fintech";
+        } else if (combined.contains("cart") || combined.contains("shop")
+                || combined.contains("checkout") || combined.contains("e-commerce")
+                || combined.contains("order")) {
+            return "e-commerce";
+        } else if (combined.contains("health") || combined.contains("hospital")
+                || combined.contains("medical") || combined.contains("patient")) {
+            return "healthcare";
+        } else if (combined.contains("saas") || combined.contains("multi-tenant")
+                || combined.contains("billing")) {
+            return "saas";
+        } else if (combined.contains("enterprise") || combined.contains("b2b")) {
+            return "enterprise";
+        } else if (combined.contains("startup") || combined.contains("funding")
+                || combined.contains("mvp")) {
+            return "startup";
+        }
+        return "other";
     }
 
     private QuestionBankResponseDto toResponseDto(QuestionBank entity) {
@@ -440,57 +520,5 @@ public class QuestionBankService {
                 .questionBank(entity.getQuestionBankJson())
                 .createdAt(entity.getCreatedAt())
                 .build();
-    }
-
-    private List<ExperienceRequirementPair> findMatchedPairs(List<DocumentChunk> cvChunks, List<DocumentChunk> jdChunks) {
-        final double SIMILARITY_THRESHOLD = 0.65;
-        final int GLOBAL_LIMIT = 7;
-
-        record ChunkMatch(DocumentChunk jdChunk, DocumentChunk cvChunk, double score) {}
-
-        List<ChunkMatch> allMatches = new ArrayList<>();
-
-        for (DocumentChunk jdChunk : jdChunks) {
-            if (jdChunk.getEmbedding() == null) continue;
-            for (DocumentChunk cvChunk : cvChunks) {
-                if (cvChunk.getEmbedding() == null) continue;
-                double score = calculateCosineSimilarity(jdChunk.getEmbedding(), cvChunk.getEmbedding());
-                if (score >= SIMILARITY_THRESHOLD) {
-                    allMatches.add(new ChunkMatch(jdChunk, cvChunk, score));
-                }
-            }
-        }
-
-        // Sort globally by similarity score descending
-        allMatches.sort((a, b) -> Double.compare(b.score(), a.score()));
-
-        List<ExperienceRequirementPair> matchedPairs = new ArrayList<>();
-        int pairCount = 0;
-        for (ChunkMatch match : allMatches) {
-            pairCount++;
-            matchedPairs.add(new ExperienceRequirementPair(
-                    match.jdChunk().getChunkText(),
-                    match.cvChunk().getChunkText(),
-                    match.jdChunk().getEmbedding(),
-                    match.cvChunk().getEmbedding(),
-                    match.score()
-            ));
-            if (pairCount >= GLOBAL_LIMIT) {
-                break;
-            }
-        }
-        return matchedPairs;
-    }
-
-    private double calculateCosineSimilarity(float[] vectorA, float[] vectorB) {
-        if (vectorA.length != vectorB.length) return 0.0;
-        double dotProduct = 0.0, normA = 0.0, normB = 0.0;
-        for (int i = 0; i < vectorA.length; i++) {
-            dotProduct += (double) vectorA[i] * vectorB[i];
-            normA += Math.pow(vectorA[i], 2);
-            normB += Math.pow(vectorB[i], 2);
-        }
-        if (normA == 0.0 || normB == 0.0) return 0.0;
-        return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
     }
 }
