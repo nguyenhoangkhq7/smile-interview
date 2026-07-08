@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import styles from './navbar.module.css';
+import { useAuthStore } from '@/store/authStore';
 
 const navLinks = [
   { 
@@ -30,13 +31,17 @@ const navLinks = [
 
 export default function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [mockUser, setMockUser] = useState<any>({
-    name: 'Đông Cao',
-    email: 'caothanhdong.41118@gmail.com',
-    avatar: '',
-    coins: 2
-  });
+
+  // ── Auth state from Zustand store ──────────────────────────────
+  const { user, isAuthenticated, logout } = useAuthStore();
+
+  const handleLogout = () => {
+    logout();
+    setDropdownOpen(false);
+    router.push('/');
+  };
 
   return (
     <header className={styles.header}>
@@ -67,7 +72,7 @@ export default function Navbar() {
         </nav>
 
         {/* Auth / Profile section */}
-        {mockUser ? (
+        {isAuthenticated && user ? (
           <div className={styles.profileSection}>
             {/* Dropdown Menu Wrapper */}
             <div className="relative">
@@ -81,7 +86,7 @@ export default function Navbar() {
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                   <circle cx="12" cy="7" r="4" />
                 </svg>
-                <span>{mockUser.name}</span>
+                <span>{user.username}</span>
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={styles.dropdownIconChevron}>
                   <polyline points="6 9 12 15 18 9" />
                 </svg>
@@ -92,16 +97,13 @@ export default function Navbar() {
                 <div className={styles.dropdownMenu}>
                   {/* User info details */}
                   <div className={styles.dropdownHeader}>
-                    <p className={styles.dropdownName}>{mockUser.name}</p>
-                    <p className={styles.dropdownEmail}>{mockUser.email}</p>
+                    <p className={styles.dropdownName}>{user.username}</p>
+                    <p className={styles.dropdownEmail}>{user.email}</p>
                   </div>
 
                   {/* Menu Options */}
                   <div>
-                    <Link
-                      href="/profile"
-                      className={styles.dropdownItem}
-                    >
+                    <Link href="/profile" className={styles.dropdownItem}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={styles.dropdownItemBlue}>
                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                         <circle cx="12" cy="7" r="4" />
@@ -109,10 +111,7 @@ export default function Navbar() {
                       Hồ sơ cá nhân
                     </Link>
 
-                    <Link
-                      href="/history"
-                      className={styles.dropdownItem}
-                    >
+                    <Link href="/history" className={styles.dropdownItem}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={styles.dropdownItemGreen}>
                         <circle cx="12" cy="12" r="10" />
                         <polyline points="12 6 12 12 16 14" />
@@ -126,7 +125,7 @@ export default function Navbar() {
                   <div>
                     <button
                       type="button"
-                      onClick={() => setMockUser(null)}
+                      onClick={handleLogout}
                       className={styles.logoutButton}
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
