@@ -67,6 +67,7 @@ public class IngestionService {
         // ── Validate inputs ──────────────────────────────────────────────────
         validateInputs(sessionId, cvFile, jdFile, jdText);
 
+        long totalStartTime = System.currentTimeMillis();
         log.info("=== [INGESTION START] sessionId={} ===", sessionId);
 
         // ── Re-ingestion: clean up existing chunks and documents for this session ──────────
@@ -83,6 +84,7 @@ public class IngestionService {
         // STEP 1 — Extract raw text from PDFs
         // ────────────────────────────────────────────────────────────────────
         log.info("[Step 1/4] Extracting raw text from uploaded files...");
+        long step1Start = System.currentTimeMillis();
         String rawCvText = pdfService.extractText(cvFile);
 
         String rawJdText;
@@ -92,14 +94,16 @@ public class IngestionService {
             // Fall back to plain text JD input
             rawJdText = jdText;
         }
+        long step1Time = System.currentTimeMillis() - step1Start;
 
-        log.info("[Step 1/4] Done. CV: {} chars | JD: {} chars",
-                rawCvText.length(), rawJdText.length());
+        log.info("[Step 1/4] Done in {}ms. CV: {} chars | JD: {} chars",
+                step1Time, rawCvText.length(), rawJdText.length());
 
         // ────────────────────────────────────────────────────────────────────
         // STEP 2 — Standardize to Markdown via Groq LLM
         // ────────────────────────────────────────────────────────────────────
         log.info("[Step 2/4] Standardizing documents via Groq LLM (Running parallel on Virtual Threads)...");
+        long step2Start = System.currentTimeMillis();
         String markdownCv;
         String markdownJd;
 
@@ -113,8 +117,9 @@ public class IngestionService {
             markdownCv = futureCv.join();
             markdownJd = futureJd.join();
         }
-        log.info("[Step 2/4] Done. CV Markdown: {} chars | JD Markdown: {} chars",
-                markdownCv.length(), markdownJd.length());
+        long step2Time = System.currentTimeMillis() - step2Start;
+        log.info("[Step 2/4] Done in {}ms. CV Markdown: {} chars | JD Markdown: {} chars",
+                step2Time, markdownCv.length(), markdownJd.length());
 
         // ── Save full Markdown documents ──────────────────────────────────────
         log.info("Saving full standardized Markdown documents to database...");
@@ -133,25 +138,30 @@ public class IngestionService {
         // STEP 3 — Split Markdown into token-bounded chunks
         // ────────────────────────────────────────────────────────────────────
         log.info("[Step 3/4] Chunking Markdown into token-bounded segments...");
+        long step3Start = System.currentTimeMillis();
         List<String> cvChunks = chunkingService.chunkText(markdownCv);
         List<String> jdChunks = chunkingService.chunkText(markdownJd);
-        log.info("[Step 3/4] Done. CV chunks: {} | JD chunks: {}", cvChunks.size(), jdChunks.size());
+        long step3Time = System.currentTimeMillis() - step3Start;
+        log.info("[Step 3/4] Done in {}ms. CV chunks: {} | JD chunks: {}", step3Time, cvChunks.size(), jdChunks.size());
 
         // ────────────────────────────────────────────────────────────────────
         // STEP 4 — Generate embeddings and save to PostgreSQL
         // ────────────────────────────────────────────────────────────────────
         log.info("[Step 4/4] Generating embeddings and saving to database...");
+        long step4Start = System.currentTimeMillis();
         List<DocumentChunk> savedCvChunks = embeddingService.embedAndSave(
                 cvChunks, sessionId, DocumentType.CV);
         List<DocumentChunk> savedJdChunks = embeddingService.embedAndSave(
                 jdChunks, sessionId, DocumentType.JD);
 
         int totalSaved = savedCvChunks.size() + savedJdChunks.size();
-        log.info("[Step 4/4] Done. Total saved: {} chunks (CV={}, JD={})",
-                totalSaved, savedCvChunks.size(), savedJdChunks.size());
+        long step4Time = System.currentTimeMillis() - step4Start;
+        log.info("[Step 4/4] Done in {}ms. Total saved: {} chunks (CV={}, JD={})",
+                step4Time, totalSaved, savedCvChunks.size(), savedJdChunks.size());
 
-        log.info("=== [INGESTION COMPLETE] sessionId={} | total={} chunks ===",
-                sessionId, totalSaved);
+        long totalTime = System.currentTimeMillis() - totalStartTime;
+        log.info("=== [INGESTION COMPLETE] sessionId={} | total={} chunks | time={}ms ===",
+                sessionId, totalSaved, totalTime);
 
         // ── Build and return response ─────────────────────────────────────
         return IngestionResponse.builder()

@@ -107,13 +107,17 @@ public class ResumeAssessment {
     @Column(name = "evidence_items", columnDefinition = "jsonb")
     private List<AssessmentResponseDto.EvidenceItem> evidenceItems;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "additional_evidence_items", columnDefinition = "jsonb")
+    private List<AssessmentResponseDto.AdHocEvidenceItem> additionalEvidenceItems;
+
     /**
      * Ordered list of actionable improvement suggestions returned by the LLM.
      * Stored as a JSONB array for native array semantics and future query support.
      */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "top_priority_improvements", columnDefinition = "jsonb")
-    private List<String> topPriorityImprovements;
+    private List<ImprovementResponseDto.ImprovementItem> topPriorityImprovements;
 
     // -------------------------------------------------------------------------
     // Audit field

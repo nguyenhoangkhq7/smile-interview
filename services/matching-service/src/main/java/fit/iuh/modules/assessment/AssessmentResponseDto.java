@@ -23,8 +23,7 @@ import java.util.List;
  *       "cv_evidence": "Sử dụng Java 21 và Spring Boot 3.3 trong dự án SmileInterview",
  *       "status": "matched"
  *     }
- *   ],
- *   "top_priority_improvements": ["Cần thêm kinh nghiệm với Kubernetes"]
+ *   ]
  * }
  * }</pre>
  */
@@ -33,8 +32,8 @@ public record AssessmentResponseDto(
         @JsonProperty("evidence_items")
         List<EvidenceItem> evidenceItems,
 
-        @JsonProperty("top_priority_improvements")
-        List<String> topPriorityImprovements
+        @JsonProperty("additional_evidence_items")
+        List<AdHocEvidenceItem> additionalEvidenceItems
 
 ) {
 
@@ -74,7 +73,36 @@ public record AssessmentResponseDto(
              * </ul>
              */
             @JsonProperty("status")
-            String status
+            String status,
 
+            /** MỚI — LLM giải thích lý do kết luận status này. */
+            @JsonProperty("reasoning")
+            String reasoning,
+
+            /** MỚI — weight từ DB, đính kèm để UI hiển thị. (Populated by Java) */
+            @JsonProperty("weight_used")
+            Double weightUsed,
+
+            /** MỚI — weight * points, đóng góp vào điểm tổng. (Populated by Java) */
+            @JsonProperty("score_contribution")
+            Double scoreContribution
+
+    ) {}
+
+    public record AdHocEvidenceItem(
+            @JsonProperty("criteria_name")
+            String criteriaName,
+
+            @JsonProperty("jd_requirement")
+            String jdRequirement,
+
+            @JsonProperty("cv_evidence")
+            String cvEvidence,
+
+            @JsonProperty("status")
+            String status,
+
+            @JsonProperty("reasoning")
+            String reasoning
     ) {}
 }
