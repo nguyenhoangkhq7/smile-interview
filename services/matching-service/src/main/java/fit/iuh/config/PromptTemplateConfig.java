@@ -158,7 +158,7 @@ public final class PromptTemplateConfig {
                 Task: For each evaluation criterion listed below, search the CV for evidence that matches the JD requirement.
                 
                 RULES:
-                1. SMART INFERENCE (CRITICAL): You ARE ALLOWED to make logical technical inferences. For example, if a candidate built a project using 'Spring Boot' or 'Java 21', they implicitly possess 'OOP' skills. If they used 'PostgreSQL' or 'MySQL', they implicitly possess 'Database Modeling' and 'Database Fundamentals'. Do not penalize candidates with 'weak' or 'missing' if foundational concepts are clearly implied by the advanced frameworks they successfully used.
+                1. ZERO HALLUCINATION (CRITICAL): EXTRACT EXACT QUOTES ONLY. IF IT IS NOT EXPLICITLY WRITTEN IN THE CV, YOU MUST RETURN STATUS 'MISSING'. Do not invent, interpolate, or assume tech stacks like caching or streaming unless explicitly present.
                 2. SEMANTIC MATCHING: Contextual equivalents are valid matches, provided the underlying proof exists literally in the text.
                 3. STRICT JSON ONLY: Output ONLY a valid JSON object. No markdown wrappers, no explanations.
                 4. LANGUAGE: Keep "jd_requirement" and "cv_evidence" in Vietnamese for human readability. ALWAYS retain technical terms (Java, Spring Boot, Kubernetes, PostgreSQL, CI/CD) in English.
@@ -195,10 +195,10 @@ public final class PromptTemplateConfig {
                 }
                 
                 STATUS DEFINITIONS:
-                - "matched": CV provides explicit evidence OR strong implicit technical proof through the frameworks/architecture used in their projects (e.g., using Spring Boot implies OOP mastery, using PostgreSQL implies DB Modeling).
-                - "weak": Skill is only listed as an isolated keyword in a Skills section without any project context, AND cannot be logically inferred from their built projects.
-                - "missing": Requirement is completely absent from the CV and cannot be logically inferred.
-                - "not_applicable": The JD does NOT explicitly ask for this specific requirement. For example, if the JD asks for 'Docker' but omits 'CI/CD pipelines', then CI/CD should be 'not_applicable'. Do not force a 'missing' or 'weak' status for baseline criteria that the employer didn't actually write in the JD.
+                - "matched": CV has strong, direct, explicit evidence demonstrating real-world depth (e.g., "Deployed on AWS with secure .env variable isolation per service" or "Agile process with clear Jira ticket conventions").
+                - "weak": Skill is listed in a Skills section without project context, or lacks practical depth (e.g., just mentioning "Jira" without showing process standardization, or just "AWS" without secure configurations).
+                - "missing": Requirement is completely absent from the CV. Look carefully across ALL sections, EXPLICITLY INCLUDING the "# Summary" prose paragraph and "Infrastructure & Tools" section. If a keyword is buried in the Summary, it is NOT missing.
+                - "not_applicable": The JD completely omits this requirement, AND it is not a strict industry necessity for the specific JD context. Use this instead of "missing" to avoid penalizing the candidate unfairly.
                 """.formatted(criteriaInstructions);
     }
 
