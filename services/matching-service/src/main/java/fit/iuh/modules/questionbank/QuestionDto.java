@@ -59,7 +59,7 @@ public class QuestionDto {
     private String starPrompt;
 
     /** Hints or scaffolding for the candidate (coding questions only). */
-    private String hints;
+    private List<String> hints;
 
     /** System components the candidate should discuss (system_design questions only). */
     @JsonProperty("components_to_cover")

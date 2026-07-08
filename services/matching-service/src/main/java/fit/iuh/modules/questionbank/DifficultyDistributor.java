@@ -11,122 +11,190 @@ import java.util.*;
 @Component
 public class DifficultyDistributor {
 
-    private static final Map<String, int[]> DISTRIBUTION_TABLE = Map.of(
-        "junior_low",     new int[]{60, 35, 5},
-        "junior_medium",  new int[]{50, 40, 10},
-        "junior_high",    new int[]{40, 45, 15},
-        "mid_low",        new int[]{35, 45, 20},
-        "mid_medium",     new int[]{25, 50, 25},
-        "mid_high",       new int[]{15, 45, 40},
-        "senior_low",     new int[]{20, 45, 35},
-        "senior_medium",  new int[]{10, 40, 50},
-        "senior_high",    new int[]{5, 30, 65},
-        "lead_high",      new int[]{5, 30, 65}
-    );
-
     /**
-     * Calculates the difficulty distribution for a given total number of questions.
+     * Calculates the difficulty and category distribution for a given total number of questions,
+     * assigning specific evidence items to each generated question.
      *
-     * @param seniorityLevel {@link SeniorityLevel} ENUM (type-safe, replaces free-string overload)
-     * @param overallMatch   low | medium | high
-     * @param totalCount     total number of questions required for a type
-     * @return map of easy/medium/hard to their respective counts
+     * @param totalQuestions     total number of questions to generate
+     * @param level              candidate seniority level
+     * @param overallMatchScore  overall match score (0-100)
+     * @param items              list of evidence items
+     * @return list of question assignments
      */
-    public Map<String, Integer> distribute(SeniorityLevel seniorityLevel, String overallMatch, int totalCount) {
-        // Delegate to string-based internal method, using ENUM.name() for normalisation
-        String levelKey = seniorityLevel != null ? seniorityLevel.name().toLowerCase() : "mid";
-        return distributeInternal(levelKey, overallMatch, totalCount);
+    public List<QuestionAssignment> distribute(int totalQuestions, SeniorityLevel level, Integer overallMatchScore, List<EvidenceItemPair> items) {
+        if (totalQuestions <= 0) {
+            return Collections.emptyList();
+        }
+
+        // 1. Calculate category distribution
+        Map<String, Integer> categoryCounts = calculateCategoryDistribution(totalQuestions, level, overallMatchScore);
+
+        // 2. Select items and assign difficulty
+        return assignQuestions(categoryCounts, items);
     }
 
-    /**
-     * String-based overload kept for backward compatibility with any existing callers.
-     * Prefer the {@link #distribute(SeniorityLevel, String, int)} overload for new code.
-     *
-     * @param candidateLevel free-string level (e.g., "junior", "mid") — normalised to lowercase
-     * @param overallMatch   low | medium | high
-     * @param totalCount     total number of questions required for a type
-     */
-    public Map<String, Integer> distribute(String candidateLevel, String overallMatch, int totalCount) {
-        return distributeInternal(candidateLevel, overallMatch, totalCount);
+    private Map<String, Integer> calculateCategoryDistribution(int totalQuestions, SeniorityLevel level, Integer overallMatchScore) {
+        double f = (overallMatchScore != null ? overallMatchScore : 50) - 50.0;
+        f = f / 50.0;
+        f = Math.max(-1.0, Math.min(1.0, f));
+
+        double baseBeh, baseTech, baseCod, baseSys;
+        double shiftBeh = -10.0 * f;
+        double shiftCod, shiftSys;
+
+        if (level == null) level = SeniorityLevel.MID;
+
+        switch (level) {
+            case INTERN:
+            case FRESHER:
+                baseBeh = 40; baseTech = 50; baseCod = 10; baseSys = 0;
+                shiftCod = 10.0 * f; shiftSys = 0;
+                break;
+            case JUNIOR:
+                baseBeh = 30; baseTech = 50; baseCod = 20; baseSys = 0;
+                shiftCod = 10.0 * f; shiftSys = 0;
+                break;
+            case MID:
+                baseBeh = 20; baseTech = 40; baseCod = 20; baseSys = 20;
+                shiftCod = 5.0 * f; shiftSys = 5.0 * f;
+                break;
+            case SENIOR:
+                baseBeh = 20; baseTech = 30; baseCod = 10; baseSys = 40;
+                shiftCod = 5.0 * f; shiftSys = 5.0 * f;
+                break;
+            case LEAD:
+                baseBeh = 20; baseTech = 20; baseCod = 10; baseSys = 50;
+                shiftCod = 5.0 * f; shiftSys = 5.0 * f;
+                break;
+            default:
+                baseBeh = 20; baseTech = 40; baseCod = 20; baseSys = 20;
+                shiftCod = 5.0 * f; shiftSys = 5.0 * f;
+                break;
+        }
+
+        double behPct = baseBeh + shiftBeh;
+        double techPct = baseTech;
+        double codPct = baseCod + shiftCod;
+        double sysPct = baseSys + shiftSys;
+
+        return applyLargestRemainderMethod(totalQuestions, behPct, techPct, codPct, sysPct);
     }
 
-    private Map<String, Integer> distributeInternal(String candidateLevel, String overallMatch, int totalCount) {
-        if (totalCount <= 0) {
-            return Map.of("easy", 0, "medium", 0, "hard", 0);
-        }
-        if (totalCount == 1) {
-            return Map.of("easy", 0, "medium", 1, "hard", 0);
-        }
+    private Map<String, Integer> applyLargestRemainderMethod(int totalCount, double... pcts) {
+        String[] types = {"behavioural", "technical", "coding", "system_design"};
+        int[] counts = new int[4];
+        double[] fractions = new double[4];
+        int sum = 0;
 
-        String level = candidateLevel != null ? candidateLevel.toLowerCase().strip() : "mid";
-        String match = overallMatch != null ? overallMatch.toLowerCase().strip() : "medium";
-        
-        // Lead falls back to senior-level ranges except for high match
-        if ("lead".equals(level)) {
-            if ("low".equals(match) || "medium".equals(match)) {
-                level = "senior";
-            }
+        for (int i = 0; i < 4; i++) {
+            double raw = totalCount * (pcts[i] / 100.0);
+            counts[i] = (int) Math.floor(raw);
+            fractions[i] = raw - counts[i];
+            sum += counts[i];
         }
 
-        String key = level + "_" + match;
-        int[] pcts = DISTRIBUTION_TABLE.getOrDefault(key, DISTRIBUTION_TABLE.get("mid_medium"));
-
-        // Special handling for count = 2
-        if (totalCount == 2) {
-            if ("junior".equals(level) && "low".equals(match)) {
-                return Map.of("easy", 1, "medium", 1, "hard", 0);
-            }
-            if (("senior".equals(level) || "lead".equals(level)) && "high".equals(match)) {
-                return Map.of("easy", 0, "medium", 1, "hard", 1);
-            }
-            return Map.of("easy", 0, "medium", 2, "hard", 0);
-        }
-
-        // Largest Remainder Method
-        double easyRaw = totalCount * (pcts[0] / 100.0);
-        double mediumRaw = totalCount * (pcts[1] / 100.0);
-        double hardRaw = totalCount * (pcts[2] / 100.0);
-
-        int easy = (int) Math.floor(easyRaw);
-        int medium = (int) Math.floor(mediumRaw);
-        int hard = (int) Math.floor(hardRaw);
-
-        int sum = easy + medium + hard;
         int remainder = totalCount - sum;
-
         if (remainder > 0) {
-            double easyFraction = easyRaw - easy;
-            double mediumFraction = mediumRaw - medium;
-            double hardFraction = hardRaw - hard;
-
-            List<FractionBucket> buckets = new ArrayList<>(List.of(
-                new FractionBucket("easy", easyFraction),
-                new FractionBucket("medium", mediumFraction),
-                new FractionBucket("hard", hardFraction)
-            ));
+            List<FractionBucket> buckets = new ArrayList<>();
+            for (int i = 0; i < 4; i++) {
+                buckets.add(new FractionBucket(i, fractions[i]));
+            }
             buckets.sort((a, b) -> Double.compare(b.fraction, a.fraction));
 
             for (int i = 0; i < remainder; i++) {
-                String type = buckets.get(i).type;
-                if ("easy".equals(type)) easy++;
-                else if ("medium".equals(type)) medium++;
-                else if ("hard".equals(type)) hard++;
+                counts[buckets.get(i).index]++;
             }
         }
 
         Map<String, Integer> result = new LinkedHashMap<>();
-        result.put("easy", easy);
-        result.put("medium", medium);
-        result.put("hard", hard);
+        for (int i = 0; i < 4; i++) {
+            if (counts[i] > 0) {
+                result.put(types[i], counts[i]);
+            }
+        }
         return result;
     }
 
     private static class FractionBucket {
-        String type;
+        int index;
         double fraction;
-        FractionBucket(String type, double fraction) {
-            this.type = type;
+        FractionBucket(int index, double fraction) {
+            this.index = index;
             this.fraction = fraction;
         }
+    }
+
+    /**
+     * Determines item-level difficulty.
+     * INVARIANT: overallMatchScore MUST NOT be used here to preserve cache consistency.
+     */
+    private String mapDifficulty(String status) {
+        if (status == null) return "medium"; // baseline
+        return switch (status.toLowerCase().strip()) {
+            case "missing" -> "easy";
+            case "weak" -> "medium";
+            case "matched" -> "hard";
+            default -> "medium";
+        };
+    }
+
+    private List<QuestionAssignment> assignQuestions(Map<String, Integer> categoryCounts, List<EvidenceItemPair> items) {
+        List<QuestionAssignment> assignments = new ArrayList<>();
+        
+        // Ensure non-null items list
+        List<EvidenceItemPair> safeItems = items != null ? new ArrayList<>(items) : new ArrayList<>();
+        
+        // Remove not_applicable or missing items we don't want to ask about? No, user says "missing -> foundational/easy".
+        // Sort items: weightUsed DESC, then missing status
+        safeItems.sort((a, b) -> {
+            double wA = a.weightUsed() != null ? a.weightUsed() : 0.0;
+            double wB = b.weightUsed() != null ? b.weightUsed() : 0.0;
+            if (Double.compare(wB, wA) != 0) return Double.compare(wB, wA);
+            
+            boolean aMissing = "missing".equalsIgnoreCase(a.status());
+            boolean bMissing = "missing".equalsIgnoreCase(b.status());
+            if (aMissing && !bMissing) return -1;
+            if (!aMissing && bMissing) return 1;
+            return 0;
+        });
+
+        // Ensure at least 1 matched item is at the top if it exists
+        EvidenceItemPair topMatched = null;
+        for (int i = 0; i < safeItems.size(); i++) {
+            if ("matched".equalsIgnoreCase(safeItems.get(i).status())) {
+                topMatched = safeItems.remove(i);
+                break;
+            }
+        }
+        if (topMatched != null) {
+            safeItems.add(0, topMatched);
+        }
+
+        int itemIndex = 0;
+        int pass = 0;
+
+        for (Map.Entry<String, Integer> entry : categoryCounts.entrySet()) {
+            String category = entry.getKey();
+            int count = entry.getValue();
+            
+            for (int i = 0; i < count; i++) {
+                EvidenceItemPair assignedItem = null;
+                boolean isFollowUp = pass > 0;
+                
+                if (!safeItems.isEmpty()) {
+                    assignedItem = safeItems.get(itemIndex);
+                    itemIndex++;
+                    if (itemIndex >= safeItems.size()) {
+                        itemIndex = 0;
+                        pass++;
+                    }
+                }
+                
+                String difficulty = assignedItem != null ? mapDifficulty(assignedItem.status()) : "medium";
+                assignments.add(new QuestionAssignment(assignedItem, category, difficulty, isFollowUp));
+            }
+        }
+
+        return assignments;
     }
 }

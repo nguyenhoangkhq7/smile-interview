@@ -333,24 +333,25 @@ public final class PromptTemplateConfig {
     public static final String SYSTEM_PROMPT_QUESTION_GENERATION =
             """
             Role: Senior IT Interviewer.
-            Task: Generate targeted interview questions strictly based on the candidate's provided context and CV.
+            Task: Generate targeted interview questions strictly based on the candidate's provided context and assessment evidence.
     
             CANDIDATE CONTEXT:
             - Level: %s
             - Role Type: %s
             - Target Domain: %s
-            - Strong Areas: %s
-            - Gap Areas: %s
-            - Possessed Tech Stack: %s
+            - Strong Areas (confirmed by assessment): %s
+            - Gap Areas (missing or weak per assessment): %s
+            - Possessed Tech Stack (from matched/weak evidence): %s
+            - Required Tech Stack (from JD, missing from CV): %s
     
             GENERATION REQUIREMENTS:
             - Question Type: %s
-            - Difficulties to generate: %s
             \s
             RULES:
-            1. ZERO HALLUCINATION: Base questions explicitly on the candidate's actual projects, tech stack, or gap areas.
-            2. NO FLUFF: Output ONLY the JSON array. Do not explain your reasoning.
-            3. LANGUAGE: "question", "follow_ups", and "good_answer_signals" MUST be in Vietnamese. Keep technical terms (e.g., API, Microservices, CI/CD) in English.
+            1. GROUNDED IN EVIDENCE: Each question MUST be traceable to one of the evidence items provided in the user message (use the "id" field to map it). Do not invent requirements not present in the evidence.
+            2. PROBE STRATEGICALLY: For "matched" items, probe depth and architecture understanding. For "weak" items, probe whether the candidate truly understands the concept or just listed the keyword. For "missing" items, probe foundational understanding to gauge learning ability.
+            3. NO FLUFF: Output ONLY the JSON object. Do not explain your reasoning.
+            4. LANGUAGE: "question", "follow_ups", and "good_answer_signals" MUST be in Vietnamese. Keep technical terms (e.g., API, Microservices, CI/CD) in English.
     
             TYPE-SPECIFIC INSTRUCTIONS:
             %s
@@ -359,7 +360,7 @@ public final class PromptTemplateConfig {
             {
               "questions": [
                 {
-                  "id": "tmp_1",
+                  "id": "<item_N — the evidence item ID from the user message that inspired this question>",
                   "difficulty": "easy|medium|hard",
                   "topic": "<Specific topic, e.g., Database Indexing>",
                   "question": "<The detailed interview question in Vietnamese, contextualized to the candidate>",
@@ -423,7 +424,7 @@ public final class PromptTemplateConfig {
     public static String getTypeSpecificOutputFields(String type) {
         return switch (type) {
             case "behavioural"   -> "- \"star_prompt\": string (STAR framework guidance for the candidate)";
-            case "coding"        -> "- \"hints\": string (hint or approach suggestion for the candidate)";
+            case "coding"        -> "- \"hints\": array of strings (hints or approach suggestions for the candidate)";
             case "system_design" -> "- \"components_to_cover\": array of strings (system components to discuss)";
             default              -> "";
         };
