@@ -7,15 +7,8 @@ import { cvJdMatchingService, AssessmentResponse } from '@/services/cvJdMatching
 import { historyService } from '@/services/historyService';
 import { Calendar, FileText, UploadCloud, FolderOpen, Briefcase, CheckCircle, XCircle, Brain, Lightbulb, X, AlertTriangle, Check, AlertCircle, TrendingUp, UserCheck, Award, ShieldCheck, RefreshCw } from 'lucide-react';
 import styles from './new.module.css';
-
-type ActiveSessionState = {
-  sessionId: string;
-  roleTitle: string;
-  cvFilename: string;
-  jdFilename: string;
-  status: string;
-  date: string;
-};
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import { ActiveSessionsList, type ActiveSession } from '@/components/interview/ActiveSessionsList';
 
 export default function NewInterviewPage() {
   const router = useRouter();
@@ -52,7 +45,7 @@ export default function NewInterviewPage() {
   const [assessment, setAssessment] = useState<AssessmentResponse | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [ingested, setIngested] = useState(false);
-  const [activeSessions, setActiveSessions] = useState<ActiveSessionState[]>([]);
+  const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
 
   const fileInputCvRef = useRef<HTMLInputElement>(null);
   const fileInputJdRef = useRef<HTMLInputElement>(null);
@@ -438,6 +431,7 @@ export default function NewInterviewPage() {
   };
 
   return (
+    <ProtectedRoute>
     <div className={styles.container}>
 
       {/* Main Content */}
@@ -447,50 +441,14 @@ export default function NewInterviewPage() {
           <p className={styles.subtitle}>Tải lên CV và Mô tả công việc (JD) để AI phân tích mức độ tương thích</p>
         </div>
 
-        {activeSessions.length > 0 && !assessment && !uploading && !analyzing && (
-          <section className={styles.formSection} style={{ marginBottom: '1.5rem' }}>
-            <div className={styles.sectionHeader} style={{ marginBottom: '1rem' }}>
-              <div className={styles.sectionHeaderContent}>
-                <span className={styles.sectionEyebrow}>Phiên đang hoạt động</span>
-                <h2 className={styles.sectionTitle}>Phiên đang thực hiện</h2>
-                <p className={styles.subtitle} style={{ marginTop: '0.35rem' }}>
-                  Các phiên này đang được quản lý trong PostgreSQL, bạn có thể tiếp tục ngay từ đây.
-                </p>
-              </div>
-              <Link href="/history" className={styles.secondaryButton}>
-                Mở toàn bộ lịch sử
-              </Link>
-            </div>
-
-            <div className={styles.sessionList}>
-              {activeSessions.slice(0, 3).map((session) => (
-                <div key={session.sessionId} className={styles.sessionCard}>
-                  <div className={styles.sessionMain}>
-                    <div className={styles.sessionTitleRow}>
-                      <strong className={styles.sessionTitle}>{session.roleTitle}</strong>
-                      <span className={styles.statusPill}>{session.status}</span>
-                    </div>
-                    <p className={styles.sessionMeta}>{session.cvFilename} • {session.jdFilename}</p>
-                    <p className={styles.sessionDate}>Cập nhật: {new Date(session.date).toLocaleString('vi-VN')}</p>
-                  </div>
-
-                  <div className={styles.sessionActions}>
-                    <button
-                      onClick={() => handleRestart(session.sessionId)}
-                      disabled={isCloning === session.sessionId}
-                      className={styles.secondaryButton}
-                    >
-                      {isCloning === session.sessionId ? <RefreshCw size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                      Thực hiện lại
-                    </button>
-                    <button className={styles.primaryButton} onClick={() => handleResumeSession(session.sessionId)}>
-                      Tiếp tục phiên này
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
+        {/* Active Sessions — rendered only when not in a result/loading state */}
+        {!assessment && !uploading && !analyzing && (
+          <ActiveSessionsList
+            sessions={activeSessions}
+            cloningId={isCloning}
+            onResume={handleResumeSession}
+            onRestart={handleRestart}
+          />
         )}
 
         {apiError && (
@@ -1008,5 +966,6 @@ export default function NewInterviewPage() {
       </main>
 
     </div>
+    </ProtectedRoute>
   );
 }

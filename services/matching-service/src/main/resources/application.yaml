@@ -88,6 +88,16 @@ app:
     temperature: ${QUESTION_BANK_TEMPERATURE:0.4}
     max-retries: ${QUESTION_BANK_MAX_RETRIES:2}
 
+  # ============================================================
+  # JWT Authentication
+  # ============================================================
+  jwt:
+    # Base64-encoded HMAC-SHA256 key (≥ 256 bits).
+    # Override in production via JWT_SECRET env variable.
+    secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+    # Token expiry in milliseconds (default: 24 hours)
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+
 # ============================================================
 # Logging
 # ============================================================

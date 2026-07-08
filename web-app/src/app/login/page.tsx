@@ -2,18 +2,55 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import styles from './login.module.css';
+import axiosClient from '@/lib/axiosClient';
+import { useAuthStore } from '@/store/authStore';
 
 export default function LoginPage() {
+  const router = useRouter();
+  const { login } = useAuthStore();
+
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ email: '', password: '' });
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
     setLoading(true);
-    // TODO: integrate with auth API
-    setTimeout(() => setLoading(false), 1500);
+
+    try {
+      const { data } = await axiosClient.post('/api/auth/login', {
+        email: form.email,
+        password: form.password,
+      });
+
+      // data: { token, id, username, email, role, phoneNumber, avatarUrl, defaultResumeId }
+      login(
+        {
+          id: data.id,
+          username: data.username,
+          email: data.email,
+          role: data.role,
+          phoneNumber: data.phoneNumber ?? null,
+          avatarUrl: data.avatarUrl ?? null,
+          defaultResumeId: data.defaultResumeId ?? null,
+        },
+        data.token
+      );
+
+      router.push('/');
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        'Email hoặc mật khẩu không đúng. Vui lòng thử lại.';
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -35,6 +72,27 @@ export default function LoginPage() {
             <p className={styles.cardSub}>Đăng nhập để tiếp tục luyện tập</p>
           </div>
 
+          {/* Global error banner */}
+          {error && (
+            <div style={{
+              background: 'rgba(239,68,68,0.12)',
+              border: '1px solid rgba(239,68,68,0.4)',
+              borderRadius: '10px',
+              padding: '10px 14px',
+              marginBottom: '16px',
+              color: '#f87171',
+              fontSize: '13px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+            }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              {error}
+            </div>
+          )}
+
           {/* Form */}
           <form onSubmit={handleSubmit} className={styles.form}>
             {/* Email */}
@@ -54,6 +112,7 @@ export default function LoginPage() {
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
                   className={styles.input}
+                  autoComplete="email"
                 />
               </div>
             </div>
@@ -78,6 +137,7 @@ export default function LoginPage() {
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
                   className={`${styles.input} ${styles.inputWithEye}`}
+                  autoComplete="current-password"
                 />
                 <button type="button" className={styles.eyeBtn} onClick={() => setShowPassword(!showPassword)}>
                   {showPassword ? (
