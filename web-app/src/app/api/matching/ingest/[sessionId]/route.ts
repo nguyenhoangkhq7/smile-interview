@@ -98,9 +98,16 @@ export async function POST(
 
     console.log(`[API Proxy Ingest] Forwarding to backend: ${backendUrl}/api/v1/ingest/${sessionId}`);
     
+    const authHeader = request.headers.get('Authorization');
+    const headers: Record<string, string> = {};
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
+    }
+
     const backendRes = await fetch(`${backendUrl}/api/v1/ingest/${sessionId}`, {
       method: 'POST',
       body: backendFormData,
+      headers: headers,
     });
 
     if (!backendRes.ok) {

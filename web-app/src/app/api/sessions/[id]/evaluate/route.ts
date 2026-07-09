@@ -52,11 +52,17 @@ export async function POST(
     };
 
     console.log(`[API Evaluate] Forwarding evaluation to matching-service: ${targetUrl}`);
+    const authHeader = request.headers.get('Authorization');
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
+    }
+
     const backendRes = await fetch(targetUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers: headers,
       body: JSON.stringify(payload)
     });
 
