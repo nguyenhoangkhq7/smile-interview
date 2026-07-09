@@ -64,31 +64,36 @@ export async function GET(request: NextRequest) {
     };
     const yearsOfExperienceEstimate = expMap[data.seniority_level] || data.seniority_level || 'N/A';
 
-    // Map evidence items to strong / gap / missing categories
-    const strongAreas = (data.evidence_items || [])
+    // Map evidence items to strong / gap / missing categories, combining both core and ad-hoc evidence items
+    const allEvidence = [
+      ...(data.evidence_items || []),
+      ...(data.additional_evidence_items || [])
+    ];
+
+    const strongAreas = allEvidence
       .filter((item: any) => item.status === 'matched')
       .map((item: any) => item.criteria_name);
 
-    const gapAreas = (data.evidence_items || [])
+    const gapAreas = allEvidence
       .filter((item: any) => item.status === 'weak')
       .map((item: any) => item.criteria_name);
 
-    const criticalMissingSkills = (data.evidence_items || [])
+    const criticalMissingSkills = allEvidence
       .filter((item: any) => item.status === 'missing')
       .map((item: any) => item.criteria_name);
 
     // Group section-wise feedback
     const sectionWiseFeedback: Record<string, string> = {};
-    if (data.evidence_items && data.evidence_items.length > 0) {
-      const matchedText = data.evidence_items
+    if (allEvidence.length > 0) {
+      const matchedText = allEvidence
         .filter((item: any) => item.status === 'matched')
         .map((item: any) => `${item.criteria_name} (${item.cv_evidence || ''})`)
         .join('; ');
-      const weakText = data.evidence_items
+      const weakText = allEvidence
         .filter((item: any) => item.status === 'weak')
         .map((item: any) => `${item.criteria_name}: Yêu cầu JD: ${item.jd_requirement || ''}. Minh chứng CV: ${item.cv_evidence || 'chưa rõ ràng'}.`)
         .join(' | ');
-      const missingText = data.evidence_items
+      const missingText = allEvidence
         .filter((item: any) => item.status === 'missing')
         .map((item: any) => item.criteria_name)
         .join(', ');
@@ -123,7 +128,11 @@ export async function GET(request: NextRequest) {
       sectionWiseFeedback,
       actionableImprovementSuggestions,
       cached: data.cached || false,
-      createdAt: data.created_at || ''
+      createdAt: data.created_at || '',
+      evidenceItems: data.evidence_items || [],
+      additionalEvidenceItems: data.additional_evidence_items || [],
+      scoreBreakdown: data.score_breakdown || null,
+      topPriorityImprovements: data.top_priority_improvements || []
     });
   } catch (error: any) {
     console.error('[API Proxy Assess] Error in proxy assessment:', error);

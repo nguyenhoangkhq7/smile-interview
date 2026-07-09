@@ -72,6 +72,14 @@ export async function POST(
     }
 
     const evalResult = await backendRes.json();
+    console.log('[Evaluate] Raw backend response:', evalResult);
+
+    const overallScore = evalResult.overall_score !== undefined ? evalResult.overall_score : (evalResult.overallScore !== undefined ? evalResult.overallScore : 60);
+    const overallFeedback = evalResult.overall_summary || evalResult.overallFeedback || '';
+    const strengthsList = evalResult.strengths || evalResult.strongAreas || [];
+    const weaknessesList = evalResult.weaknesses || evalResult.gapAreas || [];
+    const recommendationsList = evalResult.recommendations || evalResult.actionableSuggestions || [];
+    const hiringRecommendation = evalResult.hiring_recommendation || evalResult.hiringRecommendation || 'N/A';
 
     // 5. Update Database
     // Update session table
@@ -82,22 +90,25 @@ export async function POST(
         overall_feedback = $2,
         strong_areas = $3,
         gap_areas = $4,
-        actionable_suggestions = $5
-       WHERE id = $6`,
+        actionable_suggestions = $5,
+        hiring_recommendation = $6
+       WHERE id = $7`,
       [
-        evalResult.overallScore || 60,
-        evalResult.overallFeedback || '',
-        JSON.stringify(evalResult.strongAreas || []),
-        JSON.stringify(evalResult.gapAreas || []),
-        JSON.stringify(evalResult.actionableSuggestions || []),
+        overallScore,
+        overallFeedback,
+        JSON.stringify(strengthsList),
+        JSON.stringify(weaknessesList),
+        JSON.stringify(recommendationsList),
+        hiringRecommendation,
         id
       ]
     );
 
     // Update turns table with granular evaluation using index to avoid minor question text mismatches from the LLM
-    if (evalResult.evaluatedQuestions && evalResult.evaluatedQuestions.length > 0) {
-      for (let i = 0; i < evalResult.evaluatedQuestions.length; i++) {
-        const eq = evalResult.evaluatedQuestions[i];
+    const evaluatedQuestions = evalResult.turns || evalResult.evaluatedQuestions || [];
+    if (evaluatedQuestions.length > 0) {
+      for (let i = 0; i < evaluatedQuestions.length; i++) {
+        const eq = evaluatedQuestions[i];
         if (i < turns.length) {
           const turnId = turns[i].id;
           await query(
@@ -109,9 +120,9 @@ export async function POST(
              WHERE id = $5`,
             [
               eq.score || 0,
-              eq.strengths || '',
+              eq.evaluation || eq.strengths || '',
               eq.improvements || '',
-              eq.suggestedAnswer || '',
+              eq.suggested_answer || eq.suggestedAnswer || '',
               turnId
             ]
           );

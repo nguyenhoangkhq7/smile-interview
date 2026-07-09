@@ -38,6 +38,11 @@ export async function GET() {
           criticalMissingSkills: sess.critical_missing_skills ? sess.critical_missing_skills : undefined,
           sectionWiseFeedback: sess.section_wise_feedback ? sess.section_wise_feedback : undefined,
           actionableSuggestions: sess.actionable_suggestions ? sess.actionable_suggestions : undefined,
+          evidenceItems: sess.evidence_items ? sess.evidence_items : undefined,
+          additionalEvidenceItems: sess.additional_evidence_items ? sess.additional_evidence_items : undefined,
+          scoreBreakdown: sess.score_breakdown ? sess.score_breakdown : undefined,
+          topPriorityImprovements: sess.top_priority_improvements ? sess.top_priority_improvements : undefined,
+          hiringRecommendation: sess.hiring_recommendation ? sess.hiring_recommendation : undefined,
           questions: turnsRes.rows.map((t) => ({
             question: t.question,
             answer: t.answer,
@@ -74,8 +79,10 @@ export async function POST(request: NextRequest) {
         overall_score, status, overall_feedback, competency_fit_score,
         technical_depth_score, match_level, candidate_level, role_type_detected,
         years_of_experience_estimate, strong_areas, gap_areas, critical_missing_skills,
-        section_wise_feedback, actionable_suggestions, resume_id, jd_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+        section_wise_feedback, actionable_suggestions, resume_id, jd_id,
+        evidence_items, additional_evidence_items, score_breakdown, top_priority_improvements,
+        hiring_recommendation
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27)
       ON CONFLICT (id) DO UPDATE SET
         date = EXCLUDED.date,
         interview_type = EXCLUDED.interview_type,
@@ -97,7 +104,12 @@ export async function POST(request: NextRequest) {
         section_wise_feedback = EXCLUDED.section_wise_feedback,
         actionable_suggestions = EXCLUDED.actionable_suggestions,
         resume_id = EXCLUDED.resume_id,
-        jd_id = EXCLUDED.jd_id
+        jd_id = EXCLUDED.jd_id,
+        evidence_items = EXCLUDED.evidence_items,
+        additional_evidence_items = EXCLUDED.additional_evidence_items,
+        score_breakdown = EXCLUDED.score_breakdown,
+        top_priority_improvements = EXCLUDED.top_priority_improvements,
+        hiring_recommendation = EXCLUDED.hiring_recommendation
     `;
 
     await query(upsertSessionSql, [
@@ -123,6 +135,11 @@ export async function POST(request: NextRequest) {
       session.actionableSuggestions ? JSON.stringify(session.actionableSuggestions) : null,
       session.resumeId !== undefined ? session.resumeId : null,
       session.jdId !== undefined ? session.jdId : null,
+      session.evidenceItems ? JSON.stringify(session.evidenceItems) : null,
+      session.additionalEvidenceItems ? JSON.stringify(session.additionalEvidenceItems) : null,
+      session.scoreBreakdown ? JSON.stringify(session.scoreBreakdown) : null,
+      session.topPriorityImprovements ? JSON.stringify(session.topPriorityImprovements) : null,
+      session.hiringRecommendation ? session.hiringRecommendation : null,
     ]);
 
     // 2. Replace turns only when explicitly requested.
