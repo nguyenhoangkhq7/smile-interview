@@ -7,22 +7,66 @@ option java_package = "fit.iuh.grpc.inference";
 option java_outer_classname = "InferenceProto";
 
 service InferenceService {
-  rpc EvaluateResponse(InferenceRequest) returns (InferenceResponse);
+  rpc EvaluateResponse (InferenceRequest) returns (InferenceResponse);
+  rpc GenerateFinalReport (FinalReportRequest) returns (FinalReportResponse);
 }
+
+// ─── Per-turn evaluation request ───────────────────────────────────────────
 
 message InferenceRequest {
   string session_id = 1;
-  string current_question = 2;
-  string candidate_answer = 3;
-  int32 current_follow_up_count = 4;
-  string target_job_title = 5;
-  repeated string previous_qa_context = 6;
+  string target_job_title = 2;
+  string interview_domain = 3;          // "IT", "Marketing", "Sales", "Finance", ...
+  string current_question = 4;
+  string candidate_answer = 5;
+  int32 current_follow_up_count = 6;
+  int32 max_follow_up_count = 7;        // AI biết còn quota đào sâu hay không
+  repeated QAContext conversation_thread = 8; // toàn bộ nhánh hội thoại của chủ đề hiện tại
 }
 
+message QAContext {
+  string question = 1;
+  string answer = 2;
+  bool was_follow_up = 3;
+}
+
+// ─── Per-turn evaluation response ──────────────────────────────────────────
+
 message InferenceResponse {
-  string decision = 1; // "FOLLOW_UP" or "NEXT_TOPIC"
-  string reasoning = 2;
-  string generated_follow_up_question = 3;
-  int32 score = 4; // 1-10
+  string decision = 1;              // "FOLLOW_UP" | "NEXT_TOPIC"
+  string follow_up_question = 2;    // AI sinh động (rỗng nếu decision = NEXT_TOPIC)
+  string reasoning = 3;
+  int32 score = 4;                  // 0-10; bị ignore nếu is_fallback = true
   string evaluation = 5;
+  bool is_fallback = 6;             // true nếu đây là kết quả fallback do timeout/lỗi
+  bool excluded_from_scoring = 7;   // true nếu turn này KHÔNG tính vào điểm trung bình cuối
+}
+
+// ─── Final synthesis request (chạy sau khi phỏng vấn kết thúc) ─────────────
+
+message FinalReportRequest {
+  string session_id = 1;
+  string target_job_title = 2;
+  repeated TurnRecord turns = 3;    // chỉ các turn có excluded_from_scoring = false
+  string resume_text = 4;           // toàn bộ resume đã chuẩn hoá Markdown
+  string jd_text = 5;               // toàn bộ JD đã chuẩn hoá Markdown
+}
+
+message TurnRecord {
+  string question = 1;
+  string answer = 2;
+  int32 score = 3;
+  string evaluation = 4;
+  bool was_follow_up = 5;
+}
+
+// ─── Final synthesis response ───────────────────────────────────────────────
+
+message FinalReportResponse {
+  int32 overall_score = 1;
+  string overall_summary = 2;
+  repeated string strengths = 3;
+  repeated string weaknesses = 4;
+  repeated string recommendations = 5;
+  string hiring_recommendation = 6; // "Strong Hire" | "Hire" | "No Hire" | "Strong No Hire"
 }

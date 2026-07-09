@@ -4,16 +4,20 @@ spring:
   threads:
     virtual:
       enabled: true
-  ai:
-    openai:
-      base-url: ${LLM_API_URL:https://openrouter.ai/api/v1}
-      api-key: ${LLM_API_KEY}
-      chat:
-        options:
-          model: ${LLM_MODEL:google/gemini-2.5-flash}
-          headers:
-            HTTP-Referer: "https://github.com/nguyenhoangkhq7/smile-interview"
-            X-Title: "Smile Interview App"
+
+openrouter:
+  api-key: ${OPENROUTER_API_KEY}
+  base-url: ${OPENROUTER_BASE_URL:https://openrouter.ai/api/v1}
+  model:
+    evaluation: ${OPENROUTER_EVAL_MODEL:google/gemini-2.5-flash}
+    final-report: ${OPENROUTER_FINAL_REPORT_MODEL:google/gemini-2.5-flash}
+
+llm:
+  timeout-seconds: ${LLM_TIMEOUT_SECONDS:20}
+  final-report-timeout-seconds: ${LLM_FINAL_REPORT_TIMEOUT_SECONDS:60}
+
 grpc:
   server:
     port: 9091
+    security:
+      enabled: false

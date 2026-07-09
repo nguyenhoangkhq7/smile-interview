@@ -1,14 +1,22 @@
 import redisClient from '../../config/redis.js';
 import { transcribeAudio } from '../audio/audio.service.js';
 import { synthesizeSpeech } from '../tts/tts.service.js';
-import { createSession, getSession, updateSession } from './session.service.js';
-import { evaluateCandidateResponse } from './engine.client.js';
+import {
+  createSession,
+  getSession,
+  updateSession,
+  appendTurn,
+  appendToConversationThread,
+  resetConversationThread
+} from './session.service.js';
+import { evaluateCandidateResponse, generateFinalReport } from './engine.client.js';
 import { generateAvatarAction } from './mockAvatar.service.js';
 
 export const handleConnection = (io, socket) => {
   console.log(`Client connected: ${socket.id}`);
 
-  // Handle joining an interview session
+  // ─── Join interview session ───────────────────────────────────────────────
+
   socket.on('join-interview', async (data) => {
     try {
       const { interviewId, userId, initialQuestions, baseQuestionIndex = 0 } = data;
@@ -18,31 +26,33 @@ export const handleConnection = (io, socket) => {
       }
 
       console.log(`User ${userId} joined interview ${interviewId} on socket ${socket.id}, baseIndex: ${baseQuestionIndex}`);
-      
-      // Save socket-to-user/interview mapping in Redis for session management
+
       await redisClient.hSet(`socket:${socket.id}`, {
         interviewId,
         userId,
         joinedAt: new Date().toISOString()
       });
-      
+
       await redisClient.sAdd(`interview:${interviewId}:participants`, userId);
       socket.join(interviewId);
       console.log(`[Signaling] Socket ${socket.id} joined room ${interviewId}`);
-      
-      // Initialize or get orchestration session
+
       let session = await getSession(interviewId);
       console.log(`[Signaling] Fetched existing session from Redis:`, session ? 'Found' : 'Null');
       if (!session) {
         console.log(`[Signaling] Creating new session in Redis with initialQuestions:`, initialQuestions);
-        session = await createSession(interviewId, userId, initialQuestions, baseQuestionIndex);
+        session = await createSession(interviewId, userId, initialQuestions, baseQuestionIndex, {
+          interviewDomain: data.interviewDomain || 'IT',
+          targetJobTitle: data.targetJobTitle || 'IT Engineer',
+          resumeText: data.resumeText || '',
+          jdText: data.jdText || ''
+        });
       }
-      console.log(`[Signaling] Session state status: ${session?.status}, questions length: ${session?.questions?.length}`);
+      console.log(`[Signaling] Session status: ${session?.status}, questions: ${session?.questions?.length}`);
 
       socket.to(interviewId).emit('peer-joined', { userId, socketId: socket.id });
       socket.emit('joined-room', { interviewId, userId });
-      
-      // Emit initial orchestration state to the user who joined
+
       socket.emit('orchestration-event', {
         type: 'STATE_UPDATE',
         payload: {
@@ -52,14 +62,15 @@ export const handleConnection = (io, socket) => {
       });
       console.log(`[Signaling] Emitted STATE_UPDATE to client`);
 
-      // Optionally, push the first base question to start the interview if INIT
       if (session.status === 'INIT' && session.questions.length > 0) {
         const firstQuestionObj = session.questions[session.questionState?.baseQuestionIndex || 0];
-        const firstQuestion = typeof firstQuestionObj === 'object' && firstQuestionObj !== null ? firstQuestionObj.question : firstQuestionObj;
-        console.log(`[Signaling] Session status is INIT. Broadcasting first question: "${firstQuestion}"`);
+        const firstQuestion = typeof firstQuestionObj === 'object' && firstQuestionObj !== null
+          ? firstQuestionObj.question
+          : firstQuestionObj;
+
+        console.log(`[Signaling] Session INIT. Broadcasting first question: "${firstQuestion}"`);
         const avatarAction = await generateAvatarAction(firstQuestion, 'NEUTRAL');
 
-        // Update state to IN_PROGRESS
         await updateSession(interviewId, { status: 'IN_PROGRESS' });
         console.log(`[Signaling] Updated Redis session to IN_PROGRESS`);
 
@@ -70,24 +81,23 @@ export const handleConnection = (io, socket) => {
             actionType: 'TRANSITION',
             text: firstQuestion,
             reasoning: 'Starting the interview.',
-            score: 0,
+            score: null,
             evaluation: '',
+            isFallback: false,
             audioUrl: null,
             avatarTriggers: avatarAction
           }
         });
         console.log(`[Signaling] Emitted INTERVIEWER_ACTION to room ${interviewId}`);
-      } else {
-        console.log(`[Signaling] Skip INIT questions broadcast. Status: ${session.status}, questions length: ${session.questions.length}`);
       }
-
     } catch (error) {
       console.error('Error in join-interview:', error);
       socket.emit('error', { message: 'Failed to join interview room' });
     }
   });
 
-  // Handle Orchestration Events from the Frontend
+  // ─── Orchestration events ─────────────────────────────────────────────────
+
   socket.on('orchestration-event', async (data) => {
     try {
       const socketInfo = await redisClient.hGetAll(`socket:${socket.id}`);
@@ -95,141 +105,217 @@ export const handleConnection = (io, socket) => {
         socket.emit('error', { message: 'Not joined in any session' });
         return;
       }
-      
+
       const sessionId = socketInfo.interviewId;
 
+      // ── CANDIDATE_TEXT_SUBMIT ───────────────────────────────────────────
       if (data.type === 'CANDIDATE_TEXT_SUBMIT') {
         const candidateText = data.payload.text;
-        
-        // 1. Get Session State
+
+        // 1. Get session state
         const session = await getSession(sessionId);
         if (!session) throw new Error('Session not found');
 
         const qState = session.questionState;
-        
-        // Determine the current question context for the engine
         const currentQuestionObj = session.questions[qState.baseQuestionIndex];
-        const currentQuestion = typeof currentQuestionObj === 'object' && currentQuestionObj !== null ? currentQuestionObj.question : currentQuestionObj;
+        const currentQuestion = typeof currentQuestionObj === 'object' && currentQuestionObj !== null
+          ? currentQuestionObj.question
+          : currentQuestionObj;
 
-        // 2. Call Java AI Inference Service via gRPC
+        // 2. Call AI Inference Service via gRPC
         const engineResponse = await evaluateCandidateResponse({
-          sessionId: sessionId,
-          currentQuestion: currentQuestion,
+          sessionId,
+          targetJobTitle: session.targetJobTitle || 'IT Engineer',
+          interviewDomain: session.interviewDomain || 'IT',
+          currentQuestion,
           candidateAnswer: candidateText,
           currentFollowUpCount: qState.currentFollowUpDepth,
-          targetJobTitle: "IT Engineer",
-          previousQaContext: [] // Can be populated from a full history list if maintained
+          maxFollowUpCount: qState.maxFollowUpDepth || 3,
+          conversationThread: session.conversationThread || []
         });
-        
-        let nextQuestionText = "";
-        let actionType = engineResponse.decision; // e.g. "FOLLOW_UP" or "NEXT_TOPIC"
+
+        console.log(`[Signaling] AI decision: ${engineResponse.decision}, score: ${engineResponse.score}, isFallback: ${engineResponse.isFallback}`);
+
+        // 3. Append current QA to conversation thread (before potentially resetting it)
+        await appendToConversationThread(sessionId, {
+          question: currentQuestion,
+          answer: candidateText,
+          wasFollowUp: qState.currentFollowUpDepth > 0
+        });
+
+        // 4. Append turn record for final synthesis (skip fallback turns from scoring)
+        await appendTurn(sessionId, {
+          question: currentQuestion,
+          answer: candidateText,
+          score: engineResponse.score,
+          evaluation: engineResponse.evaluation || '',
+          wasFollowUp: qState.currentFollowUpDepth > 0,
+          excludedFromScoring: engineResponse.excludedFromScoring
+        });
+
+        // 5. Determine next question and update state
+        let nextQuestionText = '';
+        let actionType = engineResponse.decision;
         let nextQState = { ...qState };
 
-        if (actionType === 'FOLLOW_UP') {
-          // Select from pre-generated follow-up questions
-          if (typeof currentQuestionObj === 'object' && 
-              currentQuestionObj !== null &&
-              currentQuestionObj.follow_up_questions && 
-              qState.currentFollowUpDepth < currentQuestionObj.follow_up_questions.length) {
-            
-            nextQuestionText = currentQuestionObj.follow_up_questions[qState.currentFollowUpDepth];
-            nextQState.currentFollowUpDepth += 1;
-            console.log(`[Signaling] Selecting pre-generated follow-up: "${nextQuestionText}" (depth: ${nextQState.currentFollowUpDepth})`);
-          } else {
-            // Out of follow-ups, fallback to transition to next main question
-            console.log(`[Signaling] Out of pre-generated follow-ups for this question. Transitioning to next topic.`);
+        if (actionType === 'FOLLOW_UP' && !engineResponse.isFallback) {
+          // Use AI-generated dynamic follow-up question (no pre-generated bank)
+          nextQuestionText = engineResponse.followUpQuestion || '';
+          nextQState.currentFollowUpDepth += 1;
+          console.log(`[Signaling] AI follow-up: "${nextQuestionText}" (depth: ${nextQState.currentFollowUpDepth})`);
+
+          // Safety fallback: if AI returned empty followUpQuestion, transition to next topic
+          if (!nextQuestionText.trim()) {
+            console.warn('[Signaling] AI returned FOLLOW_UP but followUpQuestion is empty. Transitioning.');
+            actionType = 'TRANSITION';
             nextQState.baseQuestionIndex += 1;
             nextQState.currentFollowUpDepth = 0;
-            actionType = 'TRANSITION';
-            
+            await resetConversationThread(sessionId);
+
             if (nextQState.baseQuestionIndex < session.questions.length) {
-              const nextQuestionObj = session.questions[nextQState.baseQuestionIndex];
-              nextQuestionText = typeof nextQuestionObj === 'object' && nextQuestionObj !== null ? nextQuestionObj.question : nextQuestionObj;
+              const nextObj = session.questions[nextQState.baseQuestionIndex];
+              nextQuestionText = typeof nextObj === 'object' && nextObj !== null ? nextObj.question : nextObj;
             } else {
-              nextQuestionText = "Thank you. That concludes our technical questions.";
+              nextQuestionText = 'Thank you. That concludes our technical questions.';
               actionType = 'CONCLUDING';
             }
           }
         } else {
-          // Transition to Next Topic
+          // NEXT_TOPIC or fallback: move to next base question and reset thread
           nextQState.baseQuestionIndex += 1;
           nextQState.currentFollowUpDepth = 0;
-          
+          await resetConversationThread(sessionId);
+
           if (nextQState.baseQuestionIndex < session.questions.length) {
-            const nextQuestionObj = session.questions[nextQState.baseQuestionIndex];
-            nextQuestionText = typeof nextQuestionObj === 'object' && nextQuestionObj !== null ? nextQuestionObj.question : nextQuestionObj;
+            const nextObj = session.questions[nextQState.baseQuestionIndex];
+            nextQuestionText = typeof nextObj === 'object' && nextObj !== null ? nextObj.question : nextObj;
             actionType = 'TRANSITION';
           } else {
-            nextQuestionText = "Thank you. That concludes our technical questions.";
+            nextQuestionText = 'Thank you. That concludes our technical questions.';
             actionType = 'CONCLUDING';
           }
         }
 
-        // 3. Update Session State
+        // 6. Update session state
         const updatedSession = await updateSession(sessionId, {
           questionState: nextQState,
           status: actionType === 'CONCLUDING' ? 'COMPLETED' : 'IN_PROGRESS'
         });
 
-        // 4. Broadcast State Update
+        // 7. Broadcast state update
         io.to(sessionId).emit('orchestration-event', {
           type: 'STATE_UPDATE',
-          payload: { 
-            status: updatedSession.status, 
-            questionState: updatedSession.questionState 
+          payload: {
+            status: updatedSession.status,
+            questionState: updatedSession.questionState
           }
         });
 
-        // 5. Generate Mock Avatar Triggers
-        const emotionHint = engineResponse.score > 7 ? 'HAPPY' : 'CURIOUS';
+        // 8. Generate avatar triggers
+        const emotionHint = engineResponse.score != null && engineResponse.score > 7 ? 'HAPPY' : 'CURIOUS';
         const avatarAction = await generateAvatarAction(nextQuestionText, emotionHint);
-        
-        // 6. Broadcast INTERVIEWER_ACTION
+
+        // 9. Broadcast INTERVIEWER_ACTION with evaluation details
         io.to(sessionId).emit('orchestration-event', {
           type: 'INTERVIEWER_ACTION',
           payload: {
             actionId: `action-${Date.now()}`,
-            actionType: actionType,
+            actionType,
             text: nextQuestionText,
             reasoning: engineResponse.reasoning,
             score: engineResponse.score,
             evaluation: engineResponse.evaluation,
+            isFallback: engineResponse.isFallback,
             audioUrl: null,
             avatarTriggers: avatarAction
           }
         });
+      }
+
+      // ── INTERVIEW_END ───────────────────────────────────────────────────
+      if (data.type === 'INTERVIEW_END') {
+        console.log(`[Signaling] INTERVIEW_END received for session ${sessionId}`);
+        try {
+          const session = await getSession(sessionId);
+          if (!session) throw new Error('Session not found');
+
+          // Filter out turns excluded from scoring (fallback turns)
+          const scoredTurns = (session.turns || []).filter(t => !t.excludedFromScoring);
+
+          console.log(`[Signaling] Generating final report. Scored turns: ${scoredTurns.length}`);
+
+          const finalReport = await generateFinalReport({
+            sessionId,
+            targetJobTitle: session.targetJobTitle || 'IT Engineer',
+            turns: scoredTurns,
+            resumeText: session.resumeText || '',
+            jdText: session.jdText || ''
+          });
+
+          // Mark session as fully completed
+          await updateSession(sessionId, { status: 'REPORT_READY' });
+
+          // Emit final report to the room
+          io.to(sessionId).emit('orchestration-event', {
+            type: 'FINAL_REPORT',
+            payload: finalReport
+          });
+
+          console.log(`[Signaling] Final report emitted. Hiring recommendation: ${finalReport.hiringRecommendation}`);
+        } catch (reportError) {
+          console.error('[Signaling] Failed to generate final report:', reportError);
+          io.to(sessionId).emit('orchestration-event', {
+            type: 'FINAL_REPORT_ERROR',
+            payload: { message: 'Failed to generate final report. Please try again.' }
+          });
+        }
       }
     } catch (error) {
       console.error('Error in orchestration event:', error);
     }
   });
 
-  // Handle RTC Signaling (offer, answer, candidate routing)
+  // ─── RTC Signaling ────────────────────────────────────────────────────────
+
   socket.on('signal', async (data) => {
     try {
       const { targetSocketId, signal } = data;
       const senderInfo = await redisClient.hGetAll(`socket:${socket.id}`);
       if (!senderInfo || !senderInfo.userId) return;
-      
+
       if (targetSocketId) {
-        io.to(targetSocketId).emit('signal', { senderSocketId: socket.id, senderUserId: senderInfo.userId, signal });
+        io.to(targetSocketId).emit('signal', {
+          senderSocketId: socket.id,
+          senderUserId: senderInfo.userId,
+          signal
+        });
       } else if (senderInfo.interviewId) {
-        socket.to(senderInfo.interviewId).emit('signal', { senderSocketId: socket.id, senderUserId: senderInfo.userId, signal });
+        socket.to(senderInfo.interviewId).emit('signal', {
+          senderSocketId: socket.id,
+          senderUserId: senderInfo.userId,
+          signal
+        });
       }
     } catch (error) {}
   });
 
-  // Handle streaming audio chunk routing
+  // ─── Streaming audio chunk routing ───────────────────────────────────────
+
   socket.on('audio-chunk', async (data) => {
     try {
-      const { chunk } = data; 
+      const { chunk } = data;
       const socketInfo = await redisClient.hGetAll(`socket:${socket.id}`);
       if (!socketInfo || !socketInfo.interviewId) return;
-      socket.to(socketInfo.interviewId).emit('audio-chunk', { userId: socketInfo.userId, chunk, timestamp: Date.now() });
+      socket.to(socketInfo.interviewId).emit('audio-chunk', {
+        userId: socketInfo.userId,
+        chunk,
+        timestamp: Date.now()
+      });
     } catch (error) {}
   });
 
-  // STT / TTS Handlers
+  // ─── STT / TTS ────────────────────────────────────────────────────────────
+
   socket.on('process-stt', async (audioBuffer) => {
     try {
       const mockFile = { buffer: audioBuffer, originalname: 'stream.webm', mimetype: 'audio/webm' };
@@ -249,7 +335,8 @@ export const handleConnection = (io, socket) => {
     }
   });
 
-  // Handle disconnect
+  // ─── Disconnect ───────────────────────────────────────────────────────────
+
   socket.on('disconnect', async () => {
     console.log(`Client disconnected: ${socket.id}`);
     try {
