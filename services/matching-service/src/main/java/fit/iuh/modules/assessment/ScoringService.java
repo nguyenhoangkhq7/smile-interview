@@ -1,6 +1,8 @@
 package fit.iuh.modules.assessment;
 
+import fit.iuh.modules.admin.SystemSettingRepository;
 import fit.iuh.modules.rulengine.JobCriteriaRepository.CriteriaWeightProjection;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -17,9 +19,9 @@ import java.util.stream.Collectors;
  * <h2>Algorithm</h2>
  * <pre>
  *   For each evidence item:
- *     - "matched"  → points = 1.0  (full weight awarded)
- *     - "weak"     → points = 0.5  (half weight awarded)
- *     - "missing"  → points = 0.0  (no weight awarded)
+ *     - "matched"  → points = 1.0              (full weight awarded)
+ *     - "weak"     → points = STATUS_WEAK_COEFF (from system_settings, default 0.3)
+ *     - "missing"  → points = 0.0              (no weight awarded)
  *
  *   overall_match_score = round(
  *       SUM(weight_i * points_i) / SUM(weight_i) * 100
@@ -28,6 +30,11 @@ import java.util.stream.Collectors;
  *
  * <p>Weights are normalised by dividing by their total sum, so the individual
  * weights in {@code category_criteria_mapping} do NOT need to sum to 100.
+ *
+ * <h2>Dynamic Configuration</h2>
+ * {@code STATUS_WEAK_COEFF} is now read from the {@code system_settings} table
+ * via {@link SystemSettingRepository}. If the key is absent, the service falls
+ * back to {@code 0.3} (the original hardcoded value) to preserve existing behaviour.
  *
  * <h2>Design Philosophy</h2>
  * <ul>
@@ -38,12 +45,19 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class ScoringService {
 
-    /** Points awarded per evidence status. */
+    /** Fallback coefficient used when system_settings is not yet seeded. */
+    private static final double DEFAULT_WEAK_COEFF = 0.3;
+
+    /** Points awarded for a fully matched criterion — always 1.0. */
     private static final double POINTS_MATCHED = 1.0;
-    private static final double POINTS_WEAK    = 0.3;
+
+    /** Points awarded for a fully missing criterion — always 0.0. */
     private static final double POINTS_MISSING = 0.0;
+
+    private final SystemSettingRepository systemSettingRepository;
 
     public record ScoringResult(
             int score,
@@ -54,9 +68,9 @@ public class ScoringService {
     /**
      * Calculates the overall match score from evidence items and DB weights.
      *
-     * @param evidenceItems  the list of evidence items returned by the LLM (from the assessment prompt)
-     * @param criteriaWeights the criteria+weights fetched from the DB by {@code JobCriteriaRepository}
-     * @return integer score in range [0, 100]
+     * @param evidenceItems   the list of evidence items returned by the LLM
+     * @param criteriaWeights the criteria+weights fetched from the DB
+     * @return a {@link ScoringResult} containing the integer score and breakdown
      */
     public ScoringResult calculateWithBreakdown(
             List<AssessmentResponseDto.EvidenceItem> evidenceItems,
@@ -70,6 +84,10 @@ public class ScoringService {
             log.warn("[Scoring] No criteria weights found in DB — returning score 0.");
             return new ScoringResult(0, null, evidenceItems);
         }
+
+        // Read STATUS_WEAK_COEFF dynamically from system_settings
+        double pointsWeak = systemSettingRepository.getDouble("STATUS_WEAK_COEFF", DEFAULT_WEAK_COEFF);
+        log.debug("[Scoring] STATUS_WEAK_COEFF={} (from DB or fallback)", pointsWeak);
 
         // Build a lookup map: criteriaId → weightPercentage
         Map<Long, Double> weightMap = criteriaWeights.stream()
@@ -99,9 +117,9 @@ public class ScoringService {
                 continue;
             }
 
-            double points = statusToPoints(item.status());
+            double points = statusToPoints(item.status(), pointsWeak);
             double scoreContribution = weight * points;
-            
+
             if ("not_applicable".equalsIgnoreCase(item.status())) {
                 log.debug("[Scoring] JD-Driven logic: criteria='{}' is not_applicable. Excluding weight.", item.criteriaName());
             } else {
@@ -130,14 +148,14 @@ public class ScoringService {
         if (totalWeightUsed > 0.0) {
             score = (int) Math.round((weightedPointsSum / totalWeightUsed) * 100.0);
             score = Math.max(0, Math.min(100, score));
-            
+
             breakdown = new AssessmentResponse.ScoreBreakdown(
                     weightedPointsSum,
                     totalWeightUsed,
                     "SUM(weight_i * points_i) / SUM(weight_i) * 100",
-                    Map.of("matched", POINTS_MATCHED, "weak", POINTS_WEAK, "missing", POINTS_MISSING)
+                    Map.of("matched", POINTS_MATCHED, "weak", pointsWeak, "missing", POINTS_MISSING)
             );
-            log.info("[Scoring] overall_match_score={} (weighted_sum={:.2f} / total_weight={:.2f})",
+            log.info("[Scoring] overall_match_score={} (weighted_sum={} / total_weight={})",
                     score, weightedPointsSum, totalWeightUsed);
         } else {
             log.warn("[Scoring] Total weight used is 0 — no matching criteria found. Returning score 0.");
@@ -152,19 +170,22 @@ public class ScoringService {
         return calculateWithBreakdown(evidenceItems, criteriaWeights).score();
     }
 
-    // -------------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────────────────
     // Private helper
-    // -------------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────────────────
 
     /**
      * Maps an evidence {@code status} string to a numeric point value.
-     * Defaults to 0.0 for any unrecognised or null status.
+     *
+     * @param status    the status string ("matched", "weak", "missing", etc.)
+     * @param weakCoeff the dynamically loaded coefficient for "weak" status
+     * @return numeric point value (0.0 – 1.0)
      */
-    private double statusToPoints(String status) {
+    private double statusToPoints(String status, double weakCoeff) {
         if (status == null) return POINTS_MISSING;
         return switch (status.toLowerCase().strip()) {
             case "matched" -> POINTS_MATCHED;
-            case "weak"    -> POINTS_WEAK;
+            case "weak"    -> weakCoeff;
             default        -> POINTS_MISSING; // "missing" or unknown
         };
     }

@@ -41,7 +41,11 @@ export default function LoginPage() {
         data.token
       );
 
-      router.push('/');
+      if (data.role === 'ADMIN') {
+        router.push('/admin/rules');
+      } else {
+        router.push('/');
+      }
     } catch (err: any) {
       const msg =
         err?.response?.data?.detail ||

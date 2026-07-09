@@ -1,15 +1,38 @@
 package fit.iuh.modules.questionbank;
 
+import fit.iuh.modules.admin.LevelDistributionRule;
+import fit.iuh.modules.admin.LevelDistributionRuleRepository;
+import fit.iuh.modules.admin.SystemSettingRepository;
 import fit.iuh.modules.assessment.SeniorityLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+
 import java.util.*;
 
 /**
  * Calculates difficulty distribution (easy/medium/hard count) based on candidate level
  * and overall match score using the largest remainder method for rounding.
+ *
+ * <h2>Dynamic Configuration</h2>
+ * This component previously contained hardcoded constants:
+ * <ul>
+ *   <li>{@code 50.0} — pivot score (now read from {@code system_settings.MATCH_SCORE_PIVOT})</li>
+ *   <li>Switch-case level distributions — now read from {@code level_distribution_rules}</li>
+ * </ul>
+ * If either source returns {@code null} or is empty, sensible fallbacks are used to
+ * ensure the service never crashes due to a missing configuration row.
  */
+@Slf4j
 @Component
+@RequiredArgsConstructor
 public class DifficultyDistributor {
+
+    // ─── Fallback constants (used when DB is not yet seeded) ────────────────
+    private static final double DEFAULT_PIVOT = 50.0;
+
+    private final SystemSettingRepository          systemSettingRepository;
+    private final LevelDistributionRuleRepository  levelDistributionRuleRepository;
 
     /**
      * Calculates the difficulty and category distribution for a given total number of questions,
@@ -33,52 +56,85 @@ public class DifficultyDistributor {
         return assignQuestions(categoryCounts, items);
     }
 
-    private Map<String, Integer> calculateCategoryDistribution(int totalQuestions, SeniorityLevel level, Integer overallMatchScore) {
-        double f = (overallMatchScore != null ? overallMatchScore : 50) - 50.0;
-        f = f / 50.0;
-        f = Math.max(-1.0, Math.min(1.0, f));
+    // ─────────────────────────────────────────────────────────────────────────
+    // Category distribution calculation — reads from DB with fallbacks
+    // ─────────────────────────────────────────────────────────────────────────
 
-        double baseBeh, baseTech, baseCod, baseSys;
-        double shiftBeh = -10.0 * f;
-        double shiftCod, shiftSys;
+    private Map<String, Integer> calculateCategoryDistribution(int totalQuestions, SeniorityLevel level, Integer overallMatchScore) {
+        // Read pivot from system_settings (fallback: 50.0)
+        double pivot = systemSettingRepository.getDouble("MATCH_SCORE_PIVOT", DEFAULT_PIVOT);
+
+        double f = (overallMatchScore != null ? overallMatchScore : pivot) - pivot;
+        f = f / pivot;
+        f = Math.max(-1.0, Math.min(1.0, f));
 
         if (level == null) level = SeniorityLevel.MID;
 
-        switch (level) {
-            case INTERN:
-            case FRESHER:
-                baseBeh = 40; baseTech = 50; baseCod = 10; baseSys = 0;
-                shiftCod = 10.0 * f; shiftSys = 0;
-                break;
-            case JUNIOR:
-                baseBeh = 30; baseTech = 50; baseCod = 20; baseSys = 0;
-                shiftCod = 10.0 * f; shiftSys = 0;
-                break;
-            case MID:
-                baseBeh = 20; baseTech = 40; baseCod = 20; baseSys = 20;
-                shiftCod = 5.0 * f; shiftSys = 5.0 * f;
-                break;
-            case SENIOR:
-                baseBeh = 20; baseTech = 30; baseCod = 10; baseSys = 40;
-                shiftCod = 5.0 * f; shiftSys = 5.0 * f;
-                break;
-            case LEAD:
-                baseBeh = 20; baseTech = 20; baseCod = 10; baseSys = 50;
-                shiftCod = 5.0 * f; shiftSys = 5.0 * f;
-                break;
-            default:
-                baseBeh = 20; baseTech = 40; baseCod = 20; baseSys = 20;
-                shiftCod = 5.0 * f; shiftSys = 5.0 * f;
-                break;
+        // Read base distributions from level_distribution_rules (fallback: hardcoded defaults)
+        LevelDistributionRule rule = levelDistributionRuleRepository
+                .findByLevel(level.name())
+                .orElse(null);
+
+        double baseBeh, baseTech, baseCod, baseSys;
+        double shiftCod, shiftSys;
+        double shiftBeh = -10.0 * f;
+
+        if (rule != null) {
+            baseBeh = rule.getBehavioralPct();
+            baseTech = rule.getTechnicalPct();
+            baseCod  = rule.getCodingPct();
+            baseSys  = rule.getSystemDesignPct();
+
+            // Adaptive shifts: if system design is non-zero apply split shift, otherwise all to coding
+            if (baseSys > 0) {
+                shiftCod = 5.0 * f;
+                shiftSys = 5.0 * f;
+            } else {
+                shiftCod = 10.0 * f;
+                shiftSys = 0;
+            }
+
+            log.debug("[DifficultyDistributor] Loaded rule from DB for level={}: beh={}, tech={}, cod={}, sys={}",
+                    level, baseBeh, baseTech, baseCod, baseSys);
+        } else {
+            // Fallback: embedded defaults matching original hardcoded behaviour
+            log.warn("[DifficultyDistributor] No DB rule found for level={}, using hardcoded fallback.", level);
+            switch (level) {
+                case INTERN:
+                case FRESHER:
+                    baseBeh = 40; baseTech = 50; baseCod = 10; baseSys = 0;
+                    shiftCod = 10.0 * f; shiftSys = 0;
+                    break;
+                case JUNIOR:
+                    baseBeh = 30; baseTech = 50; baseCod = 20; baseSys = 0;
+                    shiftCod = 10.0 * f; shiftSys = 0;
+                    break;
+                case SENIOR:
+                    baseBeh = 20; baseTech = 30; baseCod = 10; baseSys = 40;
+                    shiftCod = 5.0 * f; shiftSys = 5.0 * f;
+                    break;
+                case LEAD:
+                    baseBeh = 20; baseTech = 20; baseCod = 10; baseSys = 50;
+                    shiftCod = 5.0 * f; shiftSys = 5.0 * f;
+                    break;
+                default: // MID
+                    baseBeh = 20; baseTech = 40; baseCod = 20; baseSys = 20;
+                    shiftCod = 5.0 * f; shiftSys = 5.0 * f;
+                    break;
+            }
         }
 
-        double behPct = baseBeh + shiftBeh;
+        double behPct  = baseBeh + shiftBeh;
         double techPct = baseTech;
-        double codPct = baseCod + shiftCod;
-        double sysPct = baseSys + shiftSys;
+        double codPct  = baseCod + shiftCod;
+        double sysPct  = baseSys + shiftSys;
 
         return applyLargestRemainderMethod(totalQuestions, behPct, techPct, codPct, sysPct);
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Largest Remainder Method — unchanged from original implementation
+    // ─────────────────────────────────────────────────────────────────────────
 
     private Map<String, Integer> applyLargestRemainderMethod(int totalCount, double... pcts) {
         String[] types = {"behavioural", "technical", "coding", "system_design"};
@@ -124,6 +180,10 @@ public class DifficultyDistributor {
         }
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // Item-level difficulty mapping — unchanged from original
+    // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * Determines item-level difficulty.
      * INVARIANT: overallMatchScore MUST NOT be used here to preserve cache consistency.
@@ -132,25 +192,24 @@ public class DifficultyDistributor {
         if (status == null) return "medium"; // baseline
         return switch (status.toLowerCase().strip()) {
             case "missing" -> "easy";
-            case "weak" -> "medium";
+            case "weak"    -> "medium";
             case "matched" -> "hard";
-            default -> "medium";
+            default        -> "medium";
         };
     }
 
     private List<QuestionAssignment> assignQuestions(Map<String, Integer> categoryCounts, List<EvidenceItemPair> items) {
         List<QuestionAssignment> assignments = new ArrayList<>();
-        
+
         // Ensure non-null items list
         List<EvidenceItemPair> safeItems = items != null ? new ArrayList<>(items) : new ArrayList<>();
-        
-        // Remove not_applicable or missing items we don't want to ask about? No, user says "missing -> foundational/easy".
+
         // Sort items: weightUsed DESC, then missing status
         safeItems.sort((a, b) -> {
             double wA = a.weightUsed() != null ? a.weightUsed() : 0.0;
             double wB = b.weightUsed() != null ? b.weightUsed() : 0.0;
             if (Double.compare(wB, wA) != 0) return Double.compare(wB, wA);
-            
+
             boolean aMissing = "missing".equalsIgnoreCase(a.status());
             boolean bMissing = "missing".equalsIgnoreCase(b.status());
             if (aMissing && !bMissing) return -1;
@@ -176,11 +235,11 @@ public class DifficultyDistributor {
         for (Map.Entry<String, Integer> entry : categoryCounts.entrySet()) {
             String category = entry.getKey();
             int count = entry.getValue();
-            
+
             for (int i = 0; i < count; i++) {
                 EvidenceItemPair assignedItem = null;
                 boolean isFollowUp = pass > 0;
-                
+
                 if (!safeItems.isEmpty()) {
                     assignedItem = safeItems.get(itemIndex);
                     itemIndex++;
@@ -189,7 +248,7 @@ public class DifficultyDistributor {
                         pass++;
                     }
                 }
-                
+
                 String difficulty = assignedItem != null ? mapDifficulty(assignedItem.status()) : "medium";
                 assignments.add(new QuestionAssignment(assignedItem, category, difficulty, isFollowUp));
             }
