@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { RefreshCw, ChevronDown, ChevronUp, FileText, X } from 'lucide-react';
-import styles from '@/app/interview/new/new.module.css';
+import styles from '@/app/(main)/interview/new/new.module.css';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
