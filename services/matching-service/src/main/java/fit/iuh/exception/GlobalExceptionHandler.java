@@ -21,7 +21,6 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
  *   <li>{@link PdfParsingException}         → 400 Bad Request</li>
  *   <li>{@link IngestionException}           → 400 Bad Request</li>
  *   <li>{@link LlmApiException}              → 502 Bad Gateway</li>
- *   <li>{@link EmbeddingException}           → 502 Bad Gateway</li>
  *   <li>{@link MaxUploadSizeExceededException} → 413 Payload Too Large</li>
  *   <li>{@link QuestionBankException}         → 422 Unprocessable Entity</li>
  *   <li>{@link Exception} (catch-all)        → 500 Internal Server Error</li>
@@ -115,24 +114,7 @@ public class GlobalExceptionHandler {
                         .build());
     }
 
-    /**
-     * Handles failures when calling the OpenAI Embeddings API
-     * (timeout, rate limit, invalid API key, wrong dimension).
-     */
-    @ExceptionHandler(EmbeddingException.class)
-    public ResponseEntity<ErrorResponse> handleEmbeddingException(
-            EmbeddingException ex, HttpServletRequest request) {
 
-        log.error("[EMBEDDING_ERROR] path={} | {}", request.getRequestURI(), ex.getMessage(), ex);
-        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
-                .body(ErrorResponse.builder()
-                        .status(HttpStatus.BAD_GATEWAY.value())
-                        .errorCode("EMBEDDING_ERROR")
-                        .message("Failed to generate embedding vectors via local/configured Embeddings API. Please retry.")
-                        .detail(ex.getMessage())
-                        .path(request.getRequestURI())
-                        .build());
-    }
 
     // -------------------------------------------------------------------------
     // 422 Unprocessable Entity — question bank generation errors

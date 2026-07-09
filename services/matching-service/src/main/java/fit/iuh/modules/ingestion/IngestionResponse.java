@@ -17,15 +17,6 @@ public class IngestionResponse {
     /** The session ID associated with this ingestion (echoed back from the URL path). */
     private String sessionId;
 
-    /** Number of CV chunks saved to the database after splitting. */
-    private int cvChunksCount;
-
-    /** Number of JD chunks saved to the database after splitting. */
-    private int jdChunksCount;
-
-    /** Total number of chunks saved (cvChunksCount + jdChunksCount). */
-    private int totalChunksCount;
-
     /** High-level status: {@code "SUCCESS"} or {@code "PARTIAL_SUCCESS"}. */
     private String status;
 
