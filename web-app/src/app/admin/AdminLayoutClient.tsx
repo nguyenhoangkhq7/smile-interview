@@ -33,14 +33,6 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
                 Live
               </span>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-slate-500 hidden sm:block">
-                matching-service · port 8081
-              </span>
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-orange-700 flex items-center justify-center text-white text-xs font-bold shadow-lg shadow-orange-900/30">
-                A
-              </div>
-            </div>
           </header>
 
           {/* Page content */}

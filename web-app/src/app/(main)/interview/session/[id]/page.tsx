@@ -31,7 +31,8 @@ import {
   CornerDownRight,
   Copy,
   CheckCircle,
-  ArrowRight
+  ArrowRight,
+  Send
 } from 'lucide-react';
 
 type SessionState = 'INITIALIZING' | 'AI_SPEAKING' | 'LISTENING' | 'AI_THINKING' | 'FINISHED';
@@ -86,6 +87,8 @@ export default function InterviewSessionPage() {
   // Recording & STT Audio buffers
   const [recording, setRecording] = useState(false);
   const [userAnswerDraft, setUserAnswerDraft] = useState('');
+  const [inputType, setInputType] = useState<'voice' | 'keyboard'>('voice');
+  const [keyboardAnswer, setKeyboardAnswer] = useState('');
   const [baseQuestionIndex, setBaseQuestionIndex] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -404,9 +407,14 @@ export default function InterviewSessionPage() {
   const handleStartRecording = useCallback(async () => {
     setUserAnswerDraft('');
     audioChunksRef.current = [];
-    setRecording(true);
 
-    if (sttMode === 'online' && mediaStream) {
+    if (sttMode === 'online') {
+      if (!mediaStream) {
+        console.error('No media stream available for online STT.');
+        alert('Thiết bị ghi âm không sẵn sàng hoặc quyền truy cập Microphone bị từ chối.');
+        return;
+      }
+      setRecording(true);
       try {
         const audioTracks = mediaStream.getAudioTracks();
         if (audioTracks.length === 0) {
@@ -454,6 +462,7 @@ export default function InterviewSessionPage() {
         setRecording(false);
       }
     } else {
+      setRecording(true);
       console.log('[Session] Starting webkitSpeechRecognition...');
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (SpeechRecognition) {
@@ -515,22 +524,10 @@ export default function InterviewSessionPage() {
         speechRecognitionRef.current = rec;
         rec.start();
       } else {
-        console.warn('SpeechRecognition not supported in this browser. Simulating typing answer.');
-        let i = 0;
-        const targetText = 'Tôi nghĩ useMemo và useCallback dùng để tối ưu hóa hiệu năng render trong React. useMemo giúp lưu giữ giá trị của phép tính phức tạp, còn useCallback giúp lưu giữ tham chiếu của callback function nhằm tránh re-render.';
-        const typingInterval = setInterval(() => {
-          if (isExitingRef.current) {
-            clearInterval(typingInterval);
-            return;
-          }
-          setUserAnswerDraft((prev) => prev + targetText.charAt(i));
-          i++;
-          if (i >= targetText.length) {
-            clearInterval(typingInterval);
-            setRecording(false);
-            submitFinalAnswer(targetText);
-          }
-        }, 30);
+        console.warn('SpeechRecognition not supported in this browser. Switching to keyboard input.');
+        alert('Trình duyệt của bạn không hỗ trợ Nhận diện Giọng nói. Vui lòng nhập câu trả lời bằng bàn phím.');
+        setInputType('keyboard');
+        setRecording(false);
       }
     }
   }, [sttMode, mediaStream, uploadAudioBlob, submitFinalAnswer]);
@@ -1314,19 +1311,120 @@ export default function InterviewSessionPage() {
           </div>
         )}
 
-        {/* Action trigger bar for speech input in LISTENING mode */}
+        {/* Action trigger bar for speech or keyboard input in LISTENING mode */}
         {sessionState === 'LISTENING' && (
-          <div className="p-3 border-t border-slate-200 bg-slate-50/30 flex justify-center shrink-0">
-            {recording ? (
-              <button className={styles.stopRecordingBtn} onClick={handleStopRecording}>
-                <MicOff size={16} />
-                <span>Tôi đã trả lời xong (Dừng ghi)</span>
-              </button>
+          <div className="p-3 border-t border-slate-200 bg-slate-50/30 flex justify-center shrink-0 w-full">
+            {inputType === 'keyboard' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', width: '100%', alignItems: 'flex-end' }}>
+                  <textarea
+                    value={keyboardAnswer}
+                    onChange={(e) => setKeyboardAnswer(e.target.value)}
+                    placeholder="Nhập câu trả lời của bạn tại đây..."
+                    style={{
+                      flex: 1,
+                      minHeight: '80px',
+                      padding: '0.75rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '0.85rem',
+                      outline: 'none',
+                      resize: 'none',
+                      fontFamily: 'inherit',
+                      color: '#0f172a',
+                      backgroundColor: '#ffffff'
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        if (keyboardAnswer.trim()) {
+                          submitFinalAnswer(keyboardAnswer);
+                          setKeyboardAnswer('');
+                        }
+                      }
+                    }}
+                  />
+                  <button
+                    onClick={() => {
+                      if (keyboardAnswer.trim()) {
+                        submitFinalAnswer(keyboardAnswer);
+                        setKeyboardAnswer('');
+                      }
+                    }}
+                    disabled={!keyboardAnswer.trim()}
+                    style={{
+                      backgroundColor: keyboardAnswer.trim() ? '#ea580c' : '#cbd5e1',
+                      color: '#ffffff',
+                      border: 'none',
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '0.5rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: keyboardAnswer.trim() ? 'pointer' : 'default',
+                      transition: 'all 0.2s',
+                      flexShrink: 0
+                    }}
+                  >
+                    <Send size={16} />
+                  </button>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Nhấn Enter để gửi, Shift + Enter để xuống dòng</span>
+                  <button
+                    onClick={() => setInputType('voice')}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#ea580c',
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem'
+                    }}
+                  >
+                    <Mic size={12} />
+                    <span>Trả lời bằng giọng nói</span>
+                  </button>
+                </div>
+              </div>
             ) : (
-              <button className={styles.startSpeakingBtn} onClick={handleStartRecording} disabled={permissionError || isRevealing}>
-                <Mic size={16} />
-                <span>Bắt đầu nói (Bật ghi âm)</span>
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', width: '100%' }}>
+                {recording ? (
+                  <button className={styles.stopRecordingBtn} onClick={handleStopRecording} style={{ width: '100%', maxWidth: '400px' }}>
+                    <MicOff size={16} />
+                    <span>Tôi đã trả lời xong (Dừng ghi)</span>
+                  </button>
+                ) : (
+                  <button className={styles.startSpeakingBtn} onClick={handleStartRecording} disabled={permissionError || isRevealing} style={{ width: '100%', maxWidth: '400px' }}>
+                    <Mic size={16} />
+                    <span>Bắt đầu nói (Bật ghi âm)</span>
+                  </button>
+                )}
+                {!recording && (
+                  <button
+                    onClick={() => setInputType('keyboard')}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#64748b',
+                      fontSize: '0.78rem',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem',
+                      marginTop: '0.25rem'
+                    }}
+                  >
+                    <MessageSquare size={12} />
+                    <span>Nhập câu trả lời bằng bàn phím</span>
+                  </button>
+                )}
+              </div>
             )}
           </div>
         )}

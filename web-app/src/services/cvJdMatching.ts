@@ -24,6 +24,10 @@ export interface AssessmentResponse {
   actionableImprovementSuggestions: string[];
   cached: boolean;
   createdAt: string;
+  evidenceItems?: any[];
+  additionalEvidenceItems?: any[];
+  scoreBreakdown?: any;
+  topPriorityImprovements?: any[];
 }
 
 const getBaseUrl = () => {

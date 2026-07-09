@@ -46,6 +46,11 @@ export interface SessionHistoryItem {
   actionableSuggestions?: string[];
   resumeId?: number;
   jdId?: number;
+  evidenceItems?: any[];
+  additionalEvidenceItems?: any[];
+  scoreBreakdown?: any;
+  topPriorityImprovements?: any[];
+  hiringRecommendation?: string;
 }
 
 export interface SessionSavePayload extends SessionHistoryItem {

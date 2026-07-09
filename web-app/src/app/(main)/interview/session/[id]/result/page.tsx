@@ -125,54 +125,12 @@ export default function InterviewResultPage() {
     );
   }
 
-  const radius = 50;
-  const circumference = 2 * Math.PI * radius;
-
-  const renderFeedbackValue = (val: any) => {
-    if (val && typeof val === 'object') {
-      return val.analysis || JSON.stringify(val);
-    }
-    return String(val || '');
-  };
-
-  const getSectionName = (key: string) => {
-    const SECTION_NAMES: Record<string, string> = {
-      cs_fundamentals: "Kiến thức Khoa học Máy tính cốt lõi (CS Fundamentals)",
-      tech_stack_alignment: "Mức độ tương thích Tech Stack",
-      project_technical_depth: "Chiều sâu kỹ thuật trong các dự án",
-      engineering_practices: "Quy trình và Thực hành Kỹ nghệ",
-      experience_evaluation: "Đánh giá kinh nghiệm làm việc",
-      education_and_certifications: "Đánh giá học vấn & chứng chỉ"
-    };
-    return SECTION_NAMES[key] || key.replace(/_/g, ' ').toUpperCase();
-  };
-
-  // Fallbacks if user bypassed upload phase
   const score = session.overallScore || 78;
-  const competencyScore = session.competencyFitScore || 75;
-  const technicalDepthScore = session.technicalDepthScore || 70;
-
-  const strokeDashoffset = circumference - (competencyScore / 100) * circumference;
-  const depthStrokeDashoffset = circumference - (technicalDepthScore / 100) * circumference;
 
   const overallFeedbackText = session.overallFeedback || 'Ứng viên hoàn thành buổi phỏng vấn ở mức Khá. Có kiến thức tương đối vững chắc về lập trình giao diện Frontend, đặc biệt là hệ sinh thái React. Kỹ năng lập luận logic tốt, tuy nhiên ở các câu hỏi đào sâu (deep-dive) còn bộc lộ một số lỗ hổng về mặt chi phí vận hành (performance overhead) và cấu trúc lõi JS. Cần trau dồi thêm kiến thức tổng quan hệ thống.';
 
   return (
     <div className={styles.container}>
-      {/* Header */}
-      <header className={styles.header}>
-        <Link href="/history" className={styles.logo}>
-          <img src="/logo.png" alt="Smile Interview Logo" className={styles.logoImg} />
-        </Link>
-        <nav className={styles.navLinks}>
-          <Link href="/history" className={styles.navLink}>
-            Lịch sử
-          </Link>
-          <Link href="/interview/new" className={styles.navLink}>
-            Phỏng vấn mới
-          </Link>
-        </nav>
-      </header>
 
       {/* Main Content */}
       <main className={styles.content}>
@@ -185,12 +143,29 @@ export default function InterviewResultPage() {
         <section className={styles.summaryCard}>
           <div className={styles.scoreRow}>
             <div className={styles.scoreCircle}>
-              <span className={styles.scoreNum}>{score}</span>
+              <span className={styles.scoreNum}>{score <= 10 ? `${score}/10` : score}</span>
               <span className={styles.scoreLabel}>ĐIỂM SỐ</span>
             </div>
 
             <div className={styles.scoreText}>
-              <h2>Đánh giá chung</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
+                <h2 style={{ margin: 0 }}>Đánh giá chung</h2>
+                {session.hiringRecommendation && (
+                  <span style={{
+                    fontSize: '0.7rem',
+                    fontWeight: 850,
+                    padding: '0.2rem 0.6rem',
+                    borderRadius: '9999px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    backgroundColor: session.hiringRecommendation.toLowerCase().includes('no') ? '#fef2f2' : (session.hiringRecommendation.toLowerCase().includes('hire') ? '#ecfdf5' : '#fffbeb'),
+                    color: session.hiringRecommendation.toLowerCase().includes('no') ? '#b91c1c' : (session.hiringRecommendation.toLowerCase().includes('hire') ? '#047857' : '#d97706'),
+                    border: `1px solid ${session.hiringRecommendation.toLowerCase().includes('no') ? '#fca5a5' : (session.hiringRecommendation.toLowerCase().includes('hire') ? '#a7f3d0' : '#fcd34d')}`
+                  }}>
+                    Quyết định: {session.hiringRecommendation}
+                  </span>
+                )}
+              </div>
               <p>{overallFeedbackText}</p>
               <div style={{ marginTop: '0.75rem', fontSize: '0.8rem', color: '#64748b' }}>
                 <span>Buổi phỏng vấn kết thúc ngày: </span>
@@ -199,212 +174,69 @@ export default function InterviewResultPage() {
             </div>
           </div>
 
-          {/* ── Matching Dashboard Section ── */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+          {/* Strengths & Weaknesses Panel */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginTop: '1rem' }}>
             
-            <div style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>
-              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                Đối chiếu Hồ sơ (CV) & Mô tả công việc (JD)
+            {/* Strengths */}
+            <div style={{ padding: '1.25rem', border: '1px solid #a7f3d0', backgroundColor: '#f0fdf4', borderRadius: '0.5rem' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#15803d', fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.75rem', marginTop: 0 }}>
+                <CheckCircle size={16} />
+                <span>Điểm mạnh nổi bật</span>
               </h3>
-              <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '0.25rem 0 0 0' }}>
-                Phân tích mức độ tương thích kỹ năng và chiều sâu kinh nghiệm
-              </p>
-            </div>
-
-            {/* Dashboard: Circular rings & Badges panel */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
-              
-              {/* Ring 1: Competency Fit */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '1.5rem', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '0.75rem', textAlign: 'center' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#4f46e5', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>Tương thích Năng lực</span>
-                <div style={{ position: 'relative', width: '110px', height: '110px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <svg width="110" height="110" viewBox="0 0 120 120">
-                    <circle cx="60" cy="60" r={radius} fill="transparent" stroke="#e2e8f0" strokeWidth="8" />
-                    <circle
-                      cx="60"
-                      cy="60"
-                      r={radius}
-                      fill="transparent"
-                      stroke="#4f46e5"
-                      strokeWidth="8"
-                      strokeDasharray={circumference}
-                      strokeDashoffset={strokeDashoffset}
-                      strokeLinecap="round"
-                      transform="rotate(-90 60 60)"
-                    />
-                  </svg>
-                  <span style={{ position: 'absolute', fontSize: '2rem', fontWeight: 900, color: '#4f46e5' }}>{competencyScore}%</span>
-                </div>
-                <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '1rem', maxWidth: '200px' }}>Độ khớp tổng quan của CV ứng viên với JD yêu cầu</p>
-              </div>
-
-              {/* Ring 2: Technical Depth */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '1.5rem', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '0.75rem', textAlign: 'center' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0ea5e9', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>Chiều sâu Kỹ thuật</span>
-                <div style={{ position: 'relative', width: '110px', height: '110px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <svg width="110" height="110" viewBox="0 0 120 120">
-                    <circle cx="60" cy="60" r={radius} fill="transparent" stroke="#e2e8f0" strokeWidth="8" />
-                    <circle
-                      cx="60"
-                      cy="60"
-                      r={radius}
-                      fill="transparent"
-                      stroke="#0ea5e9"
-                      strokeWidth="8"
-                      strokeDasharray={circumference}
-                      strokeDashoffset={depthStrokeDashoffset}
-                      strokeLinecap="round"
-                      transform="rotate(-90 60 60)"
-                    />
-                  </svg>
-                  <span style={{ position: 'absolute', fontSize: '2rem', fontWeight: 900, color: '#0ea5e9' }}>{technicalDepthScore}%</span>
-                </div>
-                <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '1rem', maxWidth: '200px' }}>Độ sâu kinh nghiệm và khả năng làm chủ công nghệ cốt lõi</p>
-              </div>
-
-              {/* Classifications Badges Panel */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '1.5rem', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '0.75rem', justifyContent: 'center' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Phân loại Ứng viên</span>
-                
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>
-                  <span style={{ fontSize: '0.82rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                    <TrendingUp size={13} style={{ color: '#4f46e5' }} /> Mức độ khớp:
-                  </span>
-                  <span style={{
-                    fontSize: '0.72rem',
-                    fontWeight: 700,
-                    padding: '0.2rem 0.5rem',
-                    borderRadius: '0.25rem',
-                    backgroundColor: session.matchLevel?.toLowerCase().includes('high') || session.matchLevel?.toLowerCase().includes('rất tốt') ? '#ecfdf5' : session.matchLevel?.toLowerCase().includes('moderate') || session.matchLevel?.toLowerCase().includes('khớp') ? '#f0f9ff' : '#fffbeb',
-                    color: session.matchLevel?.toLowerCase().includes('high') || session.matchLevel?.toLowerCase().includes('rất tốt') ? '#047857' : session.matchLevel?.toLowerCase().includes('moderate') || session.matchLevel?.toLowerCase().includes('khớp') ? '#0369a1' : '#b45309',
-                    border: '1px solid currentColor'
-                  }}>
-                    {session.matchLevel || 'N/A'}
-                  </span>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>
-                  <span style={{ fontSize: '0.82rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                    <Award size={13} style={{ color: '#8b5cf6' }} /> Định hướng:
-                  </span>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '0.2rem 0.5rem', borderRadius: '0.25rem', backgroundColor: '#f5f3ff', color: '#6d28d9' }}>
-                    {session.roleTypeDetected || 'N/A'}
-                  </span>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>
-                  <span style={{ fontSize: '0.82rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                    <UserCheck size={13} style={{ color: '#0ea5e9' }} /> Cấp bậc:
-                  </span>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '0.2rem 0.5rem', borderRadius: '0.25rem', backgroundColor: '#f1f5f9', color: '#334155' }}>
-                    {session.candidateLevel || 'N/A'}
-                  </span>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.82rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                    <ShieldCheck size={13} style={{ color: '#10b981' }} /> Kinh nghiệm:
-                  </span>
-                  <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#334155' }}>
-                    {session.yearsOfExperienceEstimate || 'N/A'}
-                  </span>
-                </div>
-
-              </div>
-
-            </div>
-
-            {/* Skills & Gaps Alignment Matrix */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
-              
-              {/* Strong Areas */}
-              <div style={{ padding: '1.25rem', border: '1px solid #a7f3d0', backgroundColor: 'rgba(236, 253, 245, 0.4)', borderRadius: '0.5rem' }}>
-                <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#047857', fontWeight: 700, fontSize: '0.95rem', marginBottom: '0.75rem', marginTop: 0 }}>
-                  <CheckCircle size={16} />
-                  <span>Điểm mạnh nổi bật</span>
-                </h3>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  {(session.strongAreas || []).length > 0 ? (
-                    (session.strongAreas || []).map((skill, index) => (
-                      <span key={index} style={{ fontSize: '0.8rem', fontWeight: 600, padding: '0.35rem 0.75rem', borderRadius: '9999px', border: '1px solid #a7f3d0', backgroundColor: '#ecfdf5', color: '#047857' }}>
-                        {skill}
-                      </span>
-                    ))
-                  ) : (
-                    <span style={{ color: '#64748b', fontSize: '0.85rem', fontStyle: 'italic' }}>Không tìm thấy thế mạnh nổi bật.</span>
-                  )}
-                </div>
-              </div>
-
-              {/* Missing & Gaps */}
-              <div style={{ padding: '1.25rem', border: '1px solid #fde68a', backgroundColor: 'rgba(255, 251, 235, 0.4)', borderRadius: '0.5rem' }}>
-                <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#b45309', fontWeight: 700, fontSize: '0.95rem', marginBottom: '0.75rem', marginTop: 0 }}>
-                  <AlertTriangle size={16} style={{ color: '#b45309' }} />
-                  <span>Điểm cần cải thiện</span>
-                </h3>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  {(session.gapAreas || []).concat(session.criticalMissingSkills || []).length > 0 ? (
-                    (session.gapAreas || []).concat(session.criticalMissingSkills || []).map((skill, index) => (
-                      <span key={index} style={{ fontSize: '0.8rem', fontWeight: 600, padding: '0.35rem 0.75rem', borderRadius: '9999px', border: '1px solid #fde68a', backgroundColor: '#fffbeb', color: '#b45309' }}>
-                        {skill}
-                      </span>
-                    ))
-                  ) : (
-                    <span style={{ color: '#64748b', fontSize: '0.85rem', fontStyle: 'italic' }}>Không phát hiện thiếu hụt kỹ năng lớn.</span>
-                  )}
-                </div>
-              </div>
-
-            </div>
-
-            {/* In-depth AI Evaluation Feedbacks */}
-            {session.sectionWiseFeedback && Object.keys(session.sectionWiseFeedback).length > 0 && (
-              <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '0.5rem', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', margin: 0 }}>
-                  <Brain size={18} style={{ color: '#4f46e5' }} />
-                  <span>Phân tích chi tiết từ AI</span>
-                </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {Object.entries(session.sectionWiseFeedback).map(([section, feedback], idx) => {
-                    const cleanText = renderFeedbackValue(feedback);
-                    if (!cleanText) return null;
-                    return (
-                      <div key={idx} style={{ borderLeft: '3px solid #818cf8', paddingLeft: '1rem' }}>
-                        <h4 style={{ fontSize: '0.82rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569', margin: '0 0 0.25rem 0' }}>
-                          {getSectionName(section)}
-                        </h4>
-                        <p style={{ margin: 0, fontSize: '0.88rem', color: '#334155', lineHeight: '1.5' }}>
-                          {cleanText}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Actionable Suggestions */}
-            <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '0.5rem', padding: '1.5rem' }}>
-              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1rem', fontWeight: 700, color: '#1e293b', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', margin: '0 0 1rem 0' }}>
-                <Lightbulb size={18} style={{ color: '#eab308' }} />
-                <span>Lời khuyên chuẩn bị phỏng vấn</span>
-              </h3>
-              <ul style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '0.75rem', paddingLeft: 0, listStyle: 'none', margin: 0 }}>
-                {(session.actionableSuggestions || []).length > 0 ? (
-                  (session.actionableSuggestions || []).map((suggestion, index) => (
-                    <li key={index} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start', margin: 0 }}>
-                      <span style={{ color: '#10b981', fontWeight: 'bold', fontSize: '1.1rem', lineHeight: '1' }}>✓</span>
-                      <span style={{ fontSize: '0.88rem', color: '#475569', lineHeight: '1.4' }}>
-                        {typeof suggestion === 'object' && suggestion !== null ? ((suggestion as any).question || JSON.stringify(suggestion)) : String(suggestion)}
-                      </span>
-                    </li>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {(session.strongAreas || []).length > 0 ? (
+                  (session.strongAreas || []).map((strength, index) => (
+                    <div key={index} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                      <span style={{ color: '#15803d', fontWeight: 'bold' }}>✓</span>
+                      <span style={{ fontSize: '0.82rem', color: '#1e293b', lineHeight: '1.4' }}>{strength}</span>
+                    </div>
                   ))
                 ) : (
-                  <p style={{ fontSize: '0.85rem', color: '#64748b', fontStyle: 'italic', margin: 0 }}>Không có đề xuất thêm.</p>
+                  <span style={{ color: '#64748b', fontSize: '0.85rem', fontStyle: 'italic' }}>Không ghi nhận điểm mạnh.</span>
                 )}
-              </ul>
+              </div>
             </div>
 
+            {/* Weaknesses */}
+            <div style={{ padding: '1.25rem', border: '1px solid #fca5a5', backgroundColor: '#fef2f2', borderRadius: '0.5rem' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#b91c1c', fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.75rem', marginTop: 0 }}>
+                <AlertCircle size={16} style={{ color: '#b91c1c' }} />
+                <span>Điểm cần cải thiện</span>
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {(session.gapAreas || []).length > 0 ? (
+                  (session.gapAreas || []).map((weakness, index) => (
+                    <div key={index} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                      <span style={{ color: '#b91c1c', fontWeight: 'bold' }}>✗</span>
+                      <span style={{ fontSize: '0.82rem', color: '#1e293b', lineHeight: '1.4' }}>{weakness}</span>
+                    </div>
+                  ))
+                ) : (
+                  <span style={{ color: '#64748b', fontSize: '0.85rem', fontStyle: 'italic' }}>Không ghi nhận điểm yếu.</span>
+                )}
+              </div>
+            </div>
+
+          </div>
+
+          {/* Recommendations */}
+          <div style={{ backgroundColor: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '0.5rem', padding: '1.25rem', marginTop: '1.5rem' }}>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', fontWeight: 700, color: '#0f172a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', margin: '0 0 0.75rem 0' }}>
+              <Lightbulb size={18} style={{ color: '#eab308' }} />
+              <span>Khuyến nghị từ AI</span>
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {(session.actionableSuggestions || []).length > 0 ? (
+                (session.actionableSuggestions || []).map((suggestion, index) => (
+                  <div key={index} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                    <span style={{ color: '#ea580c', fontWeight: 'bold' }}>➔</span>
+                    <span style={{ fontSize: '0.82rem', color: '#334155', lineHeight: '1.4' }}>{suggestion}</span>
+                  </div>
+                ))
+              ) : (
+                <p style={{ fontSize: '0.82rem', color: '#64748b', fontStyle: 'italic', margin: 0 }}>Không có đề xuất thêm.</p>
+              )}
+            </div>
           </div>
         </section>
 
@@ -513,9 +345,6 @@ export default function InterviewResultPage() {
         </div>
       </main>
 
-      <footer className={styles.footer}>
-        <img src="/footer.png" alt="Smile Interview Footer" className={styles.footerImg} />
-      </footer>
     </div>
   );
 }

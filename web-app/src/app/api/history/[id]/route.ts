@@ -48,6 +48,11 @@ export async function GET(
       criticalMissingSkills: sess.critical_missing_skills ? sess.critical_missing_skills : undefined,
       sectionWiseFeedback: sess.section_wise_feedback ? sess.section_wise_feedback : undefined,
       actionableSuggestions: sess.actionable_suggestions ? sess.actionable_suggestions : undefined,
+      evidenceItems: sess.evidence_items ? sess.evidence_items : undefined,
+      additionalEvidenceItems: sess.additional_evidence_items ? sess.additional_evidence_items : undefined,
+      scoreBreakdown: sess.score_breakdown ? sess.score_breakdown : undefined,
+      topPriorityImprovements: sess.top_priority_improvements ? sess.top_priority_improvements : undefined,
+      hiringRecommendation: sess.hiring_recommendation ? sess.hiring_recommendation : undefined,
       questions: turns.map((t) => ({
         question: t.question,
         answer: t.answer,

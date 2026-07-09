@@ -1,21 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import styles from './history.module.css';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
-
-// ── Types ────────────────────────────────────────────────────────────────────
-
-interface HistoryItem {
-  id: string;
-  filename: string;
-  badge: string;
-  badgeClass: string;
-  score: string;
-  level: string;
-  category: string;
-  date: string;
-}
+import { historyService, SessionHistoryItem } from '@/services/historyService';
 
 // ── Empty State ──────────────────────────────────────────────────────────────
 
@@ -58,18 +47,49 @@ function EmptyHistory() {
 // ── History Item Card ────────────────────────────────────────────────────────
 
 interface HistoryItemCardProps {
-  item: HistoryItem;
+  item: SessionHistoryItem;
 }
 
 function HistoryItemCard({ item }: HistoryItemCardProps) {
+  const isCompleted = item.status === 'Completed';
+  
+  // Format score based on status
+  let displayScore = 'N/A';
+  if (isCompleted && item.overallScore !== undefined && item.overallScore !== null) {
+    displayScore = item.overallScore <= 10 ? `${item.overallScore}/10` : `${item.overallScore}`;
+  } else if (item.competencyFitScore !== undefined && item.competencyFitScore !== null) {
+    displayScore = `${item.competencyFitScore}% (CV Match)`;
+  }
+
+  // Format badge
+  const badgeText = isCompleted ? 'Đã hoàn thành' : 'Đang phỏng vấn';
+  const badgeClass = isCompleted ? styles.badgeGreen : styles.badgeAmber;
+
+  const formatDate = (dateStr: string) => {
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('vi-VN', {
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const actionLink = isCompleted 
+    ? `/interview/session/${item.id}/result` 
+    : `/interview/session/${item.id}`;
+
   return (
     <div className={styles.itemCard}>
       {/* Content Details */}
       <div className={styles.itemMain}>
         <div className={styles.itemTitleRow}>
-          <span className={styles.itemTitle}>{item.filename}</span>
-          <span className={`${styles.itemBadge} ${item.badgeClass}`}>
-            {item.badge}
+          <span className={styles.itemTitle}>{item.roleTitle || item.cvFilename || 'Không rõ vị trí'}</span>
+          <span className={`${styles.itemBadge} ${badgeClass}`}>
+            {badgeText}
           </span>
         </div>
 
@@ -77,42 +97,43 @@ function HistoryItemCard({ item }: HistoryItemCardProps) {
         <div className={styles.itemMeta}>
           <div>
             <span className={styles.metaLabel}>Điểm số:</span>
-            <span className={styles.metaScore}>{item.score}</span>
+            <span className={styles.metaScore}>{displayScore}</span>
           </div>
           <div>
             <span className={styles.metaLabel}>Cấp độ:</span>
-            <span className={styles.metaVal}>&quot;{item.level}&quot;</span>
+            <span className={styles.metaVal}>&quot;{item.candidateLevel || 'N/A'}&quot;</span>
           </div>
           <div>
             <span className={styles.metaLabel}>Ngành nghề:</span>
-            <span className={styles.metaVal}>&quot;{item.category}&quot;</span>
+            <span className={styles.metaVal}>&quot;{item.roleTypeDetected || 'N/A'}&quot;</span>
           </div>
           <div>
             <span className={styles.metaLabel}>Ngày tạo:</span>
-            <span className={styles.metaVal}>{item.date}</span>
+            <span className={styles.metaVal}>{formatDate(item.date)}</span>
           </div>
         </div>
       </div>
 
       {/* Action button */}
       <div>
-        <button className={styles.btnMatching}>
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <circle cx="12" cy="12" r="10" />
-            <circle cx="12" cy="12" r="6" />
-            <circle cx="12" cy="12" r="2" />
-          </svg>
-          Matching JD
-        </button>
+        <Link href={actionLink}>
+          <button className={styles.btnMatching}>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 8 12 12 16 14" />
+            </svg>
+            <span>{isCompleted ? 'Xem báo cáo' : 'Tiếp tục'}</span>
+          </button>
+        </Link>
       </div>
     </div>
   );
@@ -124,17 +145,58 @@ export default function HistoryPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [timeFilter, setTimeFilter] = useState('all');
   const [scoreFilter, setScoreFilter] = useState('all');
+  const [historyData, setHistoryData] = useState<SessionHistoryItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // TODO: replace with real API call when backend is ready
-  const historyData: HistoryItem[] = [];
+  useEffect(() => {
+    async function fetchHistory() {
+      try {
+        const data = await historyService.getHistory();
+        setHistoryData(data);
+      } catch (err) {
+        console.error('Error fetching history:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchHistory();
+  }, []);
 
   const filtered = historyData.filter((item) => {
+    // 1. Search filter
+    const title = item.roleTitle || item.cvFilename || '';
     const matchSearch =
       !searchTerm ||
-      item.filename.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.level.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.category.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchSearch;
+      title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.candidateLevel || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.roleTypeDetected || '').toLowerCase().includes(searchTerm.toLowerCase());
+    
+    if (!matchSearch) return false;
+
+    // 2. Time filter
+    if (timeFilter !== 'all') {
+      const createdDate = new Date(item.date);
+      const now = new Date();
+      const diffTime = Math.abs(now.getTime() - createdDate.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (timeFilter === 'week' && diffDays > 7) return false;
+      if (timeFilter === 'month' && diffDays > 30) return false;
+    }
+
+    // 3. Score filter
+    if (scoreFilter !== 'all') {
+      // Prioritize overallScore, fallback to competencyFitScore
+      const score = item.overallScore !== undefined && item.overallScore !== null
+        ? (item.overallScore <= 10 ? item.overallScore * 10 : item.overallScore)
+        : (item.competencyFitScore || 0);
+
+      if (scoreFilter === 'high' && score < 80) return false;
+      if (scoreFilter === 'medium' && (score < 60 || score > 80)) return false;
+      if (scoreFilter === 'low' && score >= 60) return false;
+    }
+
+    return true;
   });
 
   return (
@@ -238,7 +300,17 @@ export default function HistoryPage() {
             </div>
 
             <div className={styles.listItems}>
-              {filtered.length === 0 ? (
+              {loading ? (
+                <div style={{ display: 'flex', padding: '3rem', justifyContent: 'center' }}>
+                  <div style={{ width: '30px', height: '30px', border: '3px solid #f1f5f9', borderTop: '3px solid #166534', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                  <style jsx>{`
+                    @keyframes spin {
+                      0% { transform: rotate(0deg); }
+                      100% { transform: rotate(360deg); }
+                    }
+                  `}</style>
+                </div>
+              ) : filtered.length === 0 ? (
                 <EmptyHistory />
               ) : (
                 filtered.map((item) => (
