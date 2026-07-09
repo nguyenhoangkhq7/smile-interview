@@ -1,9 +1,4 @@
-/**
- * CV & JD Matching Service
- * 
- * Initiates the CV-JD analysis and fetches results.
- * Communicates with the local Next.js proxy API routes to bypass CORS and hide internal ports.
- */
+import { useAuthStore } from '@/store/authStore';
 
 export interface IngestResponse {
   sessionId: string;
@@ -65,9 +60,16 @@ export const cvJdMatchingService = {
       formData.append('jdId', String(jdId));
     }
 
+    const headers: Record<string, string> = {};
+    const token = useAuthStore.getState().token;
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
     const res = await fetch(`${getBaseUrl()}/ingest/${sessionId}`, {
       method: 'POST',
       body: formData,
+      headers: headers,
     });
 
     if (!res.ok) {
@@ -82,7 +84,16 @@ export const cvJdMatchingService = {
    */
   async getAssessment(sessionId: string, forceRefresh = false): Promise<AssessmentResponse> {
     const url = `${getBaseUrl()}/assess?sessionId=${sessionId}&forceRefresh=${forceRefresh}`;
-    const res = await fetch(url);
+    
+    const headers: Record<string, string> = {};
+    const token = useAuthStore.getState().token;
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const res = await fetch(url, {
+      headers: headers
+    });
 
     if (!res.ok) {
       const errorText = await res.text();

@@ -13,12 +13,29 @@ export async function POST(request: NextRequest) {
     const targetUrl = `${backendUrl}/api/v1/question-banks/generate`;
 
     console.log(`[API Proxy QuestionBank] Forwarding to backend: ${targetUrl}`);
+    const authHeader = request.headers.get('Authorization');
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
+    }
+
+    // Calculate total questions requested from categories
+    const totalQuestions =
+      (questionConfig.behavioural || 0) +
+      (questionConfig.technical || 0) +
+      (questionConfig.coding || 0) +
+      (questionConfig.systemDesign || 0) ||
+      5;
+
     const backendRes = await fetch(targetUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: headers,
       body: JSON.stringify({
         session_id: sessionId,
-        question_config: questionConfig
+        question_config: {
+          totalQuestions: totalQuestions,
+          total_questions: totalQuestions
+        }
       })
     });
 

@@ -8,6 +8,7 @@ import { InterviewerAvatar } from '@/components/interview/InterviewerAvatar/Inte
 import { historyService, SessionHistoryItem, QuestionFeedback } from '@/services/historyService';
 // Removed questionService
 import { useSessionRecorder } from '@/hooks/useSessionRecorder';
+import { useAuthStore } from '@/store/authStore';
 import styles from './session.module.css';
 import {
   Camera,
@@ -201,7 +202,15 @@ export default function InterviewSessionPage() {
 
         // Trigger background evaluation on the backend immediately!
         console.log(`[Session Finish] Triggering background evaluation for session: ${id}`);
-        fetch(`/api/sessions/${id}/evaluate`, { method: 'POST' }).catch((evalErr) => {
+        const token = useAuthStore.getState().token;
+        const headers: Record<string, string> = {};
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        fetch(`/api/sessions/${id}/evaluate`, { 
+          method: 'POST',
+          headers: headers
+        }).catch((evalErr) => {
           console.error('[Session Finish] Background evaluation trigger failed:', evalErr);
         });
       }

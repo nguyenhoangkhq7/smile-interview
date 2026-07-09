@@ -9,6 +9,7 @@ import { Calendar, FileText, UploadCloud, FolderOpen, Briefcase, CheckCircle, XC
 import styles from './new.module.css';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { ActiveSessionsList, type ActiveSession } from '@/components/interview/ActiveSessionsList';
+import { useAuthStore } from '@/store/authStore';
 
 export default function NewInterviewPage() {
   const router = useRouter();
@@ -67,7 +68,8 @@ export default function NewInterviewPage() {
             cvFilename: item.cvFilename,
             jdFilename: item.jdFilename,
             status: item.status,
-            date: item.date
+            date: item.date,
+            hasAssessment: item.competencyFitScore !== undefined
           }));
 
         setActiveSessions(inProgressSessions);
@@ -176,8 +178,20 @@ export default function NewInterviewPage() {
     try {
       const session = await historyService.getSessionById(resumeSessionId);
       if (session) {
-        // If the session has assessment info and hasn't started (no questions yet), we can load the assessment page
-        if (session.competencyFitScore !== undefined && session.questions.length === 0) {
+        const hasQuestions = session.questions && session.questions.length > 0;
+        const hasQuestionsGenerated = session.actionableSuggestions && session.actionableSuggestions.length > 0;
+
+        // Case 1: CV & JD were uploaded/ingested, but CV assessment hasn't run yet
+        if (session.competencyFitScore === undefined && !hasQuestions) {
+          setSessionId(session.id);
+          setRoleTitle(session.roleTitle);
+          setIngested(true);
+          setAssessment(null);
+          return;
+        }
+
+        // Case 2: CV assessment is done, but Question Bank hasn't been generated yet
+        if (session.competencyFitScore !== undefined && !hasQuestions && !hasQuestionsGenerated) {
           setAssessment({
             id: '',
             sessionId: session.id,
@@ -206,6 +220,51 @@ export default function NewInterviewPage() {
     }
     router.push(`/interview/session/${resumeSessionId}`);
   };
+
+  const handleViewAssessment = async (resumeSessionId: string) => {
+    try {
+      const session = await historyService.getSessionById(resumeSessionId);
+      if (session) {
+        setAssessment({
+          id: '',
+          sessionId: session.id,
+          competencyFitScore: session.competencyFitScore || 0,
+          technicalDepthScore: session.technicalDepthScore || 0,
+          matchLevel: session.matchLevel || '',
+          candidateLevel: session.candidateLevel || '',
+          roleTypeDetected: session.roleTypeDetected || '',
+          yearsOfExperienceEstimate: session.yearsOfExperienceEstimate || '',
+          strongAreas: session.strongAreas || [],
+          gapAreas: session.gapAreas || [],
+          criticalMissingSkills: session.criticalMissingSkills || [],
+          sectionWiseFeedback: session.sectionWiseFeedback || {},
+          actionableImprovementSuggestions: session.actionableSuggestions || [],
+          cached: true,
+          createdAt: session.date
+        });
+        setSessionId(session.id);
+        setRoleTitle(session.roleTitle);
+        setIngested(true);
+
+        if (typeof window !== 'undefined') {
+          const url = new URL(window.location.href);
+          url.searchParams.set('sessionId', resumeSessionId);
+          window.history.pushState({}, '', url.toString());
+        }
+      }
+    } catch (err) {
+      console.error('Error loading assessment:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const urlSessionId = params.get('sessionId');
+    if (urlSessionId) {
+      handleViewAssessment(urlSessionId);
+    }
+  }, []);
 
   const handleUploadAndIngest = async () => {
     // Validate CV selection
@@ -319,9 +378,15 @@ export default function NewInterviewPage() {
             : (savedJds.find(j => j.id === selectedJdId)?.title || 'Saved_JD.pdf'));
 
       // Generate Question Bank
+      const token = useAuthStore.getState().token;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const qbRes = await fetch('/api/question-banks', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: headers,
         body: JSON.stringify({
           sessionId: assessment.sessionId,
           questionConfig: {
@@ -399,6 +464,13 @@ export default function NewInterviewPage() {
     setApiError(null);
     setIngested(false);
     setSessionId(null);
+
+    // Also remove the search parameter from the URL
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('sessionId');
+      window.history.pushState({}, '', url.toString());
+    }
   };
 
   // SVG Circular progress values
@@ -448,6 +520,7 @@ export default function NewInterviewPage() {
             cloningId={isCloning}
             onResume={handleResumeSession}
             onRestart={handleRestart}
+            onViewAssessment={handleViewAssessment}
           />
         )}
 

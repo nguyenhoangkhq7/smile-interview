@@ -14,7 +14,14 @@ export async function GET(request: NextRequest) {
     const targetUrl = `${backendUrl}/api/v2/assess-resume?sessionId=${sessionId}&forceRefresh=${forceRefresh}`;
 
     console.log(`[API Proxy Assess] Forwarding to backend: ${targetUrl}`);
-    const backendRes = await fetch(targetUrl);
+    const authHeader = request.headers.get('Authorization');
+    const headers: Record<string, string> = {};
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
+    }
+    const backendRes = await fetch(targetUrl, {
+      headers: headers
+    });
 
     if (!backendRes.ok) {
       const errText = await backendRes.text();
@@ -25,20 +32,96 @@ export async function GET(request: NextRequest) {
     const data = await backendRes.json();
     
     // Map Java response structure to frontend AssessmentResponse interface
+    const overallScore = data.overall_match_score || 0;
+    
+    // Compute match level
+    let matchLevel = 'Low (Cần cải thiện)';
+    if (overallScore >= 80) matchLevel = 'High (Rất tốt)';
+    else if (overallScore >= 60) matchLevel = 'Moderate (Khớp)';
+
+    // Candidate level mapping
+    const levelMap: Record<string, string> = {
+      INTERN: 'Thực tập sinh (Intern)',
+      FRESHER: 'Mới tốt nghiệp (Fresher)',
+      JUNIOR: 'Dưới 2 năm kinh nghiệm (Junior)',
+      MID: '2-5 năm kinh nghiệm (Mid-level)',
+      SENIOR: 'Trên 5 năm kinh nghiệm (Senior)',
+      LEAD: 'Trưởng nhóm kỹ thuật (Lead)'
+    };
+    const candidateLevel = levelMap[data.seniority_level] || data.seniority_level || 'N/A';
+
+    // Role type mapping
+    const roleTypeDetected = data.job_category || 'N/A';
+
+    // Experience mapping
+    const expMap: Record<string, string> = {
+      INTERN: 'Thực tập sinh',
+      FRESHER: 'Dưới 1 năm',
+      JUNIOR: '1 - 2 năm',
+      MID: '2 - 5 năm',
+      SENIOR: 'Trên 5 năm',
+      LEAD: 'Dẫn dắt / Quản lý'
+    };
+    const yearsOfExperienceEstimate = expMap[data.seniority_level] || data.seniority_level || 'N/A';
+
+    // Map evidence items to strong / gap / missing categories
+    const strongAreas = (data.evidence_items || [])
+      .filter((item: any) => item.status === 'matched')
+      .map((item: any) => item.criteria_name);
+
+    const gapAreas = (data.evidence_items || [])
+      .filter((item: any) => item.status === 'weak')
+      .map((item: any) => item.criteria_name);
+
+    const criticalMissingSkills = (data.evidence_items || [])
+      .filter((item: any) => item.status === 'missing')
+      .map((item: any) => item.criteria_name);
+
+    // Group section-wise feedback
+    const sectionWiseFeedback: Record<string, string> = {};
+    if (data.evidence_items && data.evidence_items.length > 0) {
+      const matchedText = data.evidence_items
+        .filter((item: any) => item.status === 'matched')
+        .map((item: any) => `${item.criteria_name} (${item.cv_evidence || ''})`)
+        .join('; ');
+      const weakText = data.evidence_items
+        .filter((item: any) => item.status === 'weak')
+        .map((item: any) => `${item.criteria_name}: Yêu cầu JD: ${item.jd_requirement || ''}. Minh chứng CV: ${item.cv_evidence || 'chưa rõ ràng'}.`)
+        .join(' | ');
+      const missingText = data.evidence_items
+        .filter((item: any) => item.status === 'missing')
+        .map((item: any) => item.criteria_name)
+        .join(', ');
+
+      if (matchedText) {
+        sectionWiseFeedback['tech_stack_alignment'] = `Các điểm tương thích tốt: ${matchedText}.`;
+      }
+      if (weakText) {
+        sectionWiseFeedback['project_technical_depth'] = `Các kỹ năng còn yếu hoặc thiếu chiều sâu: ${weakText}.`;
+      }
+      if (missingText) {
+        sectionWiseFeedback['cs_fundamentals'] = `Yêu cầu quan trọng trong JD nhưng thiếu trong CV: ${missingText}.`;
+      }
+    }
+
+    // Actionable improvement suggestions mapping
+    const actionableImprovementSuggestions = (data.top_priority_improvements || [])
+      .map((item: any) => `[${item.criteria_name}] ${item.suggestion}`);
+
     return NextResponse.json({
       id: data.id,
       sessionId: data.session_id,
-      competencyFitScore: data.competency_fit_score || 0,
-      technicalDepthScore: data.technical_depth_score || 0,
-      matchLevel: data.match_level || '',
-      candidateLevel: data.candidate_level || '',
-      roleTypeDetected: data.role_type_detected || '',
-      yearsOfExperienceEstimate: data.years_of_experience_estimate || '',
-      strongAreas: data.strong_areas || [],
-      gapAreas: data.gap_areas || [],
-      criticalMissingSkills: data.critical_missing_skills || [],
-      sectionWiseFeedback: data.section_wise_feedback || {},
-      actionableImprovementSuggestions: data.actionable_improvement_suggestions || [],
+      competencyFitScore: overallScore,
+      technicalDepthScore: overallScore,
+      matchLevel,
+      candidateLevel,
+      roleTypeDetected,
+      yearsOfExperienceEstimate,
+      strongAreas,
+      gapAreas,
+      criticalMissingSkills,
+      sectionWiseFeedback,
+      actionableImprovementSuggestions,
       cached: data.cached || false,
       createdAt: data.created_at || ''
     });
