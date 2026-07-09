@@ -73,12 +73,7 @@
             <!-- compile scope (default) - required by pgvector at compile time -->
         </dependency>
 
-        <!-- pgvector-java: PGvector type for PostgreSQL vector columns -->
-        <dependency>
-            <groupId>com.pgvector</groupId>
-            <artifactId>pgvector</artifactId>
-            <version>${pgvector.version}</version>
-        </dependency>
+
 
         <!-- ===== Database Migration ===== -->
         <!-- Flyway: version-controlled schema migrations (replaces Hibernate DDL auto) -->

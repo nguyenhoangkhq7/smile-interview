@@ -14,11 +14,7 @@ public class AppProperties {
     /** LLM API configuration (used for CV/JD standardization). */
     private Llm llm = new Llm();
 
-    /** Local Ollama configuration for generating embeddings. */
-    private Ollama ollama = new Ollama();
 
-    /** LangChain4j text chunking configuration. */
-    private Chunking chunking = new Chunking();
 
     /** Question Bank generation configuration. */
     private QuestionBank questionBank = new QuestionBank();
@@ -48,26 +44,7 @@ public class AppProperties {
         private int maxTokens;
     }
 
-    @Data
-    public static class Ollama {
-        /** Ollama base URL, e.g. http://host.docker.internal:11434 */
-        private String embeddingUrl;
 
-        /** Ollama embedding model name. */
-        private String embeddingModel;
-
-        /** Timeout in seconds for Ollama API calls. */
-        private int timeoutSeconds;
-    }
-
-    @Data
-    public static class Chunking {
-        /** Maximum token count per text chunk. */
-        private int maxTokens;
-
-        /** Number of overlapping tokens between consecutive chunks. */
-        private int overlapTokens;
-    }
 
     @Data
     public static class QuestionBank {

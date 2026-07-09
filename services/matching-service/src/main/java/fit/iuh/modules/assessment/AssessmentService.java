@@ -175,8 +175,20 @@ public class AssessmentService {
         String systemPrompt = PromptTemplateConfig.buildAssessmentSystemPrompt(criteriaInstructions);
         String userPrompt   = PromptTemplateConfig.buildAssessmentUserPrompt(fullCvMarkdown, fullJdMarkdown);
 
-        String llmJsonResponse = callLlmBlocking(systemPrompt, userPrompt);
-        AssessmentResponseDto dto = parseAssessmentDto(sessionId, llmJsonResponse);
+        int maxAttempts = 3;
+        AssessmentResponseDto dto = null;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                String llmJsonResponse = callLlmBlocking(systemPrompt, userPrompt);
+                dto = parseAssessmentDto(sessionId, llmJsonResponse);
+                break;
+            } catch (Exception e) {
+                log.warn("[Assessment] Step 4a LLM Call/Parse failed (attempt {}/{}): {}", attempt, maxAttempts, e.getMessage());
+                if (attempt >= maxAttempts) {
+                    throw e;
+                }
+            }
+        }
 
         log.info("[Assessment] Step 4a complete — LLM returned {} evidence items.",
                 dto.evidenceItems() != null ? dto.evidenceItems().size() : 0);
@@ -214,9 +226,21 @@ public class AssessmentService {
                 String phase2UserPrompt = PromptTemplateConfig.buildImprovementUserPrompt(weaknessJson);
                 
                 log.info("[Assessment] Calling Phase 2 (Improvement Advisor) for {} weaknesses...", weaknesses.size());
-                String phase2Response = callLlmBlocking(phase2SystemPrompt, phase2UserPrompt);
                 
-                ImprovementResponseDto phase2Dto = parseImprovementDto(sessionId, phase2Response);
+                ImprovementResponseDto phase2Dto = null;
+                for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+                    try {
+                        String phase2Response = callLlmBlocking(phase2SystemPrompt, phase2UserPrompt);
+                        phase2Dto = parseImprovementDto(sessionId, phase2Response);
+                        break;
+                    } catch (Exception e) {
+                        log.warn("[Assessment] Phase 2 LLM Call/Parse failed (attempt {}/{}): {}", attempt, maxAttempts, e.getMessage());
+                        if (attempt >= maxAttempts) {
+                            throw e;
+                        }
+                    }
+                }
+                
                 improvements = phase2Dto.topPriorityImprovements();
                 log.info("[Assessment] Phase 2 complete — generated {} improvements.", improvements != null ? improvements.size() : 0);
             } catch (Exception e) {

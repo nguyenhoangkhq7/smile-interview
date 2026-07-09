@@ -14,14 +14,7 @@ Ensure the local PostgreSQL database, Redis cache, and services are running:
 docker-compose up -d
 ```
 
-### 2. Pull Ollama Embedding Weights
-The Spring Boot `matching-service` requires embedding models to vectorize uploaded CVs and JDs:
-```bash
-# Pull the exact embedding model on your host system
-ollama pull qwen3-embedding:4b
-```
-
-### 3. Ensure HuggingFace Model Access
+### 2. Ensure HuggingFace Model Access
 The Speaches CPU container will automatically download Whisper and Piper TTS model weights. Ensure the docker host has stable internet access to complete these cache downloads:
 *   **STT Model:** `Systran/faster-whisper-small`
 *   **TTS Model:** `speaches-ai/piper-vi_VN-vais1000-medium`

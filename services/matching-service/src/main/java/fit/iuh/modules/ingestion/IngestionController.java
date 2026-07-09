@@ -77,8 +77,8 @@ public class IngestionController {
 
         IngestionResponse response = ingestionService.ingest(sessionId, cvFile, jdFile, jdText);
 
-        log.info("Ingestion completed successfully: sessionId={}, totalChunks={}",
-                sessionId, response.getTotalChunksCount());
+        log.info("Ingestion completed successfully: sessionId={}",
+                sessionId);
 
         return ResponseEntity.ok(response);
     }

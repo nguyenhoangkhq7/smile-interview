@@ -1,11 +1,8 @@
 package fit.iuh.modules.ingestion;
 
-import fit.iuh.modules.ingestion.IngestionResponse;
-import fit.iuh.modules.ingestion.DocumentChunk;
 import fit.iuh.modules.ingestion.SessionDocument;
 import fit.iuh.modules.ingestion.DocumentType;
 import fit.iuh.exception.IngestionException;
-import fit.iuh.modules.ingestion.DocumentChunkRepository;
 import fit.iuh.modules.ingestion.SessionDocumentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,17 +13,17 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 
 /**
- * Orchestrator service for the full Data Ingestion & Vectorization pipeline.
+ * Orchestrator service for the full Data Ingestion pipeline.
  *
  * <p><strong>Pipeline Steps:</strong>
  * <pre>
- *  ┌──────────┐    ┌──────────────┐    ┌───────────────────────┐    ┌──────────────┐    ┌───────────────┐
- *  │ PDF File │───▶│  PdfService  │───▶│ StandardizationService│───▶│ChunkingService│───▶│EmbeddingService│
- *  │ (CV/JD)  │    │ (extract txt)│    │ (Groq LLM → Markdown) │    │(LangChain4j) │    │(OpenAI + save) │
- *  └──────────┘    └──────────────┘    └───────────────────────┘    └──────────────┘    └───────────────┘
+ *  ┌──────────┐    ┌──────────────┐    ┌───────────────────────┐
+ *  │ PDF File │───▶│  PdfService  │───▶│ StandardizationService│
+ *  │ (CV/JD)  │    │ (extract txt)│    │ (Groq LLM → Markdown) │
+ *  └──────────┘    └──────────────┘    └───────────────────────┘
  * </pre>
  *
- * <p><strong>Re-ingestion behavior:</strong> If chunks already exist for a given
+ * <p><strong>Re-ingestion behavior:</strong> If documents already exist for a given
  * {@code sessionId}, they are deleted before the new pipeline runs. This allows
  * safe re-ingestion with updated files.
  *
@@ -41,9 +38,6 @@ public class IngestionService {
 
     private final PdfService pdfService;
     private final StandardizationService standardizationService;
-    private final ChunkingService chunkingService;
-    private final EmbeddingService embeddingService;
-    private final DocumentChunkRepository documentChunkRepository;
     private final SessionDocumentRepository sessionDocumentRepository;
 
     /**
@@ -59,10 +53,10 @@ public class IngestionService {
      */
     @Transactional
     public IngestionResponse ingest(
-            String sessionId,
-            MultipartFile cvFile,
-            MultipartFile jdFile,
-            String jdText) {
+             String sessionId,
+             MultipartFile cvFile,
+             MultipartFile jdFile,
+             String jdText) {
 
         // ── Validate inputs ──────────────────────────────────────────────────
         validateInputs(sessionId, cvFile, jdFile, jdText);
@@ -70,11 +64,7 @@ public class IngestionService {
         long totalStartTime = System.currentTimeMillis();
         log.info("=== [INGESTION START] sessionId={} ===", sessionId);
 
-        // ── Re-ingestion: clean up existing chunks and documents for this session ──────────
-        if (documentChunkRepository.existsBySessionId(sessionId)) {
-            log.warn("Existing chunks found for session={}. Deleting before re-ingestion.", sessionId);
-            documentChunkRepository.deleteAllBySessionId(sessionId);
-        }
+        // ── Re-ingestion: clean up existing documents for this session ──────────
         if (sessionDocumentRepository.existsBySessionId(sessionId)) {
             log.warn("Existing full documents found for session={}. Deleting before re-ingestion.", sessionId);
             sessionDocumentRepository.deleteAllBySessionId(sessionId);
@@ -134,45 +124,17 @@ public class IngestionService {
                 .markdownContent(markdownJd)
                 .build());
 
-        // ────────────────────────────────────────────────────────────────────
-        // STEP 3 — Split Markdown into token-bounded chunks
-        // ────────────────────────────────────────────────────────────────────
-        log.info("[Step 3/4] Chunking Markdown into token-bounded segments...");
-        long step3Start = System.currentTimeMillis();
-        List<String> cvChunks = chunkingService.chunkText(markdownCv);
-        List<String> jdChunks = chunkingService.chunkText(markdownJd);
-        long step3Time = System.currentTimeMillis() - step3Start;
-        log.info("[Step 3/4] Done in {}ms. CV chunks: {} | JD chunks: {}", step3Time, cvChunks.size(), jdChunks.size());
-
-        // ────────────────────────────────────────────────────────────────────
-        // STEP 4 — Generate embeddings and save to PostgreSQL
-        // ────────────────────────────────────────────────────────────────────
-        log.info("[Step 4/4] Generating embeddings and saving to database...");
-        long step4Start = System.currentTimeMillis();
-        List<DocumentChunk> savedCvChunks = embeddingService.embedAndSave(
-                cvChunks, sessionId, DocumentType.CV);
-        List<DocumentChunk> savedJdChunks = embeddingService.embedAndSave(
-                jdChunks, sessionId, DocumentType.JD);
-
-        int totalSaved = savedCvChunks.size() + savedJdChunks.size();
-        long step4Time = System.currentTimeMillis() - step4Start;
-        log.info("[Step 4/4] Done in {}ms. Total saved: {} chunks (CV={}, JD={})",
-                step4Time, totalSaved, savedCvChunks.size(), savedJdChunks.size());
-
         long totalTime = System.currentTimeMillis() - totalStartTime;
-        log.info("=== [INGESTION COMPLETE] sessionId={} | total={} chunks | time={}ms ===",
-                sessionId, totalSaved, totalTime);
+        log.info("=== [INGESTION COMPLETE] sessionId={} | time={}ms ===",
+                sessionId, totalTime);
 
         // ── Build and return response ─────────────────────────────────────
         return IngestionResponse.builder()
                 .sessionId(sessionId)
-                .cvChunksCount(savedCvChunks.size())
-                .jdChunksCount(savedJdChunks.size())
-                .totalChunksCount(totalSaved)
                 .status("SUCCESS")
                 .message(String.format(
-                        "Successfully ingested and vectorized %d chunks (%d CV + %d JD) for session '%s'.",
-                        totalSaved, savedCvChunks.size(), savedJdChunks.size(), sessionId))
+                        "Successfully ingested CV and JD for session '%s'.",
+                        sessionId))
                 .build();
     }
 

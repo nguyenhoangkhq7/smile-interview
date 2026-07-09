@@ -14,13 +14,12 @@ import java.time.Duration;
  * Spring configuration class that provides pre-configured {@link WebClient} beans
  * for calling external AI APIs.
  *
- * <p>Two separate beans are provided:
+ * <p>A pre-configured {@link WebClient} bean is provided:
  * <ul>
- *   <li>{@link #groqWebClient()} — for CV/JD Markdown standardization via Groq LLM API</li>
- *   <li>{@link #openAiWebClient()} — for embedding generation via OpenAI Embeddings API</li>
+ *   <li>{@link #llmWebClient()} — for CV/JD Markdown standardization via Groq LLM API</li>
  * </ul>
  *
- * <p>Both clients are configured with:
+ * <p>The client is configured with:
  * <ul>
  *   <li>Base URL from {@link AppProperties}</li>
  *   <li>Authorization Bearer token from API key</li>
@@ -56,20 +55,7 @@ public class WebClientConfig {
                 .build();
     }
 
-    /**
-     * WebClient configured for the Ollama Local Embeddings API.
-     *
-     * @return a {@link WebClient} bean named {@code embeddingWebClient}
-     */
-    @Bean("embeddingWebClient")
-    public WebClient embeddingWebClient() {
-        return WebClient.builder()
-                .baseUrl(appProperties.getOllama().getEmbeddingUrl())
-                .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
-                .exchangeStrategies(largeBufferStrategy())
-                .build();
-    }
+
 
     /**
      * Configures a 16 MB in-memory buffer for {@link WebClient} codec.
