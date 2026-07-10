@@ -43,6 +43,7 @@ export async function GET() {
           scoreBreakdown: sess.score_breakdown ? sess.score_breakdown : undefined,
           topPriorityImprovements: sess.top_priority_improvements ? sess.top_priority_improvements : undefined,
           hiringRecommendation: sess.hiring_recommendation ? sess.hiring_recommendation : undefined,
+          eligibility: sess.eligibility ? sess.eligibility : undefined,
           questions: turnsRes.rows.map((t) => ({
             question: t.question,
             answer: t.answer,
@@ -81,8 +82,8 @@ export async function POST(request: NextRequest) {
         years_of_experience_estimate, strong_areas, gap_areas, critical_missing_skills,
         section_wise_feedback, actionable_suggestions, resume_id, jd_id,
         evidence_items, additional_evidence_items, score_breakdown, top_priority_improvements,
-        hiring_recommendation
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27)
+        hiring_recommendation, eligibility
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
       ON CONFLICT (id) DO UPDATE SET
         date = EXCLUDED.date,
         interview_type = EXCLUDED.interview_type,
@@ -109,7 +110,8 @@ export async function POST(request: NextRequest) {
         additional_evidence_items = EXCLUDED.additional_evidence_items,
         score_breakdown = EXCLUDED.score_breakdown,
         top_priority_improvements = EXCLUDED.top_priority_improvements,
-        hiring_recommendation = EXCLUDED.hiring_recommendation
+        hiring_recommendation = EXCLUDED.hiring_recommendation,
+        eligibility = EXCLUDED.eligibility
     `;
 
     await query(upsertSessionSql, [
@@ -140,6 +142,7 @@ export async function POST(request: NextRequest) {
       session.scoreBreakdown ? JSON.stringify(session.scoreBreakdown) : null,
       session.topPriorityImprovements ? JSON.stringify(session.topPriorityImprovements) : null,
       session.hiringRecommendation ? session.hiringRecommendation : null,
+      session.eligibility ? JSON.stringify(session.eligibility) : null,
     ]);
 
     // 2. Replace turns only when explicitly requested.

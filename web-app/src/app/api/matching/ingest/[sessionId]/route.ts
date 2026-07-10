@@ -18,31 +18,58 @@ export async function POST(
     let finalResumeId: number | null = resumeIdStr ? parseInt(resumeIdStr, 10) : null;
     let finalJdId: number | null = jdIdStr ? parseInt(jdIdStr, 10) : null;
 
-    // 1. If CV is uploaded newly, save to Database
+    // 1. If CV is uploaded newly, check for duplicate content first or save to Database
     if (!finalResumeId && cvFile) {
       const cvBuffer = Buffer.from(await cvFile.arrayBuffer());
-      const insertResumeRes = await query(
-        'INSERT INTO resumes (file_name, file_content) VALUES ($1, $2) RETURNING id',
+      const existingCvRes = await query(
+        'SELECT id FROM resumes WHERE file_name = $1 AND file_content = $2 LIMIT 1',
         [cvFile.name, cvBuffer]
       );
-      finalResumeId = insertResumeRes.rows[0].id;
+      if (existingCvRes.rows.length > 0) {
+        console.log('[API Proxy Ingest] Reusing existing resume ID:', existingCvRes.rows[0].id);
+        finalResumeId = existingCvRes.rows[0].id;
+      } else {
+        const insertResumeRes = await query(
+          'INSERT INTO resumes (file_name, file_content) VALUES ($1, $2) RETURNING id',
+          [cvFile.name, cvBuffer]
+        );
+        finalResumeId = insertResumeRes.rows[0].id;
+      }
     }
 
-    // 2. If JD is uploaded newly, save to Database
+    // 2. If JD is uploaded newly, check for duplicate content first or save to Database
     if (!finalJdId) {
       if (jdFile) {
         const jdBuffer = Buffer.from(await jdFile.arrayBuffer());
-        const insertJdRes = await query(
-          'INSERT INTO job_descriptions (title, file_content) VALUES ($1, $2) RETURNING id',
+        const existingJdRes = await query(
+          'SELECT id FROM job_descriptions WHERE title = $1 AND file_content = $2 LIMIT 1',
           [jdFile.name, jdBuffer]
         );
-        finalJdId = insertJdRes.rows[0].id;
+        if (existingJdRes.rows.length > 0) {
+          console.log('[API Proxy Ingest] Reusing existing JD ID:', existingJdRes.rows[0].id);
+          finalJdId = existingJdRes.rows[0].id;
+        } else {
+          const insertJdRes = await query(
+            'INSERT INTO job_descriptions (title, file_content) VALUES ($1, $2) RETURNING id',
+            [jdFile.name, jdBuffer]
+          );
+          finalJdId = insertJdRes.rows[0].id;
+        }
       } else if (jdText && jdText.trim() !== '') {
-        const insertJdRes = await query(
-          'INSERT INTO job_descriptions (title, extracted_text) VALUES ($1, $2) RETURNING id',
-          ['JD_Text_' + Date.now(), jdText]
+        const existingJdRes = await query(
+          'SELECT id FROM job_descriptions WHERE extracted_text = $1 LIMIT 1',
+          [jdText]
         );
-        finalJdId = insertJdRes.rows[0].id;
+        if (existingJdRes.rows.length > 0) {
+          console.log('[API Proxy Ingest] Reusing existing JD (text) ID:', existingJdRes.rows[0].id);
+          finalJdId = existingJdRes.rows[0].id;
+        } else {
+          const insertJdRes = await query(
+            'INSERT INTO job_descriptions (title, extracted_text) VALUES ($1, $2) RETURNING id',
+            ['JD_Text_' + Date.now(), jdText]
+          );
+          finalJdId = insertJdRes.rows[0].id;
+        }
       }
     }
 

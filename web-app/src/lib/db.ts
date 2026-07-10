@@ -117,7 +117,8 @@ export async function initDb() {
     'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS additional_evidence_items JSONB;',
     'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS score_breakdown JSONB;',
     'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS top_priority_improvements JSONB;',
-    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS hiring_recommendation VARCHAR(50);'
+    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS hiring_recommendation VARCHAR(50);',
+    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS eligibility JSONB;'
   ];
 
   for (const sql of alterColumns) {

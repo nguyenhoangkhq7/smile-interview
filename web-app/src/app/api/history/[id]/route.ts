@@ -53,6 +53,7 @@ export async function GET(
       scoreBreakdown: sess.score_breakdown ? sess.score_breakdown : undefined,
       topPriorityImprovements: sess.top_priority_improvements ? sess.top_priority_improvements : undefined,
       hiringRecommendation: sess.hiring_recommendation ? sess.hiring_recommendation : undefined,
+      eligibility: sess.eligibility ? sess.eligibility : undefined,
       questions: turns.map((t) => ({
         question: t.question,
         answer: t.answer,

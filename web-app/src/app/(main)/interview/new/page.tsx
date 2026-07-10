@@ -302,15 +302,15 @@ export default function NewInterviewPage() {
           setAnalyzing(true);
           const newSessionId = `session-${Date.now()}`;
           try {
-            const displayCvName = cvSource === 'upload' && cvFile 
-              ? cvFile.name 
+            const displayCvName = cvSource === 'upload' && cvFile
+              ? cvFile.name
               : (savedResumes.find(r => r.id === selectedResumeId)?.file_name || 'Saved_CV.pdf');
-            
-            const displayJdName = jdSource === 'upload' && jdFile 
-              ? jdFile.name 
-              : (jdSource === 'text' 
-                  ? 'JD_Pasted_Text.txt' 
-                  : (savedJds.find(j => j.id === selectedJdId)?.title || 'Saved_JD.pdf'));
+
+            const displayJdName = jdSource === 'upload' && jdFile
+              ? jdFile.name
+              : (jdSource === 'text'
+                ? 'JD_Pasted_Text.txt'
+                : (savedJds.find(j => j.id === selectedJdId)?.title || 'Saved_JD.pdf'));
 
             await historyService.saveSession({
               id: newSessionId,
@@ -334,7 +334,7 @@ export default function NewInterviewPage() {
               cvSource === 'saved' ? selectedResumeId : null,
               jdSource === 'saved' ? selectedJdId : null
             );
-            
+
             // If new files were uploaded and saved, update the IDs
             if (ingestRes.resumeId) setSelectedResumeId(ingestRes.resumeId);
             if (ingestRes.jdId) setSelectedJdId(ingestRes.jdId);
@@ -354,24 +354,30 @@ export default function NewInterviewPage() {
     }, 100);
   };
 
-  const handleRunAssessment = async () => {
+  const handleRunAssessment = async (forceRefresh: boolean | React.MouseEvent = false) => {
     if (!sessionId) return;
+    const isForce = forceRefresh === true;
     setAnalyzing(true);
     setApiError(null);
     try {
-      const result = await cvJdMatchingService.getAssessment(sessionId);
+      const result = await cvJdMatchingService.getAssessment(
+        sessionId,
+        isForce,
+        selectedResumeId,
+        selectedJdId
+      );
       setAssessment(result);
 
       // Save CV match results to database immediately so history is preserved
-      const displayCvName = cvSource === 'upload' && cvFile 
-        ? cvFile.name 
+      const displayCvName = cvSource === 'upload' && cvFile
+        ? cvFile.name
         : (savedResumes.find(r => r.id === selectedResumeId)?.file_name || 'Saved_CV.pdf');
-      
-      const displayJdName = jdSource === 'upload' && jdFile 
-        ? jdFile.name 
-        : (jdSource === 'text' 
-            ? 'JD_Pasted_Text.txt' 
-            : (savedJds.find(j => j.id === selectedJdId)?.title || 'Saved_JD.pdf'));
+
+      const displayJdName = jdSource === 'upload' && jdFile
+        ? jdFile.name
+        : (jdSource === 'text'
+          ? 'JD_Pasted_Text.txt'
+          : (savedJds.find(j => j.id === selectedJdId)?.title || 'Saved_JD.pdf'));
 
       await historyService.saveSession({
         id: result.sessionId || sessionId,
@@ -395,10 +401,12 @@ export default function NewInterviewPage() {
         gapAreas: result.gapAreas,
         criticalMissingSkills: result.criticalMissingSkills,
         sectionWiseFeedback: result.sectionWiseFeedback,
+        actionableSuggestions: result.actionableImprovementSuggestions,
         evidenceItems: result.evidenceItems,
         additionalEvidenceItems: result.additionalEvidenceItems,
         scoreBreakdown: result.scoreBreakdown,
-        topPriorityImprovements: result.topPriorityImprovements
+        topPriorityImprovements: result.topPriorityImprovements,
+        eligibility: result.eligibility
       });
     } catch (err: any) {
       console.error('Assessment error:', err);
@@ -415,15 +423,15 @@ export default function NewInterviewPage() {
     setGenerating(true);
     setApiError(null);
     try {
-      const displayCvName = cvSource === 'upload' && cvFile 
-        ? cvFile.name 
+      const displayCvName = cvSource === 'upload' && cvFile
+        ? cvFile.name
         : (savedResumes.find(r => r.id === selectedResumeId)?.file_name || 'Saved_CV.pdf');
-      
-      const displayJdName = jdSource === 'upload' && jdFile 
-        ? jdFile.name 
-        : (jdSource === 'text' 
-            ? 'JD_Pasted_Text.txt' 
-            : (savedJds.find(j => j.id === selectedJdId)?.title || 'Saved_JD.pdf'));
+
+      const displayJdName = jdSource === 'upload' && jdFile
+        ? jdFile.name
+        : (jdSource === 'text'
+          ? 'JD_Pasted_Text.txt'
+          : (savedJds.find(j => j.id === selectedJdId)?.title || 'Saved_JD.pdf'));
 
       // Generate Question Bank
       const token = useAuthStore.getState().token;
@@ -556,175 +564,89 @@ export default function NewInterviewPage() {
 
   return (
     <ProtectedRoute>
-    <div className={styles.container}>
+      <div className={styles.container}>
 
-      {/* Main Content */}
-      <main className={styles.content}>
-        <div className={styles.titleSection}>
-          <h1>Khởi tạo phỏng vấn</h1>
-          <p className={styles.subtitle}>Tải lên CV và Mô tả công việc (JD) để AI phân tích mức độ tương thích</p>
-        </div>
-
-        {/* Active Sessions — rendered only when not in a result/loading state */}
-        {!assessment && !uploading && !analyzing && (
-          <ActiveSessionsList
-            sessions={activeSessions}
-            cloningId={isCloning}
-            onResume={handleResumeSession}
-            onRestart={handleRestart}
-            onViewAssessment={handleViewAssessment}
-          />
-        )}
-
-        {apiError && (
-          <div className={styles.errorBanner}>
-            <span>⚠️ {apiError}</span>
-            <button onClick={handleReset}>Thử lại</button>
+        {/* Main Content */}
+        <main className={styles.content}>
+          <div className={styles.titleSection}>
+            <h1>Khởi tạo phỏng vấn</h1>
+            <p className={styles.subtitle}>Tải lên CV và Mô tả công việc (JD) để AI phân tích mức độ tương thích</p>
           </div>
-        )}
 
-        {/* ── State 1: Ready to Upload ── */}
-        {!uploading && !analyzing && !assessment && !ingested && (
-          <div className={styles.formSection}>
-            <div className={styles.inputGroup}>
-              <label htmlFor="roleTitle">Vị trí phỏng vấn mong muốn</label>
-              <input
-                id="roleTitle"
-                type="text"
-                className={styles.textInput}
-                value={roleTitle}
-                onChange={(e) => setRoleTitle(e.target.value)}
-                placeholder="Ví dụ: React Frontend Engineer, Java Backend Developer..."
-              />
+          {/* Active Sessions — rendered only when not in a result/loading state */}
+          {!assessment && !uploading && !analyzing && (
+            <ActiveSessionsList
+              sessions={activeSessions}
+              cloningId={isCloning}
+              onResume={handleResumeSession}
+              onRestart={handleRestart}
+              onViewAssessment={handleViewAssessment}
+            />
+          )}
+
+          {apiError && (
+            <div className={styles.errorBanner}>
+              <span>⚠️ {apiError}</span>
+              <button onClick={handleReset}>Thử lại</button>
             </div>
+          )}
 
-            <div className={styles.uploadGrid}>
-              {/* CV Upload */}
-              <div className={styles.uploadCol}>
-                <label className={styles.uploadLabel}>Hồ sơ cá nhân (CV)</label>
-                 <div className={styles.tabButtons} style={{ marginBottom: '1rem' }}>
-                  <button
-                    type="button"
-                    className={`${styles.tabButton} ${cvSource === 'upload' ? styles.tabButtonActive : ''}`}
-                    onClick={() => setCvSource('upload')}
-                  >
-                    Tải CV mới
-                  </button>
-                  <button
-                    type="button"
-                    className={`${styles.tabButton} ${cvSource === 'saved' ? styles.tabButtonActive : ''}`}
-                    onClick={() => setCvSource('saved')}
-                  >
-                    Chọn CV đã lưu
-                  </button>
-                </div>
-
-                {cvSource === 'upload' ? (
-                  !cvFile ? (
-                    <div
-                      className={`${styles.dropzone} ${dragOverCv ? styles.dropzoneActive : ''}`}
-                      onDragOver={(e) => handleDragOver(e, 'cv')}
-                      onDragLeave={() => handleDragLeave('cv')}
-                      onDrop={(e) => handleDrop(e, 'cv')}
-                      onClick={() => triggerFileSelect('cv')}
-                    >
-                      <FolderOpen size={48} className={styles.uploadIcon} />
-                      <p className={styles.dropzoneText}>
-                        Kéo thả CV hoặc <span className={styles.browseLink}>chọn tệp</span>
-                      </p>
-                      <p className={styles.dropzoneHint}>Hỗ trợ định dạng PDF. Tối đa 10MB.</p>
-                      <input
-                        ref={fileInputCvRef}
-                        type="file"
-                        style={{ display: 'none' }}
-                        accept=".pdf"
-                        onChange={(e) => handleFileChange(e, 'cv')}
-                      />
-                    </div>
-                  ) : (
-                    <div className={styles.fileCard}>
-                      <div className={styles.fileInfo}>
-                        <FileText size={24} className={styles.fileIcon} />
-                        <div>
-                          <p className={styles.fileName}>{cvFile.name}</p>
-                          <p className={styles.fileSize}>{(cvFile.size / 1024 / 1024).toFixed(2)} MB</p>
-                        </div>
-                      </div>
-                      <button className={styles.removeBtn} onClick={() => setCvFile(null)}><X size={14} /></button>
-                    </div>
-                  )
-                ) : (
-                  <div className="flex flex-col gap-2">
-                    <select
-                      className={styles.textInput}
-                      style={{ width: '100%', cursor: 'pointer' }}
-                      value={selectedResumeId || ''}
-                      onChange={(e) => setSelectedResumeId(e.target.value ? parseInt(e.target.value, 10) : null)}
-                    >
-                      <option value="">-- Chọn CV trong danh sách --</option>
-                      {savedResumes.map((r) => (
-                        <option key={r.id} value={r.id}>
-                          {r.file_name} ({new Date(r.created_at).toLocaleDateString('vi-VN')})
-                        </option>
-                      ))}
-                    </select>
-                    {savedResumes.length === 0 && (
-                      <p className="text-xs text-slate-400 mt-1">Không có CV nào được lưu trước đó.</p>
-                    )}
-                  </div>
-                )}
-                {cvError && (
-                  <span className={styles.errorText} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-                    <AlertTriangle size={12} /> {cvError}
-                  </span>
-                )}
+          {/* ── State 1: Ready to Upload ── */}
+          {!uploading && !analyzing && !assessment && !ingested && (
+            <div className={styles.formSection}>
+              <div className={styles.inputGroup}>
+                <label htmlFor="roleTitle">Vị trí phỏng vấn mong muốn</label>
+                <input
+                  id="roleTitle"
+                  type="text"
+                  className={styles.textInput}
+                  value={roleTitle}
+                  onChange={(e) => setRoleTitle(e.target.value)}
+                  placeholder="Ví dụ: React Frontend Engineer, Java Backend Developer..."
+                />
               </div>
 
-              {/* JD Upload / Text Area */}
-              <div className={styles.uploadCol}>
-                <label className={styles.uploadLabel}>Mô tả công việc (JD)</label>
-                <div className={styles.jdTabContainer}>
-                  <div className={styles.tabButtons}>
+              <div className={styles.uploadGrid}>
+                {/* CV Upload */}
+                <div className={styles.uploadCol}>
+                  <label className={styles.uploadLabel}>Hồ sơ cá nhân (CV)</label>
+                  <div className={styles.tabButtons} style={{ marginBottom: '1rem' }}>
                     <button
-                      className={`${styles.tabButton} ${jdSource === 'upload' ? styles.tabButtonActive : ''}`}
-                      onClick={() => setJdSource('upload')}
+                      type="button"
+                      className={`${styles.tabButton} ${cvSource === 'upload' ? styles.tabButtonActive : ''}`}
+                      onClick={() => setCvSource('upload')}
                     >
-                      Tải tệp JD
+                      Tải CV mới
                     </button>
                     <button
-                      className={`${styles.tabButton} ${jdSource === 'text' ? styles.tabButtonActive : ''}`}
-                      onClick={() => setJdSource('text')}
+                      type="button"
+                      className={`${styles.tabButton} ${cvSource === 'saved' ? styles.tabButtonActive : ''}`}
+                      onClick={() => setCvSource('saved')}
                     >
-                      Dán văn bản
-                    </button>
-                    <button
-                      className={`${styles.tabButton} ${jdSource === 'saved' ? styles.tabButtonActive : ''}`}
-                      onClick={() => setJdSource('saved')}
-                    >
-                      Chọn JD đã lưu
+                      Chọn CV đã lưu
                     </button>
                   </div>
 
-                  {jdSource === 'upload' ? (
-                    !jdFile ? (
+                  {cvSource === 'upload' ? (
+                    !cvFile ? (
                       <div
-                        className={`${styles.dropzone} ${dragOverJd ? styles.dropzoneActive : ''}`}
-                        onDragOver={(e) => handleDragOver(e, 'jd')}
-                        onDragLeave={() => handleDragLeave('jd')}
-                        onDrop={(e) => handleDrop(e, 'jd')}
-                        onClick={() => triggerFileSelect('jd')}
+                        className={`${styles.dropzone} ${dragOverCv ? styles.dropzoneActive : ''}`}
+                        onDragOver={(e) => handleDragOver(e, 'cv')}
+                        onDragLeave={() => handleDragLeave('cv')}
+                        onDrop={(e) => handleDrop(e, 'cv')}
+                        onClick={() => triggerFileSelect('cv')}
                       >
-                        <Briefcase size={48} className={styles.uploadIcon} />
+                        <FolderOpen size={48} className={styles.uploadIcon} />
                         <p className={styles.dropzoneText}>
-                          Kéo thả JD hoặc <span className={styles.browseLink}>chọn tệp</span>
+                          Kéo thả CV hoặc <span className={styles.browseLink}>chọn tệp</span>
                         </p>
-                        <p className={styles.dropzoneHint}>Hỗ trợ PDF, DOCX, DOC. Tối đa 10MB.</p>
+                        <p className={styles.dropzoneHint}>Hỗ trợ định dạng PDF. Tối đa 10MB.</p>
                         <input
-                          ref={fileInputJdRef}
+                          ref={fileInputCvRef}
                           type="file"
                           style={{ display: 'none' }}
-                          accept=".pdf,.docx,.doc"
-                          onChange={(e) => handleFileChange(e, 'jd')}
+                          accept=".pdf"
+                          onChange={(e) => handleFileChange(e, 'cv')}
                         />
                       </div>
                     ) : (
@@ -732,565 +654,727 @@ export default function NewInterviewPage() {
                         <div className={styles.fileInfo}>
                           <FileText size={24} className={styles.fileIcon} />
                           <div>
-                            <p className={styles.fileName}>{jdFile.name}</p>
-                            <p className={styles.fileSize}>{(jdFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                            <p className={styles.fileName}>{cvFile.name}</p>
+                            <p className={styles.fileSize}>{(cvFile.size / 1024 / 1024).toFixed(2)} MB</p>
                           </div>
                         </div>
-                        <button className={styles.removeBtn} onClick={() => setJdFile(null)}><X size={14} /></button>
+                        <button className={styles.removeBtn} onClick={() => setCvFile(null)}><X size={14} /></button>
                       </div>
                     )
-                  ) : jdSource === 'text' ? (
-                    <textarea
-                      className={styles.textAreaJd}
-                      value={jdText}
-                      onChange={(e) => setJdText(e.target.value)}
-                      placeholder="Dán toàn bộ nội dung bản mô tả công việc (JD) vào đây..."
-                    />
                   ) : (
-                    <div className="flex flex-col gap-2 mt-2">
+                    <div className="flex flex-col gap-2">
                       <select
                         className={styles.textInput}
                         style={{ width: '100%', cursor: 'pointer' }}
-                        value={selectedJdId || ''}
-                        onChange={(e) => setSelectedJdId(e.target.value ? parseInt(e.target.value, 10) : null)}
+                        value={selectedResumeId || ''}
+                        onChange={(e) => setSelectedResumeId(e.target.value ? parseInt(e.target.value, 10) : null)}
                       >
-                        <option value="">-- Chọn JD trong danh sách --</option>
-                        {savedJds.map((j) => (
-                          <option key={j.id} value={j.id}>
-                            {j.title} ({new Date(j.created_at).toLocaleDateString('vi-VN')})
+                        <option value="">-- Chọn CV trong danh sách --</option>
+                        {savedResumes.map((r) => (
+                          <option key={r.id} value={r.id}>
+                            {r.file_name} ({new Date(r.created_at).toLocaleDateString('vi-VN')})
                           </option>
                         ))}
                       </select>
-                      {savedJds.length === 0 && (
-                        <p className="text-xs text-slate-400 mt-1">Không có JD nào được lưu trước đó.</p>
+                      {savedResumes.length === 0 && (
+                        <p className="text-xs text-slate-400 mt-1">Không có CV nào được lưu trước đó.</p>
                       )}
                     </div>
                   )}
-                  {jdError && (
+                  {cvError && (
                     <span className={styles.errorText} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-                      <AlertTriangle size={12} /> {jdError}
+                      <AlertTriangle size={12} /> {cvError}
                     </span>
                   )}
                 </div>
+
+                {/* JD Upload / Text Area */}
+                <div className={styles.uploadCol}>
+                  <label className={styles.uploadLabel}>Mô tả công việc (JD)</label>
+                  <div className={styles.jdTabContainer}>
+                    <div className={styles.tabButtons}>
+                      <button
+                        className={`${styles.tabButton} ${jdSource === 'upload' ? styles.tabButtonActive : ''}`}
+                        onClick={() => setJdSource('upload')}
+                      >
+                        Tải tệp JD
+                      </button>
+                      <button
+                        className={`${styles.tabButton} ${jdSource === 'text' ? styles.tabButtonActive : ''}`}
+                        onClick={() => setJdSource('text')}
+                      >
+                        Dán văn bản
+                      </button>
+                      <button
+                        className={`${styles.tabButton} ${jdSource === 'saved' ? styles.tabButtonActive : ''}`}
+                        onClick={() => setJdSource('saved')}
+                      >
+                        Chọn JD đã lưu
+                      </button>
+                    </div>
+
+                    {jdSource === 'upload' ? (
+                      !jdFile ? (
+                        <div
+                          className={`${styles.dropzone} ${dragOverJd ? styles.dropzoneActive : ''}`}
+                          onDragOver={(e) => handleDragOver(e, 'jd')}
+                          onDragLeave={() => handleDragLeave('jd')}
+                          onDrop={(e) => handleDrop(e, 'jd')}
+                          onClick={() => triggerFileSelect('jd')}
+                        >
+                          <Briefcase size={48} className={styles.uploadIcon} />
+                          <p className={styles.dropzoneText}>
+                            Kéo thả JD hoặc <span className={styles.browseLink}>chọn tệp</span>
+                          </p>
+                          <p className={styles.dropzoneHint}>Hỗ trợ PDF, DOCX, DOC. Tối đa 10MB.</p>
+                          <input
+                            ref={fileInputJdRef}
+                            type="file"
+                            style={{ display: 'none' }}
+                            accept=".pdf,.docx,.doc"
+                            onChange={(e) => handleFileChange(e, 'jd')}
+                          />
+                        </div>
+                      ) : (
+                        <div className={styles.fileCard}>
+                          <div className={styles.fileInfo}>
+                            <FileText size={24} className={styles.fileIcon} />
+                            <div>
+                              <p className={styles.fileName}>{jdFile.name}</p>
+                              <p className={styles.fileSize}>{(jdFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                            </div>
+                          </div>
+                          <button className={styles.removeBtn} onClick={() => setJdFile(null)}><X size={14} /></button>
+                        </div>
+                      )
+                    ) : jdSource === 'text' ? (
+                      <textarea
+                        className={styles.textAreaJd}
+                        value={jdText}
+                        onChange={(e) => setJdText(e.target.value)}
+                        placeholder="Dán toàn bộ nội dung bản mô tả công việc (JD) vào đây..."
+                      />
+                    ) : (
+                      <div className="flex flex-col gap-2 mt-2">
+                        <select
+                          className={styles.textInput}
+                          style={{ width: '100%', cursor: 'pointer' }}
+                          value={selectedJdId || ''}
+                          onChange={(e) => setSelectedJdId(e.target.value ? parseInt(e.target.value, 10) : null)}
+                        >
+                          <option value="">-- Chọn JD trong danh sách --</option>
+                          {savedJds.map((j) => (
+                            <option key={j.id} value={j.id}>
+                              {j.title} ({new Date(j.created_at).toLocaleDateString('vi-VN')})
+                            </option>
+                          ))}
+                        </select>
+                        {savedJds.length === 0 && (
+                          <p className="text-xs text-slate-400 mt-1">Không có JD nào được lưu trước đó.</p>
+                        )}
+                      </div>
+                    )}
+                    {jdError && (
+                      <span className={styles.errorText} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <AlertTriangle size={12} /> {jdError}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className={styles.formActions}>
+                <Link href="/" className={styles.secondaryButton}>
+                  Hủy bỏ
+                </Link>
+                <button
+                  className={styles.primaryButton}
+                  disabled={
+                    (cvSource === 'upload' && !cvFile) ||
+                    (cvSource === 'saved' && !selectedResumeId) ||
+                    (jdSource === 'upload' && !jdFile) ||
+                    (jdSource === 'text' && !jdText.trim()) ||
+                    (jdSource === 'saved' && !selectedJdId)
+                  }
+                  onClick={handleUploadAndIngest}
+                >
+                  Tải lên CV &amp; JD
+                </button>
               </div>
             </div>
+          )}
 
-            <div className={styles.formActions}>
-              <Link href="/" className={styles.secondaryButton}>
-                Hủy bỏ
-              </Link>
-              <button
-                className={styles.primaryButton}
-                disabled={
-                  (cvSource === 'upload' && !cvFile) ||
-                  (cvSource === 'saved' && !selectedResumeId) ||
-                  (jdSource === 'upload' && !jdFile) ||
-                  (jdSource === 'text' && !jdText.trim()) ||
-                  (jdSource === 'saved' && !selectedJdId)
-                }
-                onClick={handleUploadAndIngest}
-              >
-                Tải lên CV &amp; JD
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ── State 2: Uploading ── */}
-        {uploading && (
-          <div className={styles.loadingOverlay}>
-            <div className={styles.spinner} />
-            <div>
-              <h3>Đang tải tài liệu lên...</h3>
-              <p className={styles.subtitle} style={{ marginTop: '0.25rem' }}>Hồ sơ của bạn đang được truyền tải an toàn</p>
-            </div>
-            <div className={styles.progressContainer}>
-              <div className={styles.progressBar} style={{ width: `${uploadProgress}%` }} />
-            </div>
-          </div>
-        )}
-
-        {/* ── State 3: AI Analyzing (Ingesting or Assessing) ── */}
-        {analyzing && (
-          <div className={styles.loadingOverlay}>
-            <div className={styles.spinner} style={{ borderTopColor: '#8b5cf6' }} />
-            <div>
-              <h3>AI đang xử lý tài liệu của bạn...</h3>
-              <p className={styles.subtitle} style={{ marginTop: '0.25rem' }}>Quá trình này có thể mất tới 10-35 giây đối với tài liệu mới</p>
-            </div>
-            <div className={styles.loadingSteps}>
-              {!ingested ? (
-                <>
-                  <p>✓ Trích xuất nội dung văn bản từ PDF...</p>
-                  <p>➜ Chuẩn hóa định dạng tài liệu...</p>
-                </>
-              ) : (
-                <p>➜ Đối chiếu và chấm điểm mức độ tương thích kỹ năng...</p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ── State 3.5: Ingested Successfully, Ready for Assessment ── */}
-        {ingested && !analyzing && !assessment && (
-          <div className={styles.formSection} style={{ textAlign: 'center', padding: '3rem' }}>
-            <CheckCircle size={64} style={{ color: '#10b981', margin: '0 auto 1.5rem auto' }} />
-            <h2 style={{ fontSize: '1.5rem', fontWeight: 600, color: '#1e293b', marginBottom: '0.5rem' }}>Tải lên thành công!</h2>
-            <p style={{ color: '#64748b', marginBottom: '2rem' }}>
-              Tài liệu của bạn đã được chuẩn hóa và lưu trữ. Hệ thống đã sẵn sàng để phân tích độ tương thích.
-            </p>
-            <div className={styles.formActions} style={{ justifyContent: 'center' }}>
-              <button className={styles.secondaryButton} onClick={handleReset}>
-                Tải lại tài liệu khác
-              </button>
-              <button className={styles.primaryButton} onClick={handleRunAssessment}>
-                Tiến hành Đánh giá (Assessment)
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ── State 4: Display Assessment Result ── */}
-        {assessment && (
-          <div className={styles.resultSection}>
-            
-            {/* Title & Cache Meta */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
+          {/* ── State 2: Uploading ── */}
+          {uploading && (
+            <div className={styles.loadingOverlay}>
+              <div className={styles.spinner} />
               <div>
-                <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                  Kết quả phân tích độ tương thích
-                </h2>
-                <p style={{ color: '#64748b', fontSize: '0.9rem', margin: '0.25rem 0 0 0' }}>
-                  Dành cho vị trí <strong>{roleTitle}</strong>
-                </p>
+                <h3>Đang tải tài liệu lên...</h3>
+                <p className={styles.subtitle} style={{ marginTop: '0.25rem' }}>Hồ sơ của bạn đang được truyền tải an toàn</p>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.78rem', padding: '0.35rem 0.75rem', borderRadius: '0.5rem', backgroundColor: '#f1f5f9', border: '1px solid #e2e8f0', color: '#475569' }}>
-                <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: assessment.cached ? '#10b981' : '#f59e0b' }}></span>
-                {assessment.cached ? 'Kết quả từ Cache' : 'Phân tích mới'}
+              <div className={styles.progressContainer}>
+                <div className={styles.progressBar} style={{ width: `${uploadProgress}%` }} />
               </div>
             </div>
+          )}
 
-            {/* Dashboard: Circular rings & Badges panel */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
-              
-              {/* Ring 1: Competency Fit */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '1.5rem', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '0.75rem', textAlign: 'center' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#4f46e5', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>Tương thích Năng lực</span>
-                <div className={styles.scoreRing}>
-                  <svg width="110" height="110" viewBox="0 0 120 120">
-                    <circle cx="60" cy="60" r={radius} fill="transparent" stroke="#e2e8f0" strokeWidth="8" />
-                    <circle
-                      cx="60"
-                      cy="60"
-                      r={radius}
-                      fill="transparent"
-                      stroke="#4f46e5"
-                      strokeWidth="8"
-                      strokeDasharray={circumference}
-                      strokeDashoffset={strokeDashoffset}
-                      strokeLinecap="round"
-                      transform="rotate(-90 60 60)"
-                    />
-                  </svg>
-                  <span className={styles.scoreVal}>{assessment.competencyFitScore}%</span>
+          {/* ── State 3: AI Analyzing (Ingesting or Assessing) ── */}
+          {analyzing && (
+            <div className={styles.loadingOverlay}>
+              <div className={styles.spinner} style={{ borderTopColor: '#8b5cf6' }} />
+              <div>
+                <h3>AI đang xử lý tài liệu của bạn...</h3>
+                <p className={styles.subtitle} style={{ marginTop: '0.25rem' }}>Quá trình này có thể mất tới 10-35 giây đối với tài liệu mới</p>
+              </div>
+              <div className={styles.loadingSteps}>
+                {!ingested ? (
+                  <>
+                    <p>✓ Trích xuất nội dung văn bản từ PDF...</p>
+                    <p>➜ Chuẩn hóa định dạng tài liệu...</p>
+                  </>
+                ) : (
+                  <p>➜ Đối chiếu và chấm điểm mức độ tương thích kỹ năng...</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── State 3.5: Ingested Successfully, Ready for Assessment ── */}
+          {ingested && !analyzing && !assessment && (
+            <div className={styles.formSection} style={{ textAlign: 'center', padding: '3rem' }}>
+              <CheckCircle size={64} style={{ color: '#10b981', margin: '0 auto 1.5rem auto' }} />
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 600, color: '#1e293b', marginBottom: '0.5rem' }}>Tải lên thành công!</h2>
+              <p style={{ color: '#64748b', marginBottom: '2rem' }}>
+                Tài liệu của bạn đã được chuẩn hóa và lưu trữ. Hệ thống đã sẵn sàng để phân tích độ tương thích.
+              </p>
+              <div className={styles.formActions} style={{ justifyContent: 'center' }}>
+                <button className={styles.secondaryButton} onClick={handleReset}>
+                  Tải lại tài liệu khác
+                </button>
+                <button className={styles.primaryButton} onClick={handleRunAssessment}>
+                  Tiến hành Đánh giá (Assessment)
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── State 4: Display Assessment Result ── */}
+          {assessment && (
+            <div className={styles.resultSection}>
+
+              {/* Title & Cache Meta */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
+                <div>
+                  <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                    Kết quả phân tích độ tương thích
+                  </h2>
+                  <p style={{ color: '#64748b', fontSize: '0.9rem', margin: '0.25rem 0 0 0' }}>
+                    Dành cho vị trí <strong>{roleTitle}</strong>
+                  </p>
                 </div>
-                <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '1rem', maxWidth: '200px', marginInline: 'auto' }}>Độ khớp tổng quan của CV ứng viên với JD yêu cầu</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.78rem', padding: '0.35rem 0.75rem', borderRadius: '0.5rem', backgroundColor: '#f1f5f9', border: '1px solid #e2e8f0', color: '#475569' }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: assessment.cached ? '#10b981' : '#f59e0b' }}></span>
+                    {assessment.cached ? 'Kết quả từ Cache' : 'Phân tích mới'}
+                  </div>
+
+                  {assessment.cached && (
+                    <button
+                      onClick={() => handleRunAssessment(true)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.3rem',
+                        fontSize: '0.78rem',
+                        padding: '0.35rem 0.75rem',
+                        borderRadius: '0.5rem',
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #ea580c',
+                        color: '#ea580c',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                        transition: 'all 0.2s',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#fff7ed';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#ffffff';
+                      }}
+                    >
+                      <RefreshCw size={12} />
+                      <span>Đánh giá lại</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
-              {/* Ring 2: Technical Depth */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '1.5rem', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '0.75rem', textAlign: 'center' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0ea5e9', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>Chiều sâu Kỹ thuật</span>
-                <div className={styles.scoreRing}>
-                  <svg width="110" height="110" viewBox="0 0 120 120">
-                    <circle cx="60" cy="60" r={radius} fill="transparent" stroke="#e2e8f0" strokeWidth="8" />
-                    <circle
-                      cx="60"
-                      cy="60"
-                      r={radius}
-                      fill="transparent"
-                      stroke="#0ea5e9"
-                      strokeWidth="8"
-                      strokeDasharray={circumference}
-                      strokeDashoffset={depthStrokeDashoffset}
-                      strokeLinecap="round"
-                      transform="rotate(-90 60 60)"
-                    />
-                  </svg>
-                  <span className={styles.scoreVal} style={{ color: '#0ea5e9' }}>{assessment.technicalDepthScore}%</span>
-                </div>
-                <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '1rem', maxWidth: '200px', marginInline: 'auto' }}>Độ sâu kinh nghiệm và khả năng làm chủ công nghệ cốt lõi</p>
-              </div>
+              {/* Dashboard: Circular rings & Badges panel */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
 
-              {/* Classifications Badges Panel */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '1.5rem', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '0.75rem', justifyContent: 'center' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Phân loại Ứng viên</span>
-                
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>
-                  <span style={{ fontSize: '0.82rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                    <TrendingUp size={13} style={{ color: '#4f46e5' }} /> Mức độ khớp:
-                  </span>
-                  <span style={{
-                    fontSize: '0.72rem',
+                {/* Single Merged Ring: Professional Alignment */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '1.5rem', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '0.75rem', textAlign: 'center' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#4f46e5', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>Điểm tương thích chuyên môn</span>
+                  <div className={styles.scoreRing}>
+                    <svg width="110" height="110" viewBox="0 0 120 120">
+                      <circle cx="60" cy="60" r={radius} fill="transparent" stroke="#e2e8f0" strokeWidth="8" />
+                      <circle
+                        cx="60"
+                        cy="60"
+                        r={radius}
+                        fill="transparent"
+                        stroke="#4f46e5"
+                        strokeWidth="8"
+                        strokeDasharray={circumference}
+                        strokeDashoffset={strokeDashoffset}
+                        strokeLinecap="round"
+                        transform="rotate(-90 60 60)"
+                      />
+                    </svg>
+                    <span className={styles.scoreVal}>{assessment.competencyFitScore}%</span>
+                  </div>
+                  <div style={{
+                    marginTop: '1rem',
+                    fontSize: '0.75rem',
                     fontWeight: 700,
                     padding: '0.2rem 0.5rem',
                     borderRadius: '0.25rem',
+                    display: 'inline-block',
                     backgroundColor: assessment.matchLevel?.toLowerCase().includes('high') || assessment.matchLevel?.toLowerCase().includes('rất tốt') ? '#ecfdf5' : assessment.matchLevel?.toLowerCase().includes('moderate') || assessment.matchLevel?.toLowerCase().includes('khớp') ? '#f0f9ff' : '#fffbeb',
                     color: assessment.matchLevel?.toLowerCase().includes('high') || assessment.matchLevel?.toLowerCase().includes('rất tốt') ? '#047857' : assessment.matchLevel?.toLowerCase().includes('moderate') || assessment.matchLevel?.toLowerCase().includes('khớp') ? '#0369a1' : '#b45309',
                     border: '1px solid currentColor'
                   }}>
-                    {assessment.matchLevel || 'N/A'}
-                  </span>
+                    Mức độ khớp: {assessment.matchLevel || 'N/A'}
+                  </div>
+                  <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.75rem', maxWidth: '240px', marginInline: 'auto' }}>Độ tương thích tổng quan của hồ sơ ứng viên với các yêu cầu kỹ năng và kinh nghiệm</p>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>
-                  <span style={{ fontSize: '0.82rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                    <Award size={13} style={{ color: '#8b5cf6' }} /> Định hướng:
-                  </span>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '0.2rem 0.5rem', borderRadius: '0.25rem', backgroundColor: '#f5f3ff', color: '#6d28d9' }}>
-                    {assessment.roleTypeDetected || 'N/A'}
-                  </span>
+                {/* Classifications Badges Panel (Requirements from JD) */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '1.5rem', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '0.75rem', justifyContent: 'center' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Yêu cầu từ Mô tả công việc (JD)</span>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '0.82rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <Award size={13} style={{ color: '#8b5cf6' }} /> Vị trí yêu cầu:
+                    </span>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '0.2rem 0.5rem', borderRadius: '0.25rem', backgroundColor: '#f5f3ff', color: '#6d28d9' }}>
+                      {assessment.roleTypeDetected || 'N/A'}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '0.82rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <UserCheck size={13} style={{ color: '#0ea5e9' }} /> Cấp bậc yêu cầu:
+                    </span>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '0.2rem 0.5rem', borderRadius: '0.25rem', backgroundColor: '#f1f5f9', color: '#334155' }}>
+                      {assessment.candidateLevel || 'N/A'}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.82rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <ShieldCheck size={13} style={{ color: '#10b981' }} /> Kinh nghiệm yêu cầu:
+                    </span>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#334155' }}>
+                      {assessment.yearsOfExperienceEstimate || 'N/A'}
+                    </span>
+                  </div>
+
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>
-                  <span style={{ fontSize: '0.82rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                    <UserCheck size={13} style={{ color: '#0ea5e9' }} /> Cấp bậc:
-                  </span>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '0.2rem 0.5rem', borderRadius: '0.25rem', backgroundColor: '#f1f5f9', color: '#334155' }}>
-                    {assessment.candidateLevel || 'N/A'}
-                  </span>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.82rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                    <ShieldCheck size={13} style={{ color: '#10b981' }} /> Kinh nghiệm:
-                  </span>
-                  <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#334155' }}>
-                    {assessment.yearsOfExperienceEstimate || 'N/A'}
-                  </span>
-                </div>
-
-              </div>
-
-            </div>
-
-            {/* Removed tag badges alignment matrix based on user feedback */}
-
-            {/* Detailed Criteria Alignment Matrix */}
-            <div className={styles.evaluationBox} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1rem', padding: '1.25rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem', flexWrap: 'wrap', gap: '1rem' }}>
-                <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Award size={18} style={{ color: '#4f46e5' }} />
-                  <span>Chi tiết đối chiếu tiêu chí (CV vs JD)</span>
-                </h3>
-                
-                {/* Tabs */}
-                <div style={{ display: 'flex', gap: '0.25rem', padding: '0.2rem', backgroundColor: '#f1f5f9', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
-                  {(['all', 'matched', 'weak', 'missing'] as const).map((tab) => {
-                    const labelMap = { all: 'Tất cả', matched: 'Khớp', weak: 'Yếu', missing: 'Thiếu' };
-                    const count = [
-                      ...(assessment.evidenceItems || []),
-                      ...(assessment.additionalEvidenceItems || [])
-                    ].filter(item => tab === 'all' || item.status === tab).length;
+                {/* Eligibility Card */}
+                {assessment.eligibility && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '1.5rem', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '0.75rem', justifyContent: 'center' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Kết quả sàng lọc hồ sơ</span>
                     
-                    const isActive = criteriaFilter === tab;
-                    return (
-                      <button
-                        key={tab}
-                        onClick={() => setCriteriaFilter(tab)}
-                        style={{
-                          border: 'none',
-                          padding: '0.3rem 0.65rem',
-                          fontSize: '0.75rem',
-                          fontWeight: 700,
-                          borderRadius: '0.35rem',
-                          cursor: 'pointer',
-                          backgroundColor: isActive ? '#ffffff' : 'transparent',
-                          color: isActive ? '#0f172a' : '#64748b',
-                          boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        {labelMap[tab]} ({count})
-                      </button>
-                    );
-                  })}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem', marginBottom: '0.25rem' }}>
+                      <span style={{ fontSize: '0.82rem', color: '#64748b' }}>Trạng thái:</span>
+                      <span style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        padding: '0.2rem 0.5rem',
+                        borderRadius: '0.25rem',
+                        backgroundColor: assessment.eligibility.status === 'ELIGIBLE' ? '#ecfdf5' : '#fef2f2',
+                        color: assessment.eligibility.status === 'ELIGIBLE' ? '#047857' : '#b91c1c',
+                        border: '1px solid currentColor'
+                      }}>
+                        {assessment.eligibility.status === 'ELIGIBLE' ? 'ĐỦ ĐIỀU KIỆN (ELIGIBLE)' : 'CHƯA ĐỦ ĐIỀU KIỆN'}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      {(assessment.eligibility.gate_checks || []).map((check: any, idx: number) => {
+                        const isMet = check.status === 'met' || check.status === 'MET';
+                        return (
+                          <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', padding: '0.4rem 0.65rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '0.35rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <strong style={{ fontSize: '0.78rem', color: '#0f172a' }}>{check.criteria_name}</strong>
+                              <span style={{ fontSize: '0.68rem', fontWeight: 700, color: isMet ? '#047857' : '#b91c1c', display: 'flex', alignItems: 'center', gap: '0.15rem' }}>
+                                {isMet ? '✓ Đạt' : '✗ Chưa đạt'}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                              Yêu cầu: <span style={{ color: '#475569', fontWeight: 500 }}>{check.required_value}</span>
+                            </div>
+                            <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                              Thực tế: <span style={{ color: isMet ? '#047857' : '#b91c1c', fontWeight: 600 }}>{check.actual_value}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+              </div>
+
+              {/* Removed tag badges alignment matrix based on user feedback */}
+
+              {/* Detailed Criteria Alignment Matrix */}
+              <div className={styles.evaluationBox} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1rem', padding: '1.25rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem', flexWrap: 'wrap', gap: '1rem' }}>
+                  <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Award size={18} style={{ color: '#4f46e5' }} />
+                    <span>Chi tiết đối chiếu tiêu chí (CV vs JD)</span>
+                  </h3>
+
+                  {/* Tabs */}
+                  <div style={{ display: 'flex', gap: '0.25rem', padding: '0.2rem', backgroundColor: '#f1f5f9', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
+                    {(['all', 'matched', 'weak', 'missing'] as const).map((tab) => {
+                      const labelMap = { all: 'Tất cả', matched: 'Khớp', weak: 'Yếu', missing: 'Thiếu' };
+                      const count = [
+                        ...(assessment.evidenceItems || []),
+                        ...(assessment.additionalEvidenceItems || [])
+                      ].filter(item => tab === 'all' || item.status === tab).length;
+
+                      const isActive = criteriaFilter === tab;
+                      return (
+                        <button
+                          key={tab}
+                          onClick={() => setCriteriaFilter(tab)}
+                          style={{
+                            border: 'none',
+                            padding: '0.3rem 0.65rem',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            borderRadius: '0.35rem',
+                            cursor: 'pointer',
+                            backgroundColor: isActive ? '#ffffff' : 'transparent',
+                            color: isActive ? '#0f172a' : '#64748b',
+                            boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {labelMap[tab]} ({count})
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Score Breakdown if present */}
+                {assessment.scoreBreakdown && (
+                  <div style={{
+                    backgroundColor: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '0.5rem',
+                    padding: '1rem',
+                    fontSize: '0.82rem',
+                    color: '#334155'
+                  }}>
+                    <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <TrendingUp size={14} style={{ color: '#10b981' }} />
+                      <span>Chi tiết tính điểm (Score Breakdown)</span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginTop: '0.25rem' }}>
+                      <div>
+                        <div>• Tổng điểm tích lũy đạt được: <strong style={{ color: '#4f46e5' }}>{assessment.scoreBreakdown.weighted_points_sum}</strong></div>
+                        <div>• Tổng hệ số quan trọng của các yêu cầu: <strong style={{ color: '#0f172a' }}>{assessment.scoreBreakdown.total_weight_used}</strong></div>
+                      </div>
+                      <div>
+                        <div>• Công thức tính: <code style={{ backgroundColor: '#e2e8f0', padding: '0.1rem 0.3rem', borderRadius: '0.25rem', fontFamily: 'monospace', fontSize: '0.75rem' }}>SUM(hệ_số_quan_trọng * điểm_trạng_thái) / SUM(hệ_số_quan_trọng) * 100</code></div>
+                        <div>• Chi tiết phép tính: <strong style={{ color: '#ea580c' }}>({assessment.scoreBreakdown.weighted_points_sum} / {assessment.scoreBreakdown.total_weight_used}) * 100 = {assessment.competencyFitScore}%</strong></div>
+                      </div>
+                    </div>
+                    <div style={{ borderTop: '1px solid #e2e8f0', marginTop: '0.75rem', paddingTop: '0.5rem', fontSize: '0.75rem', color: '#64748b', display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
+                      <span>Quy đổi trạng thái:</span>
+                      <span>Khớp (Matched) = <strong>{assessment.scoreBreakdown.points_config?.matched || 1.0}</strong></span>
+                      <span>Yếu (Weak) = <strong>{assessment.scoreBreakdown.points_config?.weak || 0.3}</strong></span>
+                      <span>Thiếu (Missing) = <strong>{assessment.scoreBreakdown.points_config?.missing || 0.0}</strong></span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Criteria List */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  {/* Must Have Section */}
+                  <div>
+                    <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <span style={{ width: '4px', height: '14px', backgroundColor: '#e11d48', borderRadius: '2px' }}></span>
+                      Yêu cầu bắt buộc (Must Have)
+                    </h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      {(() => {
+                        const items = (assessment.evidenceItems || []).filter(item => criteriaFilter === 'all' || item.status === criteriaFilter);
+                        if (items.length === 0) {
+                          return <div style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic', padding: '1rem', border: '1px dashed #e2e8f0', borderRadius: '0.5rem', backgroundColor: '#f8fafc', textAlign: 'center' }}>Không có yêu cầu bắt buộc nào trong danh mục này</div>;
+                        }
+                        return items.map((item, idx) => renderCriterionItem(item, idx, CheckCircle, AlertCircle, XCircle));
+                      })()}
+                    </div>
+                  </div>
+
+                  {/* Prefer Section */}
+                  <div>
+                    <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <span style={{ width: '4px', height: '14px', backgroundColor: '#0284c7', borderRadius: '2px' }}></span>
+                      Yêu cầu khuyến khích (Prefer)
+                    </h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      {(() => {
+                        const items = (assessment.additionalEvidenceItems || []).filter(item => criteriaFilter === 'all' || item.status === criteriaFilter);
+                        if (items.length === 0) {
+                          return <div style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic', padding: '1rem', border: '1px dashed #e2e8f0', borderRadius: '0.5rem', backgroundColor: '#f8fafc', textAlign: 'center' }}>Không có yêu cầu khuyến khích nào trong danh mục này</div>;
+                        }
+                        return items.map((item, idx) => renderCriterionItem(item, idx + 1000, CheckCircle, AlertCircle, XCircle));
+                      })()}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Score Breakdown if present */}
-              {assessment.scoreBreakdown && (
-                <div style={{
-                  backgroundColor: '#f8fafc',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '0.5rem',
-                  padding: '1rem',
-                  fontSize: '0.82rem',
-                  color: '#334155'
-                }}>
-                  <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                    <TrendingUp size={14} style={{ color: '#10b981' }} />
-                    <span>Chi tiết tính điểm (Score Breakdown)</span>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginTop: '0.25rem' }}>
-                    <div>
-                      <div>• Tổng điểm trọng số tích lũy: <strong style={{ color: '#4f46e5' }}>{assessment.scoreBreakdown.weighted_points_sum}</strong></div>
-                      <div>• Tổng trọng số các tiêu chí: <strong style={{ color: '#0f172a' }}>{assessment.scoreBreakdown.total_weight_used}</strong></div>
-                    </div>
-                    <div>
-                      <div>• Công thức tính: <code style={{ backgroundColor: '#e2e8f0', padding: '0.1rem 0.3rem', borderRadius: '0.25rem', fontFamily: 'monospace', fontSize: '0.75rem' }}>SUM(weight * points) / SUM(weight) * 100</code></div>
-                      <div>• Chi tiết phép tính: <strong style={{ color: '#ea580c' }}>({assessment.scoreBreakdown.weighted_points_sum} / {assessment.scoreBreakdown.total_weight_used}) * 100 = {assessment.competencyFitScore}%</strong></div>
-                    </div>
-                  </div>
-                  <div style={{ borderTop: '1px solid #e2e8f0', marginTop: '0.75rem', paddingTop: '0.5rem', fontSize: '0.75rem', color: '#64748b', display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
-                    <span>Quy đổi trạng thái:</span>
-                    <span>Khớp (Matched) = <strong>{assessment.scoreBreakdown.points_config?.matched || 1.0}</strong></span>
-                    <span>Yếu (Weak) = <strong>{assessment.scoreBreakdown.points_config?.weak || 0.3}</strong></span>
-                    <span>Thiếu (Missing) = <strong>{assessment.scoreBreakdown.points_config?.missing || 0.0}</strong></span>
+              {/* In-depth AI Evaluation Feedbacks */}
+              {assessment.sectionWiseFeedback && Object.keys(assessment.sectionWiseFeedback).length > 0 && (
+                <div className={styles.evaluationBox} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', margin: 0 }}>
+                    <Brain size={18} style={{ color: '#4f46e5' }} />
+                    <span>Phân tích chi tiết từ AI</span>
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    {Object.entries(assessment.sectionWiseFeedback).map(([section, feedback], idx) => {
+                      const cleanText = renderFeedbackValue(feedback);
+                      if (!cleanText) return null;
+                      return (
+                        <div key={idx} style={{ borderLeft: '3px solid #818cf8', paddingLeft: '1rem' }}>
+                          <h4 style={{ fontSize: '0.82rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569', margin: '0 0 0.25rem 0' }}>
+                            {getSectionName(section)}
+                          </h4>
+                          <p style={{ margin: 0, fontSize: '0.88rem', color: '#334155', lineHeight: '1.5' }}>
+                            {cleanText}
+                          </p>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
 
-              {/* Criteria List */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {[
-                  ...(assessment.evidenceItems || []),
-                  ...(assessment.additionalEvidenceItems || [])
-                ]
-                  .filter(item => criteriaFilter === 'all' || item.status === criteriaFilter)
-                  .map((item, idx) => {
-                    const statusConfig = {
-                      matched: { bg: '#ecfdf5', color: '#047857', border: '#a7f3d0', label: 'Khớp (Matched)', icon: CheckCircle },
-                      weak: { bg: '#fffbeb', color: '#b45309', border: '#fde68a', label: 'Cần cải thiện (Weak)', icon: AlertCircle },
-                      missing: { bg: '#fef2f2', color: '#b91c1c', border: '#fca5a5', label: 'Thiếu hụt (Missing)', icon: XCircle }
-                    }[item.status as 'matched' | 'weak' | 'missing'] || { bg: '#f1f5f9', color: '#475569', border: '#cbd5e1', label: item.status, icon: AlertCircle };
-                    
-                    const StatusIcon = statusConfig.icon;
-
-                    return (
+              {/* Actionable Suggestions */}
+              <div className={styles.evaluationBox}>
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1rem', fontWeight: 700, color: '#1e293b', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', margin: '0 0 1rem 0' }}>
+                  <Lightbulb size={18} style={{ color: '#eab308' }} />
+                  <span>Lời khuyên chuẩn bị phỏng vấn</span>
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {assessment.topPriorityImprovements && assessment.topPriorityImprovements.length > 0 ? (
+                    assessment.topPriorityImprovements.map((item: any, index: number) => (
                       <div
-                        key={idx}
+                        key={index}
                         style={{
-                          border: `1px solid ${statusConfig.border}`,
-                          borderRadius: '0.5rem',
+                          display: 'flex',
+                          gap: '1rem',
+                          alignItems: 'flex-start',
                           backgroundColor: '#ffffff',
-                          overflow: 'hidden',
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.01)'
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '0.5rem',
+                          padding: '1rem',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
                         }}
                       >
-                        {/* Criterion Header */}
-                        <div style={{
-                          backgroundColor: statusConfig.bg,
-                          padding: '0.6rem 0.85rem',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          flexWrap: 'wrap',
-                          gap: '0.5rem',
-                          borderBottom: `1px solid ${statusConfig.border}`
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <StatusIcon size={15} style={{ color: statusConfig.color }} />
-                            <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>{item.criteria_name}</strong>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                            {item.weight_used !== undefined && (
-                              <span style={{ fontSize: '0.72rem', color: '#475569', backgroundColor: 'rgba(255,255,255,0.6)', padding: '0.15rem 0.4rem', borderRadius: '0.25rem', border: '1px solid rgba(0,0,0,0.05)' }}>
-                                Trọng số: <strong>{item.weight_used}</strong>
-                                {item.score_contribution !== undefined && <> | Điểm đóng góp: <strong>{item.score_contribution}</strong></>}
-                              </span>
-                            )}
+                        {/* Priority Bubble */}
+                        <div
+                          style={{
+                            backgroundColor: '#fff7ed',
+                            border: '1.5px solid #fdba74',
+                            color: '#ea580c',
+                            width: '30px',
+                            height: '30px',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontWeight: 800,
+                            fontSize: '0.85rem',
+                            flexShrink: 0
+                          }}
+                        >
+                          {item.priority_rank || index + 1}
+                        </div>
+
+                        {/* Content */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>
+                              {item.criteria_name || 'Đề xuất'}
+                            </span>
                             <span style={{
-                              fontSize: '0.68rem',
+                              fontSize: '0.65rem',
                               fontWeight: 700,
-                              padding: '0.15rem 0.45rem',
+                              padding: '0.1rem 0.35rem',
                               borderRadius: '0.25rem',
-                              backgroundColor: '#ffffff',
-                              color: statusConfig.color,
-                              border: `1px solid ${statusConfig.color}`
+                              backgroundColor: '#ffedd5',
+                              color: '#c2410c'
                             }}>
-                              {statusConfig.label}
+                              Ưu tiên {item.priority_rank || index + 1}
                             </span>
                           </div>
-                        </div>
-
-                        {/* Criterion Details */}
-                        <div style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.6rem', fontSize: '0.8rem' }}>
-                          {item.jd_requirement && (
-                            <div>
-                              <div style={{ fontWeight: 700, color: '#475569', marginBottom: '0.15rem' }}>Yêu cầu tuyển dụng (JD):</div>
-                              <div style={{ color: '#0f172a', backgroundColor: '#f8fafc', padding: '0.4rem 0.65rem', borderRadius: '0.25rem', border: '1px solid #f1f5f9' }}>
-                                {item.jd_requirement}
-                              </div>
-                            </div>
-                          )}
-                          {item.cv_evidence && (
-                            <div>
-                              <div style={{ fontWeight: 700, color: '#475569', marginBottom: '0.15rem' }}>Minh chứng trong CV:</div>
-                              <div style={{ color: '#0f172a', backgroundColor: '#f8fafc', padding: '0.4rem 0.65rem', borderRadius: '0.25rem', border: '1px solid #f1f5f9' }}>
-                                {item.cv_evidence}
-                              </div>
-                            </div>
-                          )}
-                          {item.reasoning && (
-                            <div>
-                              <div style={{ fontWeight: 700, color: '#475569', marginBottom: '0.15rem' }}>Phân tích &amp; Đánh giá của AI:</div>
-                              <div style={{ color: '#334155', fontStyle: 'italic', paddingLeft: '0.65rem', borderLeft: `3px solid ${statusConfig.color}` }}>
-                                {item.reasoning}
-                              </div>
-                            </div>
-                          )}
+                          <p style={{ margin: 0, fontSize: '0.8rem', color: '#475569', lineHeight: '1.5' }}>
+                            {item.suggestion}
+                          </p>
                         </div>
                       </div>
-                    );
-                  })}
-              </div>
-            </div>
-
-            {/* In-depth AI Evaluation Feedbacks */}
-            {assessment.sectionWiseFeedback && Object.keys(assessment.sectionWiseFeedback).length > 0 && (
-              <div className={styles.evaluationBox} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', margin: 0 }}>
-                  <Brain size={18} style={{ color: '#4f46e5' }} />
-                  <span>Phân tích chi tiết từ AI</span>
-                </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {Object.entries(assessment.sectionWiseFeedback).map(([section, feedback], idx) => {
-                    const cleanText = renderFeedbackValue(feedback);
-                    if (!cleanText) return null;
-                    return (
-                      <div key={idx} style={{ borderLeft: '3px solid #818cf8', paddingLeft: '1rem' }}>
-                        <h4 style={{ fontSize: '0.82rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569', margin: '0 0 0.25rem 0' }}>
-                          {getSectionName(section)}
-                        </h4>
-                        <p style={{ margin: 0, fontSize: '0.88rem', color: '#334155', lineHeight: '1.5' }}>
-                          {cleanText}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Actionable Suggestions */}
-            <div className={styles.evaluationBox}>
-              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1rem', fontWeight: 700, color: '#1e293b', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', margin: '0 0 1rem 0' }}>
-                <Lightbulb size={18} style={{ color: '#eab308' }} />
-                <span>Lời khuyên chuẩn bị phỏng vấn</span>
-              </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {assessment.topPriorityImprovements && assessment.topPriorityImprovements.length > 0 ? (
-                  assessment.topPriorityImprovements.map((item: any, index: number) => (
-                    <div
-                      key={index}
-                      style={{
-                        display: 'flex',
-                        gap: '1rem',
-                        alignItems: 'flex-start',
-                        backgroundColor: '#ffffff',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '0.5rem',
-                        padding: '1rem',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-                      }}
-                    >
-                      {/* Priority Bubble */}
+                    ))
+                  ) : (assessment.actionableImprovementSuggestions || []).length > 0 ? (
+                    (assessment.actionableImprovementSuggestions || []).map((suggestion, index) => (
                       <div
+                        key={index}
                         style={{
-                          backgroundColor: '#fff7ed',
-                          border: '1.5px solid #fdba74',
-                          color: '#ea580c',
-                          width: '30px',
-                          height: '30px',
-                          borderRadius: '50%',
                           display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontWeight: 800,
-                          fontSize: '0.85rem',
-                          flexShrink: 0
+                          gap: '0.75rem',
+                          alignItems: 'flex-start',
+                          backgroundColor: '#ffffff',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '0.5rem',
+                          padding: '0.85rem 1rem',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
                         }}
                       >
-                        {item.priority_rank || index + 1}
+                        <span style={{ color: '#ea580c', fontWeight: 'bold', fontSize: '1rem', lineHeight: '1.2' }}>➔</span>
+                        <span style={{ fontSize: '#0.8rem', color: '#475569', lineHeight: '1.5' }}>{suggestion}</span>
                       </div>
+                    ))
+                  ) : (
+                    <p style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic', margin: 0 }}>Không có đề xuất thêm.</p>
+                  )}
+                </div>
+              </div>
 
-                      {/* Content */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>
-                            {item.criteria_name || 'Đề xuất'}
-                          </span>
-                          <span style={{
-                            fontSize: '0.65rem',
-                            fontWeight: 700,
-                            padding: '0.1rem 0.35rem',
-                            borderRadius: '0.25rem',
-                            backgroundColor: '#ffedd5',
-                            color: '#c2410c'
-                          }}>
-                            Ưu tiên {item.priority_rank || index + 1}
-                          </span>
-                        </div>
-                        <p style={{ margin: 0, fontSize: '0.8rem', color: '#475569', lineHeight: '1.5' }}>
-                          {item.suggestion}
-                        </p>
-                      </div>
-                    </div>
-                  ))
-                ) : (assessment.actionableImprovementSuggestions || []).length > 0 ? (
-                  (assessment.actionableImprovementSuggestions || []).map((suggestion, index) => (
-                    <div
-                      key={index}
-                      style={{
-                        display: 'flex',
-                        gap: '0.75rem',
-                        alignItems: 'flex-start',
-                        backgroundColor: '#ffffff',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '0.5rem',
-                        padding: '0.85rem 1rem',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-                      }}
-                    >
-                      <span style={{ color: '#ea580c', fontWeight: 'bold', fontSize: '1rem', lineHeight: '1.2' }}>➔</span>
-                      <span style={{ fontSize: '#0.8rem', color: '#475569', lineHeight: '1.5' }}>{suggestion}</span>
-                    </div>
-                  ))
-                ) : (
-                  <p style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic', margin: 0 }}>Không có đề xuất thêm.</p>
-                )}
+              {/* Navigation buttons */}
+              <div className={styles.formActions} style={{ borderTop: '1px solid #e2e8f0', paddingTop: '1.5rem', margin: 0 }}>
+                <button className={styles.secondaryButton} onClick={handleReset}>
+                  Quay lại
+                </button>
+                <button className={styles.primaryButton} onClick={handleContinueToSelection}>
+                  Tiếp tục phỏng vấn ➔
+                </button>
+              </div>
+
+            </div>
+          )}
+          {/* ── State 5: Generating Question Bank ── */}
+          {generating && (
+            <div className={styles.loadingOverlay}>
+              <div className={styles.spinner} style={{ borderTopColor: '#f59e0b' }} />
+              <div>
+                <h3>Đang tạo bộ câu hỏi phỏng vấn...</h3>
+                <p className={styles.subtitle} style={{ marginTop: '0.25rem' }}>AI đang thiết kế câu hỏi dựa trên CV và JD của bạn</p>
+              </div>
+              <div className={styles.loadingSteps}>
+                <p>➜ Phân tích kỹ năng cốt lõi...</p>
+                <p>➜ Lên danh sách câu hỏi phù hợp...</p>
               </div>
             </div>
+          )}
+        </main>
 
-            {/* Navigation buttons */}
-            <div className={styles.formActions} style={{ borderTop: '1px solid #e2e8f0', paddingTop: '1.5rem', margin: 0 }}>
-              <button className={styles.secondaryButton} onClick={handleReset}>
-                Quay lại
-              </button>
-              <button className={styles.primaryButton} onClick={handleContinueToSelection}>
-                Tiếp tục phỏng vấn ➔
-              </button>
-            </div>
-
-          </div>
-        )}
-        {/* ── State 5: Generating Question Bank ── */}
-        {generating && (
-          <div className={styles.loadingOverlay}>
-            <div className={styles.spinner} style={{ borderTopColor: '#f59e0b' }} />
-            <div>
-              <h3>Đang tạo bộ câu hỏi phỏng vấn...</h3>
-              <p className={styles.subtitle} style={{ marginTop: '0.25rem' }}>AI đang thiết kế câu hỏi dựa trên CV và JD của bạn</p>
-            </div>
-            <div className={styles.loadingSteps}>
-              <p>➜ Phân tích kỹ năng cốt lõi...</p>
-              <p>➜ Lên danh sách câu hỏi phù hợp...</p>
-            </div>
-          </div>
-        )}
-      </main>
-
-    </div>
+      </div>
     </ProtectedRoute>
+  );
+}
+
+function renderCriterionItem(item: any, idx: number, CheckCircle: any, AlertCircle: any, XCircle: any) {
+  const statusConfig = {
+    matched: { bg: '#ecfdf5', color: '#047857', border: '#a7f3d0', label: 'Khớp (Matched)', icon: CheckCircle },
+    weak: { bg: '#fffbeb', color: '#b45309', border: '#fde68a', label: 'Chưa rõ ràng (Weak)', icon: AlertCircle },
+    missing: { bg: '#fef2f2', color: '#b91c1c', border: '#fca5a5', label: 'Thiếu hụt (Missing)', icon: XCircle }
+  }[item.status as 'matched' | 'weak' | 'missing'] || { bg: '#f1f5f9', color: '#475569', border: '#cbd5e1', label: item.status, icon: AlertCircle };
+
+  const StatusIcon = statusConfig.icon;
+
+  return (
+    <div
+      key={idx}
+      style={{
+        border: `1px solid ${statusConfig.border}`,
+        borderRadius: '0.5rem',
+        backgroundColor: '#ffffff',
+        overflow: 'hidden',
+        boxShadow: '0 1px 2px rgba(0,0,0,0.01)'
+      }}
+    >
+      {/* Criterion Header */}
+      <div style={{
+        backgroundColor: statusConfig.bg,
+        padding: '0.6rem 0.85rem',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '0.5rem',
+        borderBottom: `1px solid ${statusConfig.border}`
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <StatusIcon size={15} style={{ color: statusConfig.color }} />
+          <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>{item.criteria_name}</strong>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          {item.weight_used !== undefined && (
+            <span style={{ fontSize: '0.72rem', color: '#475569', backgroundColor: 'rgba(255,255,255,0.6)', padding: '0.15rem 0.4rem', borderRadius: '0.25rem', border: '1px solid rgba(0,0,0,0.05)' }}>
+              Hệ số quan trọng: <strong>{item.weight_used}</strong>
+              {item.score_contribution !== undefined && <> | Điểm đóng góp vào tổng: <strong>{item.score_contribution}</strong></>}
+            </span>
+          )}
+          <span style={{
+            fontSize: '0.68rem',
+            fontWeight: 700,
+            padding: '0.15rem 0.45rem',
+            borderRadius: '0.25rem',
+            backgroundColor: '#ffffff',
+            color: statusConfig.color,
+            border: `1px solid ${statusConfig.color}`
+          }}>
+            {statusConfig.label}
+          </span>
+        </div>
+      </div>
+
+      {/* Criterion Details */}
+      <div style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.6rem', fontSize: '0.8rem' }}>
+        {item.jd_requirement && (
+          <div>
+            <div style={{ fontWeight: 700, color: '#475569', marginBottom: '0.15rem' }}>Yêu cầu tuyển dụng (JD):</div>
+            <div style={{ color: '#0f172a', backgroundColor: '#f8fafc', padding: '0.4rem 0.65rem', borderRadius: '0.25rem', border: '1px solid #f1f5f9' }}>
+              {item.jd_requirement}
+            </div>
+          </div>
+        )}
+        {item.cv_evidence && (
+          <div>
+            <div style={{ fontWeight: 700, color: '#475569', marginBottom: '0.15rem' }}>Minh chứng trong CV:</div>
+            <div style={{ color: '#0f172a', backgroundColor: '#f8fafc', padding: '0.4rem 0.65rem', borderRadius: '0.25rem', border: '1px solid #f1f5f9' }}>
+              {item.cv_evidence}
+            </div>
+          </div>
+        )}
+        {item.reasoning && (
+          <div>
+            <div style={{ fontWeight: 700, color: '#475569', marginBottom: '0.15rem' }}>Phân tích &amp; Đánh giá của AI:</div>
+            <div style={{ color: '#334155', fontStyle: 'italic', paddingLeft: '0.65rem', borderLeft: `3px solid ${statusConfig.color}` }}>
+              {item.reasoning}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
