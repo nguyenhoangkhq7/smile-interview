@@ -111,6 +111,10 @@ public class ResumeAssessment {
     @Column(name = "additional_evidence_items", columnDefinition = "jsonb")
     private List<AssessmentResponseDto.AdHocEvidenceItem> additionalEvidenceItems;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "eligibility", columnDefinition = "jsonb")
+    private Eligibility eligibility;
+
     /**
      * Ordered list of actionable improvement suggestions returned by the LLM.
      * Stored as a JSONB array for native array semantics and future query support.

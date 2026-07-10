@@ -61,6 +61,9 @@ public class AssessmentResponse {
     @JsonProperty("overall_match_score")
     private Integer overallMatchScore;
 
+    @JsonProperty("eligibility")
+    private Eligibility eligibility;
+
     // -------------------------------------------------------------------------
     // Evidence — from LLM (evidence-matching engine output)
     // -------------------------------------------------------------------------
