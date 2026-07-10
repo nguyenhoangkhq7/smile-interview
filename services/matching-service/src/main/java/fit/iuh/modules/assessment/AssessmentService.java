@@ -68,6 +68,7 @@ public class AssessmentService {
     private final JobCriteriaRepository jobCriteriaRepository;
     private final ScoringService scoringService;
     private final SuggestedCriteriaService suggestedCriteriaService;
+    private final GateExtractionService gateExtractionService;
     private final ObjectMapper objectMapper;
 
     public AssessmentService(
@@ -79,6 +80,7 @@ public class AssessmentService {
             JobCriteriaRepository jobCriteriaRepository,
             ScoringService scoringService,
             SuggestedCriteriaService suggestedCriteriaService,
+            GateExtractionService gateExtractionService,
             ObjectMapper objectMapper) {
         this.appProperties = appProperties;
         this.llmWebClient = llmWebClient;
@@ -88,6 +90,7 @@ public class AssessmentService {
         this.jobCriteriaRepository = jobCriteriaRepository;
         this.scoringService = scoringService;
         this.suggestedCriteriaService = suggestedCriteriaService;
+        this.gateExtractionService = gateExtractionService;
         this.objectMapper = objectMapper;
     }
 
@@ -198,6 +201,10 @@ public class AssessmentService {
 
         log.info("[Assessment] Step 4b complete — overall_match_score={}", scoringResult.score());
 
+        // ── Step 4c: GATE & Eligibility Evaluation ─────────────────────────────
+        Eligibility eligibility = gateExtractionService.evaluateEligibility(fullJdMarkdown, fullCvMarkdown);
+        log.info("[Assessment] Step 4c complete — eligibility_status={}", eligibility.getStatus());
+
         // Process Ad-Hoc criteria
         suggestedCriteriaService.recordAdHocCriteria(metadata.category(), dto.additionalEvidenceItems());
 
@@ -248,8 +255,16 @@ public class AssessmentService {
             }
         }
 
-        // ── Persist and Return ─────────────────────────────────────────────────
-        ResumeAssessment entity = buildAndPersistEntity(sessionId, metadata, scoringResult.score(), dto, scoringResult.evidenceItems(), improvements);
+        // ── Step 5: Build & Persist Result ────────────────────────────────────
+        ResumeAssessment entity = buildAndPersistEntity(
+                sessionId,
+                metadata,
+                scoringResult.score(),
+                dto,
+                scoringResult.evidenceItems(),
+                improvements,
+                eligibility
+        );
         AssessmentResponse response = toResponse(entity, false);
         response.setScoreBreakdown(scoringResult.breakdown());
         return response;
@@ -420,7 +435,8 @@ public class AssessmentService {
             int overallMatchScore,
             AssessmentResponseDto dto,
             List<AssessmentResponseDto.EvidenceItem> populatedEvidenceItems,
-            List<ImprovementResponseDto.ImprovementItem> improvements) {
+            List<ImprovementResponseDto.ImprovementItem> improvements,
+            Eligibility eligibility) {
 
         ResumeAssessment entity = ResumeAssessment.builder()
                 .sessionId(sessionId)
@@ -430,6 +446,7 @@ public class AssessmentService {
                 .evidenceItems(populatedEvidenceItems)
                 .additionalEvidenceItems(dto.additionalEvidenceItems())
                 .topPriorityImprovements(improvements)
+                .eligibility(eligibility)
                 .build();
 
         ResumeAssessment saved = resumeAssessmentRepository.save(entity);
@@ -448,6 +465,7 @@ public class AssessmentService {
                 .evidenceItems(entity.getEvidenceItems())
                 .additionalEvidenceItems(entity.getAdditionalEvidenceItems())
                 .topPriorityImprovements(entity.getTopPriorityImprovements())
+                .eligibility(entity.getEligibility())
                 .cached(cached)
                 .createdAt(entity.getCreatedAt())
                 .build();

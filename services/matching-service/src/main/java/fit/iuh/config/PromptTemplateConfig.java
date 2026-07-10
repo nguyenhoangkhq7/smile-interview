@@ -46,6 +46,7 @@ public final class PromptTemplateConfig {
             * Repository: [URL]
     
             # Experience
+            (Map ALL professional experience, including Internships, Part-time jobs, and Full-time roles, strictly under this section)
             ## [Position] | [Organization] | [Location] | [Dates]
             * [Action-verb bullet points focusing on technical tools, SDLC workflow, and quantifiable outcomes]
     
@@ -81,11 +82,7 @@ public final class PromptTemplateConfig {
             * [Action-driven bullet points focusing on technical tasks, SDLC, CI/CD, collaboration, etc.]
     
             # Required Qualifications
-            * Minimum Experience: [Years/Domain requirements]
-            * Core Languages: [...]
-            * Frameworks & Libraries: [...]
-            * Databases & Infrastructure: [...]
-            * CS Fundamentals & Architecture: [OOP, System Design, Networking, Security, etc.]
+            * [Bullet points of all required qualifications, including Years of Experience, Education/Degrees, GPA, Certifications, domain knowledge, and all technical skills. DO NOT artificially group them into "Core Languages" or "Databases". Preserve the original intent.]
     
             # Preferred / Bonus Qualifications
             * [Bullet points of nice-to-have skills, advanced concepts (e.g., Microservices), or specific certifications]
@@ -93,6 +90,33 @@ public final class PromptTemplateConfig {
             # Compensation & Hiring Process
             * Compensation & Benefits: [Salary, perks, learning budget]
             * Interview Stages: [Sequential list of interview rounds, if provided]
+            """;
+            
+    public static final String SYSTEM_PROMPT_GATE_EXTRACTION =
+            """
+            Role: IT Job Description GATE Evaluator.
+            Task: Extract strict 'GATE' requirements from the Job Description and evaluate if the Candidate meets them based on the CV.
+            
+            RULES:
+            1. ONLY extract Years of Experience (YOE), Education (Degrees, Majors, Student Status), GPA thresholds, and Certifications.
+            2. If the JD does not explicitly mention a threshold, DO NOT invent it.
+            3. Differentiate between "REQUIRED" (must-have) and "PREFERRED" (nice-to-have).
+            4. Evaluate the CV against each requirement. Provide a clear 'actual_value' extracted from the CV (e.g., 'Currently a 4th-year student expected to graduate in 2026', 'Bachelor of IT').
+            5. Set 'status' to 'met' or 'not_met'.
+            6. Output ONLY a valid JSON object matching the schema.
+            
+            OUTPUT SCHEMA:
+            {
+              "gate_requirements": [
+                {
+                  "criteria_name": "<E.g., Years of Experience, Education, GPA, Certification>",
+                  "importance": "<REQUIRED|PREFERRED>",
+                  "required_value": "<Exact requirement from JD, e.g., '5+ years', 'Bachelor in CS', 'Final-year student'>",
+                  "actual_value": "<The actual evidence found in the CV, semantically matching the requirement>",
+                  "status": "<met|not_met>"
+                }
+              ]
+            }
             """;
 
     // =========================================================================
@@ -166,7 +190,7 @@ public final class PromptTemplateConfig {
                 6. BREVITY (CRITICAL): To prevent token truncation, keep "jd_requirement", "cv_evidence", and "reasoning" under 15 words each. Be extremely concise.
                 7. WEAK STATUS FORMULA: When status is "weak", the `cv_evidence` MUST strictly follow this exact template to prevent hallucination: "Tìm thấy từ khóa '[X]' trong phần '[Y]'. Hoàn toàn không có minh chứng áp dụng thực tế trong phần mô tả dự án."
                 8. REASONING: Every evidence item MUST include a "reasoning" field with 1-2 concise sentences explaining the status.
-                9. AD-HOC CRITERIA: After evaluating the main criteria, EXHAUSTIVELY scan the JD for clear, distinct technical requirements NOT covered by the criteria list. Extract the most critical missing requirements (up to 4 items max). Do not stop at just 2-3 items, but do not exceed 4 to prevent truncation. Return them in the "additional_evidence_items" array. Keep reasoning to 1 short sentence.
+                9. AD-HOC CRITERIA: After evaluating the main criteria, EXHAUSTIVELY scan the JD for clear, distinct requirements NOT covered by the criteria list, including but not limited to: technical skills, tools, or domain knowledge. Extract the most critical missing requirements (up to 4 items max). Do not stop at just 2-3 items, but do not exceed 4 to prevent truncation. Return them in the "additional_evidence_items" array. Keep reasoning to 1 short sentence. DO NOT include Years of Experience (YOE), Education/Degrees, GPA, or Certifications, as these are processed separately by the GATE extractor. DO NOT evaluate soft skills (Critical Thinking, Collaboration, Communication...) from resume text — these cannot be reliably assessed from static CV and will be handled via interview questions instead.
                 
                 EVALUATION CRITERIA (fetch from Rule Engine):
                 %s
