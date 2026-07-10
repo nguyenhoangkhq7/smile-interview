@@ -443,9 +443,19 @@ export default function InterviewSessionPage() {
             console.log('[Session] Exiting. Ignoring onstop event.');
             return;
           }
+          
+          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+
+          // Prevent sending empty/silent audio to avoid STT hallucinations on silence
+          if (audioBlob.size < 1000) {
+            console.warn('[Session] Audio recording was empty or too short, ignoring. Size:', audioBlob.size);
+            setRecording(false);
+            setSessionState('LISTENING');
+            return;
+          }
+
           setSessionState('AI_THINKING');
           autoStartMicRef.current = false;
-          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
 
           const buffer = await audioBlob.arrayBuffer();
           if (socketRef.current?.connected) {

@@ -28,6 +28,7 @@ export interface AssessmentResponse {
   additionalEvidenceItems?: any[];
   scoreBreakdown?: any;
   topPriorityImprovements?: any[];
+  eligibility?: any;
 }
 
 const getBaseUrl = () => {
@@ -86,8 +87,19 @@ export const cvJdMatchingService = {
   /**
    * Fetch matching assessment details
    */
-  async getAssessment(sessionId: string, forceRefresh = false): Promise<AssessmentResponse> {
-    const url = `${getBaseUrl()}/assess?sessionId=${sessionId}&forceRefresh=${forceRefresh}`;
+  async getAssessment(
+    sessionId: string,
+    forceRefresh = false,
+    resumeId?: number | null,
+    jdId?: number | null
+  ): Promise<AssessmentResponse> {
+    let url = `${getBaseUrl()}/assess?sessionId=${sessionId}&forceRefresh=${forceRefresh}`;
+    if (resumeId) {
+      url += `&resumeId=${resumeId}`;
+    }
+    if (jdId) {
+      url += `&jdId=${jdId}`;
+    }
     
     const headers: Record<string, string> = {};
     const token = useAuthStore.getState().token;

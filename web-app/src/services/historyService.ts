@@ -51,6 +51,7 @@ export interface SessionHistoryItem {
   scoreBreakdown?: any;
   topPriorityImprovements?: any[];
   hiringRecommendation?: string;
+  eligibility?: any;
 }
 
 export interface SessionSavePayload extends SessionHistoryItem {

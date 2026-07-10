@@ -82,13 +82,6 @@ export default function InterviewResultPage() {
   if (loading) {
     return (
       <div className={styles.container}>
-        <header className={styles.header}>
-          <div className={styles.logo}>
-            <span className={styles.logoIcon}>◈</span>
-            <span>Smile Interview</span>
-            <span className={styles.logoBadge}>AI</span>
-          </div>
-        </header>
         <div style={{ display: 'flex', minHeight: '80vh', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ width: '40px', height: '40px', border: '3px solid #f1f5f9', borderTop: '3px solid #4f46e5', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
           <p style={{ marginTop: '1rem', color: '#64748b', fontSize: '0.9rem' }}>Đang tải báo cáo đánh giá từ AI...</p>
@@ -106,11 +99,6 @@ export default function InterviewResultPage() {
   if (!session) {
     return (
       <div className={styles.container}>
-        <header className={styles.header}>
-          <Link href="/history" className={styles.logo}>
-            <img src="/logo.png" alt="Smile Interview Logo" className={styles.logoImg} />
-          </Link>
-        </header>
         <div style={{ display: 'flex', minHeight: '80vh', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', textAlign: 'center' }}>
           <FolderOpen size={48} style={{ color: '#94a3b8' }} />
           <h2 style={{ fontSize: '1.25rem', marginTop: '1.25rem', fontWeight: 700 }}>Không tìm thấy kết quả phỏng vấn</h2>

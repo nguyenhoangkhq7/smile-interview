@@ -1,13 +1,68 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { query } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const sessionId = searchParams.get('sessionId');
     const forceRefresh = searchParams.get('forceRefresh') || 'false';
+    const resumeId = searchParams.get('resumeId');
+    const jdId = searchParams.get('jdId');
 
     if (!sessionId) {
       return NextResponse.json({ error: 'sessionId is required' }, { status: 400 });
+    }
+
+    // Cache lookup: Check if we have an existing completed assessment for this resumeId & jdId
+    if (forceRefresh !== 'true' && resumeId && jdId) {
+      console.log(`[API Proxy Assess] Checking local DB cache for resumeId=${resumeId}, jdId=${jdId}`);
+      const cachedSessionRes = await query(
+        `SELECT * FROM sessions 
+         WHERE resume_id = $1 AND jd_id = $2 
+           AND competency_fit_score IS NOT NULL 
+         ORDER BY date DESC LIMIT 1`,
+        [parseInt(resumeId, 10), parseInt(jdId, 10)]
+      );
+
+      if (cachedSessionRes.rows.length > 0) {
+        const cachedSession = cachedSessionRes.rows[0];
+        console.log(`[API Proxy Assess] Cache HIT for resumeId=${resumeId}, jdId=${jdId}. Reusing session assessment.`);
+
+        const parseJsonField = (val: any) => {
+          if (typeof val === 'string') {
+            try {
+              return JSON.parse(val);
+            } catch (e) {
+              console.error('[API Proxy Assess] Error parsing JSON field:', e);
+              return val;
+            }
+          }
+          return val;
+        };
+
+        return NextResponse.json({
+          id: cachedSession.id,
+          sessionId: sessionId, // Preserve the new sessionId requested by client
+          competencyFitScore: cachedSession.competency_fit_score,
+          technicalDepthScore: cachedSession.technical_depth_score,
+          matchLevel: cachedSession.match_level,
+          candidateLevel: cachedSession.candidate_level,
+          roleTypeDetected: cachedSession.role_type_detected,
+          yearsOfExperienceEstimate: cachedSession.years_of_experience_estimate,
+          strongAreas: parseJsonField(cachedSession.strong_areas) || [],
+          gapAreas: parseJsonField(cachedSession.gap_areas) || [],
+          criticalMissingSkills: parseJsonField(cachedSession.critical_missing_skills) || [],
+          sectionWiseFeedback: parseJsonField(cachedSession.section_wise_feedback) || {},
+          actionableImprovementSuggestions: parseJsonField(cachedSession.actionable_suggestions) || [],
+          cached: true,
+          createdAt: cachedSession.date || '',
+          evidenceItems: parseJsonField(cachedSession.evidence_items) || [],
+          additionalEvidenceItems: parseJsonField(cachedSession.additional_evidence_items) || [],
+          scoreBreakdown: parseJsonField(cachedSession.score_breakdown) || null,
+          topPriorityImprovements: parseJsonField(cachedSession.top_priority_improvements) || [],
+          eligibility: parseJsonField(cachedSession.eligibility) || null
+        });
+      }
     }
 
     const backendUrl = process.env.MATCHING_SERVICE_URL || 'http://localhost:8081';
@@ -132,7 +187,8 @@ export async function GET(request: NextRequest) {
       evidenceItems: data.evidence_items || [],
       additionalEvidenceItems: data.additional_evidence_items || [],
       scoreBreakdown: data.score_breakdown || null,
-      topPriorityImprovements: data.top_priority_improvements || []
+      topPriorityImprovements: data.top_priority_improvements || [],
+      eligibility: data.eligibility || null
     });
   } catch (error: any) {
     console.error('[API Proxy Assess] Error in proxy assessment:', error);
