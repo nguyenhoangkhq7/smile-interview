@@ -46,7 +46,7 @@ export default function Modal({ open, onClose, title, children, size = 'md' }: M
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 w-screen h-screen"
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
@@ -55,11 +55,11 @@ export default function Modal({ open, onClose, title, children, size = 'md' }: M
       {/* Dialog panel */}
       <div
         ref={dialogRef}
-        className={`relative w-full ${sizeClasses[size]} bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl shadow-black/50 flex flex-col max-h-[90vh]`}
+        className={`relative w-full ${sizeClasses[size]} bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl shadow-black/50 flex flex-col max-h-[90vh] overflow-hidden`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 flex-shrink-0">
           <h2
             id="modal-title"
             className="text-base font-semibold text-white"

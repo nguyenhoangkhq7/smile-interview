@@ -108,7 +108,7 @@ export default function JobCategoryTable({ categories, onRefresh }: Props) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-700/70 bg-white/[0.03]">
-              <th className="w-20 px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">ID</th>
+              <th className="min-w-[80px] px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">ID</th>
               <th className="px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Tên</th>
               <th className="px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Danh mục cha</th>
               <th className="w-28 px-5 py-4 text-right text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Hành động</th>
@@ -116,13 +116,13 @@ export default function JobCategoryTable({ categories, onRefresh }: Props) {
           </thead>
           <tbody>
             {displayedCategories.length === 0 && (
-              <tr><td colSpan={4} className="px-5 py-10 text-center text-slate-500">Chưa có danh mục nào.</td></tr>
+              <tr><td colSpan={4} className="px-5 py-10 text-center text-slate-400">Chưa có danh mục nào.</td></tr>
             )}
-            {displayedCategories.map((cat) => (
+             {displayedCategories.map((cat) => (
               <tr key={cat.id} className="border-b border-slate-700/60 transition-colors hover:bg-white/[0.03]">
-                <td className="px-5 py-4 align-middle font-mono text-xs tabular-nums text-slate-500">{cat.id}</td>
-                <td className="px-5 py-4 align-middle font-medium text-slate-100">{cat.name}</td>
-                <td className="px-5 py-4 align-middle text-slate-400">{cat.parent_name ?? <span className="italic text-slate-600">Root</span>}</td>
+                <td className="px-5 py-4 align-middle font-mono text-xs tabular-nums text-slate-300 whitespace-nowrap">{cat.id}</td>
+                <td className="px-5 py-4 align-middle text-sm text-slate-300 font-medium">{cat.name}</td>
+                <td className="px-5 py-4 align-middle text-sm text-slate-400">{cat.parent_name ?? <span className="italic text-slate-500">Root</span>}</td>
                 <td className="px-5 py-4 align-middle">
                   <div className="flex items-center justify-end gap-2">
                     <ActionIconButton
@@ -153,21 +153,21 @@ export default function JobCategoryTable({ categories, onRefresh }: Props) {
       {/* Pagination controls */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between px-1 pt-4">
-          <span className="text-xs text-slate-500">
+          <span className="text-xs text-slate-300 font-medium">
             Trang {currentPage} / {totalPages} (tổng {categories.length} mục)
           </span>
           <div className="flex items-center gap-2">
             <button
               onClick={handlePrevPage}
               disabled={currentPage === 1}
-              className="rounded-lg border border-slate-700/80 bg-white/[0.02] px-3 py-1.5 text-xs font-medium text-slate-400 transition-colors hover:border-slate-500 hover:bg-white/[0.05] hover:text-white disabled:opacity-40 disabled:hover:border-slate-700/80 disabled:hover:bg-white/[0.02] disabled:hover:text-slate-400"
+              className="rounded-lg border border-slate-700 bg-slate-900/60 px-3.5 py-1.5 text-xs font-semibold text-slate-300 hover:border-slate-500 hover:bg-white/[0.08] hover:text-white transition-all disabled:opacity-40 disabled:hover:border-slate-700 disabled:hover:bg-slate-900/60 disabled:hover:text-slate-300 min-h-[32px] min-w-[64px] focus:outline-none focus:ring-1 focus:ring-orange-500/30"
             >
               Trước
             </button>
             <button
               onClick={handleNextPage}
               disabled={currentPage === totalPages}
-              className="rounded-lg border border-slate-700/80 bg-white/[0.02] px-3 py-1.5 text-xs font-medium text-slate-400 transition-colors hover:border-slate-500 hover:bg-white/[0.05] hover:text-white disabled:opacity-40 disabled:hover:border-slate-700/80 disabled:hover:bg-white/[0.02] disabled:hover:text-slate-400"
+              className="rounded-lg border border-slate-700 bg-slate-900/60 px-3.5 py-1.5 text-xs font-semibold text-slate-300 hover:border-slate-500 hover:bg-white/[0.08] hover:text-white transition-all disabled:opacity-40 disabled:hover:border-slate-700 disabled:hover:bg-slate-900/60 disabled:hover:text-slate-300 min-h-[32px] min-w-[64px] focus:outline-none focus:ring-1 focus:ring-orange-500/30"
             >
               Sau
             </button>

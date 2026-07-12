@@ -1,11 +1,4 @@
 @import "tailwindcss";
-@source "../components";
-@source "../hooks";
-@source "../lib";
-
-
-
-
 
 /* ── Design Tokens ── */
 @theme {

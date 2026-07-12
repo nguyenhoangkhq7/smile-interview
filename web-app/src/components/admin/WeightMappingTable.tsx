@@ -195,7 +195,7 @@ function LevelTabs({
   onChange: (nextValue: SeniorityLevel) => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap items-center gap-4 bg-slate-950/60 p-1.5 rounded-2xl border border-slate-800">
       {SENIORITY_LEVELS.map((level) => {
         const isActive = value === level;
         return (
@@ -203,13 +203,12 @@ function LevelTabs({
             key={level}
             type="button"
             onClick={() => onChange(level)}
-            className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-xs font-semibold tracking-wide transition-all duration-200 ${
+            className={`min-h-[36px] min-w-[64px] px-4 py-1.5 text-xs font-bold tracking-wide rounded-xl transition-all duration-200 select-none focus:outline-none focus:ring-1 focus:ring-teal-400/30 ${
               isActive
-                ? 'border-teal-400 bg-teal-500 text-slate-950 shadow-[0_4px_16px_rgba(20,184,166,0.3)] ring-1 ring-teal-400/25'
-                : 'border-slate-700/80 bg-white/[0.03] text-slate-400 hover:border-slate-500 hover:bg-white/[0.05] hover:text-white'
+                ? 'bg-teal-500 text-slate-950 shadow-[0_4px_12px_rgba(20,184,166,0.25)]'
+                : 'text-slate-400 hover:bg-white/[0.04] hover:text-white'
             }`}
           >
-            <span className={`h-1.5 w-1.5 rounded-full ${isActive ? 'bg-slate-950' : 'bg-slate-600'}`} />
             {SENIORITY_LABELS[level]}
           </button>
         );
@@ -322,7 +321,7 @@ function CategoryTreeNode({
   selectedLevel: SeniorityLevel;
   expandedIds: Set<number>;
   onToggle: (categoryId: number) => void;
-  onEditLeaf: (categoryId: number, criteriaId: number, seniorityLevel: SeniorityLevel) => void;
+  onEditLeaf: (categoryId: number, criteriaId: number, seniorityLevel: SeniorityLevel, e?: React.MouseEvent) => void;
   onDeleteLeaf: (categoryId: number, criteriaId: number, seniorityLevel: SeniorityLevel) => void;
 }) {
   const isExpanded = expandedIds.has(node.category.id);
@@ -353,7 +352,7 @@ function CategoryTreeNode({
               <span className="truncate text-sm font-bold text-white sm:text-base">
                 {formatCategoryLabel(node.category.name)}
               </span>
-              <span className="rounded-full border border-slate-800 bg-slate-950/40 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-[0.1em] text-slate-500">
+              <span className="rounded-md border border-slate-800 bg-slate-900/80 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-slate-400">
                 {node.children.length} child{node.children.length === 1 ? '' : 'ren'}
               </span>
               <CriteriaBadgePopover
@@ -364,7 +363,7 @@ function CategoryTreeNode({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 text-slate-400 transition-colors group-hover:text-slate-200">
+        <div className="flex items-center gap-2 text-slate-300 transition-colors group-hover:text-white">
           {!!node.children.length && (
             <svg
               width="14"
@@ -372,8 +371,8 @@ function CategoryTreeNode({
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              strokeWidth="2.25"
-              className={`transition-transform duration-200 ${isExpanded ? 'rotate-90 text-teal-300' : 'rotate-0'}`}
+              strokeWidth="2.5"
+              className={`transition-transform duration-200 ${isExpanded ? 'rotate-90 text-teal-400' : 'rotate-0'}`}
             >
               <path d="m9 18 6-6-6-6" />
             </svg>
@@ -399,11 +398,21 @@ function CategoryTreeNode({
             />
           ))}
 
+          {node.children.length > 0 && selectedLeaves.length > 0 && (
+            <div className="border-t border-slate-800/80 pt-4 mt-6 mb-3">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Tiêu chí trực thuộc danh mục này
+              </span>
+            </div>
+          )}
+
           <div className="space-y-3">
             {selectedLeaves.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-700/70 bg-slate-950/35 px-4 py-4 text-sm text-slate-500">
-                No mapped criteria for this category.
-              </div>
+              node.children.length === 0 && (
+                <div className="rounded-xl border border-dashed border-slate-700/70 bg-slate-950/35 px-4 py-4 text-sm text-slate-400">
+                  No mapped criteria for this category.
+                </div>
+              )
             ) : (
               selectedLeaves.map((leaf) => {
                 const selectedMapping = leaf.mappingsByLevel[selectedLevel] ?? null;
@@ -439,26 +448,26 @@ function CategoryTreeNode({
                           <path d="M16 13H8" />
                           <path d="M16 17H8" />
                         </svg>
-                        <p className="text-sm font-medium text-slate-100">{leaf.criteria.criteria_name}</p>
+                        <p className="text-sm font-medium text-slate-300">{leaf.criteria.criteria_name}</p>
                         <span className={`rounded-full border px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-[0.1em] ${
                           isSet
                             ? 'border-teal-400/20 bg-teal-500/10 text-teal-200'
-                            : 'border-slate-800 bg-slate-900/50 text-slate-500'
+                            : 'border-slate-800 bg-slate-900/50 text-slate-400'
                         }`}>
                           {SENIORITY_LABELS[selectedLevel]}
                         </span>
                       </div>
-                      <p className="mt-1 pl-5 text-xs text-slate-500">
+                      <p className="mt-1 pl-5 text-xs text-slate-400">
                         {isSet ? 'Mapping is configured for this level.' : 'No mapping configured for this level.'}
                       </p>
                     </div>
 
                     <div className="flex items-center gap-4 shrink-0">
                       <div className="min-w-[80px] text-right">
-                        <p className={`text-[16px] font-bold tabular-nums tracking-tight ${isSet ? 'text-brand-green-mid' : 'text-slate-500'}`}>
+                        <p className={`text-[16px] font-bold tabular-nums tracking-tight ${isSet ? 'text-teal-400' : 'text-slate-400'}`}>
                           {isSet ? `${mappingWeight}%` : '0%'}
                         </p>
-                        <p className={`text-[10px] uppercase tracking-wider font-semibold ${isSet ? 'text-brand-green-mid/70' : 'text-slate-500/60'}`}>
+                        <p className={`text-[10px] uppercase tracking-wider font-semibold ${isSet ? 'text-teal-400/80' : 'text-slate-400'}`}>
                           {isSet ? 'Active' : 'Not Set'}
                         </p>
                       </div>
@@ -467,7 +476,7 @@ function CategoryTreeNode({
                         <ActionIconButton
                           label={isSet ? 'Sửa trọng số' : 'Thêm trọng số'}
                           variant="accent"
-                          onClick={() => onEditLeaf(node.category.id, leaf.criteria.id, selectedLevel)}
+                          onClick={(e) => onEditLeaf(node.category.id, leaf.criteria.id, selectedLevel, e)}
                           icon={(
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
@@ -480,7 +489,11 @@ function CategoryTreeNode({
                           label="Xóa mapping"
                           variant="danger"
                           disabled={!selectedMapping}
-                          onClick={() => onDeleteLeaf(node.category.id, leaf.criteria.id, selectedLevel)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            onDeleteLeaf(node.category.id, leaf.criteria.id, selectedLevel);
+                          }}
                           icon={(
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                               <polyline points="3 6 5 6 21 6" />
@@ -529,22 +542,42 @@ function MappingEditorModal({
   const selectedCategoryLabel = categoryOptions.find((option) => option.value === draft.job_category_id)?.label ?? 'Select category';
   const selectedCriteriaLabel = criteria.find((item) => item.id === draft.criteria_id)?.criteria_name ?? 'Select criteria';
 
+  const selectStyle = {
+    backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E")`,
+    backgroundPosition: 'right 0.75rem center',
+    backgroundSize: '1.25rem auto',
+    backgroundRepeat: 'no-repeat',
+    paddingRight: '2.5rem',
+  };
+
   return (
     <Modal open={open} onClose={onClose} title={draft.mode === 'edit' ? 'Sửa trọng số' : 'Thêm mapping'} size="md">
       <div className="space-y-5">
-        <div className="rounded-2xl border border-slate-700/70 bg-white/[0.03] px-4 py-4">
-          <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Seniority level</p>
-          <p className="mt-1 text-sm font-medium text-white">{SENIORITY_LABELS[selectedLevel]}</p>
-        </div>
-
         {draft.mode === 'create' ? (
           <div className="grid grid-cols-1 gap-4">
             <div>
-              <label className="mb-1.5 block text-sm text-slate-400">Danh mục</label>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-400">Seniority Level (Cấp bậc)</label>
               <select
-                className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-3 text-sm text-white focus:border-teal-400 focus:outline-none"
+                className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-3 text-sm text-white focus:border-teal-400 focus:outline-none appearance-none cursor-pointer"
+                value={draft.seniority_level}
+                onChange={(event) => onChange({ ...draft, seniority_level: event.target.value as SeniorityLevel })}
+                style={selectStyle}
+              >
+                {SENIORITY_LEVELS.map((level) => (
+                  <option key={level} value={level}>
+                    {SENIORITY_LABELS[level]}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-400">Danh mục (Category)</label>
+              <select
+                className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-3 text-sm text-white focus:border-teal-400 focus:outline-none appearance-none cursor-pointer"
                 value={draft.job_category_id}
                 onChange={(event) => onChange({ ...draft, job_category_id: Number(event.target.value) })}
+                style={selectStyle}
               >
                 {categoryOptions.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -555,11 +588,12 @@ function MappingEditorModal({
             </div>
 
             <div>
-              <label className="mb-1.5 block text-sm text-slate-400">Tiêu chí</label>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-400">Tiêu chí (Criteria)</label>
               <select
-                className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-3 text-sm text-white focus:border-teal-400 focus:outline-none"
+                className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-3 text-sm text-white focus:border-teal-400 focus:outline-none appearance-none cursor-pointer"
                 value={draft.criteria_id}
                 onChange={(event) => onChange({ ...draft, criteria_id: Number(event.target.value) })}
+                style={selectStyle}
               >
                 {criteria.map((item) => (
                   <option key={item.id} value={item.id}>
@@ -568,43 +602,32 @@ function MappingEditorModal({
                 ))}
               </select>
             </div>
-
-            <div>
-              <label className="mb-1.5 block text-sm text-slate-400">Cấp bậc</label>
-              <select
-                className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-3 text-sm text-white focus:border-teal-400 focus:outline-none"
-                value={draft.seniority_level}
-                onChange={(event) => onChange({ ...draft, seniority_level: event.target.value as SeniorityLevel })}
-              >
-                {SENIORITY_LEVELS.map((level) => (
-                  <option key={level} value={level}>
-                    {SENIORITY_LABELS[level]}
-                  </option>
-                ))}
-              </select>
-            </div>
           </div>
         ) : (
-          <div className="space-y-3">
-            <div className="rounded-xl border border-slate-700/70 bg-white/[0.03] px-4 py-4">
-              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Category</p>
+          <div className="space-y-4">
+            <div className="rounded-xl border border-slate-800 bg-slate-950/40 px-4 py-3.5">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Seniority level</p>
+              <p className="mt-1 text-sm font-medium text-white">{SENIORITY_LABELS[selectedLevel]}</p>
+            </div>
+            <div className="rounded-xl border border-slate-800 bg-slate-950/40 px-4 py-3.5">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Category</p>
               <p className="mt-1 text-sm font-medium text-white">{selectedCategoryLabel}</p>
             </div>
-            <div className="rounded-xl border border-slate-700/70 bg-white/[0.03] px-4 py-4">
-              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Criteria</p>
+            <div className="rounded-xl border border-slate-800 bg-slate-950/40 px-4 py-3.5">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Criteria</p>
               <p className="mt-1 text-sm font-medium text-white">{selectedCriteriaLabel}</p>
             </div>
           </div>
         )}
 
         <div>
-          <label className="mb-1.5 block text-sm text-slate-400">Trọng số (%)</label>
+          <label className="mb-1.5 block text-sm font-semibold text-slate-400">Trọng số (%)</label>
           <input
             type="number"
             min={0}
             max={100}
             step={1}
-            className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-3 text-sm font-mono tabular-nums text-white focus:border-teal-400 focus:outline-none"
+            className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white text-sm font-mono focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400/30 transition-colors"
             value={draft.weight_percentage}
             onChange={(event) => onChange({ ...draft, weight_percentage: Number(event.target.value) })}
           />
@@ -614,7 +637,7 @@ function MappingEditorModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl border border-slate-700/80 bg-white/[0.02] px-4 py-2.5 text-sm text-slate-400 transition-colors hover:border-slate-500 hover:bg-white/[0.05] hover:text-white"
+            className="rounded-xl border border-slate-700 hover:border-slate-500 hover:bg-white/[0.08] text-slate-300 hover:text-white px-5 py-2 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-slate-700/45"
           >
             Hủy
           </button>
@@ -622,7 +645,7 @@ function MappingEditorModal({
             type="button"
             onClick={onSave}
             disabled={saving}
-            className="rounded-xl border border-teal-400/25 bg-teal-400/10 px-4 py-2.5 text-sm font-medium text-teal-200 transition-colors hover:border-teal-400/50 hover:bg-teal-400/15 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold px-5 py-2 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-teal-400/40 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? 'Đang lưu...' : 'Lưu'}
           </button>
@@ -654,7 +677,11 @@ export default function WeightMappingTable({ mappings, categories, criteria, onR
     });
   }, [treeData]);
 
-  const openCreateModal = () => {
+  const openCreateModal = (e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
     if (categoryOptions.length === 0 || criteria.length === 0) {
       toast.error('Thiếu dữ liệu danh mục hoặc tiêu chí để tạo mapping.');
       return;
@@ -670,7 +697,11 @@ export default function WeightMappingTable({ mappings, categories, criteria, onR
     setEditorOpen(true);
   };
 
-  const openLeafEditor = (jobCategoryId: number, criteriaId: number, seniorityLevel: SeniorityLevel) => {
+  const openLeafEditor = (jobCategoryId: number, criteriaId: number, seniorityLevel: SeniorityLevel, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
     const existingMapping = findMappingForLevel(mappings, jobCategoryId, criteriaId, seniorityLevel);
 
     setEditorState({
@@ -765,7 +796,7 @@ export default function WeightMappingTable({ mappings, categories, criteria, onR
       description="Cấu trúc cây theo hệ thống danh mục. Chọn seniority level để xem và chỉnh trọng số của từng mapping tương ứng."
       action={(
         <button
-          onClick={openCreateModal}
+          onClick={(e) => openCreateModal(e)}
           disabled={categoryOptions.length === 0 || criteria.length === 0}
           className="inline-flex items-center gap-2 rounded-xl border border-teal-500/25 bg-teal-500/10 px-3.5 py-2 text-sm font-semibold text-teal-300 transition-colors hover:border-teal-500/50 hover:bg-teal-500/15 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
         >
@@ -813,18 +844,20 @@ export default function WeightMappingTable({ mappings, categories, criteria, onR
         </div>
       </div>
 
-      <MappingEditorModal
-        open={editorOpen}
-        draft={editorState}
-        saving={saving}
-        categories={categories}
-        criteria={criteria}
-        selectedLevel={editorState.seniority_level}
-        onClose={closeEditor}
-        onSave={handleSave}
-        onChange={setEditorState}
-        categoryOptions={categoryOptions}
-      />
+      {editorOpen && (
+        <MappingEditorModal
+          open={editorOpen}
+          draft={editorState}
+          saving={saving}
+          categories={categories}
+          criteria={criteria}
+          selectedLevel={editorState.seniority_level}
+          onClose={closeEditor}
+          onSave={handleSave}
+          onChange={setEditorState}
+          categoryOptions={categoryOptions}
+        />
+      )}
     </RuleDashboardSection>
   );
 }
