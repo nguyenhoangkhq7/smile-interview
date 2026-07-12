@@ -111,7 +111,12 @@ public class AssessmentService {
      */
     @Transactional
     public AssessmentResponse assessResumeBlocking(String sessionId, boolean forceRefresh) {
-        log.info("[Assessment] Request for sessionId={}, forceRefresh={}", sessionId, forceRefresh);
+        return assessResumeBlocking(sessionId, forceRefresh, null);
+    }
+
+    @Transactional
+    public AssessmentResponse assessResumeBlocking(String sessionId, boolean forceRefresh, String fromSessionId) {
+        log.info("[Assessment] Request for sessionId={}, forceRefresh={}, fromSessionId={}", sessionId, forceRefresh, fromSessionId);
 
         // ── Cache-Aside: Check DB first ──────────────────────────────────────
         if (!forceRefresh) {
@@ -119,6 +124,84 @@ public class AssessmentService {
             if (cached.isPresent()) {
                 log.info("[Assessment] Cache HIT for sessionId={}", sessionId);
                 return toResponse(cached.get(), true);
+            }
+
+            // Direct clone by fromSessionId if provided
+            if (fromSessionId != null && !fromSessionId.isBlank()) {
+                var otherAssessmentOpt = resumeAssessmentRepository.findBySessionId(fromSessionId);
+                if (otherAssessmentOpt.isPresent()) {
+                    var otherAssessment = otherAssessmentOpt.get();
+                    log.info("[Assessment] Direct Cache HIT by fromSessionId! Reusing assessment from sessionId={} for new sessionId={}", fromSessionId, sessionId);
+                    
+                    // Clone the assessment for the current sessionId
+                    ResumeAssessment clonedAssessment = ResumeAssessment.builder()
+                            .sessionId(sessionId)
+                            .jobCategory(otherAssessment.getJobCategory())
+                            .seniorityLevel(otherAssessment.getSeniorityLevel())
+                            .overallMatchScore(otherAssessment.getOverallMatchScore())
+                            .evidenceItems(otherAssessment.getEvidenceItems())
+                            .additionalEvidenceItems(otherAssessment.getAdditionalEvidenceItems())
+                            .topPriorityImprovements(otherAssessment.getTopPriorityImprovements())
+                            .eligibility(otherAssessment.getEligibility())
+                            .build();
+                            
+                    ResumeAssessment savedCloned = resumeAssessmentRepository.save(clonedAssessment);
+                    
+                    List<CriteriaWeightProjection> criteriaList = jobCriteriaRepository.findCriteriaTreeByCategory(
+                            clonedAssessment.getJobCategory().name(),
+                            clonedAssessment.getSeniorityLevel().name()
+                    );
+                    if (criteriaList.isEmpty()) {
+                        criteriaList = jobCriteriaRepository.findCriteriaTreeByCategory("SOFTWARE_ENGINEERING", "ALL");
+                    }
+                    ScoringResult scoringResult = scoringService.calculateWithBreakdown(clonedAssessment.getEvidenceItems(), criteriaList);
+                    
+                    AssessmentResponse response = toResponse(savedCloned, true);
+                    response.setScoreBreakdown(scoringResult.breakdown());
+                    return response;
+                }
+            }
+
+            // Fallback to Content-based Cache HIT check
+            java.util.Optional<SessionDocument> cvDocOpt = sessionDocumentRepository.findBySessionIdAndDocumentType(sessionId, DocumentType.CV);
+            java.util.Optional<SessionDocument> jdDocOpt = sessionDocumentRepository.findBySessionIdAndDocumentType(sessionId, DocumentType.JD);
+            if (cvDocOpt.isPresent() && jdDocOpt.isPresent()) {
+                String cvContent = cvDocOpt.get().getMarkdownContent();
+                String jdContent = jdDocOpt.get().getMarkdownContent();
+                java.util.Optional<String> otherSessionIdOpt = sessionDocumentRepository.findSessionWithSameContentAndAssessment(cvContent, jdContent, sessionId);
+                if (otherSessionIdOpt.isPresent()) {
+                    String otherSessionId = otherSessionIdOpt.get();
+                    log.info("[Assessment] Content-based Cache HIT! Reusing assessment from sessionId={} for new sessionId={}", otherSessionId, sessionId);
+                    
+                    var otherAssessment = resumeAssessmentRepository.findBySessionId(otherSessionId).get();
+                    
+                    // Clone the assessment for the current sessionId
+                    ResumeAssessment clonedAssessment = ResumeAssessment.builder()
+                            .sessionId(sessionId)
+                            .jobCategory(otherAssessment.getJobCategory())
+                            .seniorityLevel(otherAssessment.getSeniorityLevel())
+                            .overallMatchScore(otherAssessment.getOverallMatchScore())
+                            .evidenceItems(otherAssessment.getEvidenceItems())
+                            .additionalEvidenceItems(otherAssessment.getAdditionalEvidenceItems())
+                            .topPriorityImprovements(otherAssessment.getTopPriorityImprovements())
+                            .eligibility(otherAssessment.getEligibility())
+                            .build();
+                            
+                    ResumeAssessment savedCloned = resumeAssessmentRepository.save(clonedAssessment);
+                    
+                    List<CriteriaWeightProjection> criteriaList = jobCriteriaRepository.findCriteriaTreeByCategory(
+                            clonedAssessment.getJobCategory().name(),
+                            clonedAssessment.getSeniorityLevel().name()
+                    );
+                    if (criteriaList.isEmpty()) {
+                        criteriaList = jobCriteriaRepository.findCriteriaTreeByCategory("SOFTWARE_ENGINEERING", "ALL");
+                    }
+                    ScoringResult scoringResult = scoringService.calculateWithBreakdown(clonedAssessment.getEvidenceItems(), criteriaList);
+                    
+                    AssessmentResponse response = toResponse(savedCloned, true);
+                    response.setScoreBreakdown(scoringResult.breakdown());
+                    return response;
+                }
             }
         } else if (resumeAssessmentRepository.existsBySessionId(sessionId)) {
             log.warn("[Assessment] Force-refresh for sessionId={}. Deleting cached result.", sessionId);

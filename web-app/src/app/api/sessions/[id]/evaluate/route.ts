@@ -75,7 +75,7 @@ export async function POST(
     console.log('[Evaluate] Raw backend response:', evalResult);
 
     const overallScore = evalResult.overall_score !== undefined ? evalResult.overall_score : (evalResult.overallScore !== undefined ? evalResult.overallScore : 60);
-    const overallFeedback = evalResult.overall_summary || evalResult.overallFeedback || '';
+    const overallFeedback = JSON.stringify(evalResult);
     const strengthsList = evalResult.strengths || evalResult.strongAreas || [];
     const weaknessesList = evalResult.weaknesses || evalResult.gapAreas || [];
     const recommendationsList = evalResult.recommendations || evalResult.actionableSuggestions || [];

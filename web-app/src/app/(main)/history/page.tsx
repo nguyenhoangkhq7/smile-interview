@@ -115,7 +115,14 @@ function HistoryItemCard({ item }: HistoryItemCardProps) {
       </div>
 
       {/* Action button */}
-      <div>
+      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+        {!isCompleted && item.competencyFitScore !== undefined && (
+          <Link href={`/interview/session/${item.id}/result`}>
+            <button className={styles.btnMatching} style={{ backgroundColor: '#ffffff', color: '#166534', border: '1px solid #166534', boxShadow: 'none' }}>
+              <span>Xem kết quả CV</span>
+            </button>
+          </Link>
+        )}
         <Link href={actionLink}>
           <button className={styles.btnMatching}>
             <svg

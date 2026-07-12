@@ -23,7 +23,16 @@ export async function GET(
     const turnsRes = await query('SELECT * FROM session_turns WHERE session_id = $1 ORDER BY id ASC', [id]);
     let turns = turnsRes.rows;
 
-
+    const parseJsonField = (val: any) => {
+      if (typeof val === 'string') {
+        try {
+          return JSON.parse(val);
+        } catch {
+          return val;
+        }
+      }
+      return val;
+    };
 
     const result = {
       id: sess.id,
@@ -43,17 +52,17 @@ export async function GET(
       candidateLevel: sess.candidate_level ? sess.candidate_level : undefined,
       roleTypeDetected: sess.role_type_detected ? sess.role_type_detected : undefined,
       yearsOfExperienceEstimate: sess.years_of_experience_estimate ? sess.years_of_experience_estimate : undefined,
-      strongAreas: sess.strong_areas ? sess.strong_areas : undefined,
-      gapAreas: sess.gap_areas ? sess.gap_areas : undefined,
-      criticalMissingSkills: sess.critical_missing_skills ? sess.critical_missing_skills : undefined,
-      sectionWiseFeedback: sess.section_wise_feedback ? sess.section_wise_feedback : undefined,
-      actionableSuggestions: sess.actionable_suggestions ? sess.actionable_suggestions : undefined,
-      evidenceItems: sess.evidence_items ? sess.evidence_items : undefined,
-      additionalEvidenceItems: sess.additional_evidence_items ? sess.additional_evidence_items : undefined,
-      scoreBreakdown: sess.score_breakdown ? sess.score_breakdown : undefined,
-      topPriorityImprovements: sess.top_priority_improvements ? sess.top_priority_improvements : undefined,
+      strongAreas: parseJsonField(sess.strong_areas) || [],
+      gapAreas: parseJsonField(sess.gap_areas) || [],
+      criticalMissingSkills: parseJsonField(sess.critical_missing_skills) || [],
+      sectionWiseFeedback: parseJsonField(sess.section_wise_feedback) || {},
+      actionableSuggestions: parseJsonField(sess.actionable_suggestions) || [],
+      evidenceItems: parseJsonField(sess.evidence_items) || [],
+      additionalEvidenceItems: parseJsonField(sess.additional_evidence_items) || [],
+      scoreBreakdown: parseJsonField(sess.score_breakdown) || null,
+      topPriorityImprovements: parseJsonField(sess.top_priority_improvements) || [],
       hiringRecommendation: sess.hiring_recommendation ? sess.hiring_recommendation : undefined,
-      eligibility: sess.eligibility ? sess.eligibility : undefined,
+      eligibility: parseJsonField(sess.eligibility) || null,
       questions: turns.map((t) => ({
         question: t.question,
         answer: t.answer,

@@ -35,24 +35,24 @@ function AdminSidebar({ collapsed, onToggle }: AdminSidebarProps) {
 
   return (
     <aside
-      className={`flex flex-col h-screen bg-slate-900 border-r border-slate-800 transition-all duration-300 ${collapsed ? 'w-16' : 'w-60'} flex-shrink-0`}
+      className={`sticky top-0 flex h-screen flex-col border-r border-white/6 bg-slate-950/90 transition-all duration-300 ${collapsed ? 'w-[76px]' : 'w-[256px]'} flex-shrink-0 backdrop-blur-md`}
       style={{ position: 'sticky', top: 0 }}
     >
       {/* Logo + Toggle */}
-      <div className="flex items-center justify-between px-4 py-4 border-b border-slate-800 min-h-[64px]">
+      <div className="flex min-h-[72px] items-center justify-between border-b border-white/6 px-4 py-4">
         {!collapsed && (
-          <div className="flex items-center gap-2">
-            <span className="text-xl font-bold bg-gradient-to-r from-orange-400 to-orange-600 bg-clip-text text-transparent">
+          <div className="flex items-center gap-2.5">
+            <span className="text-xl font-semibold bg-gradient-to-r from-amber-300 to-orange-500 bg-clip-text text-transparent">
               Smile
             </span>
-            <span className="text-xs font-semibold text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full">
+            <span className="rounded-full border border-white/6 bg-white/[0.04] px-2 py-0.5 text-[10px] font-semibold tracking-[0.16em] text-slate-400">
               ADMIN
             </span>
           </div>
         )}
         {collapsed && (
           <div className="w-full flex justify-center">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center text-white font-bold text-sm">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500 to-cyan-600 text-sm font-bold text-white shadow-[0_10px_24px_rgba(20,184,166,0.22)]">
               A
             </div>
           </div>
@@ -60,7 +60,7 @@ function AdminSidebar({ collapsed, onToggle }: AdminSidebarProps) {
         {!collapsed && (
           <button
             onClick={onToggle}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+            className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-white/[0.05] hover:text-white"
             aria-label="Thu gọn thanh bên"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -71,7 +71,7 @@ function AdminSidebar({ collapsed, onToggle }: AdminSidebarProps) {
         {collapsed && (
           <button
             onClick={onToggle}
-            className="absolute -right-3 top-6 w-6 h-6 rounded-full bg-slate-700 border border-slate-600 text-slate-300 hover:bg-slate-600 flex items-center justify-center transition-colors z-10"
+            className="absolute -right-3 top-6 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-slate-600 bg-slate-800 text-slate-300 transition-colors hover:bg-slate-700"
             aria-label="Mở rộng thanh bên"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -82,7 +82,7 @@ function AdminSidebar({ collapsed, onToggle }: AdminSidebarProps) {
       </div>
 
       {/* Nav Links */}
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
         {navItems.map((item) => {
           const isActive = pathname.startsWith(item.href);
           return (
@@ -90,10 +90,10 @@ function AdminSidebar({ collapsed, onToggle }: AdminSidebarProps) {
               key={item.href}
               href={item.href}
               title={collapsed ? item.label : undefined}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
+              className={`flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition-all duration-150 ${
                 isActive
-                  ? 'bg-gradient-to-r from-orange-600 to-orange-500 text-white shadow-lg shadow-orange-900/30'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  ? 'bg-gradient-to-r from-teal-500/20 to-cyan-500/10 text-white ring-1 ring-teal-400/20'
+                  : 'text-slate-400 hover:bg-white/[0.04] hover:text-white'
               } ${collapsed ? 'justify-center' : ''}`}
             >
               <span className="flex-shrink-0">{item.icon}</span>
@@ -104,22 +104,22 @@ function AdminSidebar({ collapsed, onToggle }: AdminSidebarProps) {
       </nav>
 
       {/* User + Logout Footer */}
-      <div className="px-3 pb-4 border-t border-slate-800 pt-4 space-y-2">
+      <div className="space-y-3 border-t border-white/6 px-3 pb-4 pt-4">
         {!collapsed && user && (
-          <div className="flex items-center gap-2.5 px-3 py-2">
-            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-green-500 to-green-700 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+          <div className="flex items-center gap-2.5 rounded-2xl border border-white/6 bg-white/[0.03] px-3 py-3">
+            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-xs font-bold text-white">
               {user.username?.charAt(0).toUpperCase() ?? 'A'}
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-medium text-white truncate">{user.username}</p>
-              <p className="text-xs text-slate-500 truncate">{user.email}</p>
+              <p className="truncate text-sm font-medium text-white">{user.username}</p>
+              <p className="truncate text-xs text-slate-500">{user.email}</p>
             </div>
           </div>
         )}
         <Link
           href="/"
           title={collapsed ? 'Về trang chủ' : undefined}
-          className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-slate-400 hover:text-white hover:bg-slate-800 transition-colors ${collapsed ? 'justify-center' : ''}`}
+          className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-slate-400 transition-colors hover:bg-white/[0.04] hover:text-white ${collapsed ? 'justify-center' : ''}`}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" />
@@ -129,7 +129,7 @@ function AdminSidebar({ collapsed, onToggle }: AdminSidebarProps) {
         <button
           onClick={handleLogout}
           title={collapsed ? 'Đăng xuất' : undefined}
-          className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-red-400 hover:text-red-300 hover:bg-red-950/40 transition-colors ${collapsed ? 'justify-center' : ''}`}
+          className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-rose-300 transition-colors hover:bg-rose-500/10 hover:text-rose-200 ${collapsed ? 'justify-center' : ''}`}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />

@@ -68,10 +68,11 @@ public class AssessmentController {
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<AssessmentResponse> assessResume(
             @RequestParam("sessionId") String sessionId,
-            @RequestParam(value = "forceRefresh", defaultValue = "false") boolean forceRefresh) {
+            @RequestParam(value = "forceRefresh", defaultValue = "false") boolean forceRefresh,
+            @RequestParam(value = "fromSessionId", required = false) String fromSessionId) {
 
-        log.info("Assessment request: sessionId={}, forceRefresh={}", sessionId, forceRefresh);
-        AssessmentResponse response = assessmentService.assessResumeBlocking(sessionId, forceRefresh);
+        log.info("Assessment request: sessionId={}, forceRefresh={}, fromSessionId={}", sessionId, forceRefresh, fromSessionId);
+        AssessmentResponse response = assessmentService.assessResumeBlocking(sessionId, forceRefresh, fromSessionId);
         return ResponseEntity.ok(response);
     }
 

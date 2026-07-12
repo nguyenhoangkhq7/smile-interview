@@ -54,4 +54,19 @@ public interface SessionDocumentRepository extends JpaRepository<SessionDocument
     @Modifying
     @Query("DELETE FROM SessionDocument sd WHERE sd.sessionId = :sessionId")
     void deleteAllBySessionId(@Param("sessionId") String sessionId);
+
+    @Query(value = "SELECT cv.session_id " +
+            "FROM session_documents cv " +
+            "JOIN session_documents jd ON cv.session_id = jd.session_id " +
+            "JOIN resume_assessments ra ON cv.session_id = ra.session_id " +
+            "WHERE cv.document_type = 'CV' " +
+            "  AND jd.document_type = 'JD' " +
+            "  AND cv.markdown_content = :cvContent " +
+            "  AND jd.markdown_content = :jdContent " +
+            "  AND cv.session_id != :currentSessionId " +
+            "LIMIT 1", nativeQuery = true)
+    java.util.Optional<String> findSessionWithSameContentAndAssessment(
+            @Param("cvContent") String cvContent,
+            @Param("jdContent") String jdContent,
+            @Param("currentSessionId") String currentSessionId);
 }

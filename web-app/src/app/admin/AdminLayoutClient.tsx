@@ -15,30 +15,29 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
 
   return (
     <AdminRoute>
-      <div className="flex h-screen overflow-hidden bg-slate-950 text-slate-100">
-        {/* Sidebar */}
-        <AdminSidebar
-          collapsed={collapsed}
-          onToggle={() => setCollapsed((prev) => !prev)}
-        />
+      <div className="relative flex min-h-screen overflow-hidden bg-slate-950 text-slate-100">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0"
+        >
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(251,146,60,0.16),_transparent_28%),radial-gradient(circle_at_top_right,_rgba(59,130,246,0.12),_transparent_24%),linear-gradient(180deg,_rgba(15,23,42,0.96),_rgba(2,6,23,1))]" />
+          <div className="absolute inset-0 opacity-[0.06] [background-image:linear-gradient(rgba(255,255,255,0.5)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.5)_1px,transparent_1px)] [background-size:32px_32px]" />
+        </div>
 
-        {/* Main content area */}
-        <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-          {/* Top header bar */}
-          <header className="flex items-center justify-between px-6 py-4 bg-slate-900/60 border-b border-slate-800 backdrop-blur-sm sticky top-0 z-10">
-            <div className="flex items-center gap-3">
-              <h1 className="text-base font-semibold text-white">Admin Control Center</h1>
-              <span className="hidden sm:inline-flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-950/60 px-2.5 py-1 rounded-full border border-emerald-900/50">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Live
-              </span>
+        <div className="relative z-10 flex w-full gap-4 p-4 lg:p-5">
+          <AdminSidebar
+            collapsed={collapsed}
+            onToggle={() => setCollapsed((prev) => !prev)}
+          />
+
+          <div className="flex min-w-0 flex-1">
+            <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-[28px] border border-white/5 bg-slate-950/80 shadow-[0_24px_90px_rgba(2,6,23,0.55)] backdrop-blur-sm">
+
+              <main className="flex-1 overflow-auto px-5 py-5 lg:px-7 lg:py-7">
+                {children}
+              </main>
             </div>
-          </header>
-
-          {/* Page content */}
-          <main className="flex-1 overflow-auto p-6">
-            {children}
-          </main>
+          </div>
         </div>
       </div>
     </AdminRoute>
