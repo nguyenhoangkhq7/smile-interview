@@ -43,6 +43,11 @@ export default function LevelDistributionTable({ rules, onRefresh }: Props) {
 
   const handleSave = async () => {
     if (!editing) return;
+    const total = (editing.form.behavioral_pct ?? 0) + (editing.form.technical_pct ?? 0) + (editing.form.coding_pct ?? 0) + (editing.form.system_design_pct ?? 0);
+    if (total !== 100) {
+      toast.error('Tổng tỷ lệ phân phối các loại câu hỏi phải bằng 100%!');
+      return;
+    }
     setSaving(true);
     try {
       await adminService.updateLevelDistributionRule(editing.level, editing.form);
@@ -56,12 +61,12 @@ export default function LevelDistributionTable({ rules, onRefresh }: Props) {
     }
   };
 
-  const PctBar = ({ value, color }: { value: number; color: string }) => (
-    <div className="flex items-center gap-3">
-      <div className="flex-1 overflow-hidden rounded-full bg-slate-700/90">
-        <div className={`h-2.5 rounded-full transition-all duration-500 ${color}`} style={{ width: `${Math.min(100, value)}%` }} />
+  const WeightBar = ({ value, colorClass }: { value: number; colorClass: string }) => (
+    <div className="flex items-center gap-3 w-full">
+      <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-white/[0.08]">
+        <div className={`h-full rounded-full transition-all duration-500 ${colorClass}`} style={{ width: `${Math.min(100, Math.max(0, value))}%` }} />
       </div>
-      <span className="w-12 text-right text-sm tabular-nums text-slate-300">{value}%</span>
+      <span className="w-12 shrink-0 text-right text-sm font-semibold tabular-nums text-slate-300">{value}%</span>
     </div>
   );
 
@@ -73,12 +78,15 @@ export default function LevelDistributionTable({ rules, onRefresh }: Props) {
       description="Điều chỉnh tỷ lệ behavioral, technical, coding và system design cho từng seniority."
     >
       {rules.length === 0 && (
-        <div className="px-6 py-10 text-center text-slate-500">Chưa có dữ liệu. Hãy chạy DatabaseSeeder.</div>
+        <div className="px-6 py-10 text-center text-slate-400">Chưa có dữ liệu. Hãy chạy DatabaseSeeder.</div>
       )}
-      <div className="space-y-5 border-t border-white/6 bg-slate-950/35 px-0 py-0">
+      <div className="space-y-5 border-t border-white/6 bg-slate-950/35 p-5 sm:p-6 lg:p-7">
         {rules.map((rule) => {
         const isEditing = editing?.level === rule.level;
         const f = isEditing ? editing!.form : null;
+        const total = isEditing
+          ? (f!.behavioral_pct ?? 0) + (f!.technical_pct ?? 0) + (f!.coding_pct ?? 0) + (f!.system_design_pct ?? 0)
+          : rule.behavioral_pct + rule.technical_pct + rule.coding_pct + rule.system_design_pct;
 
         return (
           <div
@@ -101,8 +109,8 @@ export default function LevelDistributionTable({ rules, onRefresh }: Props) {
                 />
               ) : (
                 <div className="flex gap-2">
-                  <button onClick={() => setEditing(null)} className="rounded-lg border border-slate-700/80 bg-white/[0.02] px-3 py-1.5 text-xs text-slate-400 transition-colors hover:border-slate-500 hover:bg-white/[0.05] hover:text-white">Hủy</button>
-                  <button onClick={handleSave} disabled={saving} className="rounded-lg border border-amber-400/25 bg-amber-400/10 px-3 py-1.5 text-xs font-medium text-amber-200 transition-colors hover:border-amber-400/50 hover:bg-amber-400/15 hover:text-white disabled:opacity-50">
+                  <button onClick={() => setEditing(null)} className="rounded-lg border border-slate-700 bg-slate-900/60 px-3.5 py-1.5 text-xs font-semibold text-slate-400 transition-colors hover:border-slate-500 hover:bg-white/[0.05] hover:text-white min-h-[32px]">Hủy</button>
+                  <button onClick={handleSave} disabled={saving} className="rounded-lg border border-amber-400/25 bg-amber-400/10 px-3.5 py-1.5 text-xs font-semibold text-amber-200 transition-colors hover:border-amber-400/50 hover:bg-amber-400/15 hover:text-white disabled:opacity-50 min-h-[32px]">
                     {saving ? 'Lưu...' : 'Lưu'}
                   </button>
                 </div>
@@ -128,9 +136,26 @@ export default function LevelDistributionTable({ rules, onRefresh }: Props) {
                       />
                     )}
                   </div>
-                  <PctBar value={isEditing ? f![key] : rule[key]} color={color} />
+                  <WeightBar value={isEditing ? f![key] : rule[key]} colorClass={color} />
                 </div>
               ))}
+            </div>
+
+            <div className="mt-5 flex items-center justify-between border-t border-white/5 pt-4">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400">Tổng tỉ lệ phân phối:</span>
+                <span className={`text-sm font-bold ${total === 100 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  {total}%
+                </span>
+                {total !== 100 && (
+                  <span className="text-xs text-amber-400 flex items-center gap-1.5 animate-pulse">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                    (Tổng tỉ lệ phải bằng 100%)
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         );

@@ -574,6 +574,125 @@ export default function NewInterviewPage() {
     return SECTION_NAMES[key] || key.replace(/_/g, ' ').toUpperCase();
   };
 
+  const getPriorityStyles = (rank: number) => {
+    switch (rank) {
+      case 1:
+        return {
+          bubbleBg: '#ffe4e6', // light rose
+          bubbleBorder: '#fda4af', // rose-300
+          bubbleText: '#e11d48', // rose-600
+          badgeBg: '#fecdd3', // rose-200
+          badgeText: '#9f1239', // rose-800
+          cardBg: '#fffdfd',
+          cardBorder: '#ffe4e6'
+        };
+      case 2:
+        return {
+          bubbleBg: '#ffedd5', // light orange
+          bubbleBorder: '#fdba74', // orange-300
+          bubbleText: '#ea580c', // orange-600
+          badgeBg: '#fed7aa', // orange-200
+          badgeText: '#9a3412', // orange-800
+          cardBg: '#fffbf7',
+          cardBorder: '#ffedd5'
+        };
+      case 3:
+        return {
+          bubbleBg: '#fef9c3', // light yellow
+          bubbleBorder: '#fde047', // yellow-300
+          bubbleText: '#ca8a04', // yellow-600
+          badgeBg: '#fef08a', // yellow-200
+          badgeText: '#854d0e', // yellow-800
+          cardBg: '#fffdf2',
+          cardBorder: '#fef9c3'
+        };
+      default:
+        return {
+          bubbleBg: '#f0fdf4', // light green
+          bubbleBorder: '#bbf7d0', // green-300
+          bubbleText: '#16a34a', // green-600
+          badgeBg: '#dcfce7', // green-200
+          badgeText: '#166534', // green-800
+          cardBg: '#fafdfb',
+          cardBorder: '#f0fdf4'
+        };
+    }
+  };
+
+  const renderFormattedFeedback = (text: string) => {
+    if (!text) return null;
+
+    if (text.includes('|')) {
+      const parts = text.split('|').map(p => p.trim()).filter(Boolean);
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.25rem' }}>
+          {parts.map((part, index) => {
+            let displayPart = part;
+            let prefix = "";
+            
+            // Check for prefix "Các kỹ năng còn yếu hoặc thiếu chiều sâu: " or similar
+            const prefixMatch = part.match(/^(Các kỹ năng còn yếu hoặc thiếu chiều sâu:\s*)/i);
+            if (prefixMatch) {
+              prefix = prefixMatch[1];
+              displayPart = part.substring(prefix.length).trim();
+            }
+
+            // Bold headers "Yêu cầu JD:", "Minh chứng CV:"
+            const highlightText = (txt: string) => {
+              const tokens = txt.split(/(Yêu cầu JD:|Minh chứng CV:)/g);
+              return tokens.map((token, tIdx) => {
+                if (token === 'Yêu cầu JD:' || token === 'Minh chứng CV:') {
+                  return <strong key={tIdx} style={{ color: '#0f172a', fontWeight: 700 }}>{token}</strong>;
+                }
+                return token;
+              });
+            };
+
+            return (
+              <div key={index} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                {prefix && (
+                  <div style={{ fontWeight: 700, color: '#e11d48', fontSize: '0.85rem', marginBottom: '0.1rem' }}>
+                    {prefix}
+                  </div>
+                )}
+                <div style={{ 
+                  fontSize: '0.88rem', 
+                  color: '#334155', 
+                  lineHeight: '1.5',
+                  paddingLeft: prefix ? '0.5rem' : '0'
+                }}>
+                  {highlightText(displayPart)}
+                </div>
+                {index < parts.length - 1 && (
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    color: '#cbd5e1', 
+                    fontSize: '0.75rem', 
+                    fontWeight: 'bold',
+                    marginTop: '0.5rem',
+                    marginBottom: '0.25rem',
+                    borderBottom: '1px dashed #e2e8f0',
+                    paddingBottom: '0.5rem'
+                  }}>
+                    <span style={{ margin: '0 0.5rem', color: '#94a3b8' }}>|</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
+    return (
+      <p style={{ margin: 0, fontSize: '0.88rem', color: '#334155', lineHeight: '1.5', whiteSpace: 'pre-line' }}>
+        {text}
+      </p>
+    );
+  };
+
   return (
     <ProtectedRoute>
       <div className={styles.container}>
@@ -1226,9 +1345,7 @@ export default function NewInterviewPage() {
                           <h4 style={{ fontSize: '0.82rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569', margin: '0 0 0.25rem 0' }}>
                             {getSectionName(section)}
                           </h4>
-                          <p style={{ margin: 0, fontSize: '0.88rem', color: '#334155', lineHeight: '1.5' }}>
-                            {cleanText}
-                          </p>
+                          {renderFormattedFeedback(cleanText)}
                         </div>
                       );
                     })}
@@ -1244,63 +1361,67 @@ export default function NewInterviewPage() {
                 </h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   {assessment.topPriorityImprovements && assessment.topPriorityImprovements.length > 0 ? (
-                    assessment.topPriorityImprovements.map((item: any, index: number) => (
-                      <div
-                        key={index}
-                        style={{
-                          display: 'flex',
-                          gap: '1rem',
-                          alignItems: 'flex-start',
-                          backgroundColor: '#ffffff',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '0.5rem',
-                          padding: '1rem',
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-                        }}
-                      >
-                        {/* Priority Bubble */}
+                    assessment.topPriorityImprovements.map((item: any, index: number) => {
+                      const rank = Number(item.priority_rank || index + 1);
+                      const pStyles = getPriorityStyles(rank);
+                      return (
                         <div
+                          key={index}
                           style={{
-                            backgroundColor: '#fff7ed',
-                            border: '1.5px solid #fdba74',
-                            color: '#ea580c',
-                            width: '30px',
-                            height: '30px',
-                            borderRadius: '50%',
                             display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontWeight: 800,
-                            fontSize: '0.85rem',
-                            flexShrink: 0
+                            gap: '1rem',
+                            alignItems: 'flex-start',
+                            backgroundColor: pStyles.cardBg,
+                            border: `1px solid ${pStyles.cardBorder}`,
+                            borderRadius: '0.5rem',
+                            padding: '1rem',
+                            boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
                           }}
                         >
-                          {item.priority_rank || index + 1}
-                        </div>
-
-                        {/* Content */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>
-                              {item.criteria_name || 'Đề xuất'}
-                            </span>
-                            <span style={{
-                              fontSize: '0.65rem',
-                              fontWeight: 700,
-                              padding: '0.1rem 0.35rem',
-                              borderRadius: '0.25rem',
-                              backgroundColor: '#ffedd5',
-                              color: '#c2410c'
-                            }}>
-                              Ưu tiên {item.priority_rank || index + 1}
-                            </span>
+                          {/* Priority Bubble */}
+                          <div
+                            style={{
+                              backgroundColor: pStyles.bubbleBg,
+                              border: `1.5px solid ${pStyles.bubbleBorder}`,
+                              color: pStyles.bubbleText,
+                              width: '30px',
+                              height: '30px',
+                              borderRadius: '50%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: 800,
+                              fontSize: '0.85rem',
+                              flexShrink: 0
+                            }}
+                          >
+                            {rank}
                           </div>
-                          <p style={{ margin: 0, fontSize: '0.8rem', color: '#475569', lineHeight: '1.5' }}>
-                            {item.suggestion}
-                          </p>
+
+                          {/* Content */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>
+                                {item.criteria_name || 'Đề xuất'}
+                              </span>
+                              <span style={{
+                                fontSize: '0.65rem',
+                                fontWeight: 700,
+                                padding: '0.1rem 0.35rem',
+                                borderRadius: '0.25rem',
+                                backgroundColor: pStyles.badgeBg,
+                                color: pStyles.badgeText
+                              }}>
+                                Ưu tiên {rank}
+                              </span>
+                            </div>
+                            <p style={{ margin: 0, fontSize: '0.8rem', color: '#475569', lineHeight: '1.5' }}>
+                              {item.suggestion}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    ))
+                      );
+                    })
                   ) : (assessment.actionableImprovementSuggestions || []).length > 0 ? (
                     (assessment.actionableImprovementSuggestions || []).map((suggestion, index) => (
                       <div

@@ -35,54 +35,31 @@ function AdminSidebar({ collapsed, onToggle }: AdminSidebarProps) {
 
   return (
     <aside
-      className={`sticky top-0 flex h-screen flex-col border-r border-white/6 bg-slate-950/90 transition-all duration-300 ${collapsed ? 'w-[76px]' : 'w-[256px]'} flex-shrink-0 backdrop-blur-md`}
+      className={`sticky top-0 flex h-screen flex-col overflow-y-auto border-r border-slate-800 bg-slate-950/90 transition-all duration-300 ${collapsed ? 'w-[76px]' : 'w-[256px]'} flex-shrink-0 backdrop-blur-md`}
       style={{ position: 'sticky', top: 0 }}
     >
-      {/* Logo + Toggle */}
-      <div className="flex min-h-[72px] items-center justify-between border-b border-white/6 px-4 py-4">
-        {!collapsed && (
+      {/* Logo */}
+      <div className="flex min-h-[72px] items-center justify-between border-b border-slate-800 px-4 py-4">
+        {!collapsed ? (
           <div className="flex items-center gap-2.5">
             <span className="text-xl font-semibold bg-gradient-to-r from-amber-300 to-orange-500 bg-clip-text text-transparent">
               Smile
             </span>
-            <span className="rounded-full border border-white/6 bg-white/[0.04] px-2 py-0.5 text-[10px] font-semibold tracking-[0.16em] text-slate-400">
+            <span className="rounded-full border border-slate-800 bg-white/[0.04] px-2 py-0.5 text-[10px] font-semibold tracking-[0.16em] text-slate-400">
               ADMIN
             </span>
           </div>
-        )}
-        {collapsed && (
+        ) : (
           <div className="w-full flex justify-center">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500 to-cyan-600 text-sm font-bold text-white shadow-[0_10px_24px_rgba(20,184,166,0.22)]">
               A
             </div>
           </div>
         )}
-        {!collapsed && (
-          <button
-            onClick={onToggle}
-            className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-white/[0.05] hover:text-white"
-            aria-label="Thu gọn thanh bên"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path d="M15 18l-6-6 6-6" />
-            </svg>
-          </button>
-        )}
-        {collapsed && (
-          <button
-            onClick={onToggle}
-            className="absolute -right-3 top-6 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-slate-600 bg-slate-800 text-slate-300 transition-colors hover:bg-slate-700"
-            aria-label="Mở rộng thanh bên"
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path d="M9 18l6-6-6-6" />
-            </svg>
-          </button>
-        )}
       </div>
 
       {/* Nav Links */}
-      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+      <nav className="flex-1 space-y-1.5 overflow-y-auto px-4 py-4">
         {navItems.map((item) => {
           const isActive = pathname.startsWith(item.href);
           return (
@@ -90,10 +67,10 @@ function AdminSidebar({ collapsed, onToggle }: AdminSidebarProps) {
               key={item.href}
               href={item.href}
               title={collapsed ? item.label : undefined}
-              className={`flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition-all duration-150 ${
+              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-150 ${
                 isActive
-                  ? 'bg-gradient-to-r from-teal-500/20 to-cyan-500/10 text-white ring-1 ring-teal-400/20'
-                  : 'text-slate-400 hover:bg-white/[0.04] hover:text-white'
+                  ? 'bg-teal-500/10 text-teal-300 border border-teal-500/20 shadow-[0_4px_12px_rgba(20,184,166,0.06)]'
+                  : 'text-slate-400 hover:bg-white/[0.04] hover:text-white border border-transparent'
               } ${collapsed ? 'justify-center' : ''}`}
             >
               <span className="flex-shrink-0">{item.icon}</span>
@@ -104,9 +81,9 @@ function AdminSidebar({ collapsed, onToggle }: AdminSidebarProps) {
       </nav>
 
       {/* User + Logout Footer */}
-      <div className="space-y-3 border-t border-white/6 px-3 pb-4 pt-4">
+      <div className="space-y-3 border-t border-slate-800 px-4 pb-4 pt-4">
         {!collapsed && user && (
-          <div className="flex items-center gap-2.5 rounded-2xl border border-white/6 bg-white/[0.03] px-3 py-3">
+          <div className="flex items-center gap-2.5 rounded-xl border border-slate-800 bg-white/[0.03] px-3 py-3">
             <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-xs font-bold text-white">
               {user.username?.charAt(0).toUpperCase() ?? 'A'}
             </div>
@@ -119,7 +96,7 @@ function AdminSidebar({ collapsed, onToggle }: AdminSidebarProps) {
         <Link
           href="/"
           title={collapsed ? 'Về trang chủ' : undefined}
-          className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-slate-400 transition-colors hover:bg-white/[0.04] hover:text-white ${collapsed ? 'justify-center' : ''}`}
+          className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-400 transition-colors hover:bg-white/[0.04] hover:text-white ${collapsed ? 'justify-center' : ''}`}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" />
@@ -129,7 +106,7 @@ function AdminSidebar({ collapsed, onToggle }: AdminSidebarProps) {
         <button
           onClick={handleLogout}
           title={collapsed ? 'Đăng xuất' : undefined}
-          className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-rose-300 transition-colors hover:bg-rose-500/10 hover:text-rose-200 ${collapsed ? 'justify-center' : ''}`}
+          className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-rose-300 transition-colors hover:bg-rose-500/10 hover:text-rose-200 ${collapsed ? 'justify-center' : ''}`}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />

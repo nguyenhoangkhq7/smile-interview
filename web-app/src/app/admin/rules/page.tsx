@@ -83,6 +83,7 @@ export default function AdminRulesPage() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -108,6 +109,15 @@ export default function AdminRulesPage() {
     fetchAll();
   }, [fetchAll]);
 
+  useEffect(() => {
+    const handleCollapseChange = (e: Event) => {
+      const customEvent = e as CustomEvent<boolean>;
+      setSidebarCollapsed(customEvent.detail);
+    };
+    window.addEventListener('admin-sidebar-collapsed', handleCollapseChange);
+    return () => window.removeEventListener('admin-sidebar-collapsed', handleCollapseChange);
+  }, []);
+
   // ── Stats summary ─────────────────────────────────────────────────────────
   const stats = [
     { label: 'Danh mục', value: data.categories.length, tone: 'orange' as const },
@@ -117,25 +127,42 @@ export default function AdminRulesPage() {
   ];
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 lg:space-y-8">
+    <div className="p-8 flex flex-col gap-8 max-w-7xl mx-auto">
       <ToastContainer />
 
       {/* Page header */}
       <div className="rounded-3xl border border-white/6 bg-slate-950/45 px-5 py-5 shadow-[0_18px_60px_rgba(2,6,23,0.18)] backdrop-blur-sm sm:px-6 sm:py-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-2">
-            <p className="text-xs font-medium uppercase tracking-[0.2em] text-slate-500">Rule Engine Dashboard</p>
-            <div>
-              <h1 className="text-2xl font-semibold text-white sm:text-3xl">Quản lý tiêu chí, trọng số và cấu hình hệ thống</h1>
-              <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-400">
-                Bố cục tối hơn, thoáng hơn và dễ đọc hơn cho các thao tác quản trị.
-              </p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Rule Engine Dashboard</p>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new Event('toggle-admin-sidebar'))}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-700 bg-slate-900/60 text-slate-300 transition-colors hover:border-slate-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+                aria-label={sidebarCollapsed ? "Mở rộng thanh bên" : "Thu gọn thanh bên"}
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  className={`transition-transform duration-200 ${sidebarCollapsed ? 'rotate-180' : ''}`}
+                >
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </button>
+              <h1 className="text-xl font-bold tracking-tight text-white sm:text-2xl lg:text-3xl">
+                Quản lý tiêu chí, trọng số và cấu hình hệ thống
+              </h1>
             </div>
           </div>
           <button
             onClick={fetchAll}
             disabled={loading}
-            className="inline-flex items-center gap-2 self-start rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-medium text-slate-300 transition-colors hover:border-orange-400/30 hover:bg-orange-500/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center gap-2 self-center rounded-xl border border-slate-700 bg-slate-900/60 px-4 py-2 text-sm font-semibold text-slate-300 transition-all hover:border-slate-500 hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-slate-700/50"
           >
             <svg className={loading ? 'animate-spin' : ''} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" /><path d="M16 21h5v-5" />
@@ -168,25 +195,24 @@ export default function AdminRulesPage() {
 
       {/* Tab navigation + content */}
       {!loading && !error && (
-        <div className="bg-slate-900/50 rounded-2xl border border-slate-800 overflow-hidden">
+        <div className="mt-4 bg-slate-900/50 rounded-2xl border border-slate-800 overflow-hidden">
           {/* Tab bar */}
-          <div className="flex overflow-x-auto border-b border-slate-800">
+          <div className="flex overflow-x-auto border-b border-slate-800 bg-slate-950/20">
             {TABS.map((tab) => {
               const isActive = activeTab === tab.id;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2.5 px-5 py-4 text-sm font-medium whitespace-nowrap border-b-2 transition-all duration-150 ${
-                    isActive
+                  className={`flex flex-col items-center justify-center text-center gap-1.5 px-6 py-3.5 text-xs sm:text-sm font-semibold whitespace-nowrap border-b-2 min-h-[52px] min-w-[140px] transition-all duration-150 focus:outline-none ${isActive
                       ? 'border-orange-500 text-orange-400 bg-orange-950/20'
-                      : 'border-transparent text-slate-500 hover:text-slate-300 hover:bg-slate-800/30'
-                  }`}
+                      : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/30'
+                    }`}
                 >
-                  <span className={isActive ? 'text-orange-400' : 'text-slate-600'}>{tab.icon}</span>
-                  <div className="text-left">
+                  <span className={`transition-colors duration-150 ${isActive ? 'text-orange-400' : 'text-slate-500'}`}>{tab.icon}</span>
+                  <div className="flex flex-col items-center">
                     <div>{tab.label}</div>
-                    <div className={`text-xs font-normal ${isActive ? 'text-orange-500/70' : 'text-slate-600'}`}>{tab.subtitle}</div>
+                    <div className={`text-[10px] font-normal uppercase tracking-wider ${isActive ? 'text-orange-500/80' : 'text-slate-600'}`}>{tab.subtitle}</div>
                   </div>
                 </button>
               );
