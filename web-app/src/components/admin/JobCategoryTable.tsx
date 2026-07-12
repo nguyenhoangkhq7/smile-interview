@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { adminService, JobCategoryDto, CreateJobCategoryPayload } from '@/services/adminService';
 import { toast } from './Toast';
 import Modal from './Modal';
+import RuleDashboardSection from './rule-dashboard/RuleDashboardSection';
+import ActionIconButton from './rule-dashboard/ActionIconButton';
 
 interface Props {
   categories: JobCategoryDto[];
@@ -88,50 +90,58 @@ export default function JobCategoryTable({ categories, onRefresh }: Props) {
   };
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-slate-300">Danh mục công việc ({categories.length})</h3>
+    <RuleDashboardSection
+      title="Danh mục công việc"
+      count={categories.length}
+      countLabel="mục"
+      action={(
         <button
           onClick={openCreate}
-          className="flex items-center gap-2 px-3 py-1.5 bg-orange-600 hover:bg-orange-500 text-white text-sm font-medium rounded-lg transition-colors"
+          className="inline-flex items-center gap-2 rounded-xl border border-amber-400/25 bg-amber-400/10 px-3.5 py-2 text-sm font-medium text-amber-200 transition-colors hover:border-amber-400/50 hover:bg-amber-400/15 hover:text-white"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14" /></svg>
           Thêm
         </button>
-      </div>
-
-      <div className="overflow-x-auto rounded-xl border border-slate-800">
+      )}
+    >
+      <div className="overflow-x-auto border-t border-white/6 bg-slate-950/35">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-800 bg-slate-800/50">
-              <th className="text-left px-4 py-3 text-slate-400 font-medium">ID</th>
-              <th className="text-left px-4 py-3 text-slate-400 font-medium">Tên</th>
-              <th className="text-left px-4 py-3 text-slate-400 font-medium">Danh mục cha</th>
-              <th className="text-right px-4 py-3 text-slate-400 font-medium">Hành động</th>
+            <tr className="border-b border-slate-700/70 bg-white/[0.03]">
+              <th className="w-20 px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">ID</th>
+              <th className="px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Tên</th>
+              <th className="px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Danh mục cha</th>
+              <th className="w-28 px-5 py-4 text-right text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Hành động</th>
             </tr>
           </thead>
           <tbody>
             {displayedCategories.length === 0 && (
-              <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-500">Chưa có danh mục nào.</td></tr>
+              <tr><td colSpan={4} className="px-5 py-10 text-center text-slate-500">Chưa có danh mục nào.</td></tr>
             )}
             {displayedCategories.map((cat) => (
-              <tr key={cat.id} className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
-                <td className="px-4 py-3 text-slate-500 font-mono text-xs">{cat.id}</td>
-                <td className="px-4 py-3 text-white font-medium">{cat.name}</td>
-                <td className="px-4 py-3 text-slate-400">{cat.parent_name ?? <span className="text-slate-600 italic">Root</span>}</td>
-                <td className="px-4 py-3">
+              <tr key={cat.id} className="border-b border-slate-700/60 transition-colors hover:bg-white/[0.03]">
+                <td className="px-5 py-4 align-middle font-mono text-xs tabular-nums text-slate-500">{cat.id}</td>
+                <td className="px-5 py-4 align-middle font-medium text-slate-100">{cat.name}</td>
+                <td className="px-5 py-4 align-middle text-slate-400">{cat.parent_name ?? <span className="italic text-slate-600">Root</span>}</td>
+                <td className="px-5 py-4 align-middle">
                   <div className="flex items-center justify-end gap-2">
-                    <button onClick={() => openEdit(cat)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors" title="Sửa">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-                    </button>
-                    <button
+                    <ActionIconButton
+                      label="Sửa danh mục"
+                      variant="neutral"
+                      onClick={() => openEdit(cat)}
+                      icon={(
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                      )}
+                    />
+                    <ActionIconButton
+                      label="Xóa danh mục"
+                      variant="danger"
                       onClick={() => handleDelete(cat.id)}
                       disabled={deletingId === cat.id}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-950/40 transition-colors"
-                      title="Xóa"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4h6v2" /></svg>
-                    </button>
+                      icon={(
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4h6v2" /></svg>
+                      )}
+                    />
                   </div>
                 </td>
               </tr>
@@ -142,22 +152,22 @@ export default function JobCategoryTable({ categories, onRefresh }: Props) {
 
       {/* Pagination controls */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-3 px-1">
+        <div className="flex items-center justify-between px-1 pt-4">
           <span className="text-xs text-slate-500">
             Trang {currentPage} / {totalPages} (tổng {categories.length} mục)
           </span>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             <button
               onClick={handlePrevPage}
               disabled={currentPage === 1}
-              className="px-2.5 py-1 text-xs font-medium text-slate-400 hover:text-white border border-slate-800 disabled:opacity-40 disabled:hover:text-slate-400 hover:bg-slate-800 rounded-lg transition-colors"
+              className="rounded-lg border border-slate-700/80 bg-white/[0.02] px-3 py-1.5 text-xs font-medium text-slate-400 transition-colors hover:border-slate-500 hover:bg-white/[0.05] hover:text-white disabled:opacity-40 disabled:hover:border-slate-700/80 disabled:hover:bg-white/[0.02] disabled:hover:text-slate-400"
             >
               Trước
             </button>
             <button
               onClick={handleNextPage}
               disabled={currentPage === totalPages}
-              className="px-2.5 py-1 text-xs font-medium text-slate-400 hover:text-white border border-slate-800 disabled:opacity-40 disabled:hover:text-slate-400 hover:bg-slate-800 rounded-lg transition-colors"
+              className="rounded-lg border border-slate-700/80 bg-white/[0.02] px-3 py-1.5 text-xs font-medium text-slate-400 transition-colors hover:border-slate-500 hover:bg-white/[0.05] hover:text-white disabled:opacity-40 disabled:hover:border-slate-700/80 disabled:hover:bg-white/[0.02] disabled:hover:text-slate-400"
             >
               Sau
             </button>
@@ -201,6 +211,6 @@ export default function JobCategoryTable({ categories, onRefresh }: Props) {
           </div>
         </div>
       </Modal>
-    </div>
+    </RuleDashboardSection>
   );
 }

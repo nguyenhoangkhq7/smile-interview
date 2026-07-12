@@ -28,6 +28,23 @@ export async function GET(request: NextRequest) {
         const cachedSession = cachedSessionRes.rows[0];
         console.log(`[API Proxy Assess] Cache HIT for resumeId=${resumeId}, jdId=${jdId}. Reusing session assessment.`);
 
+        // Call the Java backend to register/clone the assessment for this sessionId
+        const backendUrl = process.env.MATCHING_SERVICE_URL || 'http://localhost:8081';
+        const targetUrl = `${backendUrl}/api/v2/assess-resume?sessionId=${sessionId}&forceRefresh=false&fromSessionId=${cachedSession.id}`;
+        console.log(`[API Proxy Assess] Triggering Java backend cache/clone at: ${targetUrl}`);
+        
+        try {
+          const authHeader = request.headers.get('Authorization');
+          const headers: Record<string, string> = {};
+          if (authHeader) {
+            headers['Authorization'] = authHeader;
+          }
+          await fetch(targetUrl, { headers });
+          console.log(`[API Proxy Assess] Java backend cloned successfully for sessionId=${sessionId}`);
+        } catch (e) {
+          console.error(`[API Proxy Assess] Failed to trigger Java backend clone:`, e);
+        }
+
         const parseJsonField = (val: any) => {
           if (typeof val === 'string') {
             try {

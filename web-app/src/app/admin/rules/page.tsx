@@ -15,6 +15,7 @@ import EvaluationCriteriaTable from '@/components/admin/EvaluationCriteriaTable'
 import WeightMappingTable from '@/components/admin/WeightMappingTable';
 import LevelDistributionTable from '@/components/admin/LevelDistributionTable';
 import SystemSettingTable from '@/components/admin/SystemSettingTable';
+import StatCards from '@/components/admin/rule-dashboard/StatCards';
 
 // ── Tab definitions ───────────────────────────────────────────────────────────
 const TABS = [
@@ -109,29 +110,32 @@ export default function AdminRulesPage() {
 
   // ── Stats summary ─────────────────────────────────────────────────────────
   const stats = [
-    { label: 'Danh mục', value: data.categories.length, color: 'text-orange-400' },
-    { label: 'Tiêu chí', value: data.criteria.length, color: 'text-blue-400' },
-    { label: 'Mappings', value: data.mappings.length, color: 'text-purple-400' },
-    { label: 'Cấp bậc', value: data.levelRules.length, color: 'text-emerald-400' },
+    { label: 'Danh mục', value: data.categories.length, tone: 'orange' as const },
+    { label: 'Tiêu chí', value: data.criteria.length, tone: 'blue' as const },
+    { label: 'Mappings', value: data.mappings.length, tone: 'violet' as const },
+    { label: 'Cấp bậc', value: data.levelRules.length, tone: 'emerald' as const },
   ];
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className="mx-auto max-w-7xl space-y-6 lg:space-y-8">
       <ToastContainer />
 
       {/* Page header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-white">Rule Engine Dashboard</h1>
-            <p className="text-slate-400 text-sm mt-1">
-              Quản lý tiêu chí đánh giá, trọng số và cấu hình hệ thống
-            </p>
+      <div className="rounded-3xl border border-white/6 bg-slate-950/45 px-5 py-5 shadow-[0_18px_60px_rgba(2,6,23,0.18)] backdrop-blur-sm sm:px-6 sm:py-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="space-y-2">
+            <p className="text-xs font-medium uppercase tracking-[0.2em] text-slate-500">Rule Engine Dashboard</p>
+            <div>
+              <h1 className="text-2xl font-semibold text-white sm:text-3xl">Quản lý tiêu chí, trọng số và cấu hình hệ thống</h1>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-400">
+                Bố cục tối hơn, thoáng hơn và dễ đọc hơn cho các thao tác quản trị.
+              </p>
+            </div>
           </div>
           <button
             onClick={fetchAll}
             disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-300 hover:text-white border border-slate-700 hover:border-slate-500 rounded-xl transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-2 self-start rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-medium text-slate-300 transition-colors hover:border-orange-400/30 hover:bg-orange-500/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
             <svg className={loading ? 'animate-spin' : ''} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" /><path d="M16 21h5v-5" />
@@ -140,17 +144,7 @@ export default function AdminRulesPage() {
           </button>
         </div>
 
-        {/* Stats row */}
-        {!loading && !error && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
-            {stats.map((s) => (
-              <div key={s.label} className="bg-slate-800/40 rounded-xl border border-slate-800 px-4 py-3">
-                <p className={`text-2xl font-bold tabular-nums ${s.color}`}>{s.value}</p>
-                <p className="text-xs text-slate-500 mt-0.5">{s.label}</p>
-              </div>
-            ))}
-          </div>
-        )}
+        {!loading && !error && <div className="mt-6"><StatCards items={stats} /></div>}
       </div>
 
       {/* Error state */}

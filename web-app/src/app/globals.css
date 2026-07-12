@@ -1,6 +1,10 @@
 @import "tailwindcss";
-@source "../app/**/*.{js,ts,jsx,tsx}";
-@source "../components/**/*.{js,ts,jsx,tsx}";
+@source "../components";
+@source "../hooks";
+@source "../lib";
+
+
+
 
 
 /* ── Design Tokens ── */
@@ -65,4 +69,28 @@ button, input, select, textarea {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(234, 88, 12, 0.55);
+}
+
+@layer utilities {
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+
+  .animate-slide-in {
+    animation: slideInRight 0.3s ease;
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }

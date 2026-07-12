@@ -460,6 +460,17 @@ export default function NewInterviewPage() {
 
       const qbData = await qbRes.json();
 
+      const questionsToSave = (qbData.questionBank || qbData.question_bank || []).map((q: any) => ({
+        question: q.question || '',
+        answer: '',
+        score: 0,
+        strengths: '',
+        improvements: '',
+        suggestedAnswer: '',
+        topicTag: q.topic || '',
+        isDeepDive: false
+      }));
+
       // Persist the assessment result and generated questions (including follow-ups) to the existing session draft
       await historyService.saveSession({
         id: assessment.sessionId,
@@ -483,11 +494,12 @@ export default function NewInterviewPage() {
         gapAreas: assessment.gapAreas,
         criticalMissingSkills: assessment.criticalMissingSkills,
         sectionWiseFeedback: assessment.sectionWiseFeedback,
-        actionableSuggestions: qbData.question_bank || [],
+        actionableSuggestions: assessment.actionableImprovementSuggestions || [],
         evidenceItems: assessment.evidenceItems,
         additionalEvidenceItems: assessment.additionalEvidenceItems,
         scoreBreakdown: assessment.scoreBreakdown,
-        topPriorityImprovements: assessment.topPriorityImprovements
+        topPriorityImprovements: assessment.topPriorityImprovements,
+        eligibility: assessment.eligibility
       });
 
       // Navigate directly to the interview session room
@@ -1091,9 +1103,64 @@ export default function NewInterviewPage() {
                         <div>• Tổng điểm tích lũy đạt được: <strong style={{ color: '#4f46e5' }}>{assessment.scoreBreakdown.weighted_points_sum}</strong></div>
                         <div>• Tổng hệ số quan trọng của các yêu cầu: <strong style={{ color: '#0f172a' }}>{assessment.scoreBreakdown.total_weight_used}</strong></div>
                       </div>
-                      <div>
-                        <div>• Công thức tính: <code style={{ backgroundColor: '#e2e8f0', padding: '0.1rem 0.3rem', borderRadius: '0.25rem', fontFamily: 'monospace', fontSize: '0.75rem' }}>SUM(hệ_số_quan_trọng * điểm_trạng_thái) / SUM(hệ_số_quan_trọng) * 100</code></div>
-                        <div>• Chi tiết phép tính: <strong style={{ color: '#ea580c' }}>({assessment.scoreBreakdown.weighted_points_sum} / {assessment.scoreBreakdown.total_weight_used}) * 100 = {assessment.competencyFitScore}%</strong></div>
+                      <div style={{ gridColumn: 'span 2' }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', alignItems: 'center', marginTop: '0.25rem' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 500 }}>Công thức tính:</span>
+                            <div style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '0.5rem 1rem',
+                              backgroundColor: '#f8fafc',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '0.5rem',
+                              fontFamily: 'monospace',
+                              fontSize: '0.75rem',
+                              color: '#334155',
+                              gap: '0.4rem'
+                            }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px' }}>
+                                <span style={{ borderBottom: '1px solid #94a3b8', paddingBottom: '1px', paddingLeft: '2px', paddingRight: '2px' }}>
+                                  ∑(hệ_số_quan_trọng × điểm_trạng_thái)
+                                </span>
+                                <span style={{ paddingTop: '1px', paddingLeft: '2px', paddingRight: '2px' }}>
+                                  ∑(hệ_số_quan_trọng)
+                                </span>
+                              </div>
+                              <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>×</span>
+                              <span style={{ fontWeight: 'bold' }}>100</span>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 500 }}>Chi tiết phép tính:</span>
+                            <div style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '0.5rem 1rem',
+                              backgroundColor: '#fff7ed',
+                              border: '1px solid #ffedd5',
+                              borderRadius: '0.5rem',
+                              fontFamily: 'monospace',
+                              fontSize: '0.75rem',
+                              color: '#ea580c',
+                              gap: '0.4rem'
+                            }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px' }}>
+                                <span style={{ borderBottom: '1px solid #fdba74', paddingBottom: '1px', paddingLeft: '2px', paddingRight: '2px' }}>
+                                  {assessment.scoreBreakdown.weighted_points_sum}
+                                </span>
+                                <span style={{ paddingTop: '1px', paddingLeft: '2px', paddingRight: '2px' }}>
+                                  {assessment.scoreBreakdown.total_weight_used}
+                                </span>
+                              </div>
+                              <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>×</span>
+                              <span style={{ fontWeight: 'bold' }}>100</span>
+                              <span style={{ fontWeight: 'bold', marginLeft: '0.15rem' }}>=</span>
+                              <span style={{ fontWeight: 'bold', fontSize: '0.85rem' }}>{assessment.competencyFitScore}%</span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                     <div style={{ borderTop: '1px solid #e2e8f0', marginTop: '0.75rem', paddingTop: '0.5rem', fontSize: '0.75rem', color: '#64748b', display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>

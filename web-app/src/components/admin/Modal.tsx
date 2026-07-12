@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 interface ModalProps {
   open: boolean;
@@ -21,10 +22,16 @@ const sizeClasses = {
  * Accessible modal dialog component.
  * - Closes on Escape key press
  * - Closes on backdrop click
- * - Focus-traps the dialog
+ * - Mounted check for SSR safety
+ * - React Portal to body to prevent container clipping
  */
 export default function Modal({ open, onClose, title, children, size = 'md' }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -35,22 +42,16 @@ export default function Modal({ open, onClose, title, children, size = 'md' }: M
     return () => document.removeEventListener('keydown', handleKey);
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
+      onClick={onClose}
     >
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-        onClick={onClose}
-        aria-hidden="true"
-      />
-
       {/* Dialog panel */}
       <div
         ref={dialogRef}
@@ -81,6 +82,7 @@ export default function Modal({ open, onClose, title, children, size = 'md' }: M
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

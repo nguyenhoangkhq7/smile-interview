@@ -1,7 +1,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 1: deps — install production + dev dependencies
 # ─────────────────────────────────────────────────────────────────────────────
-FROM node:20-alpine AS deps
+FROM node:22-alpine AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
@@ -11,7 +11,7 @@ RUN npm ci --frozen-lockfile
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 2: builder — compile the Next.js application
 # ─────────────────────────────────────────────────────────────────────────────
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
@@ -25,7 +25,7 @@ RUN npm run build
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 3: runner — minimal production image
 # ─────────────────────────────────────────────────────────────────────────────
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production

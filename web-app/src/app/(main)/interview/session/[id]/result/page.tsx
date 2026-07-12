@@ -29,8 +29,7 @@ export default function InterviewResultPage() {
         if (!active) return;
 
         if (data) {
-          const hasQuestions = data.questions && data.questions.length > 0;
-          const isEvaluated = !hasQuestions || (data.overallFeedback !== undefined && data.overallFeedback !== null && data.overallFeedback.trim() !== '');
+          const isEvaluated = data.status !== 'Completed' || (data.overallFeedback !== undefined && data.overallFeedback !== null && data.overallFeedback.trim() !== '');
 
           if (isEvaluated || pollCount >= maxPolls) {
             setSession(data);
@@ -113,9 +112,80 @@ export default function InterviewResultPage() {
     );
   }
 
-  const score = session.overallScore || 78;
+  interface FinalReport {
+    strengths: string[];
+    weaknesses: string[];
+    recommendations: string[];
+    overall_score: number;
+    overall_summary: string;
+    hiring_recommendation: string;
+  }
 
-  const overallFeedbackText = session.overallFeedback || 'Ứng viên hoàn thành buổi phỏng vấn ở mức Khá. Có kiến thức tương đối vững chắc về lập trình giao diện Frontend, đặc biệt là hệ sinh thái React. Kỹ năng lập luận logic tốt, tuy nhiên ở các câu hỏi đào sâu (deep-dive) còn bộc lộ một số lỗ hổng về mặt chi phí vận hành (performance overhead) và cấu trúc lõi JS. Cần trau dồi thêm kiến thức tổng quan hệ thống.';
+  let report: FinalReport | null = null;
+  if (session.overallFeedback) {
+    try {
+      report = typeof session.overallFeedback === 'object'
+        ? session.overallFeedback
+        : JSON.parse(session.overallFeedback);
+    } catch {
+      report = null;
+    }
+  }
+
+  let strengths = session.strongAreas || [];
+  let weaknesses = session.gapAreas || [];
+  let recommendations = session.actionableSuggestions || [];
+  let score = 0;
+  let overallFeedbackText = '';
+  let hiringRecommendation = '';
+
+  const isPostInterviewEvaluated = session.status === 'Completed' || report !== null;
+
+  if (isPostInterviewEvaluated) {
+    // 1. Post-interview report loaded
+    score = session.overallScore || 0;
+    overallFeedbackText = session.overallFeedback || '';
+    hiringRecommendation = session.hiringRecommendation || '';
+
+    if (report) {
+      strengths = report.strengths || (report as any).strongAreas || strengths;
+      weaknesses = report.weaknesses || (report as any).gapAreas || weaknesses;
+      recommendations = report.recommendations || (report as any).actionableSuggestions || recommendations;
+      
+      const rawScore = report.overall_score !== undefined ? report.overall_score : (report as any).overallScore;
+      if (rawScore !== undefined) {
+        score = rawScore <= 10 ? rawScore * 10 : rawScore;
+      }
+      
+      overallFeedbackText = report.overall_summary || (report as any).overallFeedback || overallFeedbackText;
+      hiringRecommendation = report.hiring_recommendation || (report as any).hiringRecommendation || hiringRecommendation;
+    }
+
+    // Auto-calculate hiringRecommendation if it's 'N/A' or empty
+    if (!hiringRecommendation || hiringRecommendation === 'N/A') {
+      const numericScore = typeof score === 'number' ? score : parseInt(score) || 0;
+      if (numericScore >= 90) {
+        hiringRecommendation = 'Strong Hire';
+      } else if (numericScore >= 70) {
+        hiringRecommendation = 'Hire';
+      } else if (numericScore >= 40) {
+        hiringRecommendation = 'No Hire';
+      } else {
+        hiringRecommendation = 'Strong No Hire';
+      }
+    }
+  } else {
+    // 2. CV Evaluation report loaded
+    score = session.competencyFitScore || 0;
+    
+    // Construct a beautiful CV match overall feedback summary
+    overallFeedbackText = `Báo cáo đánh giá mức độ tương thích của hồ sơ ứng viên (CV) đối với mô tả công việc (JD).\n` +
+      `• Mức độ phù hợp năng lực: ${session.matchLevel || 'N/A'}\n` +
+      `• Cấp độ ứng viên phù hợp: ${session.candidateLevel || 'N/A'}\n` +
+      `• Ước tính số năm kinh nghiệm: ${session.yearsOfExperienceEstimate || 'N/A'}`;
+      
+    hiringRecommendation = 'Đánh giá CV';
+  }
 
   return (
     <div className={styles.container}>
@@ -138,7 +208,7 @@ export default function InterviewResultPage() {
             <div className={styles.scoreText}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
                 <h2 style={{ margin: 0 }}>Đánh giá chung</h2>
-                {session.hiringRecommendation && (
+                {hiringRecommendation && (
                   <span style={{
                     fontSize: '0.7rem',
                     fontWeight: 850,
@@ -146,11 +216,11 @@ export default function InterviewResultPage() {
                     borderRadius: '9999px',
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
-                    backgroundColor: session.hiringRecommendation.toLowerCase().includes('no') ? '#fef2f2' : (session.hiringRecommendation.toLowerCase().includes('hire') ? '#ecfdf5' : '#fffbeb'),
-                    color: session.hiringRecommendation.toLowerCase().includes('no') ? '#b91c1c' : (session.hiringRecommendation.toLowerCase().includes('hire') ? '#047857' : '#d97706'),
-                    border: `1px solid ${session.hiringRecommendation.toLowerCase().includes('no') ? '#fca5a5' : (session.hiringRecommendation.toLowerCase().includes('hire') ? '#a7f3d0' : '#fcd34d')}`
+                    backgroundColor: hiringRecommendation.toLowerCase().includes('no') ? '#fef2f2' : (hiringRecommendation.toLowerCase().includes('hire') ? '#ecfdf5' : '#fffbeb'),
+                    color: hiringRecommendation.toLowerCase().includes('no') ? '#b91c1c' : (hiringRecommendation.toLowerCase().includes('hire') ? '#047857' : '#d97706'),
+                    border: `1px solid ${hiringRecommendation.toLowerCase().includes('no') ? '#fca5a5' : (hiringRecommendation.toLowerCase().includes('hire') ? '#a7f3d0' : '#fcd34d')}`
                   }}>
-                    Quyết định: {session.hiringRecommendation}
+                    Quyết định: {hiringRecommendation}
                   </span>
                 )}
               </div>
@@ -162,8 +232,62 @@ export default function InterviewResultPage() {
             </div>
           </div>
 
+          {/* Eligibility Card */}
+          {session.eligibility && (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.75rem',
+              padding: '1.25rem',
+              backgroundColor: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '0.5rem',
+              marginTop: '1.5rem',
+              marginBottom: '0.5rem'
+            }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.1rem' }}>Kết quả sàng lọc hồ sơ</span>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', marginBottom: '0.1rem' }}>
+                <span style={{ fontSize: '0.82rem', color: '#64748b' }}>Trạng thái:</span>
+                <span style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  padding: '0.2rem 0.5rem',
+                  borderRadius: '0.25rem',
+                  backgroundColor: session.eligibility.status === 'ELIGIBLE' ? '#ecfdf5' : '#fef2f2',
+                  color: session.eligibility.status === 'ELIGIBLE' ? '#047857' : '#b91c1c',
+                  border: '1px solid currentColor'
+                }}>
+                  {session.eligibility.status === 'ELIGIBLE' ? 'ĐỦ ĐIỀU KIỆN (ELIGIBLE)' : 'CHƯA ĐỦ ĐIỀU KIỆN'}
+                </span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
+                {(session.eligibility.gate_checks || []).map((check: any, idx: number) => {
+                  const isMet = check.status === 'met' || check.status === 'MET';
+                  return (
+                    <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', padding: '0.4rem 0.65rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '0.35rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <strong style={{ fontSize: '0.78rem', color: '#0f172a' }}>{check.criteria_name}</strong>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 700, color: isMet ? '#047857' : '#b91c1c', display: 'flex', alignItems: 'center', gap: '0.15rem' }}>
+                          {isMet ? '✓ Đạt' : '✗ Chưa đạt'}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                        Yêu cầu: <span style={{ color: '#475569', fontWeight: 500 }}>{check.required_value}</span>
+                      </div>
+                      <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                        Thực tế: <span style={{ color: isMet ? '#047857' : '#b91c1c', fontWeight: 600 }}>{check.actual_value}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Strengths & Weaknesses Panel */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginTop: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginTop: '1.5rem' }}>
             
             {/* Strengths */}
             <div style={{ padding: '1.25rem', border: '1px solid #a7f3d0', backgroundColor: '#f0fdf4', borderRadius: '0.5rem' }}>
@@ -172,13 +296,16 @@ export default function InterviewResultPage() {
                 <span>Điểm mạnh nổi bật</span>
               </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {(session.strongAreas || []).length > 0 ? (
-                  (session.strongAreas || []).map((strength, index) => (
-                    <div key={index} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
-                      <span style={{ color: '#15803d', fontWeight: 'bold' }}>✓</span>
-                      <span style={{ fontSize: '0.82rem', color: '#1e293b', lineHeight: '1.4' }}>{strength}</span>
-                    </div>
-                  ))
+                {(strengths || []).length > 0 ? (
+                  (strengths || []).map((strength: any, index: number) => {
+                    const text = typeof strength === 'object' && strength !== null ? (strength.area || strength.name || JSON.stringify(strength)) : strength;
+                    return (
+                      <div key={index} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                        <span style={{ color: '#15803d', fontWeight: 'bold' }}>✓</span>
+                        <span style={{ fontSize: '0.82rem', color: '#1e293b', lineHeight: '1.4' }}>{text}</span>
+                      </div>
+                    );
+                  })
                 ) : (
                   <span style={{ color: '#64748b', fontSize: '0.85rem', fontStyle: 'italic' }}>Không ghi nhận điểm mạnh.</span>
                 )}
@@ -192,13 +319,16 @@ export default function InterviewResultPage() {
                 <span>Điểm cần cải thiện</span>
               </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {(session.gapAreas || []).length > 0 ? (
-                  (session.gapAreas || []).map((weakness, index) => (
-                    <div key={index} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
-                      <span style={{ color: '#b91c1c', fontWeight: 'bold' }}>✗</span>
-                      <span style={{ fontSize: '0.82rem', color: '#1e293b', lineHeight: '1.4' }}>{weakness}</span>
-                    </div>
-                  ))
+                {(weaknesses || []).length > 0 ? (
+                  (weaknesses || []).map((weakness: any, index: number) => {
+                    const text = typeof weakness === 'object' && weakness !== null ? (weakness.area || weakness.name || JSON.stringify(weakness)) : weakness;
+                    return (
+                      <div key={index} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                        <span style={{ color: '#b91c1c', fontWeight: 'bold' }}>✗</span>
+                        <span style={{ fontSize: '0.82rem', color: '#1e293b', lineHeight: '1.4' }}>{text}</span>
+                      </div>
+                    );
+                  })
                 ) : (
                   <span style={{ color: '#64748b', fontSize: '0.85rem', fontStyle: 'italic' }}>Không ghi nhận điểm yếu.</span>
                 )}
@@ -214,13 +344,16 @@ export default function InterviewResultPage() {
               <span>Khuyến nghị từ AI</span>
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {(session.actionableSuggestions || []).length > 0 ? (
-                (session.actionableSuggestions || []).map((suggestion, index) => (
-                  <div key={index} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
-                    <span style={{ color: '#ea580c', fontWeight: 'bold' }}>➔</span>
-                    <span style={{ fontSize: '0.82rem', color: '#334155', lineHeight: '1.4' }}>{suggestion}</span>
-                  </div>
-                ))
+              {(recommendations || []).length > 0 ? (
+                (recommendations || []).map((suggestion: any, index: number) => {
+                  const text = typeof suggestion === 'object' && suggestion !== null ? (suggestion.question || suggestion.suggestion || JSON.stringify(suggestion)) : suggestion;
+                  return (
+                    <div key={index} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                      <span style={{ color: '#ea580c', fontWeight: 'bold' }}>➔</span>
+                      <span style={{ fontSize: '0.82rem', color: '#334155', lineHeight: '1.4' }}>{text}</span>
+                    </div>
+                  );
+                })
               ) : (
                 <p style={{ fontSize: '0.82rem', color: '#64748b', fontStyle: 'italic', margin: 0 }}>Không có đề xuất thêm.</p>
               )}
@@ -233,9 +366,18 @@ export default function InterviewResultPage() {
           <h2 className={styles.sectionTitle}>Chi tiết câu hỏi &amp; Trả lời</h2>
 
           {session.questions.length === 0 ? (
-            <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '0.75rem', padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
-              <AlertTriangle size={32} style={{ color: '#eab308', margin: '0 auto' }} />
-              <p style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>Không có câu hỏi nào được trả lời trong phiên phỏng vấn này.</p>
+            <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '0.75rem', padding: '3rem', textAlign: 'center', color: '#94a3b8', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <AlertTriangle size={32} style={{ color: '#eab308' }} />
+              <p style={{ marginTop: '0.5rem', fontSize: '0.9rem', color: '#64748b' }}>
+                {isPostInterviewEvaluated 
+                  ? 'Không có câu hỏi nào được trả lời trong phiên phỏng vấn này.'
+                  : 'Buổi phỏng vấn chưa được thực hiện.'}
+              </p>
+              {!isPostInterviewEvaluated && (
+                <Link href={`/interview/session/${session.id}`} className={styles.primaryButton} style={{ marginTop: '1rem', textDecoration: 'none' }}>
+                  Bắt đầu phỏng vấn ngay
+                </Link>
+              )}
             </div>
           ) : (
             <div className={styles.accordionList}>
@@ -248,12 +390,16 @@ export default function InterviewResultPage() {
                       <div className={styles.headerMain}>
                         <div className={styles.headerMeta}>
                           <span className={styles.qNum}>CÂU HỎI {index + 1}</span>
-                          <span className={styles.topicBadge}>{q.topicTag}</span>
+                          <span className={styles.topicBadge}>
+                            {q.topicTag || (typeof q.question === 'object' && q.question !== null ? (q.question as any).topic : '')}
+                          </span>
                           {q.isDeepDive && (
                             <span className={styles.deepDiveBadge}>Hỏi sâu (Deep dive)</span>
                           )}
                         </div>
-                        <div className={styles.qText}>{q.question}</div>
+                        <div className={styles.qText}>
+                          {typeof q.question === 'object' && q.question !== null ? (q.question as any).question : q.question}
+                        </div>
                       </div>
 
                       <div className={styles.headerRight}>
@@ -327,9 +473,15 @@ export default function InterviewResultPage() {
           <Link href="/history" className={styles.secondaryButton}>
             Quay lại Lịch sử
           </Link>
-          <Link href="/interview/new" className={styles.primaryButton}>
-            Luyện tập lại
-          </Link>
+          {isPostInterviewEvaluated ? (
+            <Link href="/interview/new" className={styles.primaryButton}>
+              Luyện tập lại
+            </Link>
+          ) : (
+            <Link href={`/interview/session/${session.id}`} className={styles.primaryButton}>
+              Bắt đầu phỏng vấn
+            </Link>
+          )}
         </div>
       </main>
 

@@ -298,13 +298,27 @@ export default function InterviewSessionPage() {
       // Save user answer to session history
       if (id) {
         historyService.getSessionById(id).then(session => {
-          if (session && session.questions && session.questions.length > 0) {
-            const updatedQuestions = [...session.questions];
-            const lastIndex = updatedQuestions.length - 1;
-            updatedQuestions[lastIndex] = {
-              ...updatedQuestions[lastIndex],
-              answer: answer
-            };
+          if (session) {
+            const updatedQuestions = session.questions ? [...session.questions] : [];
+            if (updatedQuestions.length === 0) {
+              // Self-heal: if empty, push the current question being answered
+              updatedQuestions.push({
+                question: currentQuestionRef.current || 'Câu hỏi',
+                answer: answer,
+                score: 0,
+                strengths: '',
+                improvements: '',
+                suggestedAnswer: '',
+                topicTag: topicTag || '',
+                isDeepDive: isDeepDive
+              });
+            } else {
+              const lastIndex = updatedQuestions.length - 1;
+              updatedQuestions[lastIndex] = {
+                ...updatedQuestions[lastIndex],
+                answer: answer
+              };
+            }
             historyService.saveSession({
               ...session,
               questions: updatedQuestions,
@@ -618,7 +632,10 @@ export default function InterviewSessionPage() {
           let baseAnsweredCount = 0;
           data.questions.forEach((q: any) => {
             if (q.question) {
-               initialChatLog.push({ sender: 'AI', text: q.question, time: formatCurrentTime(), isDeepDive: q.isDeepDive });
+               const questionText = typeof q.question === 'object' && q.question !== null
+                 ? q.question.question
+                 : q.question;
+               initialChatLog.push({ sender: 'AI', text: questionText, time: formatCurrentTime(), isDeepDive: q.isDeepDive });
             }
             if (q.answer) {
                initialChatLog.push({ sender: 'User', text: q.answer, time: formatCurrentTime() });
@@ -1028,12 +1045,18 @@ export default function InterviewSessionPage() {
     return (
       <div className="min-h-screen w-screen bg-slate-50 text-slate-800 flex flex-col font-sans animate-fade-in">
         {/* Header */}
-        <header className="h-16 border-b border-slate-200 bg-white px-6 flex items-center shrink-0 shadow-sm">
-          <div>
-            <h1 className="text-sm font-semibold tracking-wide text-slate-900">Phỏng vấn Kỹ thuật</h1>
-            <p className="text-xs text-slate-500">
-              {session ? `Vị trí: ${session.roleTitle}` : 'Đang thiết lập...'}
-            </p>
+        <header className={styles.header}>
+          <div className="flex items-center gap-4">
+            <Link href="/history">
+              <img src="/logo.png" alt="Smile Interview Logo" className="h-9 w-auto" />
+            </Link>
+            <div className="h-4 w-[1px] bg-slate-200" />
+            <div>
+              <h1 className="text-sm font-semibold tracking-wide text-slate-900">Phỏng vấn Kỹ thuật</h1>
+              <p className="text-xs text-slate-500">
+                {session ? `Vị trí: ${session.roleTitle}` : 'Đang thiết lập...'}
+              </p>
+            </div>
           </div>
         </header>
 
