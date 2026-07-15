@@ -22,4 +22,10 @@ public class IngestionResponse {
 
     /** Human-readable message describing the result. */
     private String message;
+
+    /** The processed or cached CV Markdown text. */
+    private String cvMarkdown;
+
+    /** The processed or cached JD Markdown text. */
+    private String jdMarkdown;
 }

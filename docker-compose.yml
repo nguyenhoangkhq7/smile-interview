@@ -135,6 +135,8 @@ services:
       dockerfile: Dockerfile
     container_name: web_app
     restart: always
+    env_file:
+      - ./web-app/.env.local
     ports:
       - "3000:3000"
     environment:

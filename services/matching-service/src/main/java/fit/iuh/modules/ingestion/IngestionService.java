@@ -56,10 +56,12 @@ public class IngestionService {
              String sessionId,
              MultipartFile cvFile,
              MultipartFile jdFile,
-             String jdText) {
+             String jdText,
+             String resumeMarkdown,
+             String jdMarkdown) {
 
         // ── Validate inputs ──────────────────────────────────────────────────
-        validateInputs(sessionId, cvFile, jdFile, jdText);
+        validateInputs(sessionId, cvFile, jdFile, jdText, resumeMarkdown, jdMarkdown);
 
         long totalStartTime = System.currentTimeMillis();
         log.info("=== [INGESTION START] sessionId={} ===", sessionId);
@@ -71,45 +73,83 @@ public class IngestionService {
         }
 
         // ────────────────────────────────────────────────────────────────────
-        // STEP 1 — Extract raw text from PDFs
+        // STEP 1 — Extract raw text from PDFs (only if not using cached markdown)
         // ────────────────────────────────────────────────────────────────────
-        log.info("[Step 1/4] Extracting raw text from uploaded files...");
+        log.info("[Step 1/4] Extracting raw text from uploaded files where cache is miss...");
         long step1Start = System.currentTimeMillis();
-        String rawCvText = pdfService.extractText(cvFile);
+        
+        String rawCvText = null;
+        String markdownCv = null;
+        if (resumeMarkdown != null && !resumeMarkdown.isBlank()) {
+            log.info("CV Cache Hit: Bypassing PDF text extraction.");
+            markdownCv = resumeMarkdown;
+        } else {
+            rawCvText = pdfService.extractText(cvFile);
+        }
 
-        String rawJdText;
-        if (jdFile != null && !jdFile.isEmpty()) {
+        String rawJdText = null;
+        String markdownJd = null;
+        if (jdMarkdown != null && !jdMarkdown.isBlank()) {
+            log.info("JD Cache Hit: Bypassing PDF text extraction.");
+            markdownJd = jdMarkdown;
+        } else if (jdFile != null && !jdFile.isEmpty()) {
             rawJdText = pdfService.extractText(jdFile);
         } else {
-            // Fall back to plain text JD input
             rawJdText = jdText;
         }
         long step1Time = System.currentTimeMillis() - step1Start;
-
-        log.info("[Step 1/4] Done in {}ms. CV: {} chars | JD: {} chars",
-                step1Time, rawCvText.length(), rawJdText.length());
+        log.info("[Step 1/4] Done in {}ms.", step1Time);
 
         // ────────────────────────────────────────────────────────────────────
-        // STEP 2 — Standardize to Markdown via Groq LLM
+        // STEP 2 — Standardize to Markdown via Groq LLM (conditional)
         // ────────────────────────────────────────────────────────────────────
-        log.info("[Step 2/4] Standardizing documents via Groq LLM (Running parallel on Virtual Threads)...");
-        long step2Start = System.currentTimeMillis();
-        String markdownCv;
-        String markdownJd;
+        boolean needCvStandardize = (markdownCv == null);
+        boolean needJdStandardize = (markdownJd == null);
 
-        try (var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
-            java.util.concurrent.CompletableFuture<String> futureCv = java.util.concurrent.CompletableFuture.supplyAsync(
-                    () -> standardizationService.standardizeCv(rawCvText), executor);
+        if (needCvStandardize || needJdStandardize) {
+            log.info("[Step 2/4] Standardizing documents via Groq LLM (Running parallel on Virtual Threads)...");
+            long step2Start = System.currentTimeMillis();
+            
+            final String finalRawCvText = rawCvText;
+            final String finalRawJdText = rawJdText;
 
-            java.util.concurrent.CompletableFuture<String> futureJd = java.util.concurrent.CompletableFuture.supplyAsync(
-                    () -> standardizationService.standardizeJd(rawJdText), executor);
+            try (var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+                java.util.concurrent.CompletableFuture<String> futureCv = needCvStandardize
+                        ? java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+                            try {
+                                return standardizationService.standardizeCv(finalRawCvText);
+                            } catch (Exception e) {
+                                log.error("Error standardizing CV via Groq LLM: ", e);
+                                throw new IngestionException("Failed to standardize CV: " + e.getMessage(), e);
+                            }
+                        }, executor)
+                        : java.util.concurrent.CompletableFuture.completedFuture(markdownCv);
 
-            markdownCv = futureCv.join();
-            markdownJd = futureJd.join();
+                java.util.concurrent.CompletableFuture<String> futureJd = needJdStandardize
+                        ? java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+                            try {
+                                return standardizationService.standardizeJd(finalRawJdText);
+                            } catch (Exception e) {
+                                log.error("Error standardizing JD via Groq LLM: ", e);
+                                throw new IngestionException("Failed to standardize JD: " + e.getMessage(), e);
+                            }
+                        }, executor)
+                        : java.util.concurrent.CompletableFuture.completedFuture(markdownJd);
+
+                try {
+                    markdownCv = futureCv.join();
+                    markdownJd = futureJd.join();
+                } catch (Exception e) {
+                    log.error("Ingestion pipeline failed in parallel standardization task", e);
+                    throw new IngestionException("Standardization failed: " + e.getMessage(), e);
+                }
+            }
+            long step2Time = System.currentTimeMillis() - step2Start;
+            log.info("[Step 2/4] Done in {}ms. CV Markdown: {} chars | JD Markdown: {} chars",
+                    step2Time, markdownCv.length(), markdownJd.length());
+        } else {
+            log.info("[Step 2/4] Bypassed Groq LLM standardization completely (Eager Cache Hit for both CV and JD).");
         }
-        long step2Time = System.currentTimeMillis() - step2Start;
-        log.info("[Step 2/4] Done in {}ms. CV Markdown: {} chars | JD Markdown: {} chars",
-                step2Time, markdownCv.length(), markdownJd.length());
 
         // ── Save full Markdown documents ──────────────────────────────────────
         log.info("Saving full standardized Markdown documents to database...");
@@ -135,6 +175,8 @@ public class IngestionService {
                 .message(String.format(
                         "Successfully ingested CV and JD for session '%s'.",
                         sessionId))
+                .cvMarkdown(markdownCv)
+                .jdMarkdown(markdownJd)
                 .build();
     }
 
@@ -148,21 +190,26 @@ public class IngestionService {
      * @throws IngestionException if any required input is missing or invalid
      */
     private void validateInputs(String sessionId, MultipartFile cvFile,
-                                 MultipartFile jdFile, String jdText) {
+                                 MultipartFile jdFile, String jdText,
+                                 String resumeMarkdown, String jdMarkdown) {
         if (sessionId == null || sessionId.isBlank()) {
             throw new IngestionException("Session ID must not be null or blank.");
         }
 
-        if (cvFile == null || cvFile.isEmpty()) {
-            throw new IngestionException("CV file is required but was not provided.");
+        boolean hasCvFile = cvFile != null && !cvFile.isEmpty();
+        boolean hasCvMarkdown = resumeMarkdown != null && !resumeMarkdown.isBlank();
+
+        if (!hasCvFile && !hasCvMarkdown) {
+            throw new IngestionException("Either 'cvFile' (PDF) or 'resumeMarkdown' must be provided.");
         }
 
         boolean hasJdFile = jdFile != null && !jdFile.isEmpty();
         boolean hasJdText = jdText != null && !jdText.isBlank();
+        boolean hasJdMarkdown = jdMarkdown != null && !jdMarkdown.isBlank();
 
-        if (!hasJdFile && !hasJdText) {
+        if (!hasJdFile && !hasJdText && !hasJdMarkdown) {
             throw new IngestionException(
-                    "At least one of 'jdFile' (PDF) or 'jdText' (plain text) must be provided.");
+                    "At least one of 'jdFile' (PDF), 'jdText' (plain text), or 'jdMarkdown' must be provided.");
         }
     }
 }
