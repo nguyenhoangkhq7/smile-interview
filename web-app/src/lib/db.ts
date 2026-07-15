@@ -37,7 +37,8 @@ export async function initDb() {
       user_id VARCHAR(255),
       file_name VARCHAR(255) NOT NULL,
       extracted_text TEXT,
-      file_content BYTEA,
+      file_url VARCHAR(500),
+      cloudinary_id VARCHAR(255),
       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );
   `;
@@ -48,7 +49,8 @@ export async function initDb() {
       user_id VARCHAR(255),
       title VARCHAR(255) NOT NULL,
       extracted_text TEXT,
-      file_content BYTEA,
+      file_url VARCHAR(500),
+      cloudinary_id VARCHAR(255),
       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );
   `;

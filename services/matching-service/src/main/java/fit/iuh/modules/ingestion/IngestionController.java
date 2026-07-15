@@ -65,17 +65,22 @@ public class IngestionController {
     )
     public ResponseEntity<IngestionResponse> ingest(
             @PathVariable String sessionId,
-            @RequestPart("cvFile") MultipartFile cvFile,
-            @RequestPart(value = "jdFile",  required = false) MultipartFile jdFile,
-            @RequestPart(value = "jdText",  required = false) String jdText) {
+            @RequestPart(value = "cvFile", required = false) MultipartFile cvFile,
+            @RequestPart(value = "jdFile", required = false) MultipartFile jdFile,
+            @RequestPart(value = "jdText", required = false) String jdText,
+            @RequestPart(value = "resumeMarkdown", required = false) String resumeMarkdown,
+            @RequestPart(value = "jdMarkdown", required = false) String jdMarkdown) {
 
-        log.info("Received ingestion request: sessionId={}, cvFile={}, jdFile={}, jdText={}",
+        log.info("Received ingestion request: sessionId={}, cvFile={}, jdFile={}, jdText={}, hasResumeMarkdown={}, hasJdMarkdown={}",
                 sessionId,
                 cvFile != null ? cvFile.getOriginalFilename() : "null",
                 jdFile != null ? jdFile.getOriginalFilename() : "null",
-                jdText != null ? "[" + jdText.length() + " chars]" : "null");
+                jdText != null ? "[" + jdText.length() + " chars]" : "null",
+                resumeMarkdown != null && !resumeMarkdown.isBlank(),
+                jdMarkdown != null && !jdMarkdown.isBlank());
 
-        IngestionResponse response = ingestionService.ingest(sessionId, cvFile, jdFile, jdText);
+        IngestionResponse response = ingestionService.ingest(
+                sessionId, cvFile, jdFile, jdText, resumeMarkdown, jdMarkdown);
 
         log.info("Ingestion completed successfully: sessionId={}",
                 sessionId);
