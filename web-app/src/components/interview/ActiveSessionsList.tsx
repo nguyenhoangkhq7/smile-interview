@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import Link from 'next/link';
-import { RefreshCw, ChevronDown, ChevronUp, FileText, X } from 'lucide-react';
+import { RefreshCw, ChevronDown, ChevronUp, FileText, X, MessageCircle, Briefcase, Play, Clock, Sparkles } from 'lucide-react';
 import styles from '@/app/(main)/interview/new/new.module.css';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -23,6 +23,44 @@ interface ActiveSessionsListProps {
   onViewAssessment: (sessionId: string) => void;
 }
 
+// Helper: Status badge generator
+const getStatusBadge = (status: string) => {
+  let label = status;
+  let bg = '#e0e7ff';
+  let color = '#3730a3';
+  let border = '1px solid #c7d2fe';
+
+  if (status === 'In progress') {
+    label = 'Đang phỏng vấn';
+    bg = '#fff7ed';
+    color = '#ea580c';
+    border = '1px solid #ffedd5';
+  } else if (status === 'Not started') {
+    label = 'Chưa bắt đầu';
+    bg = '#f1f5f9';
+    color = '#475569';
+    border = '1px solid #e2e8f0';
+  }
+
+  return (
+    <span style={{
+      fontSize: '0.72rem',
+      padding: '0.18rem 0.5rem',
+      borderRadius: '999px',
+      backgroundColor: bg,
+      color: color,
+      border: border,
+      fontWeight: 700,
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '0.2rem'
+    }}>
+      <Clock size={10} />
+      {label}
+    </span>
+  );
+};
+
 // ── Empty State ──────────────────────────────────────────────────────────────
 
 export function EmptySessionsState() {
@@ -36,8 +74,8 @@ export function EmptySessionsState() {
         padding: '3rem 2rem',
         gap: '0.75rem',
         borderRadius: '0.75rem',
-        border: '1.5px dashed rgba(99,102,241,0.25)',
-        background: 'rgba(99,102,241,0.04)',
+        border: '1.5px dashed rgba(234, 88, 12, 0.25)',
+        background: 'rgba(234, 88, 12, 0.04)',
         textAlign: 'center',
       }}
     >
@@ -46,7 +84,7 @@ export function EmptySessionsState() {
         height="40"
         viewBox="0 0 24 24"
         fill="none"
-        stroke="#6366f1"
+        stroke="#ea580c"
         strokeWidth="1.5"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -81,54 +119,132 @@ function SessionCard({ session, isCloning, onResume, onRestart, onViewAssessment
     <div className={styles.sessionCard}>
       <div className={styles.sessionMain}>
         <div className={styles.sessionTitleRow}>
-          <strong className={styles.sessionTitle}>{session.roleTitle}</strong>
-          <span className={styles.statusPill}>{session.status}</span>
+          <strong className={styles.sessionTitle} style={{ 
+            fontSize: '0.92rem', 
+            fontWeight: 700, 
+            color: '#0f172a',
+            maxWidth: '180px',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
+          }} title={session.roleTitle}>
+            {session.roleTitle}
+          </strong>
+          {getStatusBadge(session.status)}
         </div>
-        <p className={styles.sessionMeta}>
-          {session.cvFilename} • {session.jdFilename}
-        </p>
-        <p className={styles.sessionDate}>
+        
+        {/* CV & JD Badges */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', margin: '0.5rem 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#475569', fontSize: '0.8rem' }}>
+            <FileText size={13} style={{ flexShrink: 0, color: '#f97316' }} />
+            <span style={{ 
+              overflow: 'hidden', 
+              textOverflow: 'ellipsis', 
+              whiteSpace: 'nowrap',
+              maxWidth: '280px' 
+            }} title={session.cvFilename}>
+              {session.cvFilename}
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#475569', fontSize: '0.8rem' }}>
+            <Briefcase size={13} style={{ flexShrink: 0, color: '#3b82f6' }} />
+            <span style={{ 
+              overflow: 'hidden', 
+              textOverflow: 'ellipsis', 
+              whiteSpace: 'nowrap',
+              maxWidth: '280px' 
+            }} title={session.jdFilename}>
+              {session.jdFilename}
+            </span>
+          </div>
+        </div>
+
+        <p className={styles.sessionDate} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', color: '#94a3b8', margin: 0 }}>
+          <Clock size={12} />
           Cập nhật: {new Date(session.date).toLocaleString('vi-VN')}
         </p>
       </div>
 
-      <div className={styles.sessionActions}>
+      {/* Action buttons wrapper */}
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: session.hasAssessment ? '1fr 1fr' : '1fr', 
+        gap: '0.5rem',
+        marginTop: '0.5rem' 
+      }}>
         {session.hasAssessment && (
           <button
             onClick={() => onViewAssessment(session.sessionId)}
-            className={styles.secondaryButton}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '0.25rem',
+              justifyContent: 'center',
+              gap: '0.35rem',
               backgroundColor: '#eff6ff',
-              color: '#1d4ed8',
+              color: '#2563eb',
               border: '1px solid #bfdbfe',
-              padding: '0.5rem 0.8rem',
-              borderRadius: '0.50rem',
-              fontSize: '0.85rem',
+              padding: '0.5rem 0.5rem',
+              borderRadius: '0.5rem',
+              fontSize: '0.78rem',
               fontWeight: 600,
               cursor: 'pointer',
               transition: 'all 0.2s',
             }}
+            onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#dbeafe'}
+            onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#eff6ff'}
           >
-            <FileText size={14} />
+            <Sparkles size={13} />
             Đánh giá CV
           </button>
         )}
         <button
           onClick={() => onRestart(session.sessionId)}
           disabled={isCloning}
-          className={styles.secondaryButton}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.35rem',
+            backgroundColor: '#ffffff',
+            color: '#475569',
+            border: '1px solid #cbd5e1',
+            padding: '0.5rem 0.5rem',
+            borderRadius: '0.5rem',
+            fontSize: '0.78rem',
+            fontWeight: 600,
+            cursor: isCloning ? 'not-allowed' : 'pointer',
+            transition: 'all 0.2s',
+          }}
+          onMouseOver={(e) => !isCloning && (e.currentTarget.style.backgroundColor = '#f8fafc')}
+          onMouseOut={(e) => !isCloning && (e.currentTarget.style.backgroundColor = '#ffffff')}
         >
-          <RefreshCw size={14} className={isCloning ? 'animate-spin' : undefined} />
+          <RefreshCw size={13} className={isCloning ? 'animate-spin' : undefined} />
           Thực hiện lại
         </button>
         <button
-          className={styles.primaryButton}
           onClick={() => onResume(session.sessionId)}
+          style={{
+            gridColumn: session.hasAssessment ? 'span 2' : 'auto',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.35rem',
+            backgroundColor: '#ea580c',
+            color: '#ffffff',
+            border: 'none',
+            padding: '0.55rem 0.5rem',
+            borderRadius: '0.5rem',
+            fontSize: '0.8rem',
+            fontWeight: 600,
+            cursor: 'pointer',
+            boxShadow: '0 2px 4px rgba(234, 88, 12, 0.15)',
+            transition: 'all 0.2s',
+          }}
+          onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#c2410c'}
+          onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#ea580c'}
         >
-          Tiếp tục phiên này
+          <Play size={13} fill="currentColor" />
+          Tiếp tục phỏng vấn
         </button>
       </div>
     </div>
@@ -144,13 +260,11 @@ export function ActiveSessionsList({
   onRestart,
   onViewAssessment,
 }: ActiveSessionsListProps) {
-  const [isCollapsed, setIsCollapsed] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [showAllModal, setShowAllModal] = useState(false);
   const [modalTimeFilter, setModalTimeFilter] = useState('all');
 
-  const displayedSessions = isCollapsed 
-    ? sessions.slice(0, 1) 
-    : sessions.slice(0, 5);
+  const displayedSessions = sessions.slice(0, 5);
 
   const filteredModalSessions = sessions.filter((s) => {
     if (modalTimeFilter === 'all') return true;
@@ -169,64 +283,142 @@ export function ActiveSessionsList({
     return true;
   });
 
-  return (
-    <section className={styles.formSection} style={{ marginBottom: '1.5rem' }}>
-      <div className={styles.sectionHeader} style={{ marginBottom: '1rem', alignItems: 'center' }}>
-        <div className={styles.sectionHeaderContent}>
-          <span className={styles.sectionEyebrow}>Phiên đang hoạt động</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.25rem' }}>
-            <h2 className={styles.sectionTitle} style={{ margin: 0 }}>
-              Phiên đang thực hiện
-            </h2>
-            <span style={{
-              backgroundColor: '#ffedd5',
-              color: '#ea580c',
-              padding: '0.2rem 0.65rem',
-              borderRadius: '9999px',
-              fontSize: '0.78rem',
-              fontWeight: 700
-            }}>
-              {sessions.length} phiên
-            </span>
-          </div>
-          <p className={styles.subtitle} style={{ marginTop: '0.35rem' }}>
-            Các phiên này đang được quản lý trong PostgreSQL, bạn có thể tiếp tục ngay từ đây.
-          </p>
-        </div>
+  // Floating chat button - positioned at bottom right corner
+  const ChatButton = () => (
+    <button
+      onClick={() => setIsExpanded(true)}
+      style={{
+        position: 'fixed',
+        bottom: '25px',
+        right: '25px',
+        zIndex: 1000,
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.5rem',
+        backgroundColor: '#ea580c',
+        color: 'white',
+        padding: '0.75rem 1.25rem',
+        borderRadius: '9999px',
+        fontSize: '0.9rem',
+        fontWeight: 600,
+        cursor: 'pointer',
+        boxShadow: '0 4px 16px rgba(234, 88, 12, 0.35)',
+        transition: 'all 0.3s ease',
+        border: 'none',
+      }}
+      onMouseOver={(e) => {
+        e.currentTarget.style.transform = 'translateY(-2px)';
+        e.currentTarget.style.boxShadow = '0 6px 20px rgba(234, 88, 12, 0.45)';
+      }}
+      onMouseOut={(e) => {
+        e.currentTarget.style.transform = 'translateY(0)';
+        e.currentTarget.style.boxShadow = '0 4px 16px rgba(234, 88, 12, 0.35)';
+      }}
+    >
+      <MessageCircle size={20} />
+      <span>Phiên đang thực hiện</span>
+      {sessions.length > 0 && (
+        <span style={{
+          backgroundColor: 'white',
+          color: '#ea580c',
+          padding: '0.15rem 0.5rem',
+          borderRadius: '9999px',
+          fontSize: '0.75rem',
+          fontWeight: 700,
+          minWidth: '20px',
+          textAlign: 'center',
+        }}>
+          {sessions.length}
+        </span>
+      )}
+    </button>
+  );
 
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <button
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.25rem',
-              backgroundColor: '#f1f5f9',
-              border: '1px solid #cbd5e1',
-              color: '#475569',
-              padding: '0.5rem 0.8rem',
-              borderRadius: '0.5rem',
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-            }}
-            title={isCollapsed ? "Mở rộng danh sách" : "Thu gọn danh sách"}
-          >
-            {isCollapsed ? <ChevronDown size={15} /> : <ChevronUp size={15} />}
-            {isCollapsed ? 'Mở rộng' : 'Thu gọn'}
-          </button>
-          <Link href="/history" className={styles.secondaryButton}>
-            Mở toàn bộ lịch sử
-          </Link>
+  // Expanded panel - displays above the floating button
+  const ExpandedPanel = () => (
+    <div style={{
+      position: 'fixed',
+      bottom: '90px',
+      right: '25px',
+      zIndex: 999,
+      backgroundColor: 'white',
+      borderRadius: '1rem',
+      boxShadow: '0 10px 40px rgba(15, 23, 42, 0.15)',
+      border: '1px solid #e2e8f0',
+      width: '400px',
+      maxHeight: '520px',
+      display: 'flex',
+      flexDirection: 'column',
+      overflow: 'hidden',
+      animation: 'slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+    }}>
+      {/* Header */}
+      <div style={{
+        padding: '1rem 1.25rem',
+        borderBottom: '1px solid #e2e8f0',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#f8fafc',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <MessageCircle size={18} color="#ea580c" />
+          <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.95rem' }}>
+            Phiên đang thực hiện
+          </span>
+          {sessions.length > 0 && (
+            <span style={{
+              backgroundColor: '#fff7ed',
+              color: '#ea580c',
+              padding: '0.15rem 0.5rem',
+              borderRadius: '9999px',
+              fontSize: '0.7rem',
+              fontWeight: 700,
+            }}>
+              {sessions.length}
+            </span>
+          )}
         </div>
+        <button
+          onClick={() => setIsExpanded(false)}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: '#94a3b8',
+            cursor: 'pointer',
+            padding: '0.25rem',
+            borderRadius: '9999px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+          onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+        >
+          <X size={18} />
+        </button>
       </div>
 
-      {sessions.length === 0 ? (
-        <EmptySessionsState />
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-          <div className={styles.sessionList}>
+      {/* Content */}
+      <div style={{
+        padding: '1rem',
+        overflowY: 'auto',
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.75rem',
+      }}>
+        {sessions.length === 0 ? (
+          <div style={{
+            textAlign: 'center',
+            padding: '2.5rem 1rem',
+            color: '#64748b',
+            fontSize: '0.85rem',
+          }}>
+            Không có phiên nào đang thực hiện
+          </div>
+        ) : (
+          <>
             {displayedSessions.map((session) => (
               <SessionCard
                 key={session.sessionId}
@@ -237,38 +429,56 @@ export function ActiveSessionsList({
                 onViewAssessment={onViewAssessment}
               />
             ))}
-          </div>
-
-          {!isCollapsed && sessions.length > 5 && (
-            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '0.5rem' }}>
+            {sessions.length > 5 && (
               <button
                 onClick={() => setShowAllModal(true)}
                 style={{
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #ea580c',
-                  color: '#ea580c',
-                  padding: '0.5rem 1.2rem',
-                  borderRadius: '0.50rem',
+                  backgroundColor: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  color: '#64748b',
+                  padding: '0.6rem 1rem',
+                  borderRadius: '0.5rem',
                   fontSize: '0.85rem',
                   fontWeight: 600,
                   cursor: 'pointer',
                   transition: 'all 0.2s',
+                  width: '100%',
                 }}
                 onMouseOver={(e) => {
-                  e.currentTarget.style.backgroundColor = '#ea580c';
-                  e.currentTarget.style.color = '#ffffff';
+                  e.currentTarget.style.backgroundColor = '#e2e8f0';
+                  e.currentTarget.style.color = '#475569';
                 }}
                 onMouseOut={(e) => {
-                  e.currentTarget.style.backgroundColor = '#ffffff';
-                  e.currentTarget.style.color = '#ea580c';
+                  e.currentTarget.style.backgroundColor = '#f8fafc';
+                  e.currentTarget.style.color = '#64748b';
                 }}
               >
-                Xem thêm các phiên khác
+                Xem thêm {sessions.length - 5} phiên khác
               </button>
-            </div>
-          )}
-        </div>
-      )}
+            )}
+            <Link
+              href="/history"
+              style={{
+                display: 'block',
+                textAlign: 'center',
+                color: '#ea580c',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                padding: '0.5rem',
+                textDecoration: 'none',
+              }}
+            >
+              Mở toàn bộ lịch sử →
+            </Link>
+          </>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      {!isExpanded ? <ChatButton /> : <ExpandedPanel />}
 
       {/* Full Sessions Modal */}
       {showAllModal && (
@@ -310,7 +520,7 @@ export function ActiveSessionsList({
             }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>
-                  Danh sách tất cả phiên ({sessions.length})
+                  Danh sách tất cả phiên đang thực hiện ({sessions.length})
                 </h3>
                 <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>
                   Các phiên chưa hoàn thành được liệt kê chi tiết dưới đây
@@ -399,6 +609,6 @@ export function ActiveSessionsList({
           </div>
         </div>
       )}
-    </section>
+    </>
   );
 }

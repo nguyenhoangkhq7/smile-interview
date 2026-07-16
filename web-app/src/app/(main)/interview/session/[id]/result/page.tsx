@@ -361,6 +361,12 @@ export default function InterviewResultPage() {
           </div>
         </section>
 
+
+
+
+
+
+
         {/* ── Accordion QA Section ── */}
         <section className={styles.questionsSection}>
           <h2 className={styles.sectionTitle}>Chi tiết câu hỏi &amp; Trả lời</h2>

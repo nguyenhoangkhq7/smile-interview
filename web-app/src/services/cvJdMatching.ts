@@ -1,12 +1,31 @@
 import { useAuthStore } from '@/store/authStore';
 
+export interface SkillEntry {
+  id: string;
+  keyword: string;
+  category: 'hard' | 'soft';
+  variants?: string[];
+}
+
+export interface KeywordMetadata {
+  matching_skills: SkillEntry[];
+  missing_skills: SkillEntry[];
+}
+
 export interface IngestResponse {
   sessionId: string;
   totalChunksCount: number;
   success: boolean;
   resumeId?: number;
   jdId?: number;
+  /** Jobscan-style keyword match metadata from matchKeywords.ts */
+  keywordMetadata?: KeywordMetadata;
+  /** Pre-LLM raw text extracted from CV PDF */
+  rawCvText?: string | null;
+  /** Pre-LLM raw text extracted from JD PDF */
+  rawJdText?: string | null;
 }
+
 
 export interface AssessmentResponse {
   id: string;

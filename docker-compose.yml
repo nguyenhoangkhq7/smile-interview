@@ -19,7 +19,7 @@ services:
       start_period: 10s
 
   redis:
-    image: redis:7-alpine
+    image: redis:7-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
     container_name: redis_cache
     restart: always
     ports:
@@ -147,6 +147,10 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-smile_interview_db}
       MATCHING_SERVICE_URL: http://matching-service:8081
+      # OpenRouter LLM for keyword matching BFF utility (matchKeywords.ts)
+      LLM_API_KEY: ${LLM_API_KEY}
+      LLM_API_URL: ${LLM_API_URL}
+      LLM_MODEL: ${LLM_MODEL}
     depends_on:
       - streaming-service
 
