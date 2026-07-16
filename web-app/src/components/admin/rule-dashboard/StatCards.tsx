@@ -26,10 +26,10 @@ export default function StatCards({ items }: StatCardsProps) {
         return (
           <div
             key={item.label}
-            className={`rounded-3xl border border-white/6 bg-gradient-to-br ${toneStyles[tone]} px-5 py-5 shadow-[0_14px_42px_rgba(2,6,23,0.26)] ring-1 backdrop-blur-sm`}
+            className="rounded-xl border border-slate-800 bg-slate-900 px-5 py-5 shadow-sm"
           >
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">{item.label}</p>
-            <p className="mt-2 text-[2.15rem] font-semibold leading-none tabular-nums text-white">{item.value}</p>
+            <p className="text-sm text-slate-400 uppercase tracking-wider">{item.label}</p>
+            <p className="mt-2 text-4xl font-bold leading-none tabular-nums text-white">{item.value}</p>
           </div>
         );
       })}

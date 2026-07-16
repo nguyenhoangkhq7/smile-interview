@@ -53,11 +53,11 @@ public class User implements UserDetails {
     private String avatarUrl;
 
     /**
-     * Reference to the user's default resume (UUID FK to resumes table).
-     * Stored as a plain UUID — no JPA join to avoid cross-module coupling.
+     * Reference to the user's default resume (FK to resumes table).
+     * Stored as a plain String — no JPA join to avoid cross-module coupling.
      */
     @Column(name = "default_resume_id")
-    private UUID defaultResumeId;
+    private String defaultResumeId;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

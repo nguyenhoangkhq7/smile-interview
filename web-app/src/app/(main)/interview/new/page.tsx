@@ -5,10 +5,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { cvJdMatchingService, AssessmentResponse } from '@/services/cvJdMatching';
 import { historyService } from '@/services/historyService';
-import { Calendar, FileText, UploadCloud, FolderOpen, Briefcase, CheckCircle, XCircle, Brain, Lightbulb, X, AlertTriangle, Check, AlertCircle, TrendingUp, UserCheck, Award, ShieldCheck, RefreshCw, Target, Wrench, Search, ChevronDown } from 'lucide-react';
+import { Calendar, FileText, UploadCloud, FolderOpen, Briefcase, CheckCircle, XCircle, Brain, Lightbulb, X, AlertTriangle, Check, AlertCircle, TrendingUp, UserCheck, Award, ShieldCheck, RefreshCw, Target, Wrench, Search, ChevronDown, Eye } from 'lucide-react';
 import styles from './new.module.css';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import HighlightedText from '@/components/HighlightedText';
+import dynamic from 'next/dynamic';
+const PdfViewerModal = dynamic(() => import('@/components/common/PdfViewerModal'), { ssr: false });
 
 
 import { ActiveSessionsList, type ActiveSession } from '@/components/interview/ActiveSessionsList';
@@ -87,9 +89,9 @@ function CustomCombobox({
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0, flex: 1 }}>
           {icon}
-          <span style={{ 
-            overflow: 'hidden', 
-            textOverflow: 'ellipsis', 
+          <span style={{
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
             width: '100%'
           }}>
@@ -98,7 +100,7 @@ function CustomCombobox({
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 0 }}>
           {selectedOption && (
-            <span 
+            <span
               onClick={(e) => {
                 e.stopPropagation();
                 onSelect(null);
@@ -118,13 +120,13 @@ function CustomCombobox({
               <X size={14} />
             </span>
           )}
-          <ChevronDown 
-            size={16} 
-            style={{ 
+          <ChevronDown
+            size={16}
+            style={{
               color: '#94a3b8',
               transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
               transition: 'transform 0.2s'
-            }} 
+            }}
           />
         </div>
       </button>
@@ -228,17 +230,17 @@ function CustomCombobox({
                       }
                     }}
                   >
-                    <span style={{ 
-                      overflow: 'hidden', 
-                      textOverflow: 'ellipsis', 
+                    <span style={{
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
                       maxWidth: '75%',
                       fontWeight: isSelected ? 600 : 400,
                     }} title={opt.label}>
                       {opt.label}
                     </span>
-                    <span style={{ 
-                      fontSize: '0.72rem', 
+                    <span style={{
+                      fontSize: '0.72rem',
                       color: isSelected ? '#ea580c' : '#94a3b8',
                       opacity: 0.8,
                     }}>
@@ -255,8 +257,100 @@ function CustomCombobox({
   );
 }
 
+// ── Data Adapter: derive Jobscan keyword arrays from AI evaluation results ────
+//
+// Iterates the evidenceItems / additionalEvidenceItems arrays (same data that
+// renders the AI Cards) and extracts raw keyword tokens per-criterion.
+//
+// Enhanced extraction pipeline for splitCriteriaName:
+//   1. Pull out terms inside parentheses as extra tokens (e.g. "(REST/GraphQL)" → ["REST", "GraphQL"])
+//   2. Strip the parenthetical from the main string
+//   3. Remove common descriptor filler words that never appear verbatim in CVs
+//   4. Split on all compound delimiters: & / | ,
+//   5. Filter out blank / single-character noise tokens
+
+/** Words that are purely descriptive and will never match raw CV/JD text as standalone terms. */
+const DESCRIPTOR_WORDS = new Set([
+  'fundamentals', 'fundamental', 'practices', 'practice',
+  'ecosystem', 'architecture', 'design', 'management',
+  'principles', 'principle', 'concepts', 'concept',
+  'techniques', 'technique', 'methodology', 'methodologies',
+  'basics', 'advanced', 'modern', 'best', 'patterns', 'pattern',
+  'tools', 'tool', 'skills', 'skill', 'knowledge', 'experience',
+  'proficiency', 'understanding', 'overview', 'introduction',
+  'development', 'implementation', 'integration', 'systems', 'system',
+  'and', 'or', 'the', 'for', 'with', 'using', 'via',
+]);
+
+function splitCriteriaName(name: string): string[] {
+  if (!name) return [];
+
+  const tokens: string[] = [];
+
+  // Step 1: extract terms inside parentheses as extra tokens
+  // e.g. "API Design (REST/GraphQL)" → parenthetical content "REST/GraphQL"
+  const parenMatches = name.match(/\(([^)]+)\)/g) || [];
+  for (const paren of parenMatches) {
+    const inner = paren.replace(/[()]/g, '');
+    // Split the inner part too
+    inner.split(/[&/|,\s]+/).forEach((t) => tokens.push(t.trim()));
+  }
+
+  // Step 2: strip all parenthetical groups from the main name
+  let cleaned = name.replace(/\([^)]*\)/g, ' ');
+
+  // Step 3: split on compound delimiters
+  cleaned.split(/[&/|,]+/).forEach((segment) => {
+    // Step 4: within each segment, further split on whitespace and push individual words
+    segment.split(/\s+/).forEach((word) => tokens.push(word.trim()));
+  });
+
+  // Step 5: normalise, drop descriptor words and short noise tokens
+  return tokens
+    .map((t) => t.replace(/[^a-zA-Z0-9#+.]/g, '').trim()) // keep alphanumeric + tech chars like C#, C++, .NET
+    .filter((t) => t.length >= 2)
+    .filter((t) => !DESCRIPTOR_WORDS.has(t.toLowerCase()));
+}
+
+interface DerivedKeywords {
+  matchingSkills: string[];  // from matched items
+  variationSkills: string[]; // from weak items
+  missingSkills: string[];   // from missing items
+}
+
+function extractKeywordsFromEvaluation(evidenceItems: any[], additionalEvidenceItems: any[]): DerivedKeywords {
+  const matchingSkills: string[] = [];
+  const variationSkills: string[] = [];
+  const missingSkills: string[] = [];
+
+  const allItems = [...(evidenceItems || []), ...(additionalEvidenceItems || [])];
+
+  for (const item of allItems) {
+    const name: string = item.criteria_name || '';
+    const status: string = (item.status || '').toLowerCase();
+    const tokens = splitCriteriaName(name);
+
+    if (status === 'matched') {
+      matchingSkills.push(...tokens);
+    } else if (status === 'weak') {
+      variationSkills.push(...tokens);
+    } else if (status === 'missing') {
+      missingSkills.push(...tokens);
+    }
+  }
+
+  // Deduplicate while preserving order
+  const dedupe = (arr: string[]) => [...new Set(arr)];
+  return {
+    matchingSkills: dedupe(matchingSkills),
+    variationSkills: dedupe(variationSkills),
+    missingSkills: dedupe(missingSkills)
+  };
+}
+
 export default function NewInterviewPage() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const [roleTitle, setRoleTitle] = useState('React Frontend Engineer');
 
   // Files & Sources
@@ -270,7 +364,7 @@ export default function NewInterviewPage() {
   const [savedJds, setSavedJds] = useState<any[]>([]);
   const [selectedResumeId, setSelectedResumeId] = useState<number | null>(null);
   const [selectedJdId, setSelectedJdId] = useState<number | null>(null);
-  const [cvSource, setCvSource] = useState<'upload' | 'saved'>('upload');
+  const [cvSource, setCvSource] = useState<'upload' | 'saved' | 'default'>('upload');
   const [jdSource, setJdSource] = useState<'upload' | 'text' | 'saved'>('upload');
 
   // Drag states
@@ -285,6 +379,11 @@ export default function NewInterviewPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [isCloning, setIsCloning] = useState<string | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
+
+  // PDF Viewer Modal State
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerUrl, setViewerUrl] = useState('');
+  const [viewerTitle, setViewerTitle] = useState('');
 
   // Result state
   const [assessment, setAssessment] = useState<AssessmentResponse | null>(null);
@@ -301,8 +400,16 @@ export default function NewInterviewPage() {
   const [rawCvText, setRawCvText] = useState<string | null>(null);
   const [rawJdText, setRawJdText] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<'ai-cards' | 'visual-match'>('ai-cards');
+  // Display names for the Jobscan panel headers (file name labels)
+  const [cvDisplayName, setCvDisplayName] = useState<string>('CV');
+  const [jdDisplayName, setJdDisplayName] = useState<string>('JD');
+  // resumeId / jdId for the currently loaded assessment (used to fetch raw texts from DB)
+  const [activeResumeId, setActiveResumeId] = useState<number | null>(null);
+  const [activeJdId, setActiveJdId] = useState<number | null>(null);
 
-  // React to sessionId changes to pull raw text and match values from sessionStorage
+  // React to sessionId changes to pull raw text and match values from sessionStorage.
+  // Fallback: if sessionStorage is empty (e.g. loaded from history / different tab),
+  // fetch raw texts directly from the DB via the stored resumeId / jdId.
   useEffect(() => {
     if (!sessionId) {
       setKeywordMetadata(null);
@@ -317,15 +424,32 @@ export default function NewInterviewPage() {
         setKeywordMetadata(parsed.keywordMetadata ?? null);
         setRawCvText(parsed.rawCvText ?? null);
         setRawJdText(parsed.rawJdText ?? null);
-      } else {
-        setKeywordMetadata(null);
-        setRawCvText(null);
-        setRawJdText(null);
+        return; // sessionStorage hit – done
       }
     } catch (e) {
       console.warn('[NewPage] Could not read keyword data from sessionStorage:', e);
     }
-  }, [sessionId]);
+
+    // sessionStorage miss – fetch raw texts from the DB
+    if (!activeResumeId && !activeJdId) return;
+
+    const params = new URLSearchParams();
+    if (activeResumeId) params.set('resumeId', String(activeResumeId));
+    if (activeJdId) params.set('jdId', String(activeJdId));
+
+    fetch(`/api/matching/raw-texts?${params.toString()}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setKeywordMetadata(null); // no LLM keyword metadata on this path; use adapter
+        setRawCvText(data.rawCvText ?? null);
+        setRawJdText(data.rawJdText ?? null);
+        if (data.cvFilename) setCvDisplayName(data.cvFilename);
+        if (data.jdFilename) setJdDisplayName(data.jdFilename);
+      })
+      .catch((err) => {
+        console.error('[NewPage] Failed to fetch raw texts from DB:', err);
+      });
+  }, [sessionId, activeResumeId, activeJdId]);
 
   useEffect(() => {
     let mounted = true;
@@ -530,6 +654,14 @@ export default function NewInterviewPage() {
         setRoleTitle(session.roleTitle);
         setIngested(true);
 
+        // Persist the resumeId / jdId so the sessionId useEffect can fetch raw texts from DB
+        if (session.resumeId) setActiveResumeId(session.resumeId);
+        if (session.jdId) setActiveJdId(session.jdId);
+
+        // Set display names from history immediately (may be refined by the DB fetch)
+        if (session.cvFilename) setCvDisplayName(session.cvFilename);
+        if (session.jdFilename) setJdDisplayName(session.jdFilename);
+
         if (typeof window !== 'undefined') {
           const url = new URL(window.location.href);
           url.searchParams.set('sessionId', resumeSessionId);
@@ -553,7 +685,7 @@ export default function NewInterviewPage() {
   const handleUploadAndIngest = async () => {
     // Validate CV selection
     if (cvSource === 'upload' && !cvFile) return;
-    if (cvSource === 'saved' && !selectedResumeId) return;
+    if ((cvSource === 'saved' || cvSource === 'default') && !selectedResumeId) return;
 
     // Validate JD selection
     if (jdSource === 'upload' && !jdFile) return;
@@ -596,7 +728,7 @@ export default function NewInterviewPage() {
               jdFilename: displayJdName,
               status: 'In progress',
               questions: [],
-              resumeId: cvSource === 'saved' ? (selectedResumeId || undefined) : undefined,
+              resumeId: (cvSource === 'saved' || cvSource === 'default') ? (selectedResumeId || undefined) : undefined,
               jdId: jdSource === 'saved' ? (selectedJdId || undefined) : undefined
             });
 
@@ -606,7 +738,7 @@ export default function NewInterviewPage() {
               cvSource === 'upload' ? cvFile : null,
               jdSource === 'upload' ? jdFile : null,
               jdSource === 'text' ? jdText : null,
-              cvSource === 'saved' ? selectedResumeId : null,
+              (cvSource === 'saved' || cvSource === 'default') ? selectedResumeId : null,
               jdSource === 'saved' ? selectedJdId : null
             );
 
@@ -633,6 +765,17 @@ export default function NewInterviewPage() {
 
             setSessionId(newSessionId);
             setIngested(true);
+            // Store active IDs + display names for the Jobscan panel headers
+            const finalResumeId = ingestRes.resumeId || (cvSource !== 'upload' ? selectedResumeId : null);
+            const finalJdId = ingestRes.jdId || (jdSource === 'saved' ? selectedJdId : null);
+            if (finalResumeId) setActiveResumeId(finalResumeId);
+            if (finalJdId) setActiveJdId(finalJdId);
+            setCvDisplayName(displayCvName);
+            setJdDisplayName(displayJdName);
+
+            // Directly set raw texts to component state to guarantee immediate availability
+            if (ingestRes.rawCvText) setRawCvText(ingestRes.rawCvText);
+            if (ingestRes.rawJdText) setRawJdText(ingestRes.rawJdText);
 
           } catch (err: any) {
             console.error('Ingestion error:', err);
@@ -922,7 +1065,7 @@ export default function NewInterviewPage() {
           {parts.map((part, index) => {
             let displayPart = part;
             let prefix = "";
-            
+
             // Check for prefix "Các kỹ năng còn yếu hoặc thiếu chiều sâu: " or similar
             const prefixMatch = part.match(/^(Các kỹ năng còn yếu hoặc thiếu chiều sâu:\s*)/i);
             if (prefixMatch) {
@@ -948,21 +1091,21 @@ export default function NewInterviewPage() {
                     {prefix}
                   </div>
                 )}
-                <div style={{ 
-                  fontSize: '0.88rem', 
-                  color: '#334155', 
+                <div style={{
+                  fontSize: '0.88rem',
+                  color: '#334155',
                   lineHeight: '1.5',
                   paddingLeft: prefix ? '0.5rem' : '0'
                 }}>
                   {highlightText(displayPart)}
                 </div>
                 {index < parts.length - 1 && (
-                  <div style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center', 
-                    color: '#cbd5e1', 
-                    fontSize: '0.75rem', 
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#cbd5e1',
+                    fontSize: '0.75rem',
                     fontWeight: 'bold',
                     marginTop: '0.5rem',
                     marginBottom: '0.25rem',
@@ -1037,9 +1180,54 @@ export default function NewInterviewPage() {
                     >
                       Chọn CV đã lưu
                     </button>
+                    {user?.defaultResumeId && (
+                      <button
+                        type="button"
+                        className={`${styles.tabButton} ${cvSource === 'default' ? styles.tabButtonActive : ''}`}
+                        onClick={() => {
+                          setCvSource('default');
+                          const defId = user.defaultResumeId;
+                          setSelectedResumeId(defId ? parseInt(defId, 10) : null);
+                        }}
+                      >
+                        Sử dụng CV mặc định
+                      </button>
+                    )}
                   </div>
 
-                  {cvSource === 'upload' ? (
+                  {cvSource === 'default' ? (
+                    (() => {
+                      const defResume = savedResumes.find(r => String(r.id) === String(user?.defaultResumeId));
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%' }}>
+                          <div className={styles.fileCard} style={{ border: '1px solid #ffedd5', backgroundColor: '#fff7ed' }}>
+                            <div className={styles.fileInfo}>
+                              <FileText size={24} style={{ color: '#ea580c' }} />
+                              <div>
+                                <p className={styles.fileName}>{defResume?.file_name || 'Đang tải thông tin CV mặc định...'}</p>
+                                <p className={styles.fileSize} style={{ color: '#ea580c', fontWeight: 600, fontSize: '0.75rem' }}>CV mặc định của bạn</p>
+                              </div>
+                            </div>
+                          </div>
+                          {defResume?.file_url && (
+                            <button
+                              type="button"
+                              className={styles.secondaryButton}
+                              onClick={() => {
+                                setViewerUrl(defResume.file_url);
+                                setViewerTitle(`CV mặc định: ${defResume.file_name}`);
+                                setViewerOpen(true);
+                              }}
+                              style={{ width: 'fit-content', padding: '0.4rem 0.85rem', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                            >
+                              <Eye size={12} />
+                              Xem CV mặc định
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()
+                  ) : cvSource === 'upload' ? (
                     !cvFile ? (
                       <div
                         className={`${styles.dropzone} ${dragOverCv ? styles.dropzoneActive : ''}`}
@@ -1087,6 +1275,24 @@ export default function NewInterviewPage() {
                         searchPlaceholder="Tìm kiếm CV theo tên..."
                         icon={<FileText size={16} style={{ color: '#ea580c', flexShrink: 0 }} />}
                       />
+                      {selectedResumeId && (() => {
+                        const selResume = savedResumes.find(r => r.id === selectedResumeId);
+                        return selResume?.file_url ? (
+                          <button
+                            type="button"
+                            className={styles.secondaryButton}
+                            onClick={() => {
+                              setViewerUrl(selResume.file_url);
+                              setViewerTitle(`CV đã lưu: ${selResume.file_name}`);
+                              setViewerOpen(true);
+                            }}
+                            style={{ width: 'fit-content', padding: '0.4rem 0.85rem', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.25rem' }}
+                          >
+                            <Eye size={12} />
+                            Xem CV đã chọn
+                          </button>
+                        ) : null;
+                      })()}
                       {savedResumes.length === 0 && (
                         <p className="text-xs text-slate-400 mt-1">Không có CV nào được lưu trước đó.</p>
                       )}
@@ -1179,6 +1385,24 @@ export default function NewInterviewPage() {
                           searchPlaceholder="Tìm kiếm JD theo tên..."
                           icon={<Briefcase size={16} style={{ color: '#3b82f6', flexShrink: 0 }} />}
                         />
+                        {selectedJdId && (() => {
+                          const selJd = savedJds.find(j => j.id === selectedJdId);
+                          return selJd?.file_url ? (
+                            <button
+                              type="button"
+                              className={styles.secondaryButton}
+                              onClick={() => {
+                                setViewerUrl(selJd.file_url);
+                                setViewerTitle(`JD đã chọn: ${selJd.title}`);
+                                setViewerOpen(true);
+                              }}
+                              style={{ width: 'fit-content', padding: '0.4rem 0.85rem', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.25rem' }}
+                            >
+                              <Eye size={12} />
+                              Xem JD đã chọn
+                            </button>
+                          ) : null;
+                        })()}
                         {savedJds.length === 0 && (
                           <p className="text-xs text-slate-400 mt-1">Không có JD nào được lưu trước đó.</p>
                         )}
@@ -1201,7 +1425,7 @@ export default function NewInterviewPage() {
                   className={styles.primaryButton}
                   disabled={
                     (cvSource === 'upload' && !cvFile) ||
-                    (cvSource === 'saved' && !selectedResumeId) ||
+                    ((cvSource === 'saved' || cvSource === 'default') && !selectedResumeId) ||
                     (jdSource === 'upload' && !jdFile) ||
                     (jdSource === 'text' && !jdText.trim()) ||
                     (jdSource === 'saved' && !selectedJdId)
@@ -1320,7 +1544,7 @@ export default function NewInterviewPage() {
               </div>
 
               {/* Sleek Dual-Mode Toggle Tab Group */}
-              {keywordMetadata && (rawCvText || rawJdText) && (
+              {(rawCvText || rawJdText) && (
                 <div style={{ display: 'flex', justifyContent: 'center', margin: '2rem 0' }}>
                   <div style={{
                     display: 'inline-flex',
@@ -1382,426 +1606,451 @@ export default function NewInterviewPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                   {/* Dashboard: Circular rings & Badges panel */}
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
 
-                {/* Single Merged Ring: Professional Alignment */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '1.5rem', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '0.75rem', textAlign: 'center' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#4f46e5', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>Điểm tương thích chuyên môn</span>
-                  <div className={styles.scoreRing}>
-                    <svg width="110" height="110" viewBox="0 0 120 120">
-                      <circle cx="60" cy="60" r={radius} fill="transparent" stroke="#e2e8f0" strokeWidth="8" />
-                      <circle
-                        cx="60"
-                        cy="60"
-                        r={radius}
-                        fill="transparent"
-                        stroke="#4f46e5"
-                        strokeWidth="8"
-                        strokeDasharray={circumference}
-                        strokeDashoffset={strokeDashoffset}
-                        strokeLinecap="round"
-                        transform="rotate(-90 60 60)"
-                      />
-                    </svg>
-                    <span className={styles.scoreVal}>{assessment.competencyFitScore}%</span>
-                  </div>
-                  <div style={{
-                    marginTop: '1rem',
-                    fontSize: '0.75rem',
-                    fontWeight: 700,
-                    padding: '0.2rem 0.5rem',
-                    borderRadius: '0.25rem',
-                    display: 'inline-block',
-                    backgroundColor: assessment.matchLevel?.toLowerCase().includes('high') || assessment.matchLevel?.toLowerCase().includes('rất tốt') ? '#ecfdf5' : assessment.matchLevel?.toLowerCase().includes('moderate') || assessment.matchLevel?.toLowerCase().includes('khớp') ? '#f0f9ff' : '#fffbeb',
-                    color: assessment.matchLevel?.toLowerCase().includes('high') || assessment.matchLevel?.toLowerCase().includes('rất tốt') ? '#047857' : assessment.matchLevel?.toLowerCase().includes('moderate') || assessment.matchLevel?.toLowerCase().includes('khớp') ? '#0369a1' : '#b45309',
-                    border: '1px solid currentColor'
-                  }}>
-                    Mức độ khớp: {assessment.matchLevel || 'N/A'}
-                  </div>
-                  <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.75rem', maxWidth: '240px', marginInline: 'auto' }}>Độ tương thích tổng quan của hồ sơ ứng viên với các yêu cầu kỹ năng và kinh nghiệm</p>
-                </div>
-
-                {/* Classifications Badges Panel (Requirements from JD) */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '1.5rem', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '0.75rem', justifyContent: 'center' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Yêu cầu từ Mô tả công việc (JD)</span>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>
-                    <span style={{ fontSize: '0.82rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                      <Award size={13} style={{ color: '#8b5cf6' }} /> Vị trí yêu cầu:
-                    </span>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '0.2rem 0.5rem', borderRadius: '0.25rem', backgroundColor: '#f5f3ff', color: '#6d28d9' }}>
-                      {assessment.roleTypeDetected || 'N/A'}
-                    </span>
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>
-                    <span style={{ fontSize: '0.82rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                      <UserCheck size={13} style={{ color: '#0ea5e9' }} /> Cấp bậc yêu cầu:
-                    </span>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '0.2rem 0.5rem', borderRadius: '0.25rem', backgroundColor: '#f1f5f9', color: '#334155' }}>
-                      {assessment.candidateLevel || 'N/A'}
-                    </span>
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.82rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                      <ShieldCheck size={13} style={{ color: '#10b981' }} /> Kinh nghiệm yêu cầu:
-                    </span>
-                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#334155' }}>
-                      {assessment.yearsOfExperienceEstimate || 'N/A'}
-                    </span>
-                  </div>
-
-                </div>
-
-                {/* Eligibility Card */}
-                {assessment.eligibility && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '1.5rem', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '0.75rem', justifyContent: 'center' }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Kết quả sàng lọc hồ sơ</span>
-                    
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem', marginBottom: '0.25rem' }}>
-                      <span style={{ fontSize: '0.82rem', color: '#64748b' }}>Trạng thái:</span>
-                      <span style={{
+                    {/* Single Merged Ring: Professional Alignment */}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '1.5rem', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '0.75rem', textAlign: 'center' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#4f46e5', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>Điểm tương thích chuyên môn</span>
+                      <div className={styles.scoreRing}>
+                        <svg width="110" height="110" viewBox="0 0 120 120">
+                          <circle cx="60" cy="60" r={radius} fill="transparent" stroke="#e2e8f0" strokeWidth="8" />
+                          <circle
+                            cx="60"
+                            cy="60"
+                            r={radius}
+                            fill="transparent"
+                            stroke="#4f46e5"
+                            strokeWidth="8"
+                            strokeDasharray={circumference}
+                            strokeDashoffset={strokeDashoffset}
+                            strokeLinecap="round"
+                            transform="rotate(-90 60 60)"
+                          />
+                        </svg>
+                        <span className={styles.scoreVal}>{assessment.competencyFitScore}%</span>
+                      </div>
+                      <div style={{
+                        marginTop: '1rem',
                         fontSize: '0.75rem',
                         fontWeight: 700,
                         padding: '0.2rem 0.5rem',
                         borderRadius: '0.25rem',
-                        backgroundColor: assessment.eligibility.status === 'ELIGIBLE' ? '#ecfdf5' : '#fef2f2',
-                        color: assessment.eligibility.status === 'ELIGIBLE' ? '#047857' : '#b91c1c',
+                        display: 'inline-block',
+                        backgroundColor: assessment.matchLevel?.toLowerCase().includes('high') || assessment.matchLevel?.toLowerCase().includes('rất tốt') ? '#ecfdf5' : assessment.matchLevel?.toLowerCase().includes('moderate') || assessment.matchLevel?.toLowerCase().includes('khớp') ? '#f0f9ff' : '#fffbeb',
+                        color: assessment.matchLevel?.toLowerCase().includes('high') || assessment.matchLevel?.toLowerCase().includes('rất tốt') ? '#047857' : assessment.matchLevel?.toLowerCase().includes('moderate') || assessment.matchLevel?.toLowerCase().includes('khớp') ? '#0369a1' : '#b45309',
                         border: '1px solid currentColor'
                       }}>
-                        {assessment.eligibility.status === 'ELIGIBLE' ? 'ĐỦ ĐIỀU KIỆN (ELIGIBLE)' : 'CHƯA ĐỦ ĐIỀU KIỆN'}
-                      </span>
+                        Mức độ khớp: {assessment.matchLevel || 'N/A'}
+                      </div>
+                      <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.75rem', maxWidth: '240px', marginInline: 'auto' }}>Độ tương thích tổng quan của hồ sơ ứng viên với các yêu cầu kỹ năng và kinh nghiệm</p>
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                      {(assessment.eligibility.gate_checks || []).map((check: any, idx: number) => {
-                        const isMet = check.status === 'met' || check.status === 'MET';
-                        return (
-                          <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', padding: '0.4rem 0.65rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '0.35rem' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <strong style={{ fontSize: '0.78rem', color: '#0f172a' }}>{check.criteria_name}</strong>
-                              <span style={{ fontSize: '0.68rem', fontWeight: 700, color: isMet ? '#047857' : '#b91c1c', display: 'flex', alignItems: 'center', gap: '0.15rem' }}>
-                                {isMet ? '✓ Đạt' : '✗ Chưa đạt'}
-                              </span>
-                            </div>
-                            <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
-                              Yêu cầu: <span style={{ color: '#475569', fontWeight: 500 }}>{check.required_value}</span>
-                            </div>
-                            <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
-                              Thực tế: <span style={{ color: isMet ? '#047857' : '#b91c1c', fontWeight: 600 }}>{check.actual_value}</span>
-                            </div>
-                          </div>
-                        );
-                      })}
+                    {/* Classifications Badges Panel (Requirements from JD) */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '1.5rem', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '0.75rem', justifyContent: 'center' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Yêu cầu từ Mô tả công việc (JD)</span>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>
+                        <span style={{ fontSize: '0.82rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                          <Award size={13} style={{ color: '#8b5cf6' }} /> Vị trí yêu cầu:
+                        </span>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '0.2rem 0.5rem', borderRadius: '0.25rem', backgroundColor: '#f5f3ff', color: '#6d28d9' }}>
+                          {assessment.roleTypeDetected || 'N/A'}
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>
+                        <span style={{ fontSize: '0.82rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                          <UserCheck size={13} style={{ color: '#0ea5e9' }} /> Cấp bậc yêu cầu:
+                        </span>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '0.2rem 0.5rem', borderRadius: '0.25rem', backgroundColor: '#f1f5f9', color: '#334155' }}>
+                          {assessment.candidateLevel || 'N/A'}
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.82rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                          <ShieldCheck size={13} style={{ color: '#10b981' }} /> Kinh nghiệm yêu cầu:
+                        </span>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#334155' }}>
+                          {assessment.yearsOfExperienceEstimate || 'N/A'}
+                        </span>
+                      </div>
+
                     </div>
-                  </div>
-                )}
 
-              </div>
+                    {/* Eligibility Card */}
+                    {assessment.eligibility && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '1.5rem', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '0.75rem', justifyContent: 'center' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Kết quả sàng lọc hồ sơ</span>
 
-              {/* Removed tag badges alignment matrix based on user feedback */}
-
-              {/* Detailed Criteria Alignment Matrix */}
-              <div className={styles.evaluationBox} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1rem', padding: '1.25rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem', flexWrap: 'wrap', gap: '1rem' }}>
-                  <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <Award size={18} style={{ color: '#4f46e5' }} />
-                    <span>Chi tiết đối chiếu tiêu chí (CV vs JD)</span>
-                  </h3>
-
-                  {/* Tabs */}
-                  <div style={{ display: 'flex', gap: '0.25rem', padding: '0.2rem', backgroundColor: '#f1f5f9', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
-                    {(['all', 'matched', 'weak', 'missing'] as const).map((tab) => {
-                      const labelMap = { all: 'Tất cả', matched: 'Khớp', weak: 'Yếu', missing: 'Thiếu' };
-                      const count = [
-                        ...(assessment.evidenceItems || []),
-                        ...(assessment.additionalEvidenceItems || [])
-                      ].filter(item => tab === 'all' || item.status === tab).length;
-
-                      const isActive = criteriaFilter === tab;
-                      return (
-                        <button
-                          key={tab}
-                          onClick={() => setCriteriaFilter(tab)}
-                          style={{
-                            border: 'none',
-                            padding: '0.3rem 0.65rem',
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem', marginBottom: '0.25rem' }}>
+                          <span style={{ fontSize: '0.82rem', color: '#64748b' }}>Trạng thái:</span>
+                          <span style={{
                             fontSize: '0.75rem',
                             fontWeight: 700,
-                            borderRadius: '0.35rem',
-                            cursor: 'pointer',
-                            backgroundColor: isActive ? '#ffffff' : 'transparent',
-                            color: isActive ? '#0f172a' : '#64748b',
-                            boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                            transition: 'all 0.15s ease'
-                          }}
-                        >
-                          {labelMap[tab]} ({count})
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                            padding: '0.2rem 0.5rem',
+                            borderRadius: '0.25rem',
+                            backgroundColor: assessment.eligibility.status === 'ELIGIBLE' ? '#ecfdf5' : '#fef2f2',
+                            color: assessment.eligibility.status === 'ELIGIBLE' ? '#047857' : '#b91c1c',
+                            border: '1px solid currentColor'
+                          }}>
+                            {assessment.eligibility.status === 'ELIGIBLE' ? 'ĐỦ ĐIỀU KIỆN (ELIGIBLE)' : 'CHƯA ĐỦ ĐIỀU KIỆN'}
+                          </span>
+                        </div>
 
-                {/* Score Breakdown if present */}
-                {assessment.scoreBreakdown && (
-                  <div style={{
-                    backgroundColor: '#f8fafc',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '0.5rem',
-                    padding: '1rem',
-                    fontSize: '0.82rem',
-                    color: '#334155'
-                  }}>
-                    <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                      <TrendingUp size={14} style={{ color: '#10b981' }} />
-                      <span>Chi tiết tính điểm (Score Breakdown)</span>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginTop: '0.25rem' }}>
-                      <div>
-                        <div>• Tổng điểm tích lũy đạt được: <strong style={{ color: '#4f46e5' }}>{assessment.scoreBreakdown.weighted_points_sum}</strong></div>
-                        <div>• Tổng hệ số quan trọng của các yêu cầu: <strong style={{ color: '#0f172a' }}>{assessment.scoreBreakdown.total_weight_used}</strong></div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                          {(assessment.eligibility.gate_checks || []).map((check: any, idx: number) => {
+                            const isMet = check.status === 'met' || check.status === 'MET';
+                            return (
+                              <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', padding: '0.4rem 0.65rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '0.35rem' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <strong style={{ fontSize: '0.78rem', color: '#0f172a' }}>{check.criteria_name}</strong>
+                                  <span style={{ fontSize: '0.68rem', fontWeight: 700, color: isMet ? '#047857' : '#b91c1c', display: 'flex', alignItems: 'center', gap: '0.15rem' }}>
+                                    {isMet ? '✓ Đạt' : '✗ Chưa đạt'}
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                                  Yêu cầu: <span style={{ color: '#475569', fontWeight: 500 }}>{check.required_value}</span>
+                                </div>
+                                <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                                  Thực tế: <span style={{ color: isMet ? '#047857' : '#b91c1c', fontWeight: 600 }}>{check.actual_value}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                      <div style={{ gridColumn: 'span 2' }}>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', alignItems: 'center', marginTop: '0.25rem' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                            <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 500 }}>Công thức tính:</span>
-                            <div style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              padding: '0.5rem 1rem',
-                              backgroundColor: '#f8fafc',
+                    )}
+
+                  </div>
+
+                  {/* Removed tag badges alignment matrix based on user feedback */}
+
+                  {/* Detailed Criteria Alignment Matrix */}
+                  <div className={styles.evaluationBox} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1rem', padding: '1.25rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem', flexWrap: 'wrap', gap: '1rem' }}>
+                      <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <Award size={18} style={{ color: '#4f46e5' }} />
+                        <span>Chi tiết đối chiếu tiêu chí (CV vs JD)</span>
+                      </h3>
+
+                      {/* Tabs */}
+                      <div style={{ display: 'flex', gap: '0.25rem', padding: '0.2rem', backgroundColor: '#f1f5f9', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
+                        {(['all', 'matched', 'weak', 'missing'] as const).map((tab) => {
+                          const labelMap = { all: 'Tất cả', matched: 'Khớp', weak: 'Yếu', missing: 'Thiếu' };
+                          const count = [
+                            ...(assessment.evidenceItems || []),
+                            ...(assessment.additionalEvidenceItems || [])
+                          ].filter(item => tab === 'all' || item.status === tab).length;
+
+                          const isActive = criteriaFilter === tab;
+                          return (
+                            <button
+                              key={tab}
+                              onClick={() => setCriteriaFilter(tab)}
+                              style={{
+                                border: 'none',
+                                padding: '0.3rem 0.65rem',
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                borderRadius: '0.35rem',
+                                cursor: 'pointer',
+                                backgroundColor: isActive ? '#ffffff' : 'transparent',
+                                color: isActive ? '#0f172a' : '#64748b',
+                                boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              {labelMap[tab]} ({count})
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Score Breakdown if present */}
+                    {assessment.scoreBreakdown && (
+                      <div style={{
+                        backgroundColor: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '0.5rem',
+                        padding: '1rem',
+                        fontSize: '0.82rem',
+                        color: '#334155'
+                      }}>
+                        <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <TrendingUp size={14} style={{ color: '#10b981' }} />
+                          <span>Chi tiết tính điểm (Score Breakdown)</span>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginTop: '0.25rem' }}>
+                          <div>
+                            <div>• Tổng điểm tích lũy đạt được: <strong style={{ color: '#4f46e5' }}>{assessment.scoreBreakdown.weighted_points_sum}</strong></div>
+                            <div>• Tổng hệ số quan trọng của các yêu cầu: <strong style={{ color: '#0f172a' }}>{assessment.scoreBreakdown.total_weight_used}</strong></div>
+                          </div>
+                          <div style={{ gridColumn: 'span 2' }}>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', alignItems: 'center', marginTop: '0.25rem' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 500 }}>Công thức tính:</span>
+                                <div style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  padding: '0.5rem 1rem',
+                                  backgroundColor: '#f8fafc',
+                                  border: '1px solid #e2e8f0',
+                                  borderRadius: '0.5rem',
+                                  fontFamily: 'monospace',
+                                  fontSize: '0.75rem',
+                                  color: '#334155',
+                                  gap: '0.4rem'
+                                }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px' }}>
+                                    <span style={{ borderBottom: '1px solid #94a3b8', paddingBottom: '1px', paddingLeft: '2px', paddingRight: '2px' }}>
+                                      ∑(hệ_số_quan_trọng × điểm_trạng_thái)
+                                    </span>
+                                    <span style={{ paddingTop: '1px', paddingLeft: '2px', paddingRight: '2px' }}>
+                                      ∑(hệ_số_quan_trọng)
+                                    </span>
+                                  </div>
+                                  <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>×</span>
+                                  <span style={{ fontWeight: 'bold' }}>100</span>
+                                </div>
+                              </div>
+
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 500 }}>Chi tiết phép tính:</span>
+                                <div style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  padding: '0.5rem 1rem',
+                                  backgroundColor: '#fff7ed',
+                                  border: '1px solid #ffedd5',
+                                  borderRadius: '0.5rem',
+                                  fontFamily: 'monospace',
+                                  fontSize: '0.75rem',
+                                  color: '#ea580c',
+                                  gap: '0.4rem'
+                                }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px' }}>
+                                    <span style={{ borderBottom: '1px solid #fdba74', paddingBottom: '1px', paddingLeft: '2px', paddingRight: '2px' }}>
+                                      {assessment.scoreBreakdown.weighted_points_sum}
+                                    </span>
+                                    <span style={{ paddingTop: '1px', paddingLeft: '2px', paddingRight: '2px' }}>
+                                      {assessment.scoreBreakdown.total_weight_used}
+                                    </span>
+                                  </div>
+                                  <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>×</span>
+                                  <span style={{ fontWeight: 'bold' }}>100</span>
+                                  <span style={{ fontWeight: 'bold', marginLeft: '0.15rem' }}>=</span>
+                                  <span style={{ fontWeight: 'bold', fontSize: '0.85rem' }}>{assessment.competencyFitScore}%</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ borderTop: '1px solid #e2e8f0', marginTop: '0.75rem', paddingTop: '0.5rem', fontSize: '0.75rem', color: '#64748b', display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
+                          <span>Quy đổi trạng thái:</span>
+                          <span>Khớp (Matched) = <strong>{assessment.scoreBreakdown.points_config?.matched || 1.0}</strong></span>
+                          <span>Yếu (Weak) = <strong>{assessment.scoreBreakdown.points_config?.weak || 0.3}</strong></span>
+                          <span>Thiếu (Missing) = <strong>{assessment.scoreBreakdown.points_config?.missing || 0.0}</strong></span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Criteria List */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                      {/* Must Have Section */}
+                      <div>
+                        <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <span style={{ width: '4px', height: '14px', backgroundColor: '#e11d48', borderRadius: '2px' }}></span>
+                          Yêu cầu bắt buộc (Must Have)
+                        </h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                          {(() => {
+                            const items = (assessment.evidenceItems || []).filter(item => criteriaFilter === 'all' || item.status === criteriaFilter);
+                            if (items.length === 0) {
+                              return <div style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic', padding: '1rem', border: '1px dashed #e2e8f0', borderRadius: '0.5rem', backgroundColor: '#f8fafc', textAlign: 'center' }}>Không có yêu cầu bắt buộc nào trong danh mục này</div>;
+                            }
+                            return items.map((item, idx) => renderCriterionItem(item, idx, CheckCircle, AlertCircle, XCircle));
+                          })()}
+                        </div>
+                      </div>
+
+                      {/* Prefer Section */}
+                      <div>
+                        <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <span style={{ width: '4px', height: '14px', backgroundColor: '#0284c7', borderRadius: '2px' }}></span>
+                          Yêu cầu khuyến khích (Prefer)
+                        </h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                          {(() => {
+                            const items = (assessment.additionalEvidenceItems || []).filter(item => criteriaFilter === 'all' || item.status === criteriaFilter);
+                            if (items.length === 0) {
+                              return <div style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic', padding: '1rem', border: '1px dashed #e2e8f0', borderRadius: '0.5rem', backgroundColor: '#f8fafc', textAlign: 'center' }}>Không có yêu cầu khuyến khích nào trong danh mục này</div>;
+                            }
+                            return items.map((item, idx) => renderCriterionItem(item, idx + 1000, CheckCircle, AlertCircle, XCircle));
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* In-depth AI Evaluation Feedbacks */}
+                  {assessment.sectionWiseFeedback && Object.keys(assessment.sectionWiseFeedback).length > 0 && (
+                    <div className={styles.evaluationBox} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', margin: 0 }}>
+                        <Brain size={18} style={{ color: '#4f46e5' }} />
+                        <span>Phân tích chi tiết từ AI</span>
+                      </h3>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        {Object.entries(assessment.sectionWiseFeedback).map(([section, feedback], idx) => {
+                          const cleanText = renderFeedbackValue(feedback);
+                          if (!cleanText) return null;
+                          return (
+                            <div key={idx} style={{ borderLeft: '3px solid #818cf8', paddingLeft: '1rem' }}>
+                              <h4 style={{ fontSize: '0.82rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569', margin: '0 0 0.25rem 0' }}>
+                                {getSectionName(section)}
+                              </h4>
+                              {renderFormattedFeedback(cleanText)}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Actionable Suggestions */}
+                  <div className={styles.evaluationBox}>
+                    <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1rem', fontWeight: 700, color: '#1e293b', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', margin: '0 0 1rem 0' }}>
+                      <Lightbulb size={18} style={{ color: '#eab308' }} />
+                      <span>Lời khuyên chuẩn bị phỏng vấn</span>
+                    </h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      {assessment.topPriorityImprovements && assessment.topPriorityImprovements.length > 0 ? (
+                        assessment.topPriorityImprovements.map((item: any, index: number) => {
+                          const rank = Number(item.priority_rank || index + 1);
+                          const pStyles = getPriorityStyles(rank);
+                          return (
+                            <div
+                              key={index}
+                              style={{
+                                display: 'flex',
+                                gap: '1rem',
+                                alignItems: 'flex-start',
+                                backgroundColor: pStyles.cardBg,
+                                border: `1px solid ${pStyles.cardBorder}`,
+                                borderRadius: '0.5rem',
+                                padding: '1rem',
+                                boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                              }}
+                            >
+                              {/* Priority Bubble */}
+                              <div
+                                style={{
+                                  backgroundColor: pStyles.bubbleBg,
+                                  border: `1.5px solid ${pStyles.bubbleBorder}`,
+                                  color: pStyles.bubbleText,
+                                  width: '30px',
+                                  height: '30px',
+                                  borderRadius: '50%',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontWeight: 800,
+                                  fontSize: '0.85rem',
+                                  flexShrink: 0
+                                }}
+                              >
+                                {rank}
+                              </div>
+
+                              {/* Content */}
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                  <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>
+                                    {item.criteria_name || 'Đề xuất'}
+                                  </span>
+                                  <span style={{
+                                    fontSize: '0.65rem',
+                                    fontWeight: 700,
+                                    padding: '0.1rem 0.35rem',
+                                    borderRadius: '0.25rem',
+                                    backgroundColor: pStyles.badgeBg,
+                                    color: pStyles.badgeText
+                                  }}>
+                                    Ưu tiên {rank}
+                                  </span>
+                                </div>
+                                <p style={{ margin: 0, fontSize: '0.8rem', color: '#475569', lineHeight: '1.5' }}>
+                                  {item.suggestion}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (assessment.actionableImprovementSuggestions || []).length > 0 ? (
+                        (assessment.actionableImprovementSuggestions || []).map((suggestion, index) => (
+                          <div
+                            key={index}
+                            style={{
+                              display: 'flex',
+                              gap: '0.75rem',
+                              alignItems: 'flex-start',
+                              backgroundColor: '#ffffff',
                               border: '1px solid #e2e8f0',
                               borderRadius: '0.5rem',
-                              fontFamily: 'monospace',
-                              fontSize: '0.75rem',
-                              color: '#334155',
-                              gap: '0.4rem'
-                            }}>
-                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px' }}>
-                                <span style={{ borderBottom: '1px solid #94a3b8', paddingBottom: '1px', paddingLeft: '2px', paddingRight: '2px' }}>
-                                  ∑(hệ_số_quan_trọng × điểm_trạng_thái)
-                                </span>
-                                <span style={{ paddingTop: '1px', paddingLeft: '2px', paddingRight: '2px' }}>
-                                  ∑(hệ_số_quan_trọng)
-                                </span>
-                              </div>
-                              <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>×</span>
-                              <span style={{ fontWeight: 'bold' }}>100</span>
-                            </div>
+                              padding: '0.85rem 1rem',
+                              boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                            }}
+                          >
+                            <span style={{ color: '#ea580c', fontWeight: 'bold', fontSize: '1rem', lineHeight: '1.2' }}>➔</span>
+                            <span style={{ fontSize: '#0.8rem', color: '#475569', lineHeight: '1.5' }}>{suggestion}</span>
                           </div>
-
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                            <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 500 }}>Chi tiết phép tính:</span>
-                            <div style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              padding: '0.5rem 1rem',
-                              backgroundColor: '#fff7ed',
-                              border: '1px solid #ffedd5',
-                              borderRadius: '0.5rem',
-                              fontFamily: 'monospace',
-                              fontSize: '0.75rem',
-                              color: '#ea580c',
-                              gap: '0.4rem'
-                            }}>
-                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px' }}>
-                                <span style={{ borderBottom: '1px solid #fdba74', paddingBottom: '1px', paddingLeft: '2px', paddingRight: '2px' }}>
-                                  {assessment.scoreBreakdown.weighted_points_sum}
-                                </span>
-                                <span style={{ paddingTop: '1px', paddingLeft: '2px', paddingRight: '2px' }}>
-                                  {assessment.scoreBreakdown.total_weight_used}
-                                </span>
-                              </div>
-                              <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>×</span>
-                              <span style={{ fontWeight: 'bold' }}>100</span>
-                              <span style={{ fontWeight: 'bold', marginLeft: '0.15rem' }}>=</span>
-                              <span style={{ fontWeight: 'bold', fontSize: '0.85rem' }}>{assessment.competencyFitScore}%</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+                        ))
+                      ) : (
+                        <p style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic', margin: 0 }}>Không có đề xuất thêm.</p>
+                      )}
                     </div>
-                    <div style={{ borderTop: '1px solid #e2e8f0', marginTop: '0.75rem', paddingTop: '0.5rem', fontSize: '0.75rem', color: '#64748b', display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
-                      <span>Quy đổi trạng thái:</span>
-                      <span>Khớp (Matched) = <strong>{assessment.scoreBreakdown.points_config?.matched || 1.0}</strong></span>
-                      <span>Yếu (Weak) = <strong>{assessment.scoreBreakdown.points_config?.weak || 0.3}</strong></span>
-                      <span>Thiếu (Missing) = <strong>{assessment.scoreBreakdown.points_config?.missing || 0.0}</strong></span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Criteria List */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                  {/* Must Have Section */}
-                  <div>
-                    <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                      <span style={{ width: '4px', height: '14px', backgroundColor: '#e11d48', borderRadius: '2px' }}></span>
-                      Yêu cầu bắt buộc (Must Have)
-                    </h4>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                      {(() => {
-                        const items = (assessment.evidenceItems || []).filter(item => criteriaFilter === 'all' || item.status === criteriaFilter);
-                        if (items.length === 0) {
-                          return <div style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic', padding: '1rem', border: '1px dashed #e2e8f0', borderRadius: '0.5rem', backgroundColor: '#f8fafc', textAlign: 'center' }}>Không có yêu cầu bắt buộc nào trong danh mục này</div>;
-                        }
-                        return items.map((item, idx) => renderCriterionItem(item, idx, CheckCircle, AlertCircle, XCircle));
-                      })()}
-                    </div>
-                  </div>
-
-                  {/* Prefer Section */}
-                  <div>
-                    <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                      <span style={{ width: '4px', height: '14px', backgroundColor: '#0284c7', borderRadius: '2px' }}></span>
-                      Yêu cầu khuyến khích (Prefer)
-                    </h4>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                      {(() => {
-                        const items = (assessment.additionalEvidenceItems || []).filter(item => criteriaFilter === 'all' || item.status === criteriaFilter);
-                        if (items.length === 0) {
-                          return <div style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic', padding: '1rem', border: '1px dashed #e2e8f0', borderRadius: '0.5rem', backgroundColor: '#f8fafc', textAlign: 'center' }}>Không có yêu cầu khuyến khích nào trong danh mục này</div>;
-                        }
-                        return items.map((item, idx) => renderCriterionItem(item, idx + 1000, CheckCircle, AlertCircle, XCircle));
-                      })()}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* In-depth AI Evaluation Feedbacks */}
-              {assessment.sectionWiseFeedback && Object.keys(assessment.sectionWiseFeedback).length > 0 && (
-                <div className={styles.evaluationBox} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', margin: 0 }}>
-                    <Brain size={18} style={{ color: '#4f46e5' }} />
-                    <span>Phân tích chi tiết từ AI</span>
-                  </h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    {Object.entries(assessment.sectionWiseFeedback).map(([section, feedback], idx) => {
-                      const cleanText = renderFeedbackValue(feedback);
-                      if (!cleanText) return null;
-                      return (
-                        <div key={idx} style={{ borderLeft: '3px solid #818cf8', paddingLeft: '1rem' }}>
-                          <h4 style={{ fontSize: '0.82rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569', margin: '0 0 0.25rem 0' }}>
-                            {getSectionName(section)}
-                          </h4>
-                          {renderFormattedFeedback(cleanText)}
-                        </div>
-                      );
-                    })}
                   </div>
                 </div>
               )}
 
-              {/* Actionable Suggestions */}
-              <div className={styles.evaluationBox}>
-                <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1rem', fontWeight: 700, color: '#1e293b', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', margin: '0 0 1rem 0' }}>
-                  <Lightbulb size={18} style={{ color: '#eab308' }} />
-                  <span>Lời khuyên chuẩn bị phỏng vấn</span>
-                </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  {assessment.topPriorityImprovements && assessment.topPriorityImprovements.length > 0 ? (
-                    assessment.topPriorityImprovements.map((item: any, index: number) => {
-                      const rank = Number(item.priority_rank || index + 1);
-                      const pStyles = getPriorityStyles(rank);
-                      return (
-                        <div
-                          key={index}
-                          style={{
-                            display: 'flex',
-                            gap: '1rem',
-                            alignItems: 'flex-start',
-                            backgroundColor: pStyles.cardBg,
-                            border: `1px solid ${pStyles.cardBorder}`,
-                            borderRadius: '0.5rem',
-                            padding: '1rem',
-                            boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-                          }}
-                        >
-                          {/* Priority Bubble */}
-                          <div
-                            style={{
-                              backgroundColor: pStyles.bubbleBg,
-                              border: `1.5px solid ${pStyles.bubbleBorder}`,
-                              color: pStyles.bubbleText,
-                              width: '30px',
-                              height: '30px',
-                              borderRadius: '50%',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontWeight: 800,
-                              fontSize: '0.85rem',
-                              flexShrink: 0
-                            }}
-                          >
-                            {rank}
-                          </div>
-
-                          {/* Content */}
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                              <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>
-                                {item.criteria_name || 'Đề xuất'}
-                              </span>
-                              <span style={{
-                                fontSize: '0.65rem',
-                                fontWeight: 700,
-                                padding: '0.1rem 0.35rem',
-                                borderRadius: '0.25rem',
-                                backgroundColor: pStyles.badgeBg,
-                                color: pStyles.badgeText
-                              }}>
-                                Ưu tiên {rank}
-                              </span>
-                            </div>
-                            <p style={{ margin: 0, fontSize: '0.8rem', color: '#475569', lineHeight: '1.5' }}>
-                              {item.suggestion}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })
-                  ) : (assessment.actionableImprovementSuggestions || []).length > 0 ? (
-                    (assessment.actionableImprovementSuggestions || []).map((suggestion, index) => (
-                      <div
-                        key={index}
-                        style={{
-                          display: 'flex',
-                          gap: '0.75rem',
-                          alignItems: 'flex-start',
-                          backgroundColor: '#ffffff',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '0.5rem',
-                          padding: '0.85rem 1rem',
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-                        }}
-                      >
-                        <span style={{ color: '#ea580c', fontWeight: 'bold', fontSize: '1rem', lineHeight: '1.2' }}>➔</span>
-                        <span style={{ fontSize: '#0.8rem', color: '#475569', lineHeight: '1.5' }}>{suggestion}</span>
-                      </div>
-                    ))
-                  ) : (
-                    <p style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic', margin: 0 }}>Không có đề xuất thêm.</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
               {/* Mode 2: Jobscan-style Visual Skill Comparison */}
-              {activeView === 'visual-match' && keywordMetadata && (rawCvText || rawJdText) && (() => {
-                const matchingKeywords = keywordMetadata.matching_skills.map((s: any) => s.keyword);
-                const missingKeywords  = keywordMetadata.missing_skills.map((s: any) => s.keyword);
-                const total = keywordMetadata.matching_skills.length + keywordMetadata.missing_skills.length;
-                const pct   = total > 0 ? Math.round((keywordMetadata.matching_skills.length / total) * 100) : 0;
+              {activeView === 'visual-match' && (rawCvText || rawJdText) && (() => {
+                // Data Adapter: transform evaluation results → keyword arrays
+                const derived = extractKeywordsFromEvaluation(
+                  assessment?.evidenceItems || [],
+                  assessment?.additionalEvidenceItems || []
+                );
+                const matchingKeywords = derived.matchingSkills;
+                const variationKeywords = derived.variationSkills;
+                const missingKeywords = derived.missingSkills;
+
+                // Build a keyword-to-reasoning details map for popovers
+                const keywordDetails: Record<string, { criteriaName: string; reasoning: string }> = {};
+                if (assessment) {
+                  const allItems = [...(assessment.evidenceItems || []), ...(assessment.additionalEvidenceItems || [])];
+                  for (const item of allItems) {
+                    const name = item.criteria_name || '';
+                    const reasoning = item.reasoning || item.jd_requirement || '';
+                    const tokens = splitCriteriaName(name);
+                    for (const token of tokens) {
+                      keywordDetails[token.toLowerCase()] = {
+                        criteriaName: name,
+                        reasoning: reasoning
+                      };
+                    }
+                  }
+                }
+
+                // Unified match rate: always use the AI-computed competencyFitScore
+                // for consistency with the AI Cards tab — never recalculate from keyword counts.
+                const pct = assessment ? assessment.competencyFitScore : 0;
                 const ringColor = pct >= 70 ? '#16a34a' : pct >= 40 ? '#d97706' : '#dc2626';
                 const ringTextColor = pct >= 70 ? '#15803d' : pct >= 40 ? '#b45309' : '#b91c1c';
 
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem', marginTop: '1rem' }}>
-                    
+
                     {/* Header Card */}
                     <div style={{
                       display: 'flex',
@@ -1864,12 +2113,12 @@ export default function NewInterviewPage() {
                           Ngân hàng từ khóa kỹ năng (Skill Tag Bank)
                         </h4>
                       </div>
-                      
+
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                        {keywordMetadata.matching_skills.map((skill: any) => (
+                        {matchingKeywords.map((keyword: string, idx: number) => (
                           <span
-                            key={skill.id}
-                            title={skill.variants?.length ? `Biến thể: ${skill.variants.join(', ')}` : 'Kỹ năng phù hợp'}
+                            key={`match-${idx}`}
+                            title="Kỹ năng phù hợp"
                             style={{
                               display: 'inline-flex',
                               alignItems: 'center',
@@ -1883,12 +2132,32 @@ export default function NewInterviewPage() {
                               cursor: 'help'
                             }}
                           >
-                            ✓ {skill.keyword}
+                            ✓ {keyword}
                           </span>
                         ))}
-                        {keywordMetadata.missing_skills.map((skill: any) => (
+                        {variationKeywords.map((keyword: string, idx: number) => (
                           <span
-                            key={skill.id}
+                            key={`var-${idx}`}
+                            title="Biến thể kỹ năng / Chưa rõ ràng"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '0.35rem 0.85rem',
+                              backgroundColor: '#fef3c7',
+                              color: '#d97706',
+                              border: '1px solid #fcd34d',
+                              borderRadius: '9999px',
+                              fontSize: '0.78rem',
+                              fontWeight: 600,
+                              cursor: 'help'
+                            }}
+                          >
+                            ~ {keyword}
+                          </span>
+                        ))}
+                        {missingKeywords.map((keyword: string, idx: number) => (
+                          <span
+                            key={`miss-${idx}`}
                             title="Không tìm thấy trong CV"
                             style={{
                               display: 'inline-flex',
@@ -1903,10 +2172,10 @@ export default function NewInterviewPage() {
                               cursor: 'help'
                             }}
                           >
-                            ✗ {skill.keyword}
+                            ✗ {keyword}
                           </span>
                         ))}
-                        {total === 0 && (
+                        {matchingKeywords.length === 0 && variationKeywords.length === 0 && missingKeywords.length === 0 && (
                           <span style={{ fontSize: '0.82rem', color: '#94a3b8', fontStyle: 'italic' }}>Chưa trích xuất được kỹ năng.</span>
                         )}
                       </div>
@@ -1918,7 +2187,7 @@ export default function NewInterviewPage() {
                       gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
                       gap: '1.5rem'
                     }}>
-                      
+
                       {/* LEFT: Resume */}
                       <div style={{
                         position: 'relative',
@@ -1943,14 +2212,21 @@ export default function NewInterviewPage() {
                             <UserCheck size={16} style={{ color: '#4f46e5' }} />
                             <span style={{ fontWeight: 800, fontSize: '0.82rem', color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Resume:</span>
                           </div>
-                          <span style={{ fontSize: '0.72rem', color: '#64748b', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={cvFile ? cvFile.name : 'Saved_CV.pdf'}>
-                            {cvFile ? cvFile.name : 'Saved_CV.pdf'}
+                          <span style={{ fontSize: '0.72rem', color: '#64748b', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                            title={cvFile ? cvFile.name : cvDisplayName}>
+                            {cvFile ? cvFile.name : cvDisplayName}
                           </span>
                         </div>
-                        
+
                         <div style={{ flex: 1, overflowY: 'auto', padding: '1.25rem 1.5rem', lineHeight: 1.75, fontSize: '0.85rem', color: '#334155' }}>
                           {rawCvText ? (
-                            <HighlightedText text={rawCvText} matches={matchingKeywords} missing={[]} />
+                            <HighlightedText
+                              text={rawCvText}
+                              matches={matchingKeywords}
+                              variations={variationKeywords}
+                              missing={[]}
+                              keywordDetails={keywordDetails}
+                            />
                           ) : (
                             <p style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '0.82rem', margin: 0 }}>
                               Nội dung CV chưa được lưu. Hãy tạo phiên mới để xem phân tích.
@@ -1983,14 +2259,21 @@ export default function NewInterviewPage() {
                             <Briefcase size={16} style={{ color: '#0891b2' }} />
                             <span style={{ fontWeight: 800, fontSize: '0.82rem', color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Job Description:</span>
                           </div>
-                          <span style={{ fontSize: '0.72rem', color: '#64748b', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={jdFile ? jdFile.name : 'JD_Text.txt'}>
-                            {jdFile ? jdFile.name : 'JD_Text.txt'}
+                          <span style={{ fontSize: '0.72rem', color: '#64748b', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                            title={jdFile ? jdFile.name : jdDisplayName}>
+                            {jdFile ? jdFile.name : jdDisplayName}
                           </span>
                         </div>
-                        
+
                         <div style={{ flex: 1, overflowY: 'auto', padding: '1.25rem 1.5rem', lineHeight: 1.75, fontSize: '0.85rem', color: '#334155' }}>
                           {rawJdText ? (
-                            <HighlightedText text={rawJdText} matches={matchingKeywords} missing={missingKeywords} />
+                            <HighlightedText
+                              text={rawJdText}
+                              matches={matchingKeywords}
+                              variations={variationKeywords}
+                              missing={missingKeywords}
+                              keywordDetails={keywordDetails}
+                            />
                           ) : (
                             <p style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '0.82rem', margin: 0 }}>
                               Nội dung JD chưa được lưu. Hãy tạo phiên mới để xem phân tích.
@@ -2005,38 +2288,68 @@ export default function NewInterviewPage() {
                     <div style={{
                       display: 'flex',
                       alignItems: 'center',
+                      justifyContent: 'space-around',
                       gap: '1.5rem',
                       flexWrap: 'wrap',
-                      padding: '0.9rem 1.5rem',
+                      padding: '1rem 1.5rem',
                       border: '1px solid #e2e8f0',
-                      borderRadius: '0.5rem',
+                      borderRadius: '0.75rem',
                       background: '#f8fafc',
-                      boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.01)'
+                      boxShadow: '0 2px 8px rgba(15,23,42,0.02)'
                     }}>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.78rem', color: '#475569' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.8rem', color: '#334155' }}>
                         <span style={{
-                          padding: '0.2rem 0.65rem',
-                          borderRadius: '4px',
+                          padding: '0.25rem 0.75rem',
+                          borderRadius: '6px',
                           background: '#dcfce7',
                           color: '#15803d',
                           fontWeight: 700,
                           fontSize: '0.72rem',
-                          border: '1px solid #86efac'
-                        }}>Matching Skill</span>
-                        Có trong cả CV và JD
-                      </span>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.78rem', color: '#475569' }}>
+                          border: '1px solid #86efac',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.25rem'
+                        }}>
+                          <CheckCircle size={12} /> Matching Skill
+                        </span>
+                        <span>Có trong cả CV và JD</span>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.8rem', color: '#334155' }}>
                         <span style={{
-                          padding: '0.2rem 0.65rem',
-                          borderRadius: '4px',
+                          padding: '0.25rem 0.75rem',
+                          borderRadius: '6px',
+                          background: '#fef3c7',
+                          color: '#d97706',
+                          fontWeight: 700,
+                          fontSize: '0.72rem',
+                          border: '1px solid #fcd34d',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.25rem'
+                        }}>
+                          <AlertCircle size={12} /> Skill Variation
+                        </span>
+                        <span>Khớp ở dạng biến thể / chưa rõ ràng</span>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.8rem', color: '#334155' }}>
+                        <span style={{
+                          padding: '0.25rem 0.75rem',
+                          borderRadius: '6px',
                           background: '#fee2e2',
                           color: '#b91c1c',
                           fontWeight: 700,
                           fontSize: '0.72rem',
-                          border: '1px solid #fca5a5'
-                        }}>Missing Skill</span>
-                        JD yêu cầu nhưng CV chưa có
-                      </span>
+                          border: '1px solid #fca5a5',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.25rem'
+                        }}>
+                          <XCircle size={12} /> Missing Skill
+                        </span>
+                        <span>Yêu cầu có trong JD nhưng thiếu trong CV</span>
+                      </div>
                     </div>
                   </div>
                 );
@@ -2071,6 +2384,12 @@ export default function NewInterviewPage() {
         </main>
 
       </div>
+      <PdfViewerModal
+        isOpen={viewerOpen}
+        onClose={() => setViewerOpen(false)}
+        pdfUrl={viewerUrl}
+        title={viewerTitle}
+      />
     </ProtectedRoute>
   );
 }

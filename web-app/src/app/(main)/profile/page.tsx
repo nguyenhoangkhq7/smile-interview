@@ -4,13 +4,16 @@ import type { LucideIcon } from 'lucide-react';
 import {
   BarChart3, CalendarDays, Coins, Eye, FileJson2, LockKeyhole,
   MapPin, PencilLine, Sparkles, Star, Upload, UserRound,
-  BriefcaseBusiness, ChevronDown, CheckCircle, AlertCircle, X,
+  BriefcaseBusiness, ChevronDown, CheckCircle, AlertCircle, X, FileText
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import styles from './profile.module.css';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { useAuthStore } from '@/store/authStore';
 import axiosClient from '@/lib/axiosClient';
+import axios from 'axios';
+import dynamic from 'next/dynamic';
+const PdfViewerModal = dynamic(() => import('@/components/common/PdfViewerModal'), { ssr: false });
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -183,9 +186,11 @@ export default function ProfilePage() {
     formData.append('file', file);
 
     try {
-      const { data } = await axiosClient.post('/api/auth/avatar', formData, {
+      const token = useAuthStore.getState().token;
+      const { data } = await axios.post('/api/profile/avatar', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${token}`
         },
       });
 
@@ -217,21 +222,94 @@ export default function ProfilePage() {
   };
 
   // ── Default CV state ─────────────────────────────────────────────
-  // Mock list — will be replaced with a real API call when the resume API is ready
-  const resumes: ResumeOption[] = [
-    { id: 1, name: 'CV của tôi' },
-  ];
+  const [dbResumes, setDbResumes] = useState<any[]>([]);
   const [selectedResumeId, setSelectedResumeId] = useState<number>(
-    user?.defaultResumeId ? Number(user.defaultResumeId) : (resumes[0]?.id ?? 0)
+    user?.defaultResumeId ? Number(user.defaultResumeId) : 0
   );
-
-  const handleSaveDefaultResume = () => {
-    console.log('[Profile] Save default resume:', selectedResumeId);
-    setCvToast({ type: 'success', message: `Đã lưu CV mặc định (id=${selectedResumeId}).` });
-    setTimeout(() => setCvToast(null), 3000);
-  };
-
+  const [cvLoading, setCvLoading] = useState(false);
   const [cvToast, setCvToast] = useState<ToastState>(null);
+  const fileInputCvRef = useRef<HTMLInputElement>(null);
+
+  // PDF Viewer Modal State
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerUrl, setViewerUrl] = useState('');
+  const [viewerTitle, setViewerTitle] = useState('');
+
+  useEffect(() => {
+    async function loadResumes() {
+      try {
+        const token = useAuthStore.getState().token;
+        const res = await fetch('/api/resumes', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setDbResumes(data);
+        }
+      } catch (err) {
+        console.error('Error loading resumes:', err);
+      }
+    }
+    loadResumes();
+  }, []);
+
+  // Update selectedResumeId when user defaultResumeId is loaded or changes
+  useEffect(() => {
+    if (user?.defaultResumeId) {
+      setSelectedResumeId(Number(user.defaultResumeId));
+    }
+  }, [user?.defaultResumeId]);
+
+  const handleCvUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const file = files[0];
+    const maxSize = 10 * 1024 * 1024; // 10MB
+
+    if (file.size > maxSize) {
+      setCvToast({ type: 'error', message: 'Kích thước tệp CV không được vượt quá 10MB.' });
+      return;
+    }
+
+    if (file.type !== 'application/pdf' && !file.name.endsWith('.pdf')) {
+      setCvToast({ type: 'error', message: 'CV mặc định phải ở định dạng PDF (.pdf).' });
+      return;
+    }
+
+    setCvLoading(true);
+    setCvToast(null);
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const token = useAuthStore.getState().token;
+      const { data } = await axios.post('/api/profile/default-resume', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${token}`
+        },
+      });
+
+      if (data.success) {
+        updateUser({
+          defaultResumeId: String(data.defaultResumeId),
+        });
+        setDbResumes(prev => [data.resume, ...prev]);
+        setCvToast({ type: 'success', message: 'Đã cập nhật CV mặc định thành công!' });
+      }
+    } catch (err: any) {
+      console.error('Error uploading default CV:', err);
+      setCvToast({ type: 'error', message: 'Tải CV lên thất bại. Vui lòng thử lại sau.' });
+    } finally {
+      setCvLoading(false);
+      if (fileInputCvRef.current) fileInputCvRef.current.value = '';
+      setTimeout(() => setCvToast(null), 5000);
+    }
+  };
 
   // ── Change password state ────────────────────────────────────────
   const [currentPass, setCurrentPass] = useState('');
@@ -450,49 +528,148 @@ export default function ProfilePage() {
 
               {/* Right: Default CV */}
               <div className={styles.field} style={{ gap: '0.75rem' }}>
-                <h3 className={styles.label} style={{ color: '#475569' }}>CV mặc định (JSON Resume)</h3>
+                <h3 className={styles.label} style={{ color: '#475569' }}>CV mặc định (PDF)</h3>
                 <p className={styles.cardSubText} style={{ margin: 0 }}>
-                  Chọn file CV bạn đã upload. Dùng cho tính năng tạo CV và hồ sơ ứng viên.
+                  Dùng để tự động chọn khi khởi tạo phiên phỏng vấn mới.
                 </p>
 
                 <div className={styles.field} style={{ gap: '0.875rem' }}>
                   <Toast toast={cvToast} />
 
-                  <div className={styles.selectWrap}>
-                    <select
-                      value={selectedResumeId}
-                      onChange={(e) => setSelectedResumeId(Number(e.target.value))}
-                      className={styles.select}
-                    >
-                      {resumes.map((r) => (
-                        <option key={r.id} value={r.id}>{r.name}</option>
-                      ))}
-                    </select>
-                    <div className={styles.selectIcon}>
-                      <ChevronDown size={12} strokeWidth={2.5} />
+                  {/* Active default CV display */}
+                  {user?.defaultResumeId ? (
+                    (() => {
+                      const defResume = dbResumes.find(r => String(r.id) === String(user.defaultResumeId));
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%' }}>
+                          <div style={{
+                            border: '1px solid #ffedd5',
+                            borderRadius: '0.75rem',
+                            padding: '0.75rem 1rem',
+                            backgroundColor: '#fff7ed',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.75rem',
+                          }}>
+                            <FileText size={24} style={{ color: '#ea580c', flexShrink: 0 }} />
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                              <p style={{ margin: 0, fontWeight: 600, fontSize: '0.85rem', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {defResume?.file_name || 'Đang tải thông tin CV...'}
+                              </p>
+                              {defResume && (
+                                <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b' }}>
+                                  Ngày lưu: {new Date(defResume.created_at).toLocaleDateString('vi-VN')}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            {defResume?.file_url && (
+                              <button 
+                                className={styles.btnSecondary} 
+                                onClick={() => {
+                                  setViewerUrl(defResume.file_url);
+                                  setViewerTitle(`CV mặc định: ${defResume.file_name}`);
+                                  setViewerOpen(true);
+                                }}
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', padding: '0.5rem 0.85rem' }}
+                              >
+                                <Eye size={12} strokeWidth={2.5} />
+                                Xem CV
+                              </button>
+                            )}
+                            <button 
+                              className={styles.btnPrimary} 
+                              onClick={() => fileInputCvRef.current?.click()}
+                              disabled={cvLoading}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', padding: '0.5rem 0.85rem' }}
+                            >
+                              <Upload size={12} strokeWidth={2.5} />
+                              {cvLoading ? 'Đang tải...' : 'Thay đổi CV'}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    <div>
+                      <button 
+                        className={styles.btnPrimary} 
+                        onClick={() => fileInputCvRef.current?.click()}
+                        disabled={cvLoading}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                      >
+                        <Upload size={14} strokeWidth={2.5} />
+                        {cvLoading ? 'Đang tải...' : 'Tải lên CV mặc định'}
+                      </button>
+                      <p style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.35rem' }}>Chấp nhận tệp định dạng PDF dưới 10MB.</p>
                     </div>
-                  </div>
+                  )}
 
-                  <div className={styles.chips} style={{ gap: '0.625rem' }}>
-                    <button className={styles.btnPrimary} onClick={handleSaveDefaultResume}>
-                      <FileJson2 size={12} strokeWidth={2.5} />
-                      Lưu làm mặc định
-                    </button>
-                    <button className={styles.btnSecondary}>
-                      <Eye size={12} strokeWidth={2.5} />
-                      Xem JSON Resume
-                    </button>
-                  </div>
+                  {/* Optional select from existing list */}
+                  {dbResumes.length > 0 && (
+                    <div style={{ borderTop: '1px dashed #e2e8f0', paddingTop: '0.75rem', marginTop: '0.25rem' }}>
+                      <p style={{ fontSize: '0.78rem', color: '#64748b', marginBottom: '0.35rem', fontWeight: 500 }}>Hoặc chọn từ danh sách CV đã tải lên:</p>
+                      <div style={{ display: 'flex', gap: '0.5rem', width: '100%' }}>
+                        <div className={styles.selectWrap} style={{ flex: 1 }}>
+                          <select
+                            value={selectedResumeId || ''}
+                            onChange={(e) => setSelectedResumeId(e.target.value ? parseInt(e.target.value, 10) : 0)}
+                            className={styles.select}
+                          >
+                            <option value="">-- Chọn CV trong danh sách --</option>
+                            {dbResumes.map((r) => (
+                              <option key={r.id} value={r.id}>{r.file_name}</option>
+                            ))}
+                          </select>
+                          <div className={styles.selectIcon}>
+                            <ChevronDown size={12} strokeWidth={2.5} />
+                          </div>
+                        </div>
+                        <button 
+                          className={styles.btnSecondary}
+                          onClick={async () => {
+                            if (!selectedResumeId) return;
+                            setCvLoading(true);
+                            try {
+                              const token = useAuthStore.getState().token;
+                              const res = await fetch('/api/profile/default-resume/set', {
+                                method: 'POST',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                  'Authorization': `Bearer ${token}`
+                                },
+                                body: JSON.stringify({ resumeId: selectedResumeId })
+                              });
+                              if (res.ok) {
+                                updateUser({ defaultResumeId: String(selectedResumeId) });
+                                setCvToast({ type: 'success', message: 'Đặt làm CV mặc định thành công!' });
+                              } else {
+                                setCvToast({ type: 'error', message: 'Lỗi đặt CV mặc định.' });
+                              }
+                            } catch (e) {
+                              setCvToast({ type: 'error', message: 'Lỗi đặt CV mặc định.' });
+                            } finally {
+                              setCvLoading(false);
+                              setTimeout(() => setCvToast(null), 3000);
+                            }
+                          }}
+                          style={{ fontSize: '0.8rem', padding: '0.5rem 0.85rem' }}
+                        >
+                          Chọn
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
-                  <a
-                    href="https://jsonresume.org/schema"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={styles.linkExternal}
-                  >
-                    jsonresume.org/schema
-                    <Sparkles size={10} strokeWidth={2.5} />
-                  </a>
+                  <input
+                    type="file"
+                    ref={fileInputCvRef}
+                    onChange={handleCvUpload}
+                    style={{ display: 'none' }}
+                    accept="application/pdf"
+                  />
                 </div>
               </div>
             </div>
@@ -629,6 +806,12 @@ export default function ProfilePage() {
 
         </div>
       </div>
+      <PdfViewerModal
+        isOpen={viewerOpen}
+        onClose={() => setViewerOpen(false)}
+        pdfUrl={viewerUrl}
+        title={viewerTitle}
+      />
     </ProtectedRoute>
   );
 }

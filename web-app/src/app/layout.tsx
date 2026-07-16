@@ -37,9 +37,9 @@ export default function RootLayout({
           display: 'flex',
           minHeight: '100vh',
           flexDirection: 'column',
-          backgroundColor: '#fdfbf7',
           fontFamily: 'var(--font-inter), system-ui, sans-serif',
         }}
+        className="bg-[#fdfbf7]"
       >
         {children}
       </body>
