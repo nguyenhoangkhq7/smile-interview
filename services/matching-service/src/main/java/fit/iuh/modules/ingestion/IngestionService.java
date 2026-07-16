@@ -177,6 +177,11 @@ public class IngestionService {
                         sessionId))
                 .cvMarkdown(markdownCv)
                 .jdMarkdown(markdownJd)
+                // rawCvText / rawJdText are non-null only when PDF was actually parsed
+                // (cache-miss). On cache-hits these remain null and the BFF reads
+                // raw_text from the resumes / job_descriptions DB tables instead.
+                .rawCvText(rawCvText)
+                .rawJdText(rawJdText)
                 .build();
     }
 

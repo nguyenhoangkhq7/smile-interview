@@ -388,28 +388,40 @@
 
 .sessionCard {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 1rem 1.1rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.75rem;
+  padding: 1.1rem;
   border-radius: 1rem;
-  background: linear-gradient(135deg, rgba(234, 88, 12, 0.06), rgba(251, 146, 60, 0.04));
-  border: 1px solid rgba(234, 88, 12, 0.12);
+  background: linear-gradient(135deg, rgba(234, 88, 12, 0.04), rgba(251, 146, 60, 0.02));
+  border: 1px solid rgba(234, 88, 12, 0.08);
+  transition: all 0.2s ease;
+}
+
+.sessionCard:hover {
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.05);
+  border-color: rgba(234, 88, 12, 0.15);
 }
 
 .sessionMain {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
 }
 
 .sessionTitleRow {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.5rem;
   flex-wrap: wrap;
 }
 
 .sessionTitle {
   color: #0f172a;
+  font-size: 0.95rem;
+  font-weight: 700;
 }
 
 .statusPill {
@@ -422,21 +434,22 @@
 }
 
 .sessionMeta {
-  margin: 0.35rem 0 0;
+  margin: 0;
   font-size: 0.86rem;
   color: #64748b;
 }
 
 .sessionDate {
-  margin: 0.25rem 0 0;
+  margin: 0;
   font-size: 0.78rem;
   color: #94a3b8;
 }
 
 .sessionActions {
   display: flex;
+  flex-direction: column;
   gap: 0.5rem;
-  flex-shrink: 0;
+  margin-top: 0.5rem;
 }
 
 .primaryButton {

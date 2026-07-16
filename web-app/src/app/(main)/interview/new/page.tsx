@@ -5,11 +5,255 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { cvJdMatchingService, AssessmentResponse } from '@/services/cvJdMatching';
 import { historyService } from '@/services/historyService';
-import { Calendar, FileText, UploadCloud, FolderOpen, Briefcase, CheckCircle, XCircle, Brain, Lightbulb, X, AlertTriangle, Check, AlertCircle, TrendingUp, UserCheck, Award, ShieldCheck, RefreshCw } from 'lucide-react';
+import { Calendar, FileText, UploadCloud, FolderOpen, Briefcase, CheckCircle, XCircle, Brain, Lightbulb, X, AlertTriangle, Check, AlertCircle, TrendingUp, UserCheck, Award, ShieldCheck, RefreshCw, Target, Wrench, Search, ChevronDown } from 'lucide-react';
 import styles from './new.module.css';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import HighlightedText from '@/components/HighlightedText';
+
+
 import { ActiveSessionsList, type ActiveSession } from '@/components/interview/ActiveSessionsList';
 import { useAuthStore } from '@/store/authStore';
+
+// ── Custom Searchable Combobox Component ─────────────────────────────────────
+
+interface ComboboxOption {
+  id: number;
+  label: string;
+  date: string;
+}
+
+interface CustomComboboxProps {
+  options: ComboboxOption[];
+  selectedId: number | null;
+  onSelect: (id: number | null) => void;
+  placeholder: string;
+  searchPlaceholder: string;
+  icon: React.ReactNode;
+}
+
+function CustomCombobox({
+  options,
+  selectedId,
+  onSelect,
+  placeholder,
+  searchPlaceholder,
+  icon,
+}: CustomComboboxProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const selectedOption = options.find((opt) => opt.id === selectedId);
+  const filteredOptions = options.filter((opt) =>
+    opt.label.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <div ref={wrapperRef} style={{ position: 'relative', width: '100%', zIndex: 10 }}>
+      {/* Trigger Button */}
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0.75rem 1rem',
+          backgroundColor: '#ffffff',
+          border: isOpen ? '1px solid #ea580c' : '1px solid #cbd5e1',
+          borderRadius: '0.5rem',
+          fontSize: '0.9rem',
+          color: selectedOption ? '#0f172a' : '#64748b',
+          fontWeight: selectedOption ? 500 : 400,
+          cursor: 'pointer',
+          outline: 'none',
+          boxShadow: isOpen ? '0 0 0 3px rgba(234, 88, 12, 0.12)' : 'none',
+          transition: 'all 0.2s',
+          textAlign: 'left',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0, flex: 1 }}>
+          {icon}
+          <span style={{ 
+            overflow: 'hidden', 
+            textOverflow: 'ellipsis', 
+            whiteSpace: 'nowrap',
+            width: '100%'
+          }}>
+            {selectedOption ? selectedOption.label : placeholder}
+          </span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 0 }}>
+          {selectedOption && (
+            <span 
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelect(null);
+              }}
+              style={{
+                cursor: 'pointer',
+                color: '#94a3b8',
+                padding: '0.1rem',
+                borderRadius: '50%',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              onMouseOver={(e) => e.currentTarget.style.color = '#ef4444'}
+              onMouseOut={(e) => e.currentTarget.style.color = '#94a3b8'}
+            >
+              <X size={14} />
+            </span>
+          )}
+          <ChevronDown 
+            size={16} 
+            style={{ 
+              color: '#94a3b8',
+              transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s'
+            }} 
+          />
+        </div>
+      </button>
+
+      {/* Dropdown Panel */}
+      {isOpen && (
+        <div style={{
+          position: 'absolute',
+          top: 'calc(100% + 5px)',
+          left: 0,
+          right: 0,
+          backgroundColor: '#ffffff',
+          border: '1px solid #cbd5e1',
+          borderRadius: '0.5rem',
+          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05)',
+          zIndex: 50,
+          padding: '0.5rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.5rem',
+        }}>
+          {/* Search Box */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: '0.4rem 0.60rem',
+            backgroundColor: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            borderRadius: '0.375rem',
+          }}>
+            <Search size={14} style={{ color: '#94a3b8' }} />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder={searchPlaceholder}
+              style={{
+                border: 'none',
+                backgroundColor: 'transparent',
+                fontSize: '0.85rem',
+                outline: 'none',
+                width: '100%',
+                color: '#334155',
+              }}
+            />
+          </div>
+
+          {/* List Options */}
+          <div style={{
+            maxHeight: '220px',
+            overflowY: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.2rem',
+          }}>
+            {filteredOptions.length === 0 ? (
+              <div style={{
+                padding: '1.5rem 0.5rem',
+                textAlign: 'center',
+                fontSize: '0.8rem',
+                color: '#94a3b8',
+              }}>
+                Không tìm thấy kết quả
+              </div>
+            ) : (
+              filteredOptions.map((opt) => {
+                const isSelected = opt.id === selectedId;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => {
+                      onSelect(opt.id);
+                      setIsOpen(false);
+                      setSearchTerm('');
+                    }}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '0.5rem 0.75rem',
+                      borderRadius: '0.375rem',
+                      border: 'none',
+                      backgroundColor: isSelected ? '#fff7ed' : 'transparent',
+                      color: isSelected ? '#ea580c' : '#334155',
+                      fontSize: '0.85rem',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      transition: 'background-color 0.15s',
+                    }}
+                    onMouseOver={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.backgroundColor = '#f1f5f9';
+                      }
+                    }}
+                    onMouseOut={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }
+                    }}
+                  >
+                    <span style={{ 
+                      overflow: 'hidden', 
+                      textOverflow: 'ellipsis', 
+                      whiteSpace: 'nowrap',
+                      maxWidth: '75%',
+                      fontWeight: isSelected ? 600 : 400,
+                    }} title={opt.label}>
+                      {opt.label}
+                    </span>
+                    <span style={{ 
+                      fontSize: '0.72rem', 
+                      color: isSelected ? '#ea580c' : '#94a3b8',
+                      opacity: 0.8,
+                    }}>
+                      {opt.date}
+                    </span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function NewInterviewPage() {
   const router = useRouter();
@@ -51,6 +295,37 @@ export default function NewInterviewPage() {
 
   const fileInputCvRef = useRef<HTMLInputElement>(null);
   const fileInputJdRef = useRef<HTMLInputElement>(null);
+
+  // Jobscan keyword matching states
+  const [keywordMetadata, setKeywordMetadata] = useState<any>(null);
+  const [rawCvText, setRawCvText] = useState<string | null>(null);
+  const [rawJdText, setRawJdText] = useState<string | null>(null);
+  const [activeView, setActiveView] = useState<'ai-cards' | 'visual-match'>('ai-cards');
+
+  // React to sessionId changes to pull raw text and match values from sessionStorage
+  useEffect(() => {
+    if (!sessionId) {
+      setKeywordMetadata(null);
+      setRawCvText(null);
+      setRawJdText(null);
+      return;
+    }
+    try {
+      const raw = sessionStorage.getItem(`keyword_data_${sessionId}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        setKeywordMetadata(parsed.keywordMetadata ?? null);
+        setRawCvText(parsed.rawCvText ?? null);
+        setRawJdText(parsed.rawJdText ?? null);
+      } else {
+        setKeywordMetadata(null);
+        setRawCvText(null);
+        setRawJdText(null);
+      }
+    } catch (e) {
+      console.warn('[NewPage] Could not read keyword data from sessionStorage:', e);
+    }
+  }, [sessionId]);
 
   useEffect(() => {
     let mounted = true;
@@ -339,8 +614,26 @@ export default function NewInterviewPage() {
             if (ingestRes.resumeId) setSelectedResumeId(ingestRes.resumeId);
             if (ingestRes.jdId) setSelectedJdId(ingestRes.jdId);
 
+            // Persist Jobscan keyword metadata + raw texts to sessionStorage so the
+            // result page can render the visual skill comparison without an extra API call.
+            if (ingestRes.keywordMetadata || ingestRes.rawCvText || ingestRes.rawJdText) {
+              try {
+                sessionStorage.setItem(
+                  `keyword_data_${newSessionId}`,
+                  JSON.stringify({
+                    keywordMetadata: ingestRes.keywordMetadata ?? { matching_skills: [], missing_skills: [] },
+                    rawCvText: ingestRes.rawCvText ?? null,
+                    rawJdText: ingestRes.rawJdText ?? null,
+                  })
+                );
+              } catch (storageErr) {
+                console.warn('[Ingest] Could not persist keyword data to sessionStorage:', storageErr);
+              }
+            }
+
             setSessionId(newSessionId);
             setIngested(true);
+
           } catch (err: any) {
             console.error('Ingestion error:', err);
             setApiError('Đã xảy ra lỗi khi tải lên và xử lý tài liệu. Vui lòng thử lại sau.');
@@ -725,18 +1018,6 @@ export default function NewInterviewPage() {
           {/* ── State 1: Ready to Upload ── */}
           {!uploading && !analyzing && !assessment && !ingested && (
             <div className={styles.formSection}>
-              <div className={styles.inputGroup}>
-                <label htmlFor="roleTitle">Vị trí phỏng vấn mong muốn</label>
-                <input
-                  id="roleTitle"
-                  type="text"
-                  className={styles.textInput}
-                  value={roleTitle}
-                  onChange={(e) => setRoleTitle(e.target.value)}
-                  placeholder="Ví dụ: React Frontend Engineer, Java Backend Developer..."
-                />
-              </div>
-
               <div className={styles.uploadGrid}>
                 {/* CV Upload */}
                 <div className={styles.uploadCol}>
@@ -794,19 +1075,18 @@ export default function NewInterviewPage() {
                     )
                   ) : (
                     <div className="flex flex-col gap-2">
-                      <select
-                        className={styles.textInput}
-                        style={{ width: '100%', cursor: 'pointer' }}
-                        value={selectedResumeId || ''}
-                        onChange={(e) => setSelectedResumeId(e.target.value ? parseInt(e.target.value, 10) : null)}
-                      >
-                        <option value="">-- Chọn CV trong danh sách --</option>
-                        {savedResumes.map((r) => (
-                          <option key={r.id} value={r.id}>
-                            {r.file_name} ({new Date(r.created_at).toLocaleDateString('vi-VN')})
-                          </option>
-                        ))}
-                      </select>
+                      <CustomCombobox
+                        options={savedResumes.map((r) => ({
+                          id: r.id,
+                          label: r.file_name,
+                          date: new Date(r.created_at).toLocaleDateString('vi-VN'),
+                        }))}
+                        selectedId={selectedResumeId}
+                        onSelect={setSelectedResumeId}
+                        placeholder="-- Chọn CV trong danh sách --"
+                        searchPlaceholder="Tìm kiếm CV theo tên..."
+                        icon={<FileText size={16} style={{ color: '#ea580c', flexShrink: 0 }} />}
+                      />
                       {savedResumes.length === 0 && (
                         <p className="text-xs text-slate-400 mt-1">Không có CV nào được lưu trước đó.</p>
                       )}
@@ -887,19 +1167,18 @@ export default function NewInterviewPage() {
                       />
                     ) : (
                       <div className="flex flex-col gap-2 mt-2">
-                        <select
-                          className={styles.textInput}
-                          style={{ width: '100%', cursor: 'pointer' }}
-                          value={selectedJdId || ''}
-                          onChange={(e) => setSelectedJdId(e.target.value ? parseInt(e.target.value, 10) : null)}
-                        >
-                          <option value="">-- Chọn JD trong danh sách --</option>
-                          {savedJds.map((j) => (
-                            <option key={j.id} value={j.id}>
-                              {j.title} ({new Date(j.created_at).toLocaleDateString('vi-VN')})
-                            </option>
-                          ))}
-                        </select>
+                        <CustomCombobox
+                          options={savedJds.map((j) => ({
+                            id: j.id,
+                            label: j.title,
+                            date: new Date(j.created_at).toLocaleDateString('vi-VN'),
+                          }))}
+                          selectedId={selectedJdId}
+                          onSelect={setSelectedJdId}
+                          placeholder="-- Chọn JD trong danh sách --"
+                          searchPlaceholder="Tìm kiếm JD theo tên..."
+                          icon={<Briefcase size={16} style={{ color: '#3b82f6', flexShrink: 0 }} />}
+                        />
                         {savedJds.length === 0 && (
                           <p className="text-xs text-slate-400 mt-1">Không có JD nào được lưu trước đó.</p>
                         )}
@@ -1040,7 +1319,69 @@ export default function NewInterviewPage() {
                 </div>
               </div>
 
-              {/* Dashboard: Circular rings & Badges panel */}
+              {/* Sleek Dual-Mode Toggle Tab Group */}
+              {keywordMetadata && (rawCvText || rawJdText) && (
+                <div style={{ display: 'flex', justifyContent: 'center', margin: '2rem 0' }}>
+                  <div style={{
+                    display: 'inline-flex',
+                    padding: '4px',
+                    backgroundColor: '#f1f5f9',
+                    borderRadius: '12px',
+                    border: '1px solid #e2e8f0',
+                    boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)'
+                  }}>
+                    <button
+                      onClick={() => setActiveView('ai-cards')}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '10px 24px',
+                        borderRadius: '8px',
+                        fontSize: '0.85rem',
+                        fontWeight: 700,
+                        border: 'none',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        backgroundColor: activeView === 'ai-cards' ? '#ffffff' : 'transparent',
+                        color: activeView === 'ai-cards' ? '#4f46e5' : '#64748b',
+                        boxShadow: activeView === 'ai-cards' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
+                      }}
+                    >
+                      <Brain size={16} />
+                      <span>Phân tích AI chuyên sâu</span>
+                    </button>
+                    <button
+                      onClick={() => setActiveView('visual-match')}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '10px 24px',
+                        borderRadius: '8px',
+                        fontSize: '0.85rem',
+                        fontWeight: 700,
+                        border: 'none',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        backgroundColor: activeView === 'visual-match' ? '#ffffff' : 'transparent',
+                        color: activeView === 'visual-match' ? '#4f46e5' : '#64748b',
+                        boxShadow: activeView === 'visual-match' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
+                      }}
+                    >
+                      <Target size={16} />
+                      <span>Đối chiếu từ khóa (Jobscan)</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+
+              {/* Mode 1: AI Cards */}
+              {activeView === 'ai-cards' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  {/* Dashboard: Circular rings & Badges panel */}
+
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
 
                 {/* Single Merged Ring: Professional Alignment */}
@@ -1446,6 +1787,260 @@ export default function NewInterviewPage() {
                   )}
                 </div>
               </div>
+            </div>
+          )}
+
+              {/* Mode 2: Jobscan-style Visual Skill Comparison */}
+              {activeView === 'visual-match' && keywordMetadata && (rawCvText || rawJdText) && (() => {
+                const matchingKeywords = keywordMetadata.matching_skills.map((s: any) => s.keyword);
+                const missingKeywords  = keywordMetadata.missing_skills.map((s: any) => s.keyword);
+                const total = keywordMetadata.matching_skills.length + keywordMetadata.missing_skills.length;
+                const pct   = total > 0 ? Math.round((keywordMetadata.matching_skills.length / total) * 100) : 0;
+                const ringColor = pct >= 70 ? '#16a34a' : pct >= 40 ? '#d97706' : '#dc2626';
+                const ringTextColor = pct >= 70 ? '#15803d' : pct >= 40 ? '#b45309' : '#b91c1c';
+
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem', marginTop: '1rem' }}>
+                    
+                    {/* Header Card */}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '1.5rem',
+                      padding: '1.5rem 1.75rem',
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '0.75rem',
+                      boxShadow: '0 2px 8px rgba(15,23,42,0.04)'
+                    }}>
+                      <div style={{ flex: 1, minWidth: '280px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
+                          <Target size={18} style={{ color: '#4f46e5' }} />
+                          <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>
+                            So sánh kỹ năng chuyên môn (Hard Skills)
+                          </h3>
+                          <span style={{
+                            fontSize: '0.62rem', fontWeight: 800, padding: '0.2rem 0.55rem',
+                            borderRadius: '4px', background: '#fef9c3', color: '#854d0e',
+                            border: '1px solid #fde047', textTransform: 'uppercase', letterSpacing: '0.05em'
+                          }}>HIGH SCORE IMPACT</span>
+                        </div>
+                        <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', lineHeight: 1.55 }}>
+                          Hệ thống tự động trích xuất các từ khóa kỹ năng từ JD và đối chiếu trực tiếp với CV của bạn. Hãy điều chỉnh CV để tăng điểm số tương thích.
+                        </p>
+                      </div>
+
+                      {/* Circular Match Rate */}
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
+                        <div style={{
+                          width: 68, height: 68, borderRadius: '50%', position: 'relative',
+                          background: `conic-gradient(${ringColor} ${pct * 3.6}deg, #e2e8f0 0deg)`,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}>
+                          <div style={{
+                            width: 52, height: 52, borderRadius: '50%',
+                            background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                          }}>
+                            <span style={{ fontSize: '0.95rem', fontWeight: 800, color: ringTextColor }}>{pct}%</span>
+                          </div>
+                        </div>
+                        <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Tỷ lệ khớp</span>
+                      </div>
+                    </div>
+
+                    {/* Skill Tag Bank (Pill Tags Container) */}
+                    <div style={{
+                      padding: '1.5rem 1.75rem',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '0.75rem',
+                      background: '#fafafa',
+                      boxShadow: '0 2px 8px rgba(15,23,42,0.02)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                        <Wrench size={16} style={{ color: '#475569' }} />
+                        <h4 style={{ margin: 0, fontSize: '0.8rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          Ngân hàng từ khóa kỹ năng (Skill Tag Bank)
+                        </h4>
+                      </div>
+                      
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        {keywordMetadata.matching_skills.map((skill: any) => (
+                          <span
+                            key={skill.id}
+                            title={skill.variants?.length ? `Biến thể: ${skill.variants.join(', ')}` : 'Kỹ năng phù hợp'}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '0.35rem 0.85rem',
+                              backgroundColor: '#dcfce7',
+                              color: '#15803d',
+                              border: '1px solid #86efac',
+                              borderRadius: '9999px',
+                              fontSize: '0.78rem',
+                              fontWeight: 600,
+                              cursor: 'help'
+                            }}
+                          >
+                            ✓ {skill.keyword}
+                          </span>
+                        ))}
+                        {keywordMetadata.missing_skills.map((skill: any) => (
+                          <span
+                            key={skill.id}
+                            title="Không tìm thấy trong CV"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '0.35rem 0.85rem',
+                              backgroundColor: '#fee2e2',
+                              color: '#b91c1c',
+                              border: '1px solid #fca5a5',
+                              borderRadius: '9999px',
+                              fontSize: '0.78rem',
+                              fontWeight: 600,
+                              cursor: 'help'
+                            }}
+                          >
+                            ✗ {skill.keyword}
+                          </span>
+                        ))}
+                        {total === 0 && (
+                          <span style={{ fontSize: '0.82rem', color: '#94a3b8', fontStyle: 'italic' }}>Chưa trích xuất được kỹ năng.</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Two-column Highlighted Text panel */}
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+                      gap: '1.5rem'
+                    }}>
+                      
+                      {/* LEFT: Resume */}
+                      <div style={{
+                        position: 'relative',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '0.75rem',
+                        overflow: 'hidden',
+                        backgroundColor: '#ffffff',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        height: '600px',
+                        boxShadow: '0 2px 8px rgba(15,23,42,0.03)'
+                      }}>
+                        <div style={{
+                          position: 'sticky', top: 0,
+                          backgroundColor: '#f8fafc',
+                          borderBottom: '1px solid #e2e8f0',
+                          padding: '0.85rem 1.25rem',
+                          zIndex: 10,
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <UserCheck size={16} style={{ color: '#4f46e5' }} />
+                            <span style={{ fontWeight: 800, fontSize: '0.82rem', color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Resume:</span>
+                          </div>
+                          <span style={{ fontSize: '0.72rem', color: '#64748b', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={cvFile ? cvFile.name : 'Saved_CV.pdf'}>
+                            {cvFile ? cvFile.name : 'Saved_CV.pdf'}
+                          </span>
+                        </div>
+                        
+                        <div style={{ flex: 1, overflowY: 'auto', padding: '1.25rem 1.5rem', lineHeight: 1.75, fontSize: '0.85rem', color: '#334155' }}>
+                          {rawCvText ? (
+                            <HighlightedText text={rawCvText} matches={matchingKeywords} missing={[]} />
+                          ) : (
+                            <p style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '0.82rem', margin: 0 }}>
+                              Nội dung CV chưa được lưu. Hãy tạo phiên mới để xem phân tích.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* RIGHT: Job Description */}
+                      <div style={{
+                        position: 'relative',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '0.75rem',
+                        overflow: 'hidden',
+                        backgroundColor: '#ffffff',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        height: '600px',
+                        boxShadow: '0 2px 8px rgba(15,23,42,0.03)'
+                      }}>
+                        <div style={{
+                          position: 'sticky', top: 0,
+                          backgroundColor: '#f8fafc',
+                          borderBottom: '1px solid #e2e8f0',
+                          padding: '0.85rem 1.25rem',
+                          zIndex: 10,
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <Briefcase size={16} style={{ color: '#0891b2' }} />
+                            <span style={{ fontWeight: 800, fontSize: '0.82rem', color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Job Description:</span>
+                          </div>
+                          <span style={{ fontSize: '0.72rem', color: '#64748b', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={jdFile ? jdFile.name : 'JD_Text.txt'}>
+                            {jdFile ? jdFile.name : 'JD_Text.txt'}
+                          </span>
+                        </div>
+                        
+                        <div style={{ flex: 1, overflowY: 'auto', padding: '1.25rem 1.5rem', lineHeight: 1.75, fontSize: '0.85rem', color: '#334155' }}>
+                          {rawJdText ? (
+                            <HighlightedText text={rawJdText} matches={matchingKeywords} missing={missingKeywords} />
+                          ) : (
+                            <p style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '0.82rem', margin: 0 }}>
+                              Nội dung JD chưa được lưu. Hãy tạo phiên mới để xem phân tích.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                    </div>
+
+                    {/* Bottom Legend */}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '1.5rem',
+                      flexWrap: 'wrap',
+                      padding: '0.9rem 1.5rem',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '0.5rem',
+                      background: '#f8fafc',
+                      boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.01)'
+                    }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.78rem', color: '#475569' }}>
+                        <span style={{
+                          padding: '0.2rem 0.65rem',
+                          borderRadius: '4px',
+                          background: '#dcfce7',
+                          color: '#15803d',
+                          fontWeight: 700,
+                          fontSize: '0.72rem',
+                          border: '1px solid #86efac'
+                        }}>Matching Skill</span>
+                        Có trong cả CV và JD
+                      </span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.78rem', color: '#475569' }}>
+                        <span style={{
+                          padding: '0.2rem 0.65rem',
+                          borderRadius: '4px',
+                          background: '#fee2e2',
+                          color: '#b91c1c',
+                          fontWeight: 700,
+                          fontSize: '0.72rem',
+                          border: '1px solid #fca5a5'
+                        }}>Missing Skill</span>
+                        JD yêu cầu nhưng CV chưa có
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Navigation buttons */}
               <div className={styles.formActions} style={{ borderTop: '1px solid #e2e8f0', paddingTop: '1.5rem', margin: 0 }}>

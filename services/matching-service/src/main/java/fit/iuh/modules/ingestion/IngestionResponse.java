@@ -28,4 +28,18 @@ public class IngestionResponse {
 
     /** The processed or cached JD Markdown text. */
     private String jdMarkdown;
+
+    /**
+     * Pre-LLM raw text extracted directly from the CV PDF by PdfService.
+     * Populated only on cache-miss paths where PDF parsing was actually performed.
+     * Null on cache-hits — BFF reads raw_text from the resumes DB table instead.
+     */
+    private String rawCvText;
+
+    /**
+     * Pre-LLM raw text extracted directly from the JD PDF/text source.
+     * Populated only on cache-miss paths where PDF parsing was actually performed.
+     * Null on cache-hits — BFF reads raw_text from the job_descriptions DB table instead.
+     */
+    private String rawJdText;
 }
