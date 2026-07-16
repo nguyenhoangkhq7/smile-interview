@@ -13,7 +13,7 @@ import java.util.UUID;
  * @param role            the user's assigned role (e.g. {@code "USER"}, {@code "ADMIN"})
  * @param phoneNumber     optional phone number
  * @param avatarUrl       optional avatar URL (Cloudinary etc.)
- * @param defaultResumeId optional UUID of the user's default resume
+ * @param defaultResumeId optional ID of the user's default resume
  */
 public record AuthResponse(
         String token,
@@ -23,5 +23,5 @@ public record AuthResponse(
         String role,
         String phoneNumber,
         String avatarUrl,
-        UUID defaultResumeId
+        String defaultResumeId
 ) {}

@@ -104,23 +104,23 @@ export default function EvaluationCriteriaTable({ criteria, onRefresh }: Props) 
       <div className="overflow-x-auto border-t border-white/6 bg-slate-950/35">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-700/70 bg-white/[0.03]">
-              <th className="min-w-[80px] px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">ID</th>
-              <th className="px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Tên tiêu chí</th>
-              <th className="px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Prompt Instruction</th>
-              <th className="w-28 px-5 py-4 text-right text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Hành động</th>
+            <tr className="border-b border-slate-800 bg-white/[0.03]">
+              <th className="min-w-[80px] px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">ID</th>
+              <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Tên tiêu chí</th>
+              <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Prompt Instruction</th>
+              <th className="w-28 px-6 py-4 text-right text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Hành động</th>
             </tr>
           </thead>
           <tbody>
             {displayedCriteria.length === 0 && (
-              <tr><td colSpan={4} className="px-5 py-10 text-center text-slate-400">Chưa có tiêu chí nào.</td></tr>
+              <tr><td colSpan={4} className="px-6 py-10 text-center text-slate-400">Chưa có tiêu chí nào.</td></tr>
             )}
             {displayedCriteria.map((crit) => {
               return (
-                <tr key={crit.id} className="border-b border-slate-700/60 transition-colors hover:bg-white/[0.03]">
-                  <td className="px-5 py-4 align-middle font-mono text-xs tabular-nums text-slate-300 whitespace-nowrap">{crit.id}</td>
-                  <td className="px-5 py-4 align-middle whitespace-nowrap text-sm text-slate-300 font-medium">{crit.criteria_name}</td>
-                  <td className="max-w-2xl px-5 py-4 align-middle">
+                <tr key={crit.id} className="border-b border-slate-800 transition-colors hover:bg-white/[0.03]">
+                  <td className="px-6 py-4 align-middle font-mono text-xs text-slate-500 whitespace-nowrap">{crit.id}</td>
+                  <td className="px-6 py-4 align-middle whitespace-nowrap text-sm text-slate-200 font-medium">{crit.criteria_name}</td>
+                  <td className="max-w-2xl px-6 py-4 align-middle">
                     <button
                       type="button"
                       onClick={() => setViewCriteria(crit)}
@@ -137,7 +137,7 @@ export default function EvaluationCriteriaTable({ criteria, onRefresh }: Props) 
                       </span>
                     </button>
                   </td>
-                  <td className="px-5 py-4 align-middle">
+                  <td className="px-6 py-4.5 align-middle">
                     <div className="flex items-center justify-end gap-2">
                       <ActionIconButton
                         label="Sửa tiêu chí"
@@ -165,8 +165,8 @@ export default function EvaluationCriteriaTable({ criteria, onRefresh }: Props) 
       </div>
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between px-1 pt-4">
-          <span className="text-xs text-slate-300 font-medium">
+        <div className="flex items-center justify-between border-t border-white/6 px-6 py-5 bg-slate-950/20">
+          <span className="text-xs text-slate-400 font-medium">
             Trang {currentPage} / {totalPages} (tổng {criteria.length} mục)
           </span>
           <div className="flex items-center gap-2">

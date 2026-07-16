@@ -20,12 +20,24 @@ import StatCards from '@/components/admin/rule-dashboard/StatCards';
 // ── Tab definitions ───────────────────────────────────────────────────────────
 const TABS = [
   {
-    id: 'rule-engine',
-    label: 'Khung đánh giá',
-    subtitle: 'Rule Engine',
+    id: 'categories',
+    label: 'Danh mục',
+    subtitle: 'Job Categories',
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z" /><path d="M7 7h.01" />
+        <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" />
+        <path d="M6 6h10M6 10h10" />
+      </svg>
+    ),
+  },
+  {
+    id: 'criteria',
+    label: 'Tiêu chí',
+    subtitle: 'Evaluation Criteria',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10" />
+        <path d="m9 12 2 2 4-4" />
       </svg>
     ),
   },
@@ -73,7 +85,7 @@ interface AdminData {
 }
 
 export default function AdminRulesPage() {
-  const [activeTab, setActiveTab] = useState<TabId>('rule-engine');
+  const [activeTab, setActiveTab] = useState<TabId>('categories');
   const [data, setData] = useState<AdminData>({
     categories: [],
     criteria: [],
@@ -127,19 +139,19 @@ export default function AdminRulesPage() {
   ];
 
   return (
-    <div className="p-8 flex flex-col gap-8 max-w-7xl mx-auto">
+    <div className="p-6 md:p-8 w-full max-w-7xl mx-auto space-y-8">
       <ToastContainer />
 
       {/* Page header */}
-      <div className="rounded-3xl border border-white/6 bg-slate-950/45 px-5 py-5 shadow-[0_18px_60px_rgba(2,6,23,0.18)] backdrop-blur-sm sm:px-6 sm:py-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="space-y-2">
+      <div className="rounded-3xl border border-white/6 bg-slate-950/45 px-6 py-6 shadow-[0_18px_60px_rgba(2,6,23,0.18)] backdrop-blur-sm sm:px-8 sm:py-7 lg:px-10 lg:py-8">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-3">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Rule Engine Dashboard</p>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
               <button
                 type="button"
                 onClick={() => window.dispatchEvent(new Event('toggle-admin-sidebar'))}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-700 bg-slate-900/60 text-slate-300 transition-colors hover:border-slate-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-700 bg-slate-900/60 text-slate-300 transition-colors hover:border-slate-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-teal-500/20"
                 aria-label={sidebarCollapsed ? "Mở rộng thanh bên" : "Thu gọn thanh bên"}
               >
                 <svg
@@ -154,7 +166,7 @@ export default function AdminRulesPage() {
                   <path d="M15 18l-6-6 6-6" />
                 </svg>
               </button>
-              <h1 className="text-xl font-bold tracking-tight text-white sm:text-2xl lg:text-3xl">
+              <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
                 Quản lý tiêu chí, trọng số và cấu hình hệ thống
               </h1>
             </div>
@@ -171,7 +183,7 @@ export default function AdminRulesPage() {
           </button>
         </div>
 
-        {!loading && !error && <div className="mt-6"><StatCards items={stats} /></div>}
+        {!loading && !error && <div className="mt-8"><StatCards items={stats} /></div>}
       </div>
 
       {/* Error state */}
@@ -195,7 +207,7 @@ export default function AdminRulesPage() {
 
       {/* Tab navigation + content */}
       {!loading && !error && (
-        <div className="mt-4 bg-slate-900/50 rounded-2xl border border-slate-800 overflow-hidden">
+        <div className="mt-6 bg-slate-900/50 rounded-2xl border border-slate-800 overflow-hidden">
           {/* Tab bar */}
           <div className="flex overflow-x-auto border-b border-slate-800 bg-slate-950/20">
             {TABS.map((tab) => {
@@ -204,7 +216,7 @@ export default function AdminRulesPage() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex flex-col items-center justify-center text-center gap-1.5 px-6 py-3.5 text-xs sm:text-sm font-semibold whitespace-nowrap border-b-2 min-h-[52px] min-w-[140px] transition-all duration-150 focus:outline-none ${isActive
+                  className={`flex flex-col items-center justify-center text-center gap-2 px-8 py-4 text-sm sm:text-base font-semibold whitespace-nowrap border-b-2 min-h-[60px] min-w-[160px] transition-all duration-150 focus:outline-none ${isActive
                       ? 'border-orange-500 text-orange-400 bg-orange-950/20'
                       : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/30'
                     }`}
@@ -212,7 +224,7 @@ export default function AdminRulesPage() {
                   <span className={`transition-colors duration-150 ${isActive ? 'text-orange-400' : 'text-slate-500'}`}>{tab.icon}</span>
                   <div className="flex flex-col items-center">
                     <div>{tab.label}</div>
-                    <div className={`text-[10px] font-normal uppercase tracking-wider ${isActive ? 'text-orange-500/80' : 'text-slate-600'}`}>{tab.subtitle}</div>
+                    <div className={`text-[11px] font-normal uppercase tracking-wider ${isActive ? 'text-orange-500/80' : 'text-slate-600'}`}>{tab.subtitle}</div>
                   </div>
                 </button>
               );
@@ -220,14 +232,13 @@ export default function AdminRulesPage() {
           </div>
 
           {/* Tab content */}
-          <div className="p-6">
-            {activeTab === 'rule-engine' && (
-              <div className="space-y-10">
-                <JobCategoryTable categories={data.categories} onRefresh={fetchAll} />
-                <div className="border-t border-slate-800 pt-8">
-                  <EvaluationCriteriaTable criteria={data.criteria} onRefresh={fetchAll} />
-                </div>
-              </div>
+          <div className="p-8">
+            {activeTab === 'categories' && (
+              <JobCategoryTable categories={data.categories} onRefresh={fetchAll} />
+            )}
+
+            {activeTab === 'criteria' && (
+              <EvaluationCriteriaTable criteria={data.criteria} onRefresh={fetchAll} />
             )}
 
             {activeTab === 'weights' && (

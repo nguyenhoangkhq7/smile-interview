@@ -107,23 +107,23 @@ export default function JobCategoryTable({ categories, onRefresh }: Props) {
       <div className="overflow-x-auto border-t border-white/6 bg-slate-950/35">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-700/70 bg-white/[0.03]">
-              <th className="min-w-[80px] px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">ID</th>
-              <th className="px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Tên</th>
-              <th className="px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Danh mục cha</th>
-              <th className="w-28 px-5 py-4 text-right text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Hành động</th>
+            <tr className="border-b border-slate-800 bg-white/[0.03]">
+              <th className="min-w-[80px] px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">ID</th>
+              <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Tên</th>
+              <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Danh mục cha</th>
+              <th className="w-28 px-6 py-4 text-right text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Hành động</th>
             </tr>
           </thead>
           <tbody>
             {displayedCategories.length === 0 && (
-              <tr><td colSpan={4} className="px-5 py-10 text-center text-slate-400">Chưa có danh mục nào.</td></tr>
+              <tr><td colSpan={4} className="px-6 py-10 text-center text-slate-400">Chưa có danh mục nào.</td></tr>
             )}
              {displayedCategories.map((cat) => (
-              <tr key={cat.id} className="border-b border-slate-700/60 transition-colors hover:bg-white/[0.03]">
-                <td className="px-5 py-4 align-middle font-mono text-xs tabular-nums text-slate-300 whitespace-nowrap">{cat.id}</td>
-                <td className="px-5 py-4 align-middle text-sm text-slate-300 font-medium">{cat.name}</td>
-                <td className="px-5 py-4 align-middle text-sm text-slate-400">{cat.parent_name ?? <span className="italic text-slate-500">Root</span>}</td>
-                <td className="px-5 py-4 align-middle">
+              <tr key={cat.id} className="border-b border-slate-800 transition-colors hover:bg-white/[0.03]">
+                <td className="px-6 py-4 align-middle font-mono text-xs text-slate-500 whitespace-nowrap">{cat.id}</td>
+                <td className="px-6 py-4 align-middle text-sm text-slate-200 font-medium">{cat.name}</td>
+                <td className="px-6 py-4 align-middle text-sm text-slate-400">{cat.parent_name ?? <span className="italic text-slate-500">Root</span>}</td>
+                <td className="px-6 py-4 align-middle">
                   <div className="flex items-center justify-end gap-2">
                     <ActionIconButton
                       label="Sửa danh mục"
@@ -150,10 +150,10 @@ export default function JobCategoryTable({ categories, onRefresh }: Props) {
         </table>
       </div>
 
-      {/* Pagination controls */}
+      {/* Pagination controls inside card with top border and padded container */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between px-1 pt-4">
-          <span className="text-xs text-slate-300 font-medium">
+        <div className="flex items-center justify-between border-t border-white/6 px-6 py-5 bg-slate-950/20">
+          <span className="text-xs text-slate-400 font-medium">
             Trang {currentPage} / {totalPages} (tổng {categories.length} mục)
           </span>
           <div className="flex items-center gap-2">

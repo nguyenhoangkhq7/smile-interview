@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import axiosClient from '@/lib/axiosClient';
+import { Folder, FileText } from 'lucide-react';
 import {
   CategoryCriteriaMappingDto,
   CreateMappingPayload,
@@ -327,6 +328,21 @@ function CategoryTreeNode({
   const isExpanded = expandedIds.has(node.category.id);
   const selectedLeaves = node.mappedCriteria;
 
+  // Merge children categories and criteria leaf rows for proper vertical guide line calculations
+  const childrenItems = useMemo(() => {
+    return [
+      ...node.children.map((c) => ({ type: 'category' as const, id: `cat-${c.category.id}`, data: c })),
+      ...selectedLeaves.map((l) => ({ type: 'criteria' as const, id: `crit-${l.criteria.id}`, data: l })),
+    ];
+  }, [node.children, selectedLeaves]);
+
+  const hasChildren = childrenItems.length > 0;
+  const isTopLevel = depth === 0;
+
+  const folderRowClass = isTopLevel
+    ? "group flex w-full cursor-pointer items-center justify-between rounded-2xl border border-slate-700/70 bg-white/[0.025] px-4 py-4 text-left transition-all hover:border-slate-500/70 hover:bg-white/[0.04] focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+    : "group flex w-full cursor-pointer items-center justify-between rounded-lg bg-transparent px-3 py-2 text-left transition-all hover:bg-slate-800/40 focus:outline-none focus:ring-1 focus:ring-teal-500/30";
+
   return (
     <div className="relative">
       <div
@@ -339,32 +355,36 @@ function CategoryTreeNode({
             onToggle(node.category.id);
           }
         }}
-        className="group flex w-full cursor-pointer items-center justify-between rounded-2xl border border-slate-700/70 bg-white/[0.025] px-4 py-4 text-left transition-all hover:border-slate-500/70 hover:bg-white/[0.04] focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+        className={folderRowClass}
       >
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-teal-400/20 bg-gradient-to-br from-teal-500/15 to-cyan-500/10 text-teal-200 shadow-[0_0_0_1px_rgba(20,184,166,0.08)]">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 7h6l2 2h10v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />
-            </svg>
-          </div>
+          {isTopLevel ? (
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-teal-400/20 bg-gradient-to-br from-teal-500/15 to-cyan-500/10 text-teal-200 shadow-[0_0_0_1px_rgba(20,184,166,0.08)]">
+              <Folder size={18} />
+            </div>
+          ) : (
+            <Folder size={15} className="text-slate-400 shrink-0" />
+          )}
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="truncate text-sm font-bold text-white sm:text-base">
+              <span className={`truncate text-sm font-semibold tracking-wide ${isTopLevel ? 'text-white text-base font-bold' : 'text-slate-300'}`}>
                 {formatCategoryLabel(node.category.name)}
               </span>
               <span className="rounded-md border border-slate-800 bg-slate-900/80 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-slate-400">
                 {node.children.length} child{node.children.length === 1 ? '' : 'ren'}
               </span>
-              <CriteriaBadgePopover
-                criteriaCount={selectedLeaves.length}
-                mappedCriteria={selectedLeaves}
-              />
+              {selectedLeaves.length > 0 && (
+                <CriteriaBadgePopover
+                  criteriaCount={selectedLeaves.length}
+                  mappedCriteria={selectedLeaves}
+                />
+              )}
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-2 text-slate-300 transition-colors group-hover:text-white">
-          {!!node.children.length && (
+          {node.children.length > 0 && (
             <svg
               width="14"
               height="14"
@@ -380,136 +400,114 @@ function CategoryTreeNode({
         </div>
       </div>
 
-      {isExpanded && (
-        <div
-          className="ml-3 border-l border-slate-700/50 space-y-4 py-4 relative"
-          style={{ paddingLeft: `${depth === 0 ? 1.5 : 2}rem` }}
-        >
-          {node.children.map((child) => (
-            <CategoryTreeNode
-              key={child.category.id}
-              node={child}
-              depth={depth + 1}
-              selectedLevel={selectedLevel}
-              expandedIds={expandedIds}
-              onToggle={onToggle}
-              onEditLeaf={onEditLeaf}
-              onDeleteLeaf={onDeleteLeaf}
-            />
-          ))}
+      {isExpanded && hasChildren && (
+        <div className="ml-5 mt-2 space-y-1 relative pl-0">
+          {childrenItems.map((item, index) => {
+            const isLast = index === childrenItems.length - 1;
+            const itemMidHeight = item.type === 'category' ? (isTopLevel ? 28 : 20) : 22; // adjusted vertical branch segment anchor
 
-          {node.children.length > 0 && selectedLeaves.length > 0 && (
-            <div className="border-t border-slate-800/80 pt-4 mt-6 mb-3">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Tiêu chí trực thuộc danh mục này
-              </span>
-            </div>
-          )}
+            return (
+              <div key={item.id} className="relative">
+                {/* Vertical connecting line segment */}
+                <div
+                  className="absolute left-[-16px] w-[1px] bg-slate-700/50"
+                  style={{
+                    top: '-8px',
+                    bottom: isLast ? `calc(100% - ${itemMidHeight}px)` : '-8px',
+                  }}
+                />
+                {/* Horizontal branch line pointing to child icon */}
+                <div 
+                  className="absolute left-[-16px] h-[1px] bg-slate-700/50"
+                  style={{
+                    top: `${itemMidHeight}px`,
+                    width: '16px',
+                  }}
+                />
 
-          <div className="space-y-3">
-            {selectedLeaves.length === 0 ? (
-              node.children.length === 0 && (
-                <div className="rounded-xl border border-dashed border-slate-700/70 bg-slate-950/35 px-4 py-4 text-sm text-slate-400">
-                  No mapped criteria for this category.
+                <div className="pl-5">
+                  {item.type === 'category' ? (
+                    <CategoryTreeNode
+                      node={item.data as CategoryTreeNodeData}
+                      depth={depth + 1}
+                      selectedLevel={selectedLevel}
+                      expandedIds={expandedIds}
+                      onToggle={onToggle}
+                      onEditLeaf={onEditLeaf}
+                      onDeleteLeaf={onDeleteLeaf}
+                    />
+                  ) : (() => {
+                    const leaf = item.data as MappingLeafNode;
+                    const selectedMapping = leaf.mappingsByLevel[selectedLevel] ?? null;
+                    const isSet = Boolean(selectedMapping);
+                    const mappingWeight = selectedMapping?.weight_percentage ?? 0;
+
+                    return (
+                      <div className="group flex items-center justify-between gap-4 rounded-lg bg-transparent px-3 py-2 transition-all hover:bg-slate-800/40">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <FileText size={15} className="text-emerald-400 shrink-0 shadow-[0_0_8px_rgba(52,211,153,0.15)]" />
+                            <p className="text-sm font-semibold text-white tracking-wide">{leaf.criteria.criteria_name}</p>
+                            <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.1em] ${
+                              isSet
+                                ? 'border-teal-400/20 bg-teal-500/10 text-teal-300'
+                                : 'border-slate-800 bg-slate-900/50 text-slate-500'
+                            }`}>
+                              {SENIORITY_LABELS[selectedLevel]}
+                            </span>
+                          </div>
+                          <p className="mt-0.5 pl-6 text-xs text-slate-400">
+                            {isSet ? `Trọng số active: ${mappingWeight}%` : 'Không có cấu hình trọng số cho cấp bậc này.'}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-4 shrink-0">
+                          <div className="min-w-[60px] text-right">
+                            <p className={`text-sm font-bold font-mono tabular-nums tracking-tight ${isSet ? 'text-teal-400' : 'text-slate-500'}`}>
+                              {isSet ? `${mappingWeight}%` : '0%'}
+                            </p>
+                          </div>
+
+                          {/* Action buttons wrapper hidden until row hover */}
+                          <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                            <ActionIconButton
+                              label={isSet ? 'Sửa trọng số' : 'Thêm trọng số'}
+                              variant="accent"
+                              onClick={(e) => onEditLeaf(node.category.id, leaf.criteria.id, selectedLevel, e)}
+                              icon={(
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                </svg>
+                              )}
+                            />
+                            <ActionIconButton
+                              label="Xóa mapping"
+                              variant="danger"
+                              disabled={!selectedMapping}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                onDeleteLeaf(node.category.id, leaf.criteria.id, selectedLevel);
+                              }}
+                              icon={(
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <polyline points="3 6 5 6 21 6" />
+                                  <path d="M19 6l-1 14H6L5 6" />
+                                  <path d="M10 11v6M14 11v6" />
+                                  <path d="M9 6V4h6v2" />
+                                </svg>
+                              )}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
-              )
-            ) : (
-              selectedLeaves.map((leaf) => {
-                const selectedMapping = leaf.mappingsByLevel[selectedLevel] ?? null;
-                const isSet = Boolean(selectedMapping);
-                const mappingWeight = selectedMapping?.weight_percentage ?? 0;
-
-                return (
-                  <div
-                    key={`${node.category.id}-${leaf.criteria.id}`}
-                    className={`flex items-center justify-between gap-4 rounded-xl border px-4 py-3.5 transition-all duration-200 ${
-                      isSet
-                        ? 'border-teal-400/15 bg-teal-500/[0.04] shadow-[0_4px_16px_rgba(20,184,166,0.04)] hover:bg-teal-500/[0.08] hover:border-teal-400/30'
-                        : 'border-slate-800 bg-slate-950/40 hover:bg-slate-800/50 hover:border-slate-700'
-                    }`}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        {/* HiOutlineDocumentText Document Icon */}
-                        <svg
-                          width="14"
-                          height="14"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2.25"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className="text-slate-400 shrink-0"
-                        >
-                          <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
-                          <path d="M14 2v4a2 2 0 0 0 2 2h4" />
-                          <path d="M10 9H8" />
-                          <path d="M16 13H8" />
-                          <path d="M16 17H8" />
-                        </svg>
-                        <p className="text-sm font-medium text-slate-300">{leaf.criteria.criteria_name}</p>
-                        <span className={`rounded-full border px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-[0.1em] ${
-                          isSet
-                            ? 'border-teal-400/20 bg-teal-500/10 text-teal-200'
-                            : 'border-slate-800 bg-slate-900/50 text-slate-400'
-                        }`}>
-                          {SENIORITY_LABELS[selectedLevel]}
-                        </span>
-                      </div>
-                      <p className="mt-1 pl-5 text-xs text-slate-400">
-                        {isSet ? 'Mapping is configured for this level.' : 'No mapping configured for this level.'}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-4 shrink-0">
-                      <div className="min-w-[80px] text-right">
-                        <p className={`text-[16px] font-bold tabular-nums tracking-tight ${isSet ? 'text-teal-400' : 'text-slate-400'}`}>
-                          {isSet ? `${mappingWeight}%` : '0%'}
-                        </p>
-                        <p className={`text-[10px] uppercase tracking-wider font-semibold ${isSet ? 'text-teal-400/80' : 'text-slate-400'}`}>
-                          {isSet ? 'Active' : 'Not Set'}
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-1.5">
-                        <ActionIconButton
-                          label={isSet ? 'Sửa trọng số' : 'Thêm trọng số'}
-                          variant="accent"
-                          onClick={(e) => onEditLeaf(node.category.id, leaf.criteria.id, selectedLevel, e)}
-                          icon={(
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                            </svg>
-                          )}
-                        />
-
-                        <ActionIconButton
-                          label="Xóa mapping"
-                          variant="danger"
-                          disabled={!selectedMapping}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            onDeleteLeaf(node.category.id, leaf.criteria.id, selectedLevel);
-                          }}
-                          icon={(
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <polyline points="3 6 5 6 21 6" />
-                              <path d="M19 6l-1 14H6L5 6" />
-                              <path d="M10 11v6M14 11v6" />
-                              <path d="M9 6V4h6v2" />
-                            </svg>
-                          )}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

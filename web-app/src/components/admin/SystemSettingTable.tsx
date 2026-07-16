@@ -64,61 +64,65 @@ export default function SystemSettingTable({ settings, onRefresh }: Props) {
         <div className="px-6 py-10 text-center text-slate-400">Chưa có cài đặt nào. Hãy chạy DatabaseSeeder.</div>
       )}
       <div className="border-t border-white/6 bg-slate-950/35 p-5 sm:p-6 lg:p-7">
-        <div className="max-w-4xl mx-auto space-y-6">
-          {settings.map((s) => {
-            const meta = SETTING_META[s.setting_key];
-            const isEditing = editing?.key === s.setting_key;
+        <div className="w-full space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {settings.map((s) => {
+              const meta = SETTING_META[s.setting_key];
+              const isEditing = editing?.key === s.setting_key;
 
-            return (
-              <div
-                key={s.setting_key}
-                className={`rounded-2xl border px-6 py-6 transition-all ${isEditing ? 'border-amber-400/40 bg-amber-400/8' : 'border-slate-700/70 bg-white/[0.025] hover:bg-white/[0.04]'}`}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0 flex-1">
-                    <div className="mb-1 flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-semibold text-white">{meta?.label ?? s.setting_key}</span>
-                      <code className="rounded-md border border-orange-400/15 bg-orange-400/10 px-2 py-0.5 text-xs font-mono font-semibold text-orange-200">{s.setting_key}</code>
+              return (
+                <div
+                  key={s.setting_key}
+                  className={`rounded-2xl border px-5 py-5 flex flex-col justify-between transition-all ${isEditing ? 'border-amber-400/40 bg-amber-400/8' : 'border-slate-700/70 bg-white/[0.025] hover:bg-white/[0.04]'}`}
+                >
+                  <div className="min-w-0 flex-1 flex flex-col justify-between h-full">
+                    <div>
+                      <div className="mb-2 flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-semibold text-white">{meta?.label ?? s.setting_key}</span>
+                        <code className="rounded-md border border-orange-400/15 bg-orange-400/10 px-2 py-0.5 text-xs font-mono font-semibold text-orange-200">{s.setting_key}</code>
+                      </div>
                       {meta?.unit && (
-                        <span className="rounded-full border border-slate-700/80 bg-white/[0.04] px-2 py-0.5 text-xs text-slate-400">{meta.unit}</span>
+                        <span className="inline-block mb-2 rounded-full border border-slate-700/80 bg-white/[0.04] px-2 py-0.5 text-[10px] text-slate-400">{meta.unit}</span>
+                      )}
+                      {meta && <p className="text-xs leading-relaxed text-slate-400 mb-4">{meta.description}</p>}
+                    </div>
+
+                    <div className="flex items-center justify-between border-t border-slate-800/80 pt-3">
+                      {isEditing ? (
+                        <div className="flex items-center gap-2 w-full justify-between">
+                          <input
+                            type="text"
+                            className="w-20 rounded-lg border border-amber-400/35 bg-slate-900 px-2 py-1 text-xs font-mono tabular-nums text-white focus:border-amber-300 focus:outline-none"
+                            value={editing.value}
+                            onChange={(e) => setEditing({ key: s.setting_key, value: e.target.value })}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') setEditing(null); }}
+                            autoFocus
+                          />
+                          <div className="flex gap-1 shrink-0">
+                            <button onClick={() => setEditing(null)} className="rounded-md border border-slate-700 bg-slate-900/60 px-2 py-1 text-[10px] font-semibold text-slate-400 transition-colors hover:border-slate-500 hover:bg-white/[0.05] hover:text-white">Hủy</button>
+                            <button onClick={handleSave} disabled={saving} className="rounded-md border border-amber-400/25 bg-amber-400/10 px-2 py-1 text-[10px] font-semibold text-amber-200 transition-colors hover:border-amber-400/50 hover:bg-amber-400/15 hover:text-white disabled:opacity-50">
+                              {saving ? '...' : 'Lưu'}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="text-lg font-semibold tabular-nums font-mono text-white">{s.setting_value}</span>
+                          <ActionIconButton
+                            label="Chỉnh sửa cài đặt"
+                            onClick={() => setEditing({ key: s.setting_key, value: s.setting_value })}
+                            icon={(
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                            )}
+                          />
+                        </>
                       )}
                     </div>
-                    {meta && <p className="text-xs leading-relaxed text-slate-400">{meta.description}</p>}
-                  </div>
-
-                  <div className="flex shrink-0 items-center gap-3">
-                    {isEditing ? (
-                      <>
-                        <input
-                          type="text"
-                          className="w-28 rounded-lg border border-amber-400/35 bg-slate-900 px-3 py-2 text-sm font-mono tabular-nums text-white focus:border-amber-300 focus:outline-none"
-                          value={editing.value}
-                          onChange={(e) => setEditing({ ...editing, value: e.target.value })}
-                          onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') setEditing(null); }}
-                          autoFocus
-                        />
-                        <button onClick={() => setEditing(null)} className="rounded-lg border border-slate-700 bg-slate-900/60 px-3.5 py-1.5 text-xs font-semibold text-slate-400 transition-colors hover:border-slate-500 hover:bg-white/[0.05] hover:text-white min-h-[32px]">Hủy</button>
-                        <button onClick={handleSave} disabled={saving} className="rounded-lg border border-amber-400/25 bg-amber-400/10 px-3.5 py-1.5 text-xs font-semibold text-amber-200 transition-colors hover:border-amber-400/50 hover:bg-amber-400/15 hover:text-white disabled:opacity-50 min-h-[32px]">
-                          {saving ? '...' : 'Lưu'}
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <span className="text-xl font-semibold tabular-nums font-mono text-white">{s.setting_value}</span>
-                        <ActionIconButton
-                          label="Chỉnh sửa cài đặt"
-                          onClick={() => setEditing({ key: s.setting_key, value: s.setting_value })}
-                          icon={(
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-                          )}
-                        />
-                      </>
-                    )}
                   </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
 
           <div className="mt-5 rounded-2xl border border-slate-700/70 bg-white/[0.025] p-4">
             <div className="flex items-start gap-3">

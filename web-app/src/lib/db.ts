@@ -104,6 +104,7 @@ export async function initDb() {
 
   // Alter sessions to add resume_id, jd_id, and all assessment columns if they do not exist
   const alterColumns = [
+    'ALTER TABLE users ALTER COLUMN default_resume_id TYPE VARCHAR(255) USING default_resume_id::varchar;',
     'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS resume_id INT REFERENCES resumes(id) ON DELETE SET NULL;',
     'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS jd_id INT REFERENCES job_descriptions(id) ON DELETE SET NULL;',
     'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS competency_fit_score INT;',
