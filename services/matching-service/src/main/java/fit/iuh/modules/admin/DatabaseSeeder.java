@@ -77,24 +77,39 @@ public class DatabaseSeeder implements CommandLineRunner {
     // ─────────────────────────────────────────────────────────────────────────
 
     private void seedSystemSettings() {
-        if (systemSettingRepository.count() > 0) {
-            log.debug("[Seeder] System settings already seeded — skipping.");
-            return;
+        seedSettingIfMissing("MATCH_SCORE_PIVOT", "50.0");
+        seedSettingIfMissing("STATUS_WEAK_COEFF", "0.3");
+        seedSettingIfMissing("WEAK_COEFF_INTERN_FRESHER", "0.5");
+        seedSettingIfMissing("WEAK_COEFF_SENIOR_LEAD", "0.1");
+        seedSettingIfMissing("MUST_HAVE_WEIGHT_RATIO", "0.8");
+        seedSettingIfMissing("PREFER_TO_HAVE_WEIGHT_RATIO", "0.2");
+
+        // Difficulty Matrix Settings
+        seedSettingIfMissing("DIFF_INTERN_FRESHER_MISSING", "easy");
+        seedSettingIfMissing("DIFF_INTERN_FRESHER_WEAK", "easy");
+        seedSettingIfMissing("DIFF_INTERN_FRESHER_MATCHED", "medium");
+
+        seedSettingIfMissing("DIFF_JUNIOR_MISSING", "easy");
+        seedSettingIfMissing("DIFF_JUNIOR_WEAK", "medium");
+        seedSettingIfMissing("DIFF_JUNIOR_MATCHED", "medium");
+
+        seedSettingIfMissing("DIFF_MID_MISSING", "medium");
+        seedSettingIfMissing("DIFF_MID_WEAK", "medium");
+        seedSettingIfMissing("DIFF_MID_MATCHED", "hard");
+
+        seedSettingIfMissing("DIFF_SENIOR_LEAD_MISSING", "medium");
+        seedSettingIfMissing("DIFF_SENIOR_LEAD_WEAK", "medium");
+        seedSettingIfMissing("DIFF_SENIOR_LEAD_MATCHED", "hard");
+    }
+
+    private void seedSettingIfMissing(String key, String defaultValue) {
+        if (systemSettingRepository.findBySettingKey(key).isEmpty()) {
+            systemSettingRepository.save(SystemSetting.builder()
+                    .settingKey(key)
+                    .settingValue(defaultValue)
+                    .build());
+            log.info("[Seeder] Seeded system setting: {} = {}", key, defaultValue);
         }
-
-        List<SystemSetting> defaults = List.of(
-                SystemSetting.builder()
-                        .settingKey("MATCH_SCORE_PIVOT")
-                        .settingValue("50.0")
-                        .build(),
-                SystemSetting.builder()
-                        .settingKey("STATUS_WEAK_COEFF")
-                        .settingValue("0.3")
-                        .build()
-        );
-
-        systemSettingRepository.saveAll(defaults);
-        log.info("[Seeder] System settings seeded: MATCH_SCORE_PIVOT=50.0, STATUS_WEAK_COEFF=0.3");
     }
 
     // ─────────────────────────────────────────────────────────────────────────

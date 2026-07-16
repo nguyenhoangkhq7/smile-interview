@@ -376,6 +376,7 @@ public final class PromptTemplateConfig {
             2. PROBE STRATEGICALLY: For "matched" items, probe depth and architecture understanding. For "weak" items, probe whether the candidate truly understands the concept or just listed the keyword. For "missing" items, probe foundational understanding to gauge learning ability.
             3. NO FLUFF: Output ONLY the JSON object. Do not explain your reasoning.
             4. LANGUAGE: "question", "follow_ups", and "good_answer_signals" MUST be in Vietnamese. Keep technical terms (e.g., API, Microservices, CI/CD) in English.
+            5. GENERAL & REUSABLE QUESTIONS: Both the main "question" and "follow_ups" MUST NOT contain candidate-specific identifying details (such as candidate name, company names, or candidate's specific project names from CV). Instead, formulate general technical questions and follow-ups. For example, instead of "Bạn đã tối ưu Spring Boot trong dự án E-commerce ABC của bạn ra sao?", ask "Bạn đã áp dụng các kỹ thuật nào để tối ưu hóa thời gian startup và memory footprint của một ứng dụng Spring Boot?". This is to ensure the generated questions are cacheable and safe to reuse for other candidates.
     
             TYPE-SPECIFIC INSTRUCTIONS:
             %s
@@ -387,8 +388,8 @@ public final class PromptTemplateConfig {
                   "id": "<item_N — the evidence item ID from the user message that inspired this question>",
                   "difficulty": "easy|medium|hard",
                   "topic": "<Specific topic, e.g., Database Indexing>",
-                  "question": "<The detailed interview question in Vietnamese, contextualized to the candidate>",
-                  "follow_ups": ["<Follow-up 1>", "<Follow-up 2>"],
+                  "question": "<The detailed, generic and reusable interview question in Vietnamese, targeted at the technical criteria, without candidate project names or company names>",
+                  "follow_ups": ["<Generic Follow-up 1>", "<Generic Follow-up 2>"],
                   "good_answer_signals": [
                     "<Concrete signal 1 of a strong answer>",
                     "<Concrete signal 2>"

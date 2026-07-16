@@ -22,6 +22,86 @@ const SETTING_META: Record<string, { label: string; description: string; unit?: 
     description: 'Điểm được cộng khi tiêu chí có trạng thái "weak" trong ScoringService. "matched" = 1.0, "missing" = 0.0.',
     unit: 'hệ số (0.0 - 1.0)',
   },
+  WEAK_COEFF_INTERN_FRESHER: {
+    label: 'Hệ số Weak (Intern/Fresher)',
+    description: 'Hệ số điểm cộng cho tiêu chí ở trạng thái Weak đối với ứng viên Intern hoặc Fresher (chấp nhận lý thuyết).',
+    unit: 'hệ số (0.0 - 1.0)',
+  },
+  WEAK_COEFF_SENIOR_LEAD: {
+    label: 'Hệ số Weak (Senior/Lead)',
+    description: 'Hệ số điểm cộng cho tiêu chí ở trạng thái Weak đối với ứng viên Senior hoặc Lead (đòi hỏi thực chiến khắt khe).',
+    unit: 'hệ số (0.0 - 1.0)',
+  },
+  MUST_HAVE_WEIGHT_RATIO: {
+    label: 'Tỷ trọng tiêu chí Bắt buộc (Must-Have)',
+    description: 'Tỷ lệ trọng số đóng góp của bộ tiêu chí chuẩn bắt buộc vào tổng điểm đánh giá cuối cùng.',
+    unit: 'tỷ lệ (0.0 - 1.0)',
+  },
+  PREFER_TO_HAVE_WEIGHT_RATIO: {
+    label: 'Tỷ trọng tiêu chí Ưu tiên (Prefer-to-Have)',
+    description: 'Tỷ lệ trọng số đóng góp của các tiêu chí bổ sung (ad-hoc) vào tổng điểm đánh giá cuối cùng.',
+    unit: 'tỷ lệ (0.0 - 1.0)',
+  },
+  DIFF_INTERN_FRESHER_MISSING: {
+    label: 'Độ khó câu hỏi Intern/Fresher - Missing',
+    description: 'Độ khó câu hỏi khi ứng viên Intern/Fresher bị thiếu (missing) tiêu chí kỹ năng.',
+    unit: 'easy | medium | hard',
+  },
+  DIFF_INTERN_FRESHER_WEAK: {
+    label: 'Độ khó câu hỏi Intern/Fresher - Weak',
+    description: 'Độ khó câu hỏi khi ứng viên Intern/Fresher ở mức yếu (weak) tiêu chí kỹ năng.',
+    unit: 'easy | medium | hard',
+  },
+  DIFF_INTERN_FRESHER_MATCHED: {
+    label: 'Độ khó câu hỏi Intern/Fresher - Matched',
+    description: 'Độ khó câu hỏi khi ứng viên Intern/Fresher ở mức tốt (matched) tiêu chí kỹ năng.',
+    unit: 'easy | medium | hard',
+  },
+  DIFF_JUNIOR_MISSING: {
+    label: 'Độ khó câu hỏi Junior - Missing',
+    description: 'Độ khó câu hỏi khi ứng viên Junior bị thiếu (missing) tiêu chí kỹ năng.',
+    unit: 'easy | medium | hard',
+  },
+  DIFF_JUNIOR_WEAK: {
+    label: 'Độ khó câu hỏi Junior - Weak',
+    description: 'Độ khó câu hỏi khi ứng viên Junior ở mức yếu (weak) tiêu chí kỹ năng.',
+    unit: 'easy | medium | hard',
+  },
+  DIFF_JUNIOR_MATCHED: {
+    label: 'Độ khó câu hỏi Junior - Matched',
+    description: 'Độ khó câu hỏi khi ứng viên Junior ở mức tốt (matched) tiêu chí kỹ năng.',
+    unit: 'easy | medium | hard',
+  },
+  DIFF_MID_MISSING: {
+    label: 'Độ khó câu hỏi Mid - Missing',
+    description: 'Độ khó câu hỏi khi ứng viên Mid bị thiếu (missing) tiêu chí kỹ năng.',
+    unit: 'easy | medium | hard',
+  },
+  DIFF_MID_WEAK: {
+    label: 'Độ khó câu hỏi Mid - Weak',
+    description: 'Độ khó câu hỏi khi ứng viên Mid ở mức yếu (weak) tiêu chí kỹ năng.',
+    unit: 'easy | medium | hard',
+  },
+  DIFF_MID_MATCHED: {
+    label: 'Độ khó câu hỏi Mid - Matched',
+    description: 'Độ khó câu hỏi khi ứng viên Mid ở mức tốt (matched) tiêu chí kỹ năng.',
+    unit: 'easy | medium | hard',
+  },
+  DIFF_SENIOR_LEAD_MISSING: {
+    label: 'Độ khó câu hỏi Senior/Lead - Missing',
+    description: 'Độ khó câu hỏi khi ứng viên Senior/Lead bị thiếu (missing) tiêu chí kỹ năng.',
+    unit: 'easy | medium | hard',
+  },
+  DIFF_SENIOR_LEAD_WEAK: {
+    label: 'Độ khó câu hỏi Senior/Lead - Weak',
+    description: 'Độ khó câu hỏi khi ứng viên Senior/Lead ở mức yếu (weak) tiêu chí kỹ năng.',
+    unit: 'easy | medium | hard',
+  },
+  DIFF_SENIOR_LEAD_MATCHED: {
+    label: 'Độ khó câu hỏi Senior/Lead - Matched',
+    description: 'Độ khó câu hỏi khi ứng viên Senior/Lead ở mức tốt (matched) tiêu chí kỹ năng.',
+    unit: 'easy | medium | hard',
+  },
 };
 
 interface EditState {

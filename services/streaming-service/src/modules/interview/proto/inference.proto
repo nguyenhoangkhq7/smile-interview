@@ -22,6 +22,9 @@ message InferenceRequest {
   int32 current_follow_up_count = 6;
   int32 max_follow_up_count = 7;        // AI biết còn quota đào sâu hay không
   repeated QAContext conversation_thread = 8; // toàn bộ nhánh hội thoại của chủ đề hiện tại
+  bool fast_mode = 9;
+  string cv_text = 10;
+  repeated string good_answer_signals = 11;
 }
 
 message QAContext {

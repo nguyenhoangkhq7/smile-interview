@@ -21,7 +21,6 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import fit.iuh.modules.assessment.ScoringService.ScoringResult;
 
 /**
@@ -154,7 +153,12 @@ public class AssessmentService {
                     if (criteriaList.isEmpty()) {
                         criteriaList = jobCriteriaRepository.findCriteriaTreeByCategory("SOFTWARE_ENGINEERING", "ALL");
                     }
-                    ScoringResult scoringResult = scoringService.calculateWithBreakdown(clonedAssessment.getEvidenceItems(), criteriaList);
+                    ScoringResult scoringResult = scoringService.calculateWithBreakdown(
+                            clonedAssessment.getEvidenceItems(),
+                            clonedAssessment.getAdditionalEvidenceItems(),
+                            criteriaList,
+                            clonedAssessment.getSeniorityLevel()
+                    );
                     
                     AssessmentResponse response = toResponse(savedCloned, true);
                     response.setScoreBreakdown(scoringResult.breakdown());
@@ -196,7 +200,12 @@ public class AssessmentService {
                     if (criteriaList.isEmpty()) {
                         criteriaList = jobCriteriaRepository.findCriteriaTreeByCategory("SOFTWARE_ENGINEERING", "ALL");
                     }
-                    ScoringResult scoringResult = scoringService.calculateWithBreakdown(clonedAssessment.getEvidenceItems(), criteriaList);
+                    ScoringResult scoringResult = scoringService.calculateWithBreakdown(
+                            clonedAssessment.getEvidenceItems(),
+                            clonedAssessment.getAdditionalEvidenceItems(),
+                            criteriaList,
+                            clonedAssessment.getSeniorityLevel()
+                    );
                     
                     AssessmentResponse response = toResponse(savedCloned, true);
                     response.setScoreBreakdown(scoringResult.breakdown());
@@ -280,7 +289,12 @@ public class AssessmentService {
                 dto.evidenceItems() != null ? dto.evidenceItems().size() : 0);
 
         // ── Step 4b: Java Scoring (ScoringService) ────────────────────────────
-        ScoringResult scoringResult = scoringService.calculateWithBreakdown(dto.evidenceItems(), criteriaList);
+        ScoringResult scoringResult = scoringService.calculateWithBreakdown(
+                dto.evidenceItems(),
+                dto.additionalEvidenceItems(),
+                criteriaList,
+                metadata.level()
+        );
 
         log.info("[Assessment] Step 4b complete — overall_match_score={}", scoringResult.score());
 

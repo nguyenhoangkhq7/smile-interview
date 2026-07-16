@@ -48,6 +48,11 @@ public record EvidenceItemPair(
          * DB weight of this criterion, used for sorting by importance.
          * {@code null} for ad-hoc items.
          */
-        Double weightUsed
+        Double weightUsed,
+
+        /**
+         * Semantic question type matching.
+         */
+        String questionType
 
 ) {}

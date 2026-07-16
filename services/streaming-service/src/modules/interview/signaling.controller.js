@@ -108,7 +108,7 @@ export const handleConnection = (io, socket) => {
 
       const sessionId = socketInfo.interviewId;
 
-      // ── CANDIDATE_TEXT_SUBMIT ───────────────────────────────────────────
+       // ── CANDIDATE_TEXT_SUBMIT ───────────────────────────────────────────
       if (data.type === 'CANDIDATE_TEXT_SUBMIT') {
         const candidateText = data.payload.text;
 
@@ -122,19 +122,57 @@ export const handleConnection = (io, socket) => {
           ? currentQuestionObj.question
           : currentQuestionObj;
 
-        // 2. Call AI Inference Service via gRPC
-        const engineResponse = await evaluateCandidateResponse({
-          sessionId,
-          targetJobTitle: session.targetJobTitle || 'IT Engineer',
-          interviewDomain: session.interviewDomain || 'IT',
-          currentQuestion,
-          candidateAnswer: candidateText,
-          currentFollowUpCount: qState.currentFollowUpDepth,
-          maxFollowUpCount: qState.maxFollowUpDepth || 3,
-          conversationThread: session.conversationThread || []
-        });
+        const goodAnswerSignals = currentQuestionObj && currentQuestionObj.good_answer_signals
+          ? currentQuestionObj.good_answer_signals
+          : [];
 
-        console.log(`[Signaling] AI decision: ${engineResponse.decision}, score: ${engineResponse.score}, isFallback: ${engineResponse.isFallback}`);
+        const cvText = session.resumeText || '';
+        const limitReached = qState.currentFollowUpDepth >= (qState.maxFollowUpDepth || 3);
+
+        let engineResponse;
+
+        if (limitReached) {
+          console.log(`[Signaling] Limit reached. Bypassing synchronous LLM evaluation.`);
+          engineResponse = {
+            decision: 'NEXT_TOPIC',
+            followUpQuestion: '',
+            reasoning: 'Bypassed LLM call: reached maximum follow-up depth.',
+            score: null,
+            evaluation: '',
+            isFallback: false,
+            excludedFromScoring: false
+          };
+        } else {
+          // Fast mode evaluation synchronously
+          console.log(`[Signaling] Calling fast evaluation synchronously...`);
+          try {
+            engineResponse = await evaluateCandidateResponse({
+              sessionId,
+              targetJobTitle: session.targetJobTitle || 'IT Engineer',
+              interviewDomain: session.interviewDomain || 'IT',
+              currentQuestion,
+              candidateAnswer: candidateText,
+              currentFollowUpCount: qState.currentFollowUpDepth,
+              maxFollowUpCount: qState.maxFollowUpDepth || 3,
+              conversationThread: session.conversationThread || [],
+              fastMode: true,
+              cvText
+            });
+          } catch (error) {
+            console.error('[Signaling] Fast evaluation failed. Using fallback.', error);
+            engineResponse = {
+              decision: 'NEXT_TOPIC',
+              followUpQuestion: '',
+              reasoning: 'Fast evaluation failed, falling back to NEXT_TOPIC.',
+              score: null,
+              evaluation: '',
+              isFallback: true,
+              excludedFromScoring: true
+            };
+          }
+        }
+
+        console.log(`[Signaling] Fast decision: ${engineResponse.decision}, reasoning: ${engineResponse.reasoning}`);
 
         // 3. Append current QA to conversation thread (before potentially resetting it)
         await appendToConversationThread(sessionId, {
@@ -143,28 +181,75 @@ export const handleConnection = (io, socket) => {
           wasFollowUp: qState.currentFollowUpDepth > 0
         });
 
-        // 4. Append turn record for final synthesis (skip fallback turns from scoring)
+        // 4. Append turn record for final synthesis (initially empty score/eval)
         await appendTurn(sessionId, {
           question: currentQuestion,
           answer: candidateText,
-          score: engineResponse.score,
-          evaluation: engineResponse.evaluation || '',
+          score: null,
+          evaluation: '',
           wasFollowUp: qState.currentFollowUpDepth > 0,
           excludedFromScoring: engineResponse.excludedFromScoring
         });
 
-        // 5. Determine next question and update state
+        // 5. Fire asynchronous slow evaluation in the background
+        const slowEvalParams = {
+          sessionId,
+          targetJobTitle: session.targetJobTitle || 'IT Engineer',
+          interviewDomain: session.interviewDomain || 'IT',
+          currentQuestion,
+          candidateAnswer: candidateText,
+          currentFollowUpCount: qState.currentFollowUpDepth,
+          maxFollowUpCount: qState.maxFollowUpDepth || 3,
+          conversationThread: session.conversationThread || [],
+          fastMode: false,
+          cvText,
+          goodAnswerSignals
+        };
+
+        // Asynchronous IIFE for background evaluation
+        (async () => {
+          console.log(`[Background Eval] Starting detailed evaluation in background...`);
+          try {
+            const slowRes = await evaluateCandidateResponse(slowEvalParams);
+            console.log(`[Background Eval] Finished for session ${sessionId}. Score: ${slowRes.score}`);
+            
+            // Update Redis turns
+            const sess = await getSession(sessionId);
+            if (sess) {
+              const turns = sess.turns || [];
+              let updated = false;
+              for (let i = turns.length - 1; i >= 0; i--) {
+                if (turns[i].question === currentQuestion && turns[i].answer === candidateText) {
+                  turns[i].score = slowRes.score;
+                  turns[i].evaluation = slowRes.evaluation || '';
+                  turns[i].excludedFromScoring = slowRes.excludedFromScoring;
+                  updated = true;
+                  break;
+                }
+              }
+              if (updated) {
+                await redisClient.hSet(`session:${sessionId}`, {
+                  turns: JSON.stringify(turns),
+                  updatedAt: new Date().toISOString()
+                });
+                console.log(`[Background Eval] Successfully updated Redis turns with score.`);
+              }
+            }
+          } catch (e) {
+            console.error(`[Background Eval] Detailed evaluation failed in background:`, e);
+          }
+        })();
+
+        // 6. Determine next question and update state
         let nextQuestionText = '';
         let actionType = engineResponse.decision;
         let nextQState = { ...qState };
 
         if (actionType === 'FOLLOW_UP' && !engineResponse.isFallback) {
-          // Use AI-generated dynamic follow-up question (no pre-generated bank)
           nextQuestionText = engineResponse.followUpQuestion || '';
           nextQState.currentFollowUpDepth += 1;
           console.log(`[Signaling] AI follow-up: "${nextQuestionText}" (depth: ${nextQState.currentFollowUpDepth})`);
 
-          // Safety fallback: if AI returned empty followUpQuestion, transition to next topic
           if (!nextQuestionText.trim()) {
             console.warn('[Signaling] AI returned FOLLOW_UP but followUpQuestion is empty. Transitioning.');
             actionType = 'TRANSITION';
@@ -181,7 +266,6 @@ export const handleConnection = (io, socket) => {
             }
           }
         } else {
-          // NEXT_TOPIC or fallback: move to next base question and reset thread
           nextQState.baseQuestionIndex += 1;
           nextQState.currentFollowUpDepth = 0;
           await resetConversationThread(sessionId);
@@ -196,13 +280,13 @@ export const handleConnection = (io, socket) => {
           }
         }
 
-        // 6. Update session state
+        // 7. Update session state
         const updatedSession = await updateSession(sessionId, {
           questionState: nextQState,
           status: actionType === 'CONCLUDING' ? 'COMPLETED' : 'IN_PROGRESS'
         });
 
-        // 7. Broadcast state update
+        // 8. Broadcast state update
         io.to(sessionId).emit('orchestration-event', {
           type: 'STATE_UPDATE',
           payload: {
@@ -211,11 +295,11 @@ export const handleConnection = (io, socket) => {
           }
         });
 
-        // 8. Generate avatar triggers
-        const emotionHint = engineResponse.score != null && engineResponse.score > 7 ? 'HAPPY' : 'CURIOUS';
+        // 9. Generate avatar triggers
+        const emotionHint = 'CURIOUS'; // Baseline since score is calculated asynchronously
         const avatarAction = await generateAvatarAction(nextQuestionText, emotionHint);
 
-        // 9. Broadcast INTERVIEWER_ACTION with evaluation details
+        // 10. Broadcast INTERVIEWER_ACTION
         io.to(sessionId).emit('orchestration-event', {
           type: 'INTERVIEWER_ACTION',
           payload: {
@@ -223,8 +307,8 @@ export const handleConnection = (io, socket) => {
             actionType,
             text: nextQuestionText,
             reasoning: engineResponse.reasoning,
-            score: engineResponse.score,
-            evaluation: engineResponse.evaluation,
+            score: null,
+            evaluation: '',
             isFallback: engineResponse.isFallback,
             audioUrl: null,
             avatarTriggers: avatarAction

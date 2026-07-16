@@ -53,7 +53,7 @@ public class DifficultyDistributor {
         Map<String, Integer> categoryCounts = calculateCategoryDistribution(totalQuestions, level, overallMatchScore);
 
         // 2. Select items and assign difficulty
-        return assignQuestions(categoryCounts, items);
+        return assignQuestions(categoryCounts, items, level);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -185,20 +185,42 @@ public class DifficultyDistributor {
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * Determines item-level difficulty.
+     * Determines item-level difficulty based on dynamic seniority-difficulty matrix.
      * INVARIANT: overallMatchScore MUST NOT be used here to preserve cache consistency.
      */
-    private String mapDifficulty(String status) {
-        if (status == null) return "medium"; // baseline
-        return switch (status.toLowerCase().strip()) {
-            case "missing" -> "easy";
-            case "weak"    -> "medium";
-            case "matched" -> "hard";
-            default        -> "medium";
+    private String mapDifficulty(String status, SeniorityLevel level) {
+        if (level == null) level = SeniorityLevel.MID;
+        String normStatus = status != null ? status.toLowerCase().strip() : "weak";
+
+        return switch (level) {
+            case INTERN, FRESHER -> switch (normStatus) {
+                case "matched" -> systemSettingRepository.getString("DIFF_INTERN_FRESHER_MATCHED", "medium");
+                case "weak" -> systemSettingRepository.getString("DIFF_INTERN_FRESHER_WEAK", "easy");
+                case "missing" -> systemSettingRepository.getString("DIFF_INTERN_FRESHER_MISSING", "easy");
+                default -> "easy";
+            };
+            case JUNIOR -> switch (normStatus) {
+                case "matched" -> systemSettingRepository.getString("DIFF_JUNIOR_MATCHED", "medium");
+                case "weak" -> systemSettingRepository.getString("DIFF_JUNIOR_WEAK", "medium");
+                case "missing" -> systemSettingRepository.getString("DIFF_JUNIOR_MISSING", "easy");
+                default -> "medium";
+            };
+            case MID -> switch (normStatus) {
+                case "matched" -> systemSettingRepository.getString("DIFF_MID_MATCHED", "hard");
+                case "weak" -> systemSettingRepository.getString("DIFF_MID_WEAK", "medium");
+                case "missing" -> systemSettingRepository.getString("DIFF_MID_MISSING", "medium");
+                default -> "medium";
+            };
+            case SENIOR, LEAD -> switch (normStatus) {
+                case "matched" -> systemSettingRepository.getString("DIFF_SENIOR_LEAD_MATCHED", "hard");
+                case "weak" -> systemSettingRepository.getString("DIFF_SENIOR_LEAD_WEAK", "medium");
+                case "missing" -> systemSettingRepository.getString("DIFF_SENIOR_LEAD_MISSING", "medium");
+                default -> "medium";
+            };
         };
     }
 
-    private List<QuestionAssignment> assignQuestions(Map<String, Integer> categoryCounts, List<EvidenceItemPair> items) {
+    private List<QuestionAssignment> assignQuestions(Map<String, Integer> categoryCounts, List<EvidenceItemPair> items, SeniorityLevel level) {
         List<QuestionAssignment> assignments = new ArrayList<>();
 
         // Ensure non-null items list
@@ -229,27 +251,62 @@ public class DifficultyDistributor {
             safeItems.add(0, topMatched);
         }
 
-        int itemIndex = 0;
-        int pass = 0;
+        // Keep track of how many times each item has been assigned
+        Map<EvidenceItemPair, Integer> itemUsageCounts = new LinkedHashMap<>();
+        for (EvidenceItemPair item : safeItems) {
+            itemUsageCounts.put(item, 0);
+        }
 
         for (Map.Entry<String, Integer> entry : categoryCounts.entrySet()) {
-            String category = entry.getKey();
+            String category = entry.getKey(); // e.g., "behavioural", "technical", "coding", "system_design"
             int count = entry.getValue();
 
             for (int i = 0; i < count; i++) {
                 EvidenceItemPair assignedItem = null;
-                boolean isFollowUp = pass > 0;
 
                 if (!safeItems.isEmpty()) {
-                    assignedItem = safeItems.get(itemIndex);
-                    itemIndex++;
-                    if (itemIndex >= safeItems.size()) {
-                        itemIndex = 0;
-                        pass++;
+                    // Find matching items (matching questionType category)
+                    List<EvidenceItemPair> matchingCategoryItems = new ArrayList<>();
+                    for (EvidenceItemPair item : safeItems) {
+                        if (item.questionType() != null && item.questionType().equalsIgnoreCase(category)) {
+                            matchingCategoryItems.add(item);
+                        }
+                    }
+
+                    if (!matchingCategoryItems.isEmpty()) {
+                        // Pick the matching item with the lowest usage count.
+                        // Since safeItems is pre-sorted by weight DESC, iterating from first to last preserves weight priority.
+                        assignedItem = matchingCategoryItems.get(0);
+                        int minUsage = itemUsageCounts.get(assignedItem);
+                        for (EvidenceItemPair item : matchingCategoryItems) {
+                            if (itemUsageCounts.get(item) < minUsage) {
+                                minUsage = itemUsageCounts.get(item);
+                                assignedItem = item;
+                            }
+                        }
+                    } else {
+                        // Fallback: Pick any item in safeItems with the lowest usage count.
+                        assignedItem = safeItems.get(0);
+                        int minUsage = itemUsageCounts.get(assignedItem);
+                        for (EvidenceItemPair item : safeItems) {
+                            if (itemUsageCounts.get(item) < minUsage) {
+                                minUsage = itemUsageCounts.get(item);
+                                assignedItem = item;
+                            }
+                        }
+                    }
+
+                    if (assignedItem != null) {
+                        // Increment usage count
+                        int usage = itemUsageCounts.get(assignedItem);
+                        itemUsageCounts.put(assignedItem, usage + 1);
                     }
                 }
 
-                String difficulty = assignedItem != null ? mapDifficulty(assignedItem.status()) : "medium";
+                int usage = assignedItem != null ? itemUsageCounts.get(assignedItem) : 0;
+                boolean isFollowUp = usage > 1;
+
+                String difficulty = assignedItem != null ? mapDifficulty(assignedItem.status(), level) : "medium";
                 assignments.add(new QuestionAssignment(assignedItem, category, difficulty, isFollowUp));
             }
         }

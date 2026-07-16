@@ -3,7 +3,6 @@ package fit.iuh.modules.assessment;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fit.iuh.config.PromptTemplateConfig;
-import fit.iuh.exception.LlmApiException;
 import fit.iuh.dto.chat.LlmChatRequest;
 import fit.iuh.dto.chat.LlmChatResponse;
 import fit.iuh.config.AppProperties;
@@ -16,8 +15,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;

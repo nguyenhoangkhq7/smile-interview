@@ -41,9 +41,20 @@ public class InterviewEvaluationService {
     // ─────────────────────────────────────────────────────────────────────────
 
     public EvaluationResult evaluate(InferenceRequest request) {
-        String systemPrompt = buildEvalSystemPrompt(
-                request.getTargetJobTitle(),
-                request.getInterviewDomain());
+        boolean fastMode = request.getFastMode();
+        String systemPrompt;
+        if (fastMode) {
+            systemPrompt = buildEvalSystemPromptFast(
+                    request.getTargetJobTitle(),
+                    request.getInterviewDomain(),
+                    request.getCvText());
+        } else {
+            systemPrompt = buildEvalSystemPrompt(
+                    request.getTargetJobTitle(),
+                    request.getInterviewDomain(),
+                    request.getCvText(),
+                    request.getGoodAnswerSignalsList());
+        }
         String userPrompt = buildEvalUserPrompt(request);
 
         try {
@@ -85,11 +96,12 @@ public class InterviewEvaluationService {
     // System prompts
     // ─────────────────────────────────────────────────────────────────────────
 
-    private String buildEvalSystemPrompt(String targetJobTitle, String interviewDomain) {
+    private String buildEvalSystemPrompt(String targetJobTitle, String interviewDomain, String cvText, List<String> goodAnswerSignals) {
         String domain = (interviewDomain == null || interviewDomain.isBlank()) ? "IT" : interviewDomain;
         String jobTitle = (targetJobTitle == null || targetJobTitle.isBlank()) ? "Software Engineer" : targetJobTitle;
 
-        return """
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format("""
                 Bạn là một chuyên gia phỏng vấn tuyển dụng cấp cao cho vị trí "%s"
                 thuộc lĩnh vực "%s". Nhiệm vụ của bạn là đóng vai LLM-as-a-judge để
                 đánh giá MỘT câu trả lời của ứng viên trong ngữ cảnh cuộc phỏng vấn đang diễn ra.
@@ -100,6 +112,26 @@ public class InterviewEvaluationService {
                 2. Độ liên quan & bao phủ: Trả lời có đúng trọng tâm câu hỏi? Có bao quát các
                    khía cạnh kỹ thuật quan trọng không?
                 3. Ứng dụng thực tế: Có ví dụ/tình huống/kết quả cụ thể (STAR) không, hay chỉ lý thuyết?
+                """, jobTitle, domain));
+
+        if (goodAnswerSignals != null && !goodAnswerSignals.isEmpty()) {
+            sb.append("\n## Bước 1.5 — So sánh với Tín hiệu trả lời tốt (Good Answer Signals)\n");
+            sb.append("Hãy đối chiếu câu trả lời của ứng viên với các tín hiệu/từ khóa kỹ thuật mong đợi sau:\n");
+            for (String signal : goodAnswerSignals) {
+                sb.append("- ").append(signal).append("\n");
+            }
+            sb.append("Chấm điểm dựa trên tỷ lệ bao phủ của các tín hiệu này.\n");
+        }
+
+        if (cvText != null && !cvText.isBlank()) {
+            sb.append("\n## Bước 1.6 — Tham chiếu CV của ứng viên để đặt câu hỏi phụ (Cá nhân hóa)\n");
+            sb.append("Khi sinh câu hỏi phụ (follow_up_question), hãy tìm kiếm các dự án hoặc công nghệ liên quan trong CV dưới đây để đặt câu hỏi liên hệ thực tế của ứng viên đó:\n");
+            sb.append("=== CV CỦA ỨNG VIÊN ===\n");
+            sb.append(cvText).append("\n");
+            sb.append("=======================\n");
+        }
+
+        sb.append("""
 
                 ## Bước 2 — Chấm điểm (rubric bắt buộc)
                 - 9-10: Trả lời đầy đủ, chính xác, có ví dụ thực tế cụ thể, thể hiện chiều sâu chuyên môn rõ ràng.
@@ -129,7 +161,48 @@ public class InterviewEvaluationService {
                   "score": <số nguyên 0-10>,
                   "evaluation": "Điểm mạnh: ...\\nĐiểm yếu / Hạn chế: ...\\nGợi ý bổ sung: ..."
                 }
-                """.formatted(jobTitle, domain);
+                """);
+
+        return sb.toString();
+    }
+
+    private String buildEvalSystemPromptFast(String targetJobTitle, String interviewDomain, String cvText) {
+        String domain = (interviewDomain == null || interviewDomain.isBlank()) ? "IT" : interviewDomain;
+        String jobTitle = (targetJobTitle == null || targetJobTitle.isBlank()) ? "Software Engineer" : targetJobTitle;
+
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format("""
+                Bạn là một chuyên gia phỏng vấn tuyển dụng cấp cao cho vị trí "%s"
+                thuộc lĩnh vực "%s". Nhiệm vụ của bạn là đưa ra quyết định đi tiếp hay hỏi câu hỏi phụ đối với câu trả lời vừa rồi của ứng viên.
+
+                ## Quyết định đi tiếp (decision):
+                - FOLLOW_UP: câu trả lời chưa trọn vẹn, còn khía cạnh cụ thể đáng để hỏi sâu thêm VÀ current_follow_up_count < max_follow_up_count.
+                - NEXT_TOPIC: câu trả lời đạt yêu cầu xuất sắc, HOẶC ứng viên nói không biết, HOẶC đã đạt max_follow_up_count, HOẶC câu trả lời quá kém.
+                """, jobTitle, domain));
+
+        if (cvText != null && !cvText.isBlank()) {
+            sb.append("\n## Tham chiếu CV của ứng viên để đặt câu hỏi phụ (Cá nhân hóa)\n");
+            sb.append("Khi sinh câu hỏi phụ (follow_up_question), hãy tìm kiếm các dự án hoặc công nghệ liên quan trong CV dưới đây để đặt câu hỏi liên hệ thực tế của ứng viên đó:\n");
+            sb.append("=== CV CỦA ỨNG VIÊN ===\n");
+            sb.append(cvText).append("\n");
+            sb.append("=======================\n");
+        }
+
+        sb.append("""
+
+                ## Sinh câu hỏi phụ (follow_up_question):
+                - Nếu chọn FOLLOW_UP: sinh 1 câu hỏi đào sâu ngắn gọn, nhắm thẳng vào phần chưa rõ hoặc thiếu trong câu trả lời của ứng viên.
+                - Nếu chọn NEXT_TOPIC: để chuỗi rỗng "".
+
+                ## Output — CHỈ trả JSON đúng schema, không thêm bất kỳ văn bản nào khác ngoài JSON:
+                {
+                  "decision": "FOLLOW_UP" hoặc "NEXT_TOPIC",
+                  "follow_up_question": "...",
+                  "reasoning": "1 câu ngắn gọn giải thích vì sao chọn decision này"
+                }
+                """);
+
+        return sb.toString();
     }
 
     private String buildFinalReportSystemPrompt(String targetJobTitle) {

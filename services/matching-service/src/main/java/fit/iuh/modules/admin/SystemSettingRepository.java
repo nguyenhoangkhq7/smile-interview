@@ -38,4 +38,18 @@ public interface SystemSettingRepository extends JpaRepository<SystemSetting, St
                 })
                 .orElse(defaultValue);
     }
+
+    /**
+     * Convenience method: reads the string value for a given key,
+     * returning the provided default if the key is absent.
+     *
+     * @param settingKey   the setting key to look up
+     * @param defaultValue fallback value used if key is missing
+     * @return setting value, or {@code defaultValue}
+     */
+    default String getString(String settingKey, String defaultValue) {
+        return findBySettingKey(settingKey)
+                .map(SystemSetting::getSettingValue)
+                .orElse(defaultValue);
+    }
 }

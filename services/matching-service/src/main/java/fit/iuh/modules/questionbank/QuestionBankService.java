@@ -8,6 +8,8 @@ import fit.iuh.modules.ingestion.DocumentType;
 import fit.iuh.modules.ingestion.SessionDocument;
 import fit.iuh.modules.ingestion.SessionDocumentRepository;
 import fit.iuh.exception.QuestionBankException;
+import fit.iuh.modules.rulengine.EvaluationCriteria;
+import fit.iuh.modules.rulengine.EvaluationCriteriaRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -17,6 +19,8 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 
 /**
  * Orchestrates the full Question Bank generation pipeline: loading data,
@@ -51,6 +55,7 @@ public class QuestionBankService {
     private final ObjectMapper objectMapper;
     private final SemanticCacheKeyGenerator cacheKeyGenerator;
     private final SemanticCacheService cacheService;
+    private final EvaluationCriteriaRepository evaluationCriteriaRepository;
 
     /**
      * Generates a personalized question bank for a session.
@@ -97,22 +102,23 @@ public class QuestionBankService {
                 .distinct()
                 .collect(Collectors.toList());
 
-        // techStackPossessed: cvEvidence of ALL matched/weak items (simple, no tech filtering)
-        // Rationale: all evidence fields are used as LLM context hints; minor non-tech items are harmless.
-        List<String> techStackPossessed = allEvidencePairs.stream()
+        // techStackPossessed: cvEvidence of ALL matched/weak items (normalized via regex dictionary)
+        List<String> rawTechPossessed = allEvidencePairs.stream()
                 .filter(p -> "matched".equalsIgnoreCase(p.status()) || "weak".equalsIgnoreCase(p.status()))
                 .map(EvidenceItemPair::cvEvidence)
                 .filter(s -> s != null && !s.isBlank())
                 .distinct()
                 .collect(Collectors.toList());
+        List<String> techStackPossessed = extractTechKeywords(rawTechPossessed);
 
-        // techStackRequired: jdRequirement of ALL missing items
-        List<String> techStackRequired = allEvidencePairs.stream()
+        // techStackRequired: jdRequirement of ALL missing items (normalized via regex dictionary)
+        List<String> rawTechRequired = allEvidencePairs.stream()
                 .filter(p -> "missing".equalsIgnoreCase(p.status()))
                 .map(EvidenceItemPair::jdRequirement)
                 .filter(s -> s != null && !s.isBlank())
                 .distinct()
                 .collect(Collectors.toList());
+        List<String> techStackRequired = extractTechKeywords(rawTechRequired);
 
         // targetDomain: keyword heuristic on CV/JD markdown (kept as-is until AssessmentService stores it)
         SessionDocument cvDoc = documentRepo.findBySessionIdAndDocumentType(sessionId, DocumentType.CV)
@@ -412,6 +418,19 @@ public class QuestionBankService {
     private List<EvidenceItemPair> buildEvidencePairs(ResumeAssessment assessment) {
         List<EvidenceItemPair> pairs = new ArrayList<>();
 
+        // Load all evaluation criteria to map criteriaId -> questionType
+        Map<Long, String> criteriaIdToTypeMap = new HashMap<>();
+        try {
+            List<EvaluationCriteria> allCriteria = evaluationCriteriaRepository.findAll();
+            for (EvaluationCriteria ec : allCriteria) {
+                if (ec.getId() != null) {
+                    criteriaIdToTypeMap.put(ec.getId(), ec.getQuestionType() != null ? ec.getQuestionType() : "technical");
+                }
+            }
+        } catch (Exception e) {
+            log.error("[QuestionBank] Failed to load evaluation criteria for question types", e);
+        }
+
         // 1. Standard evidence items — sorted by weight descending, capped at MAX
         if (assessment.getEvidenceItems() != null) {
             assessment.getEvidenceItems().stream()
@@ -428,7 +447,8 @@ public class QuestionBankService {
                             item.cvEvidence(),
                             item.status(),
                             item.reasoning(),
-                            item.weightUsed()
+                            item.weightUsed(),
+                            criteriaIdToTypeMap.getOrDefault(item.criteriaId(), "technical")
                     )));
         }
 
@@ -445,7 +465,8 @@ public class QuestionBankService {
                             item.cvEvidence(),
                             item.status(),
                             item.reasoning(),
-                            null            // no weight for ad-hoc items
+                            null,            // no weight for ad-hoc items
+                            "technical"      // default question type for ad-hoc is technical
                     )));
         }
 
@@ -520,5 +541,206 @@ public class QuestionBankService {
                 .questionBank(entity.getQuestionBankJson())
                 .createdAt(entity.getCreatedAt())
                 .build();
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Technology Dictionary & Regex Extraction Helpers
+    // ──────────────────────────────────────────────────────────────────────────
+
+    private static final Set<String> TECH_DICTIONARY = Set.of(
+        "java", "spring boot", "spring", "hibernate", "jpa", "mybatis", "kotlin", "scala", "groovy", "maven", "gradle",
+        "node.js", "nodejs", "express", "koa", "nestjs", "typescript", "javascript", "react", "redux", "next.js", "nextjs",
+        "vue", "vuex", "nuxtjs", "nuxt", "angular", "html", "css", "sass", "less", "tailwind", "bootstrap", "python",
+        "django", "flask", "fastapi", "pytorch", "tensorflow", "keras", "numpy", "pandas", "scikit-learn", "golang", "go",
+        "ruby", "rails", "php", "laravel", "symfony", "c#", ".net", "asp.net", "entity framework", "c++", "c", "rust",
+        "swift", "objective-c", "flutter", "react native", "xamarin", "cordova", "ionic", "mysql", "postgresql", "postgres",
+        "oracle", "sql server", "sqlite", "mongodb", "redis", "memcached", "cassandra", "dynamodb", "neo4j", "elasticsearch",
+        "solr", "rabbitmq", "kafka", "activemq", "sqs", "aws", "ecr", "ecs", "eks", "lambda", "s3", "rds", "azure", "gcp",
+        "docker", "kubernetes", "k8s", "jenkins", "gitlab ci", "github actions", "travis ci", "circleci", "ansible", "terraform",
+        "cloudformation", "git", "svn", "agile", "scrum", "kanban", "jira", "confluence", "junit", "mockito", "selenium",
+        "cypress", "playwright", "jest", "mocha", "chai", "postman", "restassured", "jmeter", "prometheus", "grafana",
+        "elk", "splunk", "sonarqube", "rest", "graphql", "grpc", "ci/cd", "microservices", "api", "etl", "elt", "rag", "star schema",
+        "snowflake", "arc"
+    );
+
+    private static final Map<String, String> TECH_CAPITALIZATION_MAP;
+    static {
+        Map<String, String> m = new HashMap<>();
+        m.put("java", "Java");
+        m.put("spring boot", "Spring Boot");
+        m.put("spring", "Spring");
+        m.put("hibernate", "Hibernate");
+        m.put("jpa", "JPA");
+        m.put("mybatis", "MyBatis");
+        m.put("kotlin", "Kotlin");
+        m.put("scala", "Scala");
+        m.put("groovy", "Groovy");
+        m.put("maven", "Maven");
+        m.put("gradle", "Gradle");
+        m.put("node.js", "Node.js");
+        m.put("nodejs", "Node.js");
+        m.put("express", "Express");
+        m.put("koa", "Koa");
+        m.put("nestjs", "NestJS");
+        m.put("typescript", "TypeScript");
+        m.put("javascript", "JavaScript");
+        m.put("react", "React");
+        m.put("redux", "Redux");
+        m.put("next.js", "Next.js");
+        m.put("nextjs", "Next.js");
+        m.put("vue", "Vue");
+        m.put("vuex", "Vuex");
+        m.put("nuxtjs", "Nuxt.js");
+        m.put("nuxt", "Nuxt.js");
+        m.put("angular", "Angular");
+        m.put("html", "HTML");
+        m.put("css", "CSS");
+        m.put("sass", "SASS");
+        m.put("less", "LESS");
+        m.put("tailwind", "Tailwind CSS");
+        m.put("bootstrap", "Bootstrap");
+        m.put("python", "Python");
+        m.put("django", "Django");
+        m.put("flask", "Flask");
+        m.put("fastapi", "FastAPI");
+        m.put("pytorch", "PyTorch");
+        m.put("tensorflow", "TensorFlow");
+        m.put("keras", "Keras");
+        m.put("numpy", "NumPy");
+        m.put("pandas", "Pandas");
+        m.put("scikit-learn", "Scikit-Learn");
+        m.put("golang", "Go");
+        m.put("go", "Go");
+        m.put("ruby", "Ruby");
+        m.put("rails", "Ruby on Rails");
+        m.put("php", "PHP");
+        m.put("laravel", "Laravel");
+        m.put("symfony", "Symfony");
+        m.put("c#", "C#");
+        m.put(".net", ".NET");
+        m.put("asp.net", "ASP.NET");
+        m.put("entity framework", "Entity Framework");
+        m.put("c++", "C++");
+        m.put("c", "C");
+        m.put("rust", "Rust");
+        m.put("swift", "Swift");
+        m.put("objective-c", "Objective-C");
+        m.put("flutter", "Flutter");
+        m.put("react native", "React Native");
+        m.put("xamarin", "Xamarin");
+        m.put("cordova", "Cordova");
+        m.put("ionic", "Ionic");
+        m.put("mysql", "MySQL");
+        m.put("postgresql", "PostgreSQL");
+        m.put("postgres", "PostgreSQL");
+        m.put("oracle", "Oracle DB");
+        m.put("sql server", "SQL Server");
+        m.put("sqlite", "SQLite");
+        m.put("mongodb", "MongoDB");
+        m.put("redis", "Redis");
+        m.put("memcached", "Memcached");
+        m.put("cassandra", "Cassandra");
+        m.put("dynamodb", "DynamoDB");
+        m.put("neo4j", "Neo4j");
+        m.put("elasticsearch", "Elasticsearch");
+        m.put("solr", "Solr");
+        m.put("rabbitmq", "RabbitMQ");
+        m.put("kafka", "Apache Kafka");
+        m.put("activemq", "ActiveMQ");
+        m.put("sqs", "AWS SQS");
+        m.put("aws", "AWS");
+        m.put("ecr", "AWS ECR");
+        m.put("ecs", "AWS ECS");
+        m.put("eks", "AWS EKS");
+        m.put("lambda", "AWS Lambda");
+        m.put("s3", "AWS S3");
+        m.put("rds", "AWS RDS");
+        m.put("azure", "Azure");
+        m.put("gcp", "GCP");
+        m.put("docker", "Docker");
+        m.put("kubernetes", "Kubernetes");
+        m.put("k8s", "Kubernetes");
+        m.put("jenkins", "Jenkins");
+        m.put("gitlab ci", "GitLab CI");
+        m.put("github actions", "GitHub Actions");
+        m.put("travis ci", "Travis CI");
+        m.put("circleci", "CircleCI");
+        m.put("ansible", "Ansible");
+        m.put("terraform", "Terraform");
+        m.put("cloudformation", "CloudFormation");
+        m.put("git", "Git");
+        m.put("svn", "SVN");
+        m.put("agile", "Agile");
+        m.put("scrum", "Scrum");
+        m.put("kanban", "Kanban");
+        m.put("jira", "Jira");
+        m.put("confluence", "Confluence");
+        m.put("junit", "JUnit");
+        m.put("mockito", "Mockito");
+        m.put("selenium", "Selenium");
+        m.put("cypress", "Cypress");
+        m.put("playwright", "Playwright");
+        m.put("jest", "Jest");
+        m.put("mocha", "Mocha");
+        m.put("chai", "Chai");
+        m.put("postman", "Postman");
+        m.put("restassured", "RestAssured");
+        m.put("jmeter", "JMeter");
+        m.put("prometheus", "Prometheus");
+        m.put("grafana", "Grafana");
+        m.put("elk", "ELK Stack");
+        m.put("splunk", "Splunk");
+        m.put("sonarqube", "SonarQube");
+        m.put("rest", "REST API");
+        m.put("graphql", "GraphQL");
+        m.put("grpc", "gRPC");
+        m.put("ci/cd", "CI/CD");
+        m.put("microservices", "Microservices");
+        m.put("api", "API");
+        m.put("etl", "ETL");
+        m.put("elt", "ELT");
+        m.put("rag", "RAG");
+        m.put("star schema", "Star Schema");
+        m.put("snowflake", "Snowflake");
+        m.put("arc", "ARC");
+        TECH_CAPITALIZATION_MAP = Collections.unmodifiableMap(m);
+    }
+
+    public static List<String> extractTechKeywords(List<String> rawTexts) {
+        if (rawTexts == null || rawTexts.isEmpty()) {
+            return Collections.emptyList();
+        }
+        
+        Set<String> matchedTechs = new LinkedHashSet<>();
+        
+        for (String text : rawTexts) {
+            if (text == null || text.isBlank()) continue;
+            
+            String lowerText = text.toLowerCase();
+            
+            for (String tech : TECH_DICTIONARY) {
+                String escapedTech = Pattern.quote(tech);
+                String regex;
+                if (tech.endsWith("+") || tech.endsWith("#") || tech.startsWith(".")) {
+                    regex = "(?i)(?<=^|[^a-zA-Z0-9])" + escapedTech + "(?=$|[^a-zA-Z0-9])";
+                } else {
+                    regex = "(?i)\\b" + escapedTech + "\\b";
+                }
+                
+                if (Pattern.compile(regex).matcher(lowerText).find()) {
+                    matchedTechs.add(capitalizeTech(tech));
+                }
+            }
+        }
+        return new ArrayList<>(matchedTechs);
+    }
+
+    private static String capitalizeTech(String tech) {
+        if (tech == null) return "";
+        String mapped = TECH_CAPITALIZATION_MAP.get(tech.toLowerCase());
+        if (mapped != null) {
+            return mapped;
+        }
+        return tech.substring(0, 1).toUpperCase() + tech.substring(1);
     }
 }

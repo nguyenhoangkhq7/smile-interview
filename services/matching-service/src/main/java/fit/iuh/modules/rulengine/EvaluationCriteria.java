@@ -49,4 +49,7 @@ public class EvaluationCriteria {
      */
     @Column(name = "prompt_instruction", nullable = false, columnDefinition = "TEXT")
     private String promptInstruction;
+
+    @Column(name = "question_type", length = 50)
+    private String questionType;
 }

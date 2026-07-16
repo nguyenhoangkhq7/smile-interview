@@ -54,7 +54,10 @@ export const evaluateCandidateResponse = (request) => {
         question: ctx.question || '',
         answer: ctx.answer || '',
         was_follow_up: ctx.wasFollowUp || false
-      }))
+      })),
+      fast_mode: request.fastMode || false,
+      cv_text: request.cvText || '',
+      good_answer_signals: request.goodAnswerSignals || []
     };
 
     client.EvaluateResponse(grpcRequest, (error, response) => {
