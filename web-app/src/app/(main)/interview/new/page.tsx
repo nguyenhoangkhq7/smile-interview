@@ -280,6 +280,16 @@ const DESCRIPTOR_WORDS = new Set([
   'proficiency', 'understanding', 'overview', 'introduction',
   'development', 'implementation', 'integration', 'systems', 'system',
   'and', 'or', 'the', 'for', 'with', 'using', 'via',
+  // Vietnamese prepositions and common filler words
+  'trong', 'tại', 'ở', 'cho', 'với', 'như', 'các', 'những', 'của', 'và', 'hoặc',
+  'để', 'về', 'bằng', 'từ', 'đến', 'trên', 'dưới', 'một', 'hai', 'ba', 'nhiều',
+  // Vietnamese descriptive terms (often used in criteria names)
+  'phát', 'triển', 'xây', 'dựng', 'sử', 'dụng', 'thiết', 'kế', 'quản', 'lý',
+  'tối', 'ưu', 'triển', 'khai', 'áp', 'dụng', 'thực', 'hiện', 'phân', 'tích',
+  'đánh', 'giá', 'chức', 'năng', 'hệ', 'thống', 'công', 'cụ', 'kỹ', 'năng',
+  'kinh', 'nghiệm', 'kiến', 'thức', 'hiểu', 'biết', 'nền', 'tảng', 'ngôn', 'ngữ',
+  'quy', 'trình', 'phương', 'pháp', 'dự', 'án', 'ứng', 'dụng', 'vị', 'trí',
+  'yêu', 'cầu', 'tiêu', 'chí', 'đối', 'chiếu', 'khả', 'năng'
 ]);
 
 function splitCriteriaName(name: string): string[] {
@@ -347,6 +357,24 @@ function extractKeywordsFromEvaluation(evidenceItems: any[], additionalEvidenceI
     missingSkills: dedupe(missingSkills)
   };
 }
+
+const getDisplayRoleTitle = (rawRole: string | null | undefined) => {
+  if (!rawRole) return 'Software Engineer';
+  const roleUpper = rawRole.toUpperCase();
+  const roleMapping: Record<string, string> = {
+    BACKEND: 'Backend Engineer',
+    FRONTEND: 'Frontend Engineer',
+    FULLSTACK: 'Fullstack Engineer',
+    DEVOPS: 'DevOps Engineer',
+    DATA_ENGINEERING: 'Data Engineer',
+    ML_ENGINEERING: 'ML Engineer',
+    MOBILE: 'Mobile Developer',
+    SECURITY: 'Security Engineer',
+    QA: 'QA/QC Engineer',
+    OTHER: 'Software Engineer'
+  };
+  return roleMapping[roleUpper] || rawRole;
+};
 
 export default function NewInterviewPage() {
   const router = useRouter();
@@ -719,11 +747,20 @@ export default function NewInterviewPage() {
                 ? 'JD_Pasted_Text.txt'
                 : (savedJds.find(j => j.id === selectedJdId)?.title || 'Saved_JD.pdf'));
 
+            const initialRoleTitle = 
+              jdSource === 'saved' && selectedJdId
+                ? (savedJds.find(j => j.id === selectedJdId)?.title || 'Software Engineer')
+                : jdSource === 'upload' && jdFile
+                ? jdFile.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ')
+                : 'Software Engineer';
+
+            setRoleTitle(initialRoleTitle);
+
             await historyService.saveSession({
               id: newSessionId,
               date: new Date().toISOString(),
               interviewType: 'Technical',
-              roleTitle,
+              roleTitle: initialRoleTitle,
               cvFilename: displayCvName,
               jdFilename: displayJdName,
               status: 'In progress',
@@ -815,11 +852,21 @@ export default function NewInterviewPage() {
           ? 'JD_Pasted_Text.txt'
           : (savedJds.find(j => j.id === selectedJdId)?.title || 'Saved_JD.pdf'));
 
+      const finalRoleTitle = result.roleTypeDetected
+        ? getDisplayRoleTitle(result.roleTypeDetected)
+        : jdSource === 'saved' && selectedJdId
+        ? (savedJds.find(j => j.id === selectedJdId)?.title || 'Software Engineer')
+        : jdSource === 'upload' && jdFile
+        ? jdFile.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ')
+        : 'Software Engineer';
+
+      setRoleTitle(finalRoleTitle);
+
       await historyService.saveSession({
         id: result.sessionId || sessionId,
         date: new Date().toISOString(),
         interviewType: 'Technical',
-        roleTitle,
+        roleTitle: finalRoleTitle,
         cvFilename: displayCvName,
         jdFilename: displayJdName,
         resumeId: selectedResumeId || undefined,
@@ -904,7 +951,8 @@ export default function NewInterviewPage() {
         improvements: '',
         suggestedAnswer: '',
         topicTag: q.topic || '',
-        isDeepDive: false
+        isDeepDive: false,
+        goodAnswerSignals: q.good_answer_signals || q.goodAnswerSignals || []
       }));
 
       // Persist the assessment result and generated questions (including follow-ups) to the existing session draft
@@ -912,13 +960,13 @@ export default function NewInterviewPage() {
         id: assessment.sessionId,
         date: new Date().toISOString(),
         interviewType: 'Technical',
-        roleTitle,
+        roleTitle: assessment.roleTypeDetected ? getDisplayRoleTitle(assessment.roleTypeDetected) : roleTitle,
         cvFilename: displayCvName,
         jdFilename: displayJdName,
         resumeId: selectedResumeId || undefined,
         jdId: selectedJdId || undefined,
         status: 'In progress',
-        questions: [],
+        questions: questionsToSave,
         replaceQuestions: true,
         competencyFitScore: assessment.competencyFitScore,
         technicalDepthScore: assessment.technicalDepthScore,
@@ -1594,7 +1642,7 @@ export default function NewInterviewPage() {
                       }}
                     >
                       <Target size={16} />
-                      <span>Đối chiếu từ khóa (Jobscan)</span>
+                      <span>Đối chiếu từ khóa</span>
                     </button>
                   </div>
                 </div>

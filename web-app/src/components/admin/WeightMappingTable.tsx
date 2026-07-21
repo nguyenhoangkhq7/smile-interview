@@ -401,7 +401,7 @@ function CategoryTreeNode({
       </div>
 
       {isExpanded && hasChildren && (
-        <div className="ml-5 mt-2 space-y-1 relative pl-0">
+        <div className="mt-2 space-y-1 relative" style={{ marginLeft: '24px', paddingLeft: 0 }}>
           {childrenItems.map((item, index) => {
             const isLast = index === childrenItems.length - 1;
             const itemMidHeight = item.type === 'category' ? (isTopLevel ? 28 : 20) : 22; // adjusted vertical branch segment anchor
@@ -410,22 +410,30 @@ function CategoryTreeNode({
               <div key={item.id} className="relative">
                 {/* Vertical connecting line segment */}
                 <div
-                  className="absolute left-[-16px] w-[1px] bg-slate-700/50"
+                  className="absolute bg-slate-700/50"
                   style={{
+                    position: 'absolute',
+                    left: '-20px',
+                    width: '1px',
+                    backgroundColor: 'rgba(51, 65, 85, 0.5)',
                     top: '-8px',
                     bottom: isLast ? `calc(100% - ${itemMidHeight}px)` : '-8px',
                   }}
                 />
                 {/* Horizontal branch line pointing to child icon */}
                 <div 
-                  className="absolute left-[-16px] h-[1px] bg-slate-700/50"
+                  className="absolute bg-slate-700/50"
                   style={{
+                    position: 'absolute',
+                    left: '-20px',
+                    height: '1px',
+                    backgroundColor: 'rgba(51, 65, 85, 0.5)',
                     top: `${itemMidHeight}px`,
-                    width: '16px',
+                    width: '20px',
                   }}
                 />
 
-                <div className="pl-5">
+                <div style={{ paddingLeft: '24px' }}>
                   {item.type === 'category' ? (
                     <CategoryTreeNode
                       node={item.data as CategoryTreeNodeData}

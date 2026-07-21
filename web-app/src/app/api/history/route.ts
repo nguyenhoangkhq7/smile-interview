@@ -64,7 +64,8 @@ export async function GET() {
             improvements: t.improvements,
             suggestedAnswer: t.suggested_answer,
             topicTag: t.topic_tag,
-            isDeepDive: t.is_deep_dive
+            isDeepDive: t.is_deep_dive,
+            goodAnswerSignals: parseJsonField(t.good_answer_signals) || []
           }))
         };
       })
@@ -165,8 +166,8 @@ export async function POST(request: NextRequest) {
         for (const t of session.questions) {
           const insertTurnSql = `
             INSERT INTO session_turns (
-              session_id, question, answer, score, strengths, improvements, suggested_answer, topic_tag, is_deep_dive
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+              session_id, question, answer, score, strengths, improvements, suggested_answer, topic_tag, is_deep_dive, good_answer_signals
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
           `;
           await query(insertTurnSql, [
             session.id,
@@ -177,7 +178,8 @@ export async function POST(request: NextRequest) {
             t.improvements,
             t.suggestedAnswer,
             t.topicTag,
-            t.isDeepDive
+            t.isDeepDive,
+            t.goodAnswerSignals ? JSON.stringify(t.goodAnswerSignals) : null
           ]);
         }
       }

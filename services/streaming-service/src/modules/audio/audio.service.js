@@ -51,6 +51,7 @@ export const transcribeAudio = async (fileBuffer, originalName) => {
   const formData = new FormData();
   formData.append('file', audioBlob, originalName);
   formData.append('model', whisperModel);
+  formData.append('language', 'vi');
   formData.append('prompt', 'Cao Thanh Đông, Backend, Java, Spring Boot, RESTful API, MySQL, Git, Docker, IT, Công nghệ thông tin');
 
   let response;
