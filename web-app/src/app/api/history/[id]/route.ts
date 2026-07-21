@@ -71,7 +71,8 @@ export async function GET(
         improvements: t.improvements,
         suggestedAnswer: t.suggested_answer,
         topicTag: t.topic_tag,
-        isDeepDive: t.is_deep_dive
+        isDeepDive: t.is_deep_dive,
+        goodAnswerSignals: parseJsonField(t.good_answer_signals) || []
       }))
     };
 

@@ -44,6 +44,10 @@ export default function InterviewSessionPage() {
 
   // Session Data & Navigation
   const [session, setSession] = useState<SessionHistoryItem | null>(null);
+  const sessionRef = useRef<SessionHistoryItem | null>(null);
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
   const [sessionState, setSessionState] = useState<SessionState>('INITIALIZING');
   const [currentQuestion, setCurrentQuestion] = useState('');
   const [questionCount, setQuestionCount] = useState(0);
@@ -626,22 +630,22 @@ export default function InterviewSessionPage() {
       if (data) {
         setSession(data);
         
-        // Resume state from history
+        // Resume state from history (only for completed turns with answers)
         if (data.questions && data.questions.length > 0) {
           const initialChatLog: any[] = [];
           let baseAnsweredCount = 0;
           data.questions.forEach((q: any) => {
-            if (q.question) {
-               const questionText = typeof q.question === 'object' && q.question !== null
-                 ? q.question.question
-                 : q.question;
-               initialChatLog.push({ sender: 'AI', text: questionText, time: formatCurrentTime(), isDeepDive: q.isDeepDive });
-            }
             if (q.answer) {
-               initialChatLog.push({ sender: 'User', text: q.answer, time: formatCurrentTime() });
-               if (!q.isDeepDive) {
-                 baseAnsweredCount++;
-               }
+              if (q.question) {
+                 const questionText = typeof q.question === 'object' && q.question !== null
+                   ? q.question.question
+                   : q.question;
+                 initialChatLog.push({ sender: 'AI', text: questionText, time: formatCurrentTime(), isDeepDive: q.isDeepDive });
+              }
+              initialChatLog.push({ sender: 'User', text: q.answer, time: formatCurrentTime() });
+              if (!q.isDeepDive) {
+                baseAnsweredCount++;
+              }
             }
           });
           console.log('[Session] Reconstructed chatLog:', initialChatLog, 'baseAnsweredCount:', baseAnsweredCount);
@@ -825,6 +829,27 @@ export default function InterviewSessionPage() {
         } else if (data.payload.status === 'IN_PROGRESS') {
            // User rejoined an in-progress session, let them continue speaking
            setSessionState('LISTENING');
+
+           // Auto-reconstruct current active question if not present
+           const activeSess = sessionRef.current;
+           if (!currentQuestionRef.current && activeSess && activeSess.questions && activeSess.questions.length > 0) {
+              const qState = data.payload.questionState;
+              const idx = qState?.baseQuestionIndex ?? 0;
+              const currentQ = activeSess.questions[idx];
+              if (currentQ) {
+                 const qText = currentQ.question;
+                 setCurrentQuestion(qText);
+                 currentQuestionRef.current = qText;
+                 
+                 setChatLog((prev) => {
+                    const exists = prev.some(log => log.sender === 'AI' && log.text === qText);
+                    if (!exists) {
+                       return [...prev, { sender: 'AI', text: qText, time: formatCurrentTime(), isDeepDive: currentQ.isDeepDive }];
+                    }
+                    return prev;
+                 });
+              }
+           }
         }
       }
     });
@@ -920,13 +945,21 @@ export default function InterviewSessionPage() {
     if (socketRef.current?.connected) {
       let initialQuestions = [];
       try {
-        if (session?.actionableSuggestions) {
+        if (session?.questions && session.questions.length > 0) {
+          console.log('[Session] Using actual generated questions from session history:', session.questions.length);
+          initialQuestions = session.questions.map((q: any) => ({
+            question: q.question || '',
+            good_answer_signals: q.goodAnswerSignals || [],
+            topic: q.topicTag || ''
+          }));
+        } else if (session?.actionableSuggestions) {
+          console.log('[Session] Falling back to actionable suggestions for initialQuestions');
           initialQuestions = typeof session.actionableSuggestions === 'string' 
             ? JSON.parse(session.actionableSuggestions) 
             : session.actionableSuggestions;
         }
       } catch (e) {
-        console.error('Failed to parse initialQuestions from actionableSuggestions', e);
+        console.error('Failed to parse initialQuestions from session data', e);
       }
       
       console.log('[Session] Emitting join-interview with initialQuestions:', initialQuestions, 'baseQuestionIndex:', baseQuestionIndex);
@@ -1053,9 +1086,6 @@ export default function InterviewSessionPage() {
             <div className="h-4 w-[1px] bg-slate-200" />
             <div>
               <h1 className="text-sm font-semibold tracking-wide text-slate-900">Phỏng vấn Kỹ thuật</h1>
-              <p className="text-xs text-slate-500">
-                {session ? `Vị trí: ${session.roleTitle}` : 'Đang thiết lập...'}
-              </p>
             </div>
           </div>
         </header>
@@ -1121,9 +1151,6 @@ export default function InterviewSessionPage() {
           <div className="h-4 w-[1px] bg-slate-200" />
           <div>
             <h1 className="text-sm font-semibold tracking-wide text-slate-900">Phỏng vấn Kỹ thuật</h1>
-            <p className="text-xs text-slate-500">
-              {session ? `Vị trí: ${session.roleTitle}` : 'Đang thiết lập...'}
-            </p>
           </div>
         </div>
 
@@ -1278,15 +1305,6 @@ export default function InterviewSessionPage() {
             <div className="h-full flex flex-col items-center justify-center text-slate-400 text-center gap-4 py-12 bg-white min-h-[200px] animate-fade-in">
               <MessageSquare size={36} className="text-[#cbd5e1]" />
               <p className="text-sm text-[#94a3b8]">Nội dung phỏng vấn sẽ xuất hiện tại đây.</p>
-              {sessionState === 'INITIALIZING' && (
-                <button 
-                  className={styles.startBtn} 
-                  onClick={handleStartInterview}
-                >
-                  <Play size={14} className="fill-current" />
-                  <span>Bắt đầu phỏng vấn</span>
-                </button>
-              )}
             </div>
           ) : (
             <div className="flex flex-col gap-4 w-full">
@@ -1330,6 +1348,25 @@ export default function InterviewSessionPage() {
           )}
           <div ref={transcriptEndRef} />
         </div>
+
+        {/* Start / Resume trigger bar in INITIALIZING mode */}
+        {sessionState === 'INITIALIZING' && (
+          <div className="p-4 border-t border-slate-200 bg-slate-50/50 flex flex-col items-center justify-center shrink-0 w-full gap-2">
+            <p className="text-xs text-slate-500">
+              {chatLog.length > 0 
+                ? 'Nhấp vào nút dưới đây để tiếp tục buổi phỏng vấn của bạn.' 
+                : 'Nhấp vào nút dưới đây để bắt đầu buổi phỏng vấn giả lập.'}
+            </p>
+            <button 
+              className={styles.startBtn} 
+              onClick={handleStartInterview}
+              style={{ padding: '0.75rem 2rem', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <Play size={14} className="fill-current" />
+              <span>{chatLog.length > 0 ? 'Tiếp tục phỏng vấn' : 'Bắt đầu phỏng vấn'}</span>
+            </button>
+          </div>
+        )}
 
         {/* Inline notification warning when mic is turned off inside LISTENING state */}
         {sessionState === 'LISTENING' && !micEnabled && (

@@ -27,12 +27,21 @@ export interface HighlightedTextProps {
   keywordDetails?: Record<string, { criteriaName: string; reasoning: string }>;
 }
 
+const STOP_WORDS = new Set([
+  'at', 'in', 'on', 'the', 'and', 'of', 'to', 'a', 'an', 'by', 'for', 'with', 'about', 'from',
+  'tại', 'ở', 'và', 'cho', 'của', 'để', 'với', 'về', 'từ', 'bởi'
+]);
+
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function buildPattern(keywords: string[]): RegExp | null {
-  const nonEmpty = [...new Set(keywords.filter((k) => k && k.trim().length > 0))];
+  const nonEmpty = [...new Set(
+    keywords
+      .filter((k) => k && k.trim().length > 0)
+      .filter((k) => !STOP_WORDS.has(k.trim().toLowerCase()))
+  )];
   if (nonEmpty.length === 0) return null;
 
   const alts = nonEmpty
@@ -122,8 +131,8 @@ export default function HighlightedText({ text, matches, variations = [], missin
   const isMissing = tooltip?.type === 'missing';
 
   return (
-    <span 
-      ref={containerRef} 
+    <span
+      ref={containerRef}
       style={{ position: 'relative', display: 'block', height: '100%', width: '100%' }}
     >
       <span style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8, fontSize: '0.875rem', color: '#1e293b' }}>
@@ -132,7 +141,7 @@ export default function HighlightedText({ text, matches, variations = [], missin
             return (
               <span
                 key={idx}
-                title="✅ Kỹ năng phù hợp"
+                title="Kỹ năng phù hợp"
                 style={{
                   color: '#15803d',
                   fontWeight: 700,
@@ -216,13 +225,13 @@ export default function HighlightedText({ text, matches, variations = [], missin
         >
           {/* Header */}
           <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-            <span style={{ 
-              display: 'inline-flex', 
-              alignItems: 'center', 
-              gap: '0.35rem', 
-              fontWeight: 800, 
-              color: isMissing ? '#991b1b' : '#92400e', 
-              fontSize: '0.82rem' 
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              fontWeight: 800,
+              color: isMissing ? '#991b1b' : '#92400e',
+              fontSize: '0.82rem'
             }}>
               {isMissing ? <XCircle size={14} /> : <AlertCircle size={14} />}
               {isMissing ? 'Kỹ năng còn thiếu' : 'Biến thể kỹ năng'}
@@ -247,18 +256,18 @@ export default function HighlightedText({ text, matches, variations = [], missin
           {/* Reasoning Content */}
           <span style={{ display: 'block', margin: '0 0 0.5rem 0', color: '#334155', fontSize: '0.78rem' }}>
             {tooltip.reasoning ? tooltip.reasoning : (
-              isMissing 
+              isMissing
                 ? `Kỹ năng "${tooltip.value}" không được tìm thấy trong bản CV của bạn.`
                 : `Kỹ năng "${tooltip.value}" khớp một phần hoặc ở dạng từ khóa biến thể trong CV.`
             )}
           </span>
 
           {/* Recommendation */}
-          <span style={{ 
-            display: 'flex', 
-            alignItems: 'flex-start', 
-            gap: '0.35rem', 
-            borderTop: `1px solid ${isMissing ? '#fee2e2' : '#fef3c7'}`, 
+          <span style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '0.35rem',
+            borderTop: `1px solid ${isMissing ? '#fee2e2' : '#fef3c7'}`,
             paddingTop: '0.5rem',
             marginTop: '0.5rem',
             color: '#475569',
@@ -266,7 +275,7 @@ export default function HighlightedText({ text, matches, variations = [], missin
           }}>
             <Info size={12} style={{ marginTop: '2px', flexShrink: 0 }} />
             <span>
-              {isMissing 
+              {isMissing
                 ? 'Khuyến nghị: Bạn nên bổ sung kỹ năng này vào CV để tăng độ tương thích với mô tả công việc.'
                 : 'Khuyến nghị: Bạn nên làm rõ thế mạnh của mình bằng việc bổ sung biến thể từ khóa này vào CV.'}
             </span>
