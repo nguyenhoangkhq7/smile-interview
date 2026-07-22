@@ -46,10 +46,11 @@ export default function LoginPage() {
       } else {
         router.push('/');
       }
-    } catch (err: any) {
+    } catch (err) {
+      const axiosError = err as { response?: { data?: { detail?: string; message?: string } } };
       const msg =
-        err?.response?.data?.detail ||
-        err?.response?.data?.message ||
+        axiosError?.response?.data?.detail ||
+        axiosError?.response?.data?.message ||
         'Email hoặc mật khẩu không đúng. Vui lòng thử lại.';
       setError(msg);
     } finally {

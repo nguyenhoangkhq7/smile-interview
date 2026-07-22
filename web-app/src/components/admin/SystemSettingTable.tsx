@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { adminService, SystemSettingDto, UpdateSystemSettingPayload } from '@/services/adminService';
+import { adminService, SystemSettingDto } from '@/services/adminService';
 import { toast } from './Toast';
 import RuleDashboardSection from './rule-dashboard/RuleDashboardSection';
 import ActionIconButton from './rule-dashboard/ActionIconButton';

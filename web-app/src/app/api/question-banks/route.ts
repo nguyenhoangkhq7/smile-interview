@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
 
     const data = await backendRes.json();
     return NextResponse.json(data);
-  } catch (error: any) {
+  } catch (errorVal) { const error = errorVal as Error;
     console.error('[API Proxy QuestionBank] Error in proxy:', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }

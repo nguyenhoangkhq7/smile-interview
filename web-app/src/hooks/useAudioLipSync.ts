@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { io } from 'socket.io-client';
+import { io, Socket } from 'socket.io-client';
 
 /**
  * useAudioLipSync
@@ -18,7 +18,7 @@ export function useAudioLipSync(serverUrl: string = 'http://localhost:8001') {
   const [isConnected, setIsConnected] = useState<boolean>(false);
 
   // Refs — mutated without triggering re-renders
-  const socketRef        = useRef<any>(null);
+  const socketRef        = useRef<Socket | null>(null);
   const audioContextRef  = useRef<AudioContext | null>(null);
   const analyserRef      = useRef<AnalyserNode | null>(null);
   const audioRef         = useRef<HTMLAudioElement | null>(null);       // singleton <audio> element
@@ -35,7 +35,7 @@ export function useAudioLipSync(serverUrl: string = 'http://localhost:8001') {
     isInitializedRef.current = true;
 
     // 1. AudioContext (singleton)
-    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    const AudioContextClass = window.AudioContext || (window as Window & typeof globalThis & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     const ctx = new AudioContextClass();
     audioContextRef.current = ctx;
 
@@ -76,15 +76,15 @@ export function useAudioLipSync(serverUrl: string = 'http://localhost:8001') {
   // ── handleTTSResult ────────────────────────────────────────────────────────
   // Called each time the server streams back a TTS audio buffer.
   // ──────────────────────────────────────────────────────────────────────────
-  const handleTTSResult = useCallback(async (data: any) => {
+  const handleTTSResult = useCallback(async (data: ArrayBuffer | { buffer: ArrayBuffer } | ArrayLike<number>) => {
     // Normalise incoming data to ArrayBuffer (Socket.IO may deliver Buffer)
     let buffer: ArrayBuffer;
     if (data instanceof ArrayBuffer) {
       buffer = data;
-    } else if (data?.buffer instanceof ArrayBuffer) {
-      buffer = data.buffer;
+    } else if (data && typeof data === 'object' && 'buffer' in data && (data as { buffer: unknown }).buffer instanceof ArrayBuffer) {
+      buffer = (data as { buffer: ArrayBuffer }).buffer;
     } else {
-      buffer = new Uint8Array(data).buffer;
+      buffer = new Uint8Array(data as ArrayLike<number>).buffer;
     }
 
     const blob = new Blob([buffer], { type: 'audio/mpeg' });

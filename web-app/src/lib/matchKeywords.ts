@@ -126,9 +126,9 @@ ${cvSnippet}`;
     }
 
     // Parse and validate the returned JSON
-    let parsed: any;
+    let parsed: { matching_skills?: unknown[]; missing_skills?: unknown[] } | null = null;
     try {
-      parsed = JSON.parse(rawContent);
+      parsed = JSON.parse(rawContent) as { matching_skills?: unknown[]; missing_skills?: unknown[] };
     } catch (parseErr) {
       console.error('[matchKeywords] Failed to parse LLM JSON response:', parseErr, '\nRaw:', rawContent);
       return FALLBACK;
@@ -136,14 +136,14 @@ ${cvSnippet}`;
 
     // Basic structural validation before returning
     const matchingSkills: SkillEntry[] = Array.isArray(parsed?.matching_skills)
-      ? parsed.matching_skills.filter(
-          (s: any) => typeof s?.id === 'string' && typeof s?.keyword === 'string'
+      ? (parsed.matching_skills as SkillEntry[]).filter(
+          (s) => typeof s?.id === 'string' && typeof s?.keyword === 'string'
         )
       : [];
 
     const missingSkills: SkillEntry[] = Array.isArray(parsed?.missing_skills)
-      ? parsed.missing_skills.filter(
-          (s: any) => typeof s?.id === 'string' && typeof s?.keyword === 'string'
+      ? (parsed.missing_skills as SkillEntry[]).filter(
+          (s) => typeof s?.id === 'string' && typeof s?.keyword === 'string'
         )
       : [];
 

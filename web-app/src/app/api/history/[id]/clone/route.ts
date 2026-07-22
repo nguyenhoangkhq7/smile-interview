@@ -19,10 +19,6 @@ export async function POST(
     }
     const oldSession = sessionRes.rows[0];
 
-    // 2. Fetch the old turns
-    const turnsRes = await query('SELECT * FROM session_turns WHERE session_id = $1 ORDER BY id ASC', [oldSessionId]);
-    const oldTurns = turnsRes.rows;
-
     // 3. Create a new session ID
     const newSessionId = 'session-' + Date.now();
     const currentDate = new Date().toISOString();
@@ -50,8 +46,9 @@ export async function POST(
     ]);
 
     return NextResponse.json({ success: true, newSessionId });
-  } catch (error: any) {
-    console.error('[API History Clone] Error:', error);
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+  } catch (error) {
+    const err = error as Error;
+    console.error('[API History Clone] Error:', err);
+    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
   }
 }

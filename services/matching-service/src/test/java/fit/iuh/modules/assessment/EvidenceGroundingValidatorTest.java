@@ -1,6 +1,7 @@
 package fit.iuh.modules.assessment;
 
-import fit.iuh.modules.assessment.AssessmentResponseDto.EvidenceItem;
+import fit.iuh.modules.assessment.dto.AssessmentResponseDto.EvidenceItem;
+import fit.iuh.modules.assessment.service.EvidenceGroundingValidator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

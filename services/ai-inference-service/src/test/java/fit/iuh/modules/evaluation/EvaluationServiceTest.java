@@ -12,6 +12,11 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
+import fit.iuh.modules.evaluation.client.OpenRouterClient;
+import fit.iuh.modules.evaluation.service.EvaluationServiceImpl;
+import fit.iuh.modules.evaluation.prompt.PromptBuilder;
+import fit.iuh.modules.evaluation.model.EvaluationResult;
+
 /**
  * Unit tests for InterviewEvaluationService.
  * All LLM network calls are mocked via OpenRouterClient.
@@ -19,14 +24,14 @@ import static org.mockito.Mockito.*;
 class EvaluationServiceTest {
 
     private OpenRouterClient mockOpenRouterClient;
-    private InterviewEvaluationService service;
+    private EvaluationServiceImpl service;
     private ObjectMapper objectMapper;
 
     @BeforeEach
     void setUp() {
         mockOpenRouterClient = mock(OpenRouterClient.class);
         objectMapper = new ObjectMapper();
-        service = new InterviewEvaluationService(mockOpenRouterClient, objectMapper, 10, 30);
+        service = new EvaluationServiceImpl(mockOpenRouterClient, objectMapper, new PromptBuilder(), 10, 30);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -123,8 +128,8 @@ class EvaluationServiceTest {
                 .thenReturn(Mono.error(new RuntimeException("Simulated timeout")));
 
         // Use a very short timeout so CompletableFuture fires quickly
-        InterviewEvaluationService shortTimeoutService =
-                new InterviewEvaluationService(mockOpenRouterClient, objectMapper, 1, 30);
+        EvaluationServiceImpl shortTimeoutService =
+                new EvaluationServiceImpl(mockOpenRouterClient, objectMapper, new PromptBuilder(), 1, 30);
 
         InferenceRequest request = InferenceRequest.newBuilder()
                 .setTargetJobTitle("Backend Engineer")

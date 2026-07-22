@@ -46,12 +46,25 @@ export interface SessionHistoryItem {
   actionableSuggestions?: string[];
   resumeId?: number;
   jdId?: number;
-  evidenceItems?: any[];
-  additionalEvidenceItems?: any[];
-  scoreBreakdown?: any;
-  topPriorityImprovements?: any[];
+  evidenceItems?: unknown[];
+  additionalEvidenceItems?: unknown[];
+  scoreBreakdown?: unknown;
+  topPriorityImprovements?: unknown[];
   hiringRecommendation?: string;
-  eligibility?: any;
+  eligibility?: SessionEligibility;
+}
+
+export interface SessionEligibility {
+  status?: string;
+  gate_checks?: {
+    criteria_name?: string;
+    status?: string;
+    required_value?: string;
+    actual_value?: string;
+    passed?: boolean;
+    description?: string;
+    criterion?: string;
+  }[];
 }
 
 export interface SessionSavePayload extends SessionHistoryItem {

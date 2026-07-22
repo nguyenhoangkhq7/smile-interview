@@ -1,4 +1,5 @@
 import { useAuthStore } from '@/store/authStore';
+import type { SessionEligibility } from './historyService';
 
 export interface SkillEntry {
   id: string;
@@ -43,11 +44,11 @@ export interface AssessmentResponse {
   actionableImprovementSuggestions: string[];
   cached: boolean;
   createdAt: string;
-  evidenceItems?: any[];
-  additionalEvidenceItems?: any[];
-  scoreBreakdown?: any;
-  topPriorityImprovements?: any[];
-  eligibility?: any;
+  evidenceItems?: unknown[];
+  additionalEvidenceItems?: unknown[];
+  scoreBreakdown?: unknown;
+  topPriorityImprovements?: unknown[];
+  eligibility?: SessionEligibility;
 }
 
 const getBaseUrl = () => {

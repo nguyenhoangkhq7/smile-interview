@@ -33,9 +33,10 @@ export async function GET(request: NextRequest) {
       );
     }
     return NextResponse.json(result.rows);
-  } catch (error: any) {
-    console.error('[API JDs] Error fetching JDs:', error);
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+  } catch (error) {
+    const err = error as Error;
+    console.error('[API JDs] Error fetching JDs:', err);
+    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -87,9 +88,10 @@ export async function POST(request: NextRequest) {
           });
           fileUrl = uploadRes.secure_url;
           cloudinaryId = uploadRes.public_id;
-        } catch (uploadError: any) {
-          console.error('[API JDs] Cloudinary upload failed:', uploadError);
-          return NextResponse.json({ error: `Cloudinary upload failed: ${uploadError.message || uploadError}` }, { status: 500 });
+        } catch (uploadError) {
+          const uErr = uploadError as Error;
+          console.error('[API JDs] Cloudinary upload failed:', uErr);
+          return NextResponse.json({ error: `Cloudinary upload failed: ${uErr.message || uErr}` }, { status: 500 });
         }
         if (!finalTitle) finalTitle = file.name;
       } else if (!finalTitle) {
@@ -127,9 +129,10 @@ export async function POST(request: NextRequest) {
           });
           fileUrl = uploadRes.secure_url;
           cloudinaryId = uploadRes.public_id;
-        } catch (uploadError: any) {
-          console.error('[API JDs] Cloudinary upload failed:', uploadError);
-          return NextResponse.json({ error: `Cloudinary upload failed: ${uploadError.message || uploadError}` }, { status: 500 });
+        } catch (uploadError) {
+          const uErr = uploadError as Error;
+          console.error('[API JDs] Cloudinary upload failed:', uErr);
+          return NextResponse.json({ error: `Cloudinary upload failed: ${uErr.message || uErr}` }, { status: 500 });
         }
       }
 
@@ -140,9 +143,10 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({ success: true, jd: result.rows[0] });
     }
-  } catch (error: any) {
-    console.error('[API JDs] Error saving JD:', error);
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+  } catch (error) {
+    const err = error as Error;
+    console.error('[API JDs] Error saving JD:', err);
+    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -158,8 +162,9 @@ export async function DELETE(request: NextRequest) {
 
     await query('DELETE FROM job_descriptions WHERE id = $1', [parseInt(id, 10)]);
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('[API JDs] Error deleting JD:', error);
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+  } catch (error) {
+    const err = error as Error;
+    console.error('[API JDs] Error deleting JD:', err);
+    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
   }
 }

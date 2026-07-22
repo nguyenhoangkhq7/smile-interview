@@ -2,6 +2,7 @@
 
 import React, { Suspense } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Terminal, UserCheck, Code2, Briefcase, Network } from 'lucide-react';
 import styles from './type.module.css';
@@ -66,7 +67,7 @@ function TypeSelectionContent() {
     <div className={styles.container}>
       <header className={styles.header}>
         <Link href="/history" className={styles.logo}>
-          <img src="/logo.png" alt="Smile Interview Logo" className={styles.logoImg} />
+          <Image src="/logo.png" alt="Smile Interview Logo" width={180} height={50} className={styles.logoImg} unoptimized />
         </Link>
         <nav className={styles.navLinks}>
           <Link href="/history" className={styles.navLink}>
@@ -128,7 +129,7 @@ function TypeSelectionContent() {
       </main>
 
       <footer className={styles.footer}>
-        <img src="/footer.png" alt="Smile Interview Footer" className={styles.footerImg} />
+        <Image src="/footer.png" alt="Smile Interview Footer" width={1200} height={200} className={styles.footerImg} unoptimized />
       </footer>
     </div>
   );

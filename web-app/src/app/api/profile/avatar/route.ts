@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     );
 
     return NextResponse.json({ avatarUrl });
-  } catch (error: any) {
+  } catch (errorVal) { const error = errorVal as Error;
     console.error('[API Avatar] Error uploading avatar:', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }

@@ -133,7 +133,7 @@ export async function POST(
     console.log(`[API Evaluate] Session ${id} successfully evaluated and saved.`);
     return NextResponse.json({ success: true, data: evalResult });
 
-  } catch (error: any) {
+  } catch (errorVal) { const error = errorVal as Error;
     console.error(`[API Evaluate] Error evaluating session:`, error);
     // Graceful fallback
     try {

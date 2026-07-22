@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
       );
     }
     return NextResponse.json(result.rows);
-  } catch (error: any) {
+  } catch (errorVal) { const error = errorVal as Error;
     console.error('[API Resumes] Error fetching resumes:', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
           use_filename: true,
           unique_filename: true,
         });
-      } catch (uploadError: any) {
+      } catch (uploadErrorVal) { const uploadError = uploadErrorVal as Error;
         console.error('[API Resumes] Cloudinary upload failed:', uploadError);
         return NextResponse.json({ error: `Cloudinary upload failed: ${uploadError.message || uploadError}` }, { status: 500 });
       }
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
           });
           fileUrl = uploadRes.secure_url;
           cloudinaryId = uploadRes.public_id;
-        } catch (uploadError: any) {
+        } catch (uploadErrorVal) { const uploadError = uploadErrorVal as Error;
           console.error('[API Resumes] Cloudinary upload failed:', uploadError);
           return NextResponse.json({ error: `Cloudinary upload failed: ${uploadError.message || uploadError}` }, { status: 500 });
         }
@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({ success: true, resume: result.rows[0] });
     }
-  } catch (error: any) {
+  } catch (errorVal) { const error = errorVal as Error;
     console.error('[API Resumes] Error saving resume:', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }
@@ -146,7 +146,7 @@ export async function DELETE(request: NextRequest) {
 
     await query('DELETE FROM resumes WHERE id = $1', [parseInt(id, 10)]);
     return NextResponse.json({ success: true });
-  } catch (error: any) {
+  } catch (errorVal) { const error = errorVal as Error;
     console.error('[API Resumes] Error deleting resume:', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }

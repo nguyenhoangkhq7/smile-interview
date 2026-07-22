@@ -526,7 +526,7 @@ function MappingEditorModal({
   open,
   draft,
   saving,
-  categories,
+  categories: _categories,
   criteria,
   selectedLevel,
   onClose,

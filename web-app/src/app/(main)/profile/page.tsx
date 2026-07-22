@@ -2,11 +2,12 @@
 
 import type { LucideIcon } from 'lucide-react';
 import {
-  BarChart3, CalendarDays, Coins, Eye, FileJson2, LockKeyhole,
+  BarChart3, CalendarDays, Coins, Eye, LockKeyhole,
   MapPin, PencilLine, Sparkles, Star, Upload, UserRound,
   BriefcaseBusiness, ChevronDown, CheckCircle, AlertCircle, X, FileText
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
+import Image from 'next/image';
 import styles from './profile.module.css';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { useAuthStore } from '@/store/authStore';
@@ -22,11 +23,6 @@ type StatItem = {
   value: number;
   icon: LucideIcon;
   iconClass: string;
-};
-
-type ResumeOption = {
-  id: number;
-  name: string;
 };
 
 // ── Toast helper (lightweight, no external dep) ───────────────────────────────
@@ -134,10 +130,11 @@ export default function ProfilePage() {
 
       setInfoToast({ type: 'success', message: 'Cập nhật thông tin cá nhân thành công!' });
       setIsEditing(false);
-    } catch (err: any) {
+    } catch (err) {
+      const axiosError = err as { response?: { data?: { detail?: string; message?: string } } };
       const msg =
-        err?.response?.data?.detail ||
-        err?.response?.data?.message ||
+        axiosError?.response?.data?.detail ||
+        axiosError?.response?.data?.message ||
         'Cập nhật thất bại. Vui lòng thử lại sau.';
       setInfoToast({ type: 'error', message: msg });
     } finally {
@@ -199,10 +196,11 @@ export default function ProfilePage() {
       });
 
       setAvatarToast({ type: 'success', message: 'Cập nhật ảnh đại diện thành công!' });
-    } catch (err: any) {
+    } catch (err) {
+      const axiosError = err as { response?: { data?: { detail?: string; message?: string } } };
       const msg =
-        err?.response?.data?.detail ||
-        err?.response?.data?.message ||
+        axiosError?.response?.data?.detail ||
+        axiosError?.response?.data?.message ||
         'Tải ảnh lên thất bại. Vui lòng thử lại sau.';
       setAvatarToast({ type: 'error', message: msg });
     } finally {
@@ -222,7 +220,13 @@ export default function ProfilePage() {
   };
 
   // ── Default CV state ─────────────────────────────────────────────
-  const [dbResumes, setDbResumes] = useState<any[]>([]);
+  interface Resume {
+    id: number;
+    file_name: string;
+    created_at: string;
+    file_url: string;
+  }
+  const [dbResumes, setDbResumes] = useState<Resume[]>([]);
   const [selectedResumeId, setSelectedResumeId] = useState<number>(
     user?.defaultResumeId ? Number(user.defaultResumeId) : 0
   );
@@ -301,7 +305,7 @@ export default function ProfilePage() {
         setDbResumes(prev => [data.resume, ...prev]);
         setCvToast({ type: 'success', message: 'Đã cập nhật CV mặc định thành công!' });
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error uploading default CV:', err);
       setCvToast({ type: 'error', message: 'Tải CV lên thất bại. Vui lòng thử lại sau.' });
     } finally {
@@ -377,10 +381,13 @@ export default function ProfilePage() {
             {/* Avatar: show image if avatarUrl exists, else placeholder icon */}
             <div className={styles.avatarBig}>
               {user?.avatarUrl ? (
-                <img
+                <Image
                   src={getAvatarUrl(user.avatarUrl)}
                   alt="Avatar"
+                  width={100}
+                  height={100}
                   style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
+                  unoptimized
                 />
               ) : (
                 <UserRound size={30} strokeWidth={2.4} />
@@ -648,7 +655,7 @@ export default function ProfilePage() {
                               } else {
                                 setCvToast({ type: 'error', message: 'Lỗi đặt CV mặc định.' });
                               }
-                            } catch (e) {
+                            } catch {
                               setCvToast({ type: 'error', message: 'Lỗi đặt CV mặc định.' });
                             } finally {
                               setCvLoading(false);

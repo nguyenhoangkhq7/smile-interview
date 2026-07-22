@@ -158,14 +158,14 @@ export function useSessionRecorder(stream: MediaStream | null) {
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         try {
           mediaRecorderRef.current.stop();
-        } catch (e) {
+        } catch {
           // ignore
         }
       }
       if (screenStreamRef.current) {
         try {
           screenStreamRef.current.getTracks().forEach((track) => track.stop());
-        } catch (e) {
+        } catch {
           // ignore
         }
       }

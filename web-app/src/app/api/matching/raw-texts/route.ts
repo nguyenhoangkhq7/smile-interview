@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
       cvFilename,
       jdFilename,
     });
-  } catch (error: any) {
+  } catch (errorVal) { const error = errorVal as Error;
     console.error('[raw-texts] Error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },

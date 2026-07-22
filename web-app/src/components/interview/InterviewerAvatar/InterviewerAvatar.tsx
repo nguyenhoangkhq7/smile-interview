@@ -19,9 +19,14 @@ function AvatarFallback() {
   );
 }
 
+interface AudioAnalyserLike {
+  frequencyBinCount: number;
+  getByteFrequencyData(array: Uint8Array): void;
+}
+
 interface InterviewerAvatarProps {
   controlled?: boolean;
-  analyser?: AnalyserNode | null;
+  analyser?: AudioAnalyserLike | null;
   isConnected?: boolean;
   isPlaying?: boolean;
   isListening?: boolean;

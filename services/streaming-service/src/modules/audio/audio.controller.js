@@ -49,3 +49,49 @@ export const transcribe = async (req, res) => {
     });
   }
 };
+
+/**
+ * GET /api/v1/audio/stream-transcribe
+ *
+ * Accepts query parameter `text` and returns a Server-Sent Events (SSE) stream
+ * that types out each word of the text at 80ms intervals.
+ *
+ * @param {import('express').Request}  req
+ * @param {import('express').Response} res
+ */
+export const streamTranscribe = (req, res) => {
+  const text = req.query.text || '';
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': '*',
+  });
+
+  res.write('data: [START]\n\n');
+
+  if (!text) {
+    res.write('data: [END]\n\n');
+    res.end();
+    return;
+  }
+
+  const words = text.split(' ');
+  let index = 0;
+
+  const interval = setInterval(() => {
+    if (index < words.length) {
+      res.write(`data: ${words[index]}\n\n`);
+      index++;
+    } else {
+      clearInterval(interval);
+      res.write('data: [END]\n\n');
+      res.end();
+    }
+  }, 80);
+
+  req.on('close', () => {
+    clearInterval(interval);
+  });
+};

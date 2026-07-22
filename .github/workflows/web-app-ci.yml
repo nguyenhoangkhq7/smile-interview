@@ -1,0 +1,48 @@
+name: Web App Frontend CI
+
+on:
+  pull_request:
+    branches: [ "develop", "main", "master" ]
+    paths:
+      - 'web-app/**'
+      - '.github/workflows/web-app-ci.yml'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web-app
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: web-app/package-lock.json
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Run ESLint
+        run: npm run lint
+        
+      - name: Run TypeScript typecheck
+        run: npx tsc --noEmit
+        
+      - name: Run SAST Scan (Trivy)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: 'web-app'
+          format: 'table'
+          exit-code: '1' # Block merge if there are CRITICAL/HIGH vulnerabilities
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+          
+      - name: Build Next.js (Dry-run)
+        run: npm run build

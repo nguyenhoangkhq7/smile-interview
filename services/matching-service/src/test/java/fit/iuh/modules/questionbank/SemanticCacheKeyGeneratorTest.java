@@ -1,6 +1,7 @@
 package fit.iuh.modules.questionbank;
 
-import fit.iuh.modules.assessment.SeniorityLevel;
+import fit.iuh.modules.assessment.entity.SeniorityLevel;
+import fit.iuh.modules.questionbank.service.SemanticCacheKeyGenerator;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 

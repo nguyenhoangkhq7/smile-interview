@@ -1,0 +1,70 @@
+package fit.iuh.modules.assessment.dto;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import fit.iuh.modules.assessment.entity.Eligibility;
+import fit.iuh.modules.assessment.entity.JobCategory;
+import fit.iuh.modules.assessment.entity.SeniorityLevel;
+import lombok.Builder;
+import lombok.Data;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+
+@Data
+@Builder
+public class AssessmentResponse {
+
+    @JsonProperty("id")
+    private UUID id;
+
+    @JsonProperty("session_id")
+    private String sessionId;
+
+    @JsonProperty("job_category")
+    private JobCategory jobCategory;
+
+    @JsonProperty("seniority_level")
+    private SeniorityLevel seniorityLevel;
+
+    @JsonProperty("overall_match_score")
+    private Integer overallMatchScore;
+
+    @JsonProperty("eligibility")
+    private Eligibility eligibility;
+
+    @JsonProperty("evidence_items")
+    private List<AssessmentResponseDto.EvidenceItem> evidenceItems;
+
+    @JsonProperty("additional_evidence_items")
+    private List<AssessmentResponseDto.AdHocEvidenceItem> additionalEvidenceItems;
+
+    @JsonProperty("score_breakdown")
+    private ScoreBreakdown scoreBreakdown;
+
+    @JsonProperty("top_priority_improvements")
+    private List<ImprovementResponseDto.ImprovementItem> topPriorityImprovements;
+
+    @JsonProperty("cached")
+    private boolean cached;
+
+    @JsonProperty("created_at")
+    private LocalDateTime createdAt;
+
+    public record ScoreBreakdown(
+            @JsonProperty("raw_must_have_score")
+            int rawMustHaveScore,
+
+            @JsonProperty("must_have_weight_ratio")
+            double mustHaveWeightRatio,
+
+            @JsonProperty("raw_ad_hoc_score")
+            int rawAdHocScore,
+
+            @JsonProperty("prefer_to_have_weight_ratio")
+            double preferToHaveWeightRatio,
+
+            @JsonProperty("final_score")
+            int finalScore
+    ) {}
+}

@@ -1,12 +1,11 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Geist } from 'next/font/google';
 import '../globals.css';
+import { cn } from "@/lib/utils";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "@/components/ui/sonner";
 
-const inter = Inter({
-  subsets: ['latin', 'vietnamese'],
-  variable: '--font-inter',
-  display: 'swap',
-});
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
   title: {
@@ -17,31 +16,18 @@ export const metadata: Metadata = {
     'Nền tảng luyện tập phỏng vấn AI thông minh. Tải CV, chọn JD và bắt đầu phỏng vấn thực tế với trợ lý AI giọng nói tự nhiên.',
 };
 
-/**
- * Root layout — shared HTML shell for the ENTIRE application.
- *
- * This layout intentionally does NOT include <Navbar> or <Footer>.
- * Those are provided by nested route-group layouts:
- *   - (main)/layout.tsx  → public/user pages (Navbar + Footer)
- *   - admin/layout.tsx   → admin pages (dark sidebar, no Navbar/Footer)
- */
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="vi" className={inter.variable}>
-      <body
-        style={{
-          display: 'flex',
-          minHeight: '100vh',
-          flexDirection: 'column',
-          fontFamily: 'var(--font-inter), system-ui, sans-serif',
-        }}
-        className="bg-[#fdfbf7]"
-      >
-        {children}
+    <html lang="vi" className={cn("font-sans", geist.variable)}>
+      <body className="flex min-h-screen flex-col font-sans bg-background">
+        <TooltipProvider>
+          {children}
+          <Toaster position="top-center" richColors />
+        </TooltipProvider>
       </body>
     </html>
   );

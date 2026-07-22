@@ -2,14 +2,40 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
-import { FolderOpen, Target, Briefcase, Wrench, Lightbulb, AlertTriangle, MessageSquare, BarChart3, CheckCircle2, XCircle, TrendingUp, Award, UserCheck, ShieldCheck, Brain, CheckCircle, AlertCircle } from 'lucide-react';
+import { useParams } from 'next/navigation';
+import { FolderOpen, Lightbulb, AlertTriangle, CheckCircle, AlertCircle, MessageSquare, BarChart3, CheckCircle2, XCircle } from 'lucide-react';
 import { historyService, SessionHistoryItem } from '@/services/historyService';
 import styles from './result.module.css';
 
+interface GateCheck {
+  status: string;
+  criteria_name: string;
+  required_value: string;
+  actual_value: string;
+}
+
+interface StrengthObject {
+  area?: string;
+  name?: string;
+}
+
+interface WeaknessObject {
+  area?: string;
+  name?: string;
+}
+
+interface RecommendationObject {
+  question?: string;
+  suggestion?: string;
+}
+
+interface QuestionObject {
+  topic?: string;
+  question?: string;
+}
+
 export default function InterviewResultPage() {
   const params = useParams();
-  const router = useRouter();
   const id = (params?.id as string) || '';
 
   const [session, setSession] = useState<SessionHistoryItem | null>(null);
@@ -113,12 +139,18 @@ export default function InterviewResultPage() {
   }
 
   interface FinalReport {
-    strengths: string[];
-    weaknesses: string[];
-    recommendations: string[];
-    overall_score: number;
-    overall_summary: string;
-    hiring_recommendation: string;
+    strengths?: string[];
+    weaknesses?: string[];
+    recommendations?: string[];
+    overall_score?: number;
+    overall_summary?: string;
+    hiring_recommendation?: string;
+    strongAreas?: string[];
+    gapAreas?: string[];
+    actionableSuggestions?: string[];
+    overallScore?: number;
+    overallFeedback?: string;
+    hiringRecommendation?: string;
   }
 
   let report: FinalReport | null = null;
@@ -148,17 +180,17 @@ export default function InterviewResultPage() {
     hiringRecommendation = session.hiringRecommendation || '';
 
     if (report) {
-      strengths = report.strengths || (report as any).strongAreas || strengths;
-      weaknesses = report.weaknesses || (report as any).gapAreas || weaknesses;
-      recommendations = report.recommendations || (report as any).actionableSuggestions || recommendations;
+      strengths = report.strengths || report.strongAreas || strengths;
+      weaknesses = report.weaknesses || report.gapAreas || weaknesses;
+      recommendations = report.recommendations || report.actionableSuggestions || recommendations;
       
-      const rawScore = report.overall_score !== undefined ? report.overall_score : (report as any).overallScore;
+      const rawScore = report.overall_score !== undefined ? report.overall_score : report.overallScore;
       if (rawScore !== undefined) {
         score = rawScore <= 10 ? rawScore * 10 : rawScore;
       }
       
-      overallFeedbackText = report.overall_summary || (report as any).overallFeedback || overallFeedbackText;
-      hiringRecommendation = report.hiring_recommendation || (report as any).hiringRecommendation || hiringRecommendation;
+      overallFeedbackText = report.overall_summary || report.overallFeedback || overallFeedbackText;
+      hiringRecommendation = report.hiring_recommendation || report.hiringRecommendation || hiringRecommendation;
     }
 
     // Auto-calculate hiringRecommendation if it's 'N/A' or empty
@@ -263,7 +295,7 @@ export default function InterviewResultPage() {
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
-                {(session.eligibility.gate_checks || []).map((check: any, idx: number) => {
+                {(session.eligibility.gate_checks as GateCheck[] || []).map((check, idx) => {
                   const isMet = check.status === 'met' || check.status === 'MET';
                   return (
                     <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', padding: '0.4rem 0.65rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '0.35rem' }}>
@@ -297,7 +329,7 @@ export default function InterviewResultPage() {
               </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {(strengths || []).length > 0 ? (
-                  (strengths || []).map((strength: any, index: number) => {
+                  (strengths as (string | StrengthObject)[] || []).map((strength, index) => {
                     const text = typeof strength === 'object' && strength !== null ? (strength.area || strength.name || JSON.stringify(strength)) : strength;
                     return (
                       <div key={index} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
@@ -320,7 +352,7 @@ export default function InterviewResultPage() {
               </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {(weaknesses || []).length > 0 ? (
-                  (weaknesses || []).map((weakness: any, index: number) => {
+                  (weaknesses as (string | WeaknessObject)[] || []).map((weakness, index) => {
                     const text = typeof weakness === 'object' && weakness !== null ? (weakness.area || weakness.name || JSON.stringify(weakness)) : weakness;
                     return (
                       <div key={index} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
@@ -345,7 +377,7 @@ export default function InterviewResultPage() {
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               {(recommendations || []).length > 0 ? (
-                (recommendations || []).map((suggestion: any, index: number) => {
+                (recommendations as (string | RecommendationObject)[] || []).map((suggestion, index) => {
                   const text = typeof suggestion === 'object' && suggestion !== null ? (suggestion.question || suggestion.suggestion || JSON.stringify(suggestion)) : suggestion;
                   return (
                     <div key={index} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
@@ -397,14 +429,14 @@ export default function InterviewResultPage() {
                         <div className={styles.headerMeta}>
                           <span className={styles.qNum}>CÂU HỎI {index + 1}</span>
                           <span className={styles.topicBadge}>
-                            {q.topicTag || (typeof q.question === 'object' && q.question !== null ? (q.question as any).topic : '')}
+                            {q.topicTag || (typeof q.question === 'object' && q.question !== null ? (q.question as unknown as QuestionObject).topic : '')}
                           </span>
                           {q.isDeepDive && (
                             <span className={styles.deepDiveBadge}>Hỏi sâu (Deep dive)</span>
                           )}
                         </div>
                         <div className={styles.qText}>
-                          {typeof q.question === 'object' && q.question !== null ? (q.question as any).question : q.question}
+                          {typeof q.question === 'object' && q.question !== null ? (q.question as unknown as QuestionObject).question : q.question}
                         </div>
                       </div>
 

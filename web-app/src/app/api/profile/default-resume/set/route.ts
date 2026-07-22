@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     );
 
     return NextResponse.json({ success: true, defaultResumeId: String(resumeId) });
-  } catch (error: any) {
+  } catch (errorVal) { const error = errorVal as Error;
     console.error('[API Set Default Resume] Error:', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }

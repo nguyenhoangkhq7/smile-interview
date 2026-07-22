@@ -2,25 +2,12 @@ package fit.iuh.modules.admin.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotBlank;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import java.time.LocalDateTime;
 
-/**
- * DTO for {@link fit.iuh.modules.admin.SystemSetting}.
- */
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class SystemSettingDto {
-
-    @NotBlank(message = "setting_key is required")
-    @JsonProperty("setting_key")
-    private String settingKey;
-
-    @NotBlank(message = "setting_value is required")
-    @JsonProperty("setting_value")
-    private String settingValue;
-}
+public record SystemSettingDto(
+        @JsonProperty("id") Long id,
+        @NotBlank(message = "setting_key is required") @JsonProperty("setting_key") String settingKey,
+        @NotBlank(message = "setting_value is required") @JsonProperty("setting_value") String settingValue,
+        @JsonProperty("description") String description,
+        @JsonProperty("updated_at") LocalDateTime updatedAt
+) {}

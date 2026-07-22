@@ -21,9 +21,9 @@ export async function GET(
 
     // 2. Fetch turns for the session
     const turnsRes = await query('SELECT * FROM session_turns WHERE session_id = $1 ORDER BY id ASC', [id]);
-    let turns = turnsRes.rows;
+    const turns = turnsRes.rows;
 
-    const parseJsonField = (val: any) => {
+    const parseJsonField = (val: unknown) => {
       if (typeof val === 'string') {
         try {
           return JSON.parse(val);
@@ -77,8 +77,9 @@ export async function GET(
     };
 
     return NextResponse.json(result);
-  } catch (error: any) {
-    console.error(`[API History Detail] Error fetching session detail:`, error);
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+  } catch (error) {
+    const err = error as Error;
+    console.error(`[API History Detail] Error fetching session detail:`, err);
+    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
   }
 }

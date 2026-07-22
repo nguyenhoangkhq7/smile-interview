@@ -5,8 +5,13 @@ import { useFrame } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 
+interface AudioAnalyserLike {
+  frequencyBinCount: number;
+  getByteFrequencyData(array: Uint8Array): void;
+}
+
 interface InterviewerModelProps {
-  analyser?: AnalyserNode | null;
+  analyser?: AudioAnalyserLike | null;
   position?: [number, number, number];
   scale?: [number, number, number];
   rotation?: [number, number, number];
@@ -15,7 +20,7 @@ interface InterviewerModelProps {
 }
 
 interface MorphTargetRef {
-  mesh: any;
+  mesh: THREE.Mesh;
   index: number;
   name: string;
 }
@@ -33,7 +38,7 @@ export function InterviewerModel({
   isListening = false,
   isThinking = false,
 }: InterviewerModelProps) {
-  const { scene } = useGLTF('/models/avatar.glb') as any;
+  const { scene } = useGLTF('/models/avatar.glb') as unknown as { scene: THREE.Group };
 
   // ── All animation state lives in refs — zero re-renders ─────────────────
   const groupRef = useRef<THREE.Group | null>(null);
@@ -46,7 +51,7 @@ export function InterviewerModel({
   const blinkTargetsRef = useRef<MorphTargetRef[]>([]); // Eyelid blink targets
 
   // Head / Neck bone for nodding
-  const headBoneRef = useRef<any>(null);
+  const headBoneRef = useRef<THREE.Object3D | null>(null);
   const originalHeadRotationXRef = useRef<number>(0);
 
   // Frequency data buffer (lazily allocated)
@@ -112,16 +117,17 @@ export function InterviewerModel({
       blink: MorphTargetRef[];
     } = { jaw: [], mid: [], high: [], brow: [], blink: [] };
 
-    scene.traverse((node: any) => {
-      if (!node.isMesh || !node.morphTargetDictionary || !node.morphTargetInfluences) return;
+    scene.traverse((node: THREE.Object3D) => {
+      const mesh = node as THREE.Mesh;
+      if (!mesh.isMesh || !mesh.morphTargetDictionary || !mesh.morphTargetInfluences) return;
 
-      const dict = node.morphTargetDictionary;
+      const dict = mesh.morphTargetDictionary;
 
-      console.log('👉 TARGET MESH FOUND:', node.name, dict);
+      console.log('👉 TARGET MESH FOUND:', mesh.name, dict);
 
       const findFirst = (names: string[]): MorphTargetRef | null => {
         for (const name of names) {
-          if (dict[name] !== undefined) return { mesh: node, index: dict[name], name };
+          if (dict[name] !== undefined) return { mesh: mesh, index: dict[name], name };
         }
         return null;
       };
@@ -129,7 +135,7 @@ export function InterviewerModel({
       const findAll = (names: string[]): MorphTargetRef[] => {
         const res: MorphTargetRef[] = [];
         for (const name of names) {
-          if (dict[name] !== undefined) res.push({ mesh: node, index: dict[name], name });
+          if (dict[name] !== undefined) res.push({ mesh: mesh, index: dict[name], name });
         }
         return res;
       };
@@ -149,8 +155,8 @@ export function InterviewerModel({
     blinkTargetsRef.current = found.blink;
 
     // ── Find head / neck bone for nodding & alignment ──────────────────────
-    scene.traverse((node: any) => {
-      if (!headBoneRef.current && (node.isBone || node.type === 'Bone')) {
+    scene.traverse((node: THREE.Object3D) => {
+      if (!headBoneRef.current && (node.type === 'Bone' || node.name.toLowerCase().includes('head') || node.name.toLowerCase().includes('neck'))) {
         const n = node.name.toLowerCase();
         if (n.includes('head') || n.includes('neck')) {
           headBoneRef.current = node;
@@ -184,8 +190,10 @@ export function InterviewerModel({
       if (!freqDataRef.current || freqDataRef.current.length !== analyser.frequencyBinCount) {
         freqDataRef.current = new Uint8Array(analyser.frequencyBinCount);
       }
-      analyser.getByteFrequencyData(freqDataRef.current as any);
-      const bins = freqDataRef.current;
+      if (freqDataRef.current) {
+        analyser.getByteFrequencyData(freqDataRef.current as Uint8Array<ArrayBuffer>);
+      }
+      const bins = freqDataRef.current || new Uint8Array(0);
 
       const bandAvg = (from: number, to: number) => {
         let sum = 0;

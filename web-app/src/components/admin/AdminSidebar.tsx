@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
-import { LayoutDashboard, Home, LogOut, ChevronLeft, ChevronRight, User } from 'lucide-react';
+import { LayoutDashboard, Home, LogOut, ChevronLeft, User } from 'lucide-react';
 
 interface AdminSidebarProps {
   collapsed: boolean;

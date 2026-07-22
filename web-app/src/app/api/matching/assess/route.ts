@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 
+interface EvidenceItem {
+  status: string;
+  criteria_name: string;
+  cv_evidence?: string;
+  jd_requirement?: string;
+}
+
+interface ImprovementItem {
+  criteria_name: string;
+  suggestion: string;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -45,7 +57,7 @@ export async function GET(request: NextRequest) {
           console.error(`[API Proxy Assess] Failed to trigger Java backend clone:`, e);
         }
 
-        const parseJsonField = (val: any) => {
+        const parseJsonField = (val: unknown) => {
           if (typeof val === 'string') {
             try {
               return JSON.parse(val);
@@ -142,32 +154,32 @@ export async function GET(request: NextRequest) {
       ...(data.additional_evidence_items || [])
     ];
 
-    const strongAreas = allEvidence
-      .filter((item: any) => item.status === 'matched')
-      .map((item: any) => item.criteria_name);
+    const strongAreas = (allEvidence as EvidenceItem[])
+      .filter((item) => item.status === 'matched')
+      .map((item) => item.criteria_name);
 
-    const gapAreas = allEvidence
-      .filter((item: any) => item.status === 'weak')
-      .map((item: any) => item.criteria_name);
+    const gapAreas = (allEvidence as EvidenceItem[])
+      .filter((item) => item.status === 'weak')
+      .map((item) => item.criteria_name);
 
-    const criticalMissingSkills = allEvidence
-      .filter((item: any) => item.status === 'missing')
-      .map((item: any) => item.criteria_name);
+    const criticalMissingSkills = (allEvidence as EvidenceItem[])
+      .filter((item) => item.status === 'missing')
+      .map((item) => item.criteria_name);
 
     // Group section-wise feedback
     const sectionWiseFeedback: Record<string, string> = {};
     if (allEvidence.length > 0) {
-      const matchedText = allEvidence
-        .filter((item: any) => item.status === 'matched')
-        .map((item: any) => `${item.criteria_name} (${item.cv_evidence || ''})`)
+      const matchedText = (allEvidence as EvidenceItem[])
+        .filter((item) => item.status === 'matched')
+        .map((item) => `${item.criteria_name} (${item.cv_evidence || ''})`)
         .join('; ');
-      const weakText = allEvidence
-        .filter((item: any) => item.status === 'weak')
-        .map((item: any) => `${item.criteria_name}: Yêu cầu JD: ${item.jd_requirement || ''}. Minh chứng CV: ${item.cv_evidence || 'chưa rõ ràng'}.`)
+      const weakText = (allEvidence as EvidenceItem[])
+        .filter((item) => item.status === 'weak')
+        .map((item) => `${item.criteria_name}: Yêu cầu JD: ${item.jd_requirement || ''}. Minh chứng CV: ${item.cv_evidence || 'chưa rõ ràng'}.`)
         .join(' | ');
-      const missingText = allEvidence
-        .filter((item: any) => item.status === 'missing')
-        .map((item: any) => item.criteria_name)
+      const missingText = (allEvidence as EvidenceItem[])
+        .filter((item) => item.status === 'missing')
+        .map((item) => item.criteria_name)
         .join(', ');
 
       if (matchedText) {
@@ -182,8 +194,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Actionable improvement suggestions mapping
-    const actionableImprovementSuggestions = (data.top_priority_improvements || [])
-      .map((item: any) => `[${item.criteria_name}] ${item.suggestion}`);
+    const actionableImprovementSuggestions = (data.top_priority_improvements as ImprovementItem[] || [])
+      .map((item) => `[${item.criteria_name}] ${item.suggestion}`);
 
     return NextResponse.json({
       id: data.id,
@@ -207,8 +219,9 @@ export async function GET(request: NextRequest) {
       topPriorityImprovements: data.top_priority_improvements || [],
       eligibility: data.eligibility || null
     });
-  } catch (error: any) {
-    console.error('[API Proxy Assess] Error in proxy assessment:', error);
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+  } catch (error) {
+    const err = error as Error;
+    console.error('[API Proxy Assess] Error in proxy assessment:', err);
+    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
   }
 }

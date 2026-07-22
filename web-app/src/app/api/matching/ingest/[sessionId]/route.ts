@@ -54,9 +54,10 @@ export async function POST(
           use_filename: true,
           unique_filename: true,
         });
-      } catch (uploadError: any) {
-        console.error('[API Proxy Ingest] Cloudinary upload failed for CV:', uploadError);
-        return NextResponse.json({ error: `Cloudinary upload failed: ${uploadError.message || uploadError}` }, { status: 500 });
+      } catch (uploadError) {
+        const uErr = uploadError as Error;
+        console.error('[API Proxy Ingest] Cloudinary upload failed for CV:', uErr);
+        return NextResponse.json({ error: `Cloudinary upload failed: ${uErr.message || uErr}` }, { status: 500 });
       }
 
       const insertResumeRes = await query(
@@ -79,9 +80,10 @@ export async function POST(
             use_filename: true,
             unique_filename: true,
           });
-        } catch (uploadError: any) {
-          console.error('[API Proxy Ingest] Cloudinary upload failed for JD:', uploadError);
-          return NextResponse.json({ error: `Cloudinary upload failed: ${uploadError.message || uploadError}` }, { status: 500 });
+        } catch (uploadError) {
+          const uErr = uploadError as Error;
+          console.error('[API Proxy Ingest] Cloudinary upload failed for JD:', uErr);
+          return NextResponse.json({ error: `Cloudinary upload failed: ${uErr.message || uErr}` }, { status: 500 });
         }
 
         const insertJdRes = await query(
@@ -335,8 +337,9 @@ export async function POST(
       rawCvText: rawCvText || null,
       rawJdText: rawJdText || null,
     });
-  } catch (error: any) {
-    console.error('[API Proxy Ingest] Error in proxy ingestion:', error);
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+  } catch (error) {
+    const err = error as Error;
+    console.error('[API Proxy Ingest] Error in proxy ingestion:', err);
+    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
   }
 }

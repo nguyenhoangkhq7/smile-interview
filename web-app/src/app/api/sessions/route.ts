@@ -48,7 +48,7 @@ export async function GET() {
     );
 
     return NextResponse.json(fullSessions);
-  } catch (error: any) {
+  } catch (errorVal) { const error = errorVal as Error;
     console.error('[API Sessions] Error fetching sessions:', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }
@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true, session });
-  } catch (error: any) {
+  } catch (errorVal) { const error = errorVal as Error;
     console.error('[API Sessions] Error saving session:', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }
@@ -164,7 +164,7 @@ export async function DELETE(request: NextRequest) {
 
     await query('DELETE FROM sessions WHERE id = $1', [id]);
     return NextResponse.json({ success: true });
-  } catch (error: any) {
+  } catch (errorVal) { const error = errorVal as Error;
     console.error('[API Sessions] Error deleting session:', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }

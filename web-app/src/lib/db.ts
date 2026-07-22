@@ -134,7 +134,7 @@ export async function initDb() {
   console.log('[DB] Database tables initialized successfully');
 }
 
-export async function query(text: string, params?: any[]) {
+export async function query(text: string, params?: unknown[]) {
   if (!dbInitialized) {
     try {
       await initDb();

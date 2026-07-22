@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import styles from './navbar.module.css';
 import { useAuthStore } from '@/store/authStore';
@@ -49,7 +50,7 @@ export default function Navbar() {
 
         {/* Logo */}
         <Link href="/" className={styles.logo}>
-          <img src="/logo.png" alt="Smile Interview Logo" className={styles.logoImg} />
+          <Image src="/logo.png" alt="Smile Interview Logo" width={150} height={36} className={styles.logoImg} unoptimized />
         </Link>
 
         {/* Center Nav */}

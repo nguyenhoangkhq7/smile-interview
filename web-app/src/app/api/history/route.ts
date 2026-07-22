@@ -16,7 +16,7 @@ export async function GET() {
       sessions.map(async (sess) => {
         const turnsRes = await query('SELECT * FROM session_turns WHERE session_id = $1 ORDER BY id ASC', [sess.id]);
         
-        const parseJsonField = (val: any) => {
+        const parseJsonField = (val: unknown) => {
           if (typeof val === 'string') {
             try {
               return JSON.parse(val);
@@ -72,9 +72,10 @@ export async function GET() {
     );
 
     return NextResponse.json(fullSessions);
-  } catch (error: any) {
-    console.error('[API History] Error fetching history:', error);
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+  } catch (error) {
+    const err = error as Error;
+    console.error('[API History] Error fetching history:', err);
+    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -186,8 +187,9 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true, session });
-  } catch (error: any) {
-    console.error('[API History] Error saving history:', error);
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+  } catch (error) {
+    const err = error as Error;
+    console.error('[API History] Error saving history:', err);
+    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
   }
 }

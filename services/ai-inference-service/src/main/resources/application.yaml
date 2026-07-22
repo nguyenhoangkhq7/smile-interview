@@ -6,7 +6,7 @@ spring:
       enabled: true
 
 openrouter:
-  api-key: ${OPENROUTER_API_KEY}
+  api-key: ${OPENROUTER_API_KEY:mock-key}
   base-url: ${OPENROUTER_BASE_URL:https://openrouter.ai/api/v1}
   model:
     evaluation: ${OPENROUTER_EVAL_MODEL:google/gemini-2.5-flash}

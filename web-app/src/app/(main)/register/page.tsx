@@ -46,10 +46,11 @@ export default function RegisterPage() {
       setSuccess(true);
       // Brief success flash, then redirect to login
       setTimeout(() => router.push('/login'), 1500);
-    } catch (err: any) {
+    } catch (err) {
+      const axiosError = err as { response?: { data?: { detail?: string; message?: string } } };
       const msg =
-        err?.response?.data?.detail ||
-        err?.response?.data?.message ||
+        axiosError?.response?.data?.detail ||
+        axiosError?.response?.data?.message ||
         'Đăng ký thất bại. Vui lòng thử lại.';
       setApiError(msg);
     } finally {

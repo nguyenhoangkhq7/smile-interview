@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import styles from './footer.module.css';
 
 export default function Footer() {
@@ -8,7 +9,7 @@ export default function Footer() {
         {/* Left Column */}
         <div className={styles.columnLeft}>
           <Link href="/" className={styles.brand}>
-            <img src="/logo.png" alt="Smile Interview Logo" className={styles.footerLogo} />
+            <Image src="/logo.png" alt="Smile Interview Logo" width={150} height={36} className={styles.footerLogo} unoptimized />
           </Link>
           <p className={styles.description}>
             Chấm điểm CV theo chuẩn ATS chỉ trong 30s, nhận ngay báo cáo đánh giá và gợi ý cải thiện CV để tăng cơ hội gọi phỏng vấn
@@ -102,7 +103,7 @@ export default function Footer() {
       {/* Bottom Strip */}
       <div className={styles.bottom}>
         <span className={styles.poweredBy}>Powered by</span>
-        <img src="/logo.png" alt="Powered By Logo" className={styles.poweredLogo} />
+        <Image src="/logo.png" alt="Powered By Logo" width={80} height={20} className={styles.poweredLogo} unoptimized />
       </div>
     </footer>
   );
