@@ -190,7 +190,8 @@ public final class PromptTemplateConfig {
                 6. BREVITY (CRITICAL): To prevent token truncation, keep "jd_requirement", "cv_evidence", and "reasoning" under 15 words each. Be extremely concise.
                 7. WEAK STATUS FORMULA: When status is "weak", the `cv_evidence` MUST strictly follow this exact template to prevent hallucination: "Tìm thấy từ khóa '[X]' trong phần '[Y]'. Hoàn toàn không có minh chứng áp dụng thực tế trong phần mô tả dự án."
                 8. REASONING: Every evidence item MUST include a "reasoning" field with 1-2 concise sentences explaining the status.
-                9. AD-HOC CRITERIA: After evaluating the main criteria, EXHAUSTIVELY scan the JD for clear, distinct requirements NOT covered by the criteria list, including but not limited to: technical skills, tools, or domain knowledge. Extract the most critical missing requirements (up to 4 items max). Do not stop at just 2-3 items, but do not exceed 4 to prevent truncation. Return them in the "additional_evidence_items" array. Keep reasoning to 1 short sentence. DO NOT include Years of Experience (YOE), Education/Degrees, GPA, or Certifications, as these are processed separately by the GATE extractor. DO NOT evaluate soft skills (Critical Thinking, Collaboration, Communication...) from resume text — these cannot be reliably assessed from static CV and will be handled via interview questions instead. DO NOT extract common English/Vietnamese stop words, prepositions, or grammatical particles (such as 'At', 'in', 'and', 'the', 'of', 'to', 'for', 'with', 'tại', 'ở', 'và', 'của') as requirements.
+                9. AD-HOC CRITERIA: After evaluating the main criteria, EXHAUSTIVELY scan the JD for clear, distinct requirements NOT covered by the criteria list, including but not limited to: technical skills, tools, or domain knowledge. Extract the most critical missing requirements (up to 4 items max). Do not stop at just 2-3 items, but do not exceed 4 to prevent truncation. Return them in the "additional_evidence_items" array. Keep reasoning to 1 short sentence. DO NOT include Years of Experience (YOE), Education/Degrees, GPA, or Certifications, as these are processed separately by the GATE extractor. DO NOT evaluate soft skills (Critical Thinking, Collaboration, Communication...) from resume text — these cannot be reliably assessed from static CV and will be handled via interview questions instead.
+                10. SOURCE SPAN (CRITICAL): For every item in `evidence_items`, you MUST include a "source_span" field containing an exact, near-verbatim excerpt (~10-40 words) taken directly from the CV Markdown as physical proof. Do not paraphrase or summarize. If status is 'missing', set "source_span" to null.
                 
                 EVALUATION CRITERIA (fetch from Rule Engine):
                 %s
@@ -203,6 +204,7 @@ public final class PromptTemplateConfig {
                       "criteria_name": "<string — exact criteria name from the list above>",
                       "jd_requirement": "<specific requirement extracted from the JD for this criterion>",
                       "cv_evidence": "<concrete evidence from the CV, or null if absent>",
+                      "source_span": "<exact 10-40 word verbatim snippet quoted directly from CV Markdown, or null if missing>",
                       "status": "<matched|weak|missing>",
                       "reasoning": "<1-2 sentences explaining why this status was chosen>"
                     }

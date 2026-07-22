@@ -52,4 +52,24 @@ public interface SystemSettingRepository extends JpaRepository<SystemSetting, St
                 .map(SystemSetting::getSettingValue)
                 .orElse(defaultValue);
     }
+
+    /**
+     * Convenience method: reads the integer value for a given key,
+     * returning the provided default if the key is absent or unparseable.
+     *
+     * @param settingKey   the setting key to look up
+     * @param defaultValue fallback value used if key is missing or malformed
+     * @return parsed integer value, or {@code defaultValue}
+     */
+    default int getInt(String settingKey, int defaultValue) {
+        return findBySettingKey(settingKey)
+                .map(s -> {
+                    try {
+                        return Integer.parseInt(s.getSettingValue());
+                    } catch (NumberFormatException e) {
+                        return defaultValue;
+                    }
+                })
+                .orElse(defaultValue);
+    }
 }

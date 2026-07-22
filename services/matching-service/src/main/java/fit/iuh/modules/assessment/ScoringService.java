@@ -143,7 +143,12 @@ public class ScoringService {
                         item.status(),
                         item.reasoning(),
                         weight,
-                        scoreContribution
+                        scoreContribution,
+                        item.sourceSpan(),
+                        item.groundingScore(),
+                        item.confidenceVotes(),
+                        item.lowConfidence(),
+                        item.needsManualReview()
                 );
                 updatedItems.add(updated);
             }
