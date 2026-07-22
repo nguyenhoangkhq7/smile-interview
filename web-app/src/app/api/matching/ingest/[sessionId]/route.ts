@@ -46,14 +46,22 @@ export async function POST(
     if (!finalResumeId && cvFile) {
       let uploadRes;
       try {
-        const cvBuffer = Buffer.from(await cvFile.arrayBuffer());
-        const base64Data = `data:${cvFile.type || 'application/octet-stream'};base64,${cvBuffer.toString('base64')}`;
-        uploadRes = await cloudinary.uploader.upload(base64Data, {
-          resource_type: 'raw',
-          public_id: cvFile.name,
-          use_filename: true,
-          unique_filename: true,
-        });
+        if (!process.env.CLOUDINARY_API_KEY) {
+          console.warn('[API Proxy Ingest] CLOUDINARY_API_KEY is not set, using mock upload for CV.');
+          uploadRes = {
+            secure_url: `https://example.com/resumes/${encodeURIComponent(cvFile.name)}`,
+            public_id: `mock_cv_${Date.now()}_${encodeURIComponent(cvFile.name)}`,
+          };
+        } else {
+          const cvBuffer = Buffer.from(await cvFile.arrayBuffer());
+          const base64Data = `data:${cvFile.type || 'application/octet-stream'};base64,${cvBuffer.toString('base64')}`;
+          uploadRes = await cloudinary.uploader.upload(base64Data, {
+            resource_type: 'raw',
+            public_id: cvFile.name,
+            use_filename: true,
+            unique_filename: true,
+          });
+        }
       } catch (uploadError) {
         const uErr = uploadError as Error;
         console.error('[API Proxy Ingest] Cloudinary upload failed for CV:', uErr);
@@ -72,14 +80,22 @@ export async function POST(
       if (jdFile) {
         let uploadRes;
         try {
-          const jdBuffer = Buffer.from(await jdFile.arrayBuffer());
-          const base64Data = `data:${jdFile.type || 'application/octet-stream'};base64,${jdBuffer.toString('base64')}`;
-          uploadRes = await cloudinary.uploader.upload(base64Data, {
-            resource_type: 'raw',
-            public_id: jdFile.name,
-            use_filename: true,
-            unique_filename: true,
-          });
+          if (!process.env.CLOUDINARY_API_KEY) {
+            console.warn('[API Proxy Ingest] CLOUDINARY_API_KEY is not set, using mock upload for JD.');
+            uploadRes = {
+              secure_url: `https://example.com/jds/${encodeURIComponent(jdFile.name)}`,
+              public_id: `mock_jd_${Date.now()}_${encodeURIComponent(jdFile.name)}`,
+            };
+          } else {
+            const jdBuffer = Buffer.from(await jdFile.arrayBuffer());
+            const base64Data = `data:${jdFile.type || 'application/octet-stream'};base64,${jdBuffer.toString('base64')}`;
+            uploadRes = await cloudinary.uploader.upload(base64Data, {
+              resource_type: 'raw',
+              public_id: jdFile.name,
+              use_filename: true,
+              unique_filename: true,
+            });
+          }
         } catch (uploadError) {
           const uErr = uploadError as Error;
           console.error('[API Proxy Ingest] Cloudinary upload failed for JD:', uErr);

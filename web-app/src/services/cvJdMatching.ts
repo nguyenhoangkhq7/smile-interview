@@ -28,6 +28,19 @@ export interface IngestResponse {
 }
 
 
+export interface ScoreBreakdown {
+  must_have_score?: number;
+  must_have_weight_ratio?: number;
+  prefer_to_have_score?: number;
+  prefer_to_have_weight_ratio?: number;
+  overall_match_score?: number;
+  mustHaveScore?: number;
+  mustHaveWeightRatio?: number;
+  preferToHaveScore?: number;
+  preferToHaveWeightRatio?: number;
+  overallMatchScore?: number;
+}
+
 export interface AssessmentResponse {
   id: string;
   sessionId: string;
@@ -46,7 +59,7 @@ export interface AssessmentResponse {
   createdAt: string;
   evidenceItems?: unknown[];
   additionalEvidenceItems?: unknown[];
-  scoreBreakdown?: unknown;
+  scoreBreakdown?: ScoreBreakdown | null;
   topPriorityImprovements?: unknown[];
   eligibility?: SessionEligibility;
 }

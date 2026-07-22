@@ -31,20 +31,28 @@ export async function POST(request: NextRequest) {
     }
 
     // Convert file to base64 for Cloudinary
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const base64Data = `data:${file.type};base64,${buffer.toString('base64')}`;
-
-    console.log(`[API Default Resume] Uploading default CV to Cloudinary for user ${authUserId}...`);
-    const uploadRes = await cloudinary.uploader.upload(base64Data, {
-      folder: 'smile-interview/resumes',
-      resource_type: 'raw', // Support PDF/Docx raw upload
-    });
-
-    const fileUrl = uploadRes.secure_url;
-    const cloudinaryId = uploadRes.public_id;
+    let fileUrl;
+    let cloudinaryId;
     const fileName = file.name;
 
-    console.log(`[API Default Resume] Cloudinary upload success. URL: ${fileUrl}`);
+    if (!process.env.CLOUDINARY_API_KEY) {
+      console.warn('[API Default Resume] CLOUDINARY_API_KEY is not set, using mock upload.');
+      fileUrl = `https://example.com/resumes/${encodeURIComponent(file.name)}`;
+      cloudinaryId = `mock_cv_${Date.now()}_${encodeURIComponent(file.name)}`;
+    } else {
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const base64Data = `data:${file.type};base64,${buffer.toString('base64')}`;
+
+      console.log(`[API Default Resume] Uploading default CV to Cloudinary for user ${authUserId}...`);
+      const uploadRes = await cloudinary.uploader.upload(base64Data, {
+        folder: 'smile-interview/resumes',
+        resource_type: 'raw', // Support PDF/Docx raw upload
+      });
+
+      fileUrl = uploadRes.secure_url;
+      cloudinaryId = uploadRes.public_id;
+      console.log(`[API Default Resume] Cloudinary upload success. URL: ${fileUrl}`);
+    }
 
     // Insert CV into resumes table
     const resumeInsertRes = await query(

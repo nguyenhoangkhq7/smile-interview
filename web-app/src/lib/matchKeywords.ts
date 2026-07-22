@@ -1,159 +1,139 @@
 /**
  * matchKeywords.ts
  *
- * BFF utility for Jobscan-style Visual Keyword Matching.
+ * Fast, Zero-Token Local Keyword Matcher.
  *
- * Takes the original raw text of a CV and a Job Description (pre-LLM,
- * as extracted directly from the PDF), then calls the OpenRouter LLM
- * in strict JSON mode to:
- *   1. Identify all skill/keyword requirements in the JD.
- *   2. Determine which are present (matched) or absent (missing) in the CV.
- *   3. Classify each as "hard" (technical) or "soft" skill.
- *
- * Returns a KeywordMatchResult. On any LLM failure or JSON parse error
- * the function falls back gracefully to { matching_skills: [], missing_skills: [] }.
- *
- * LLM latency: ~1–3 seconds (OpenRouter / free-tier model).
+ * Scans raw CV and JD text using a rich technical lexicon and regex word-boundary matching.
+ * Replaces external LLM calls to save ~3,000-5,000 tokens per upload and execute in < 5ms.
  */
 
 export interface SkillEntry {
   /** Unique visual tag ID (e.g. "ms1", "msk2") */
   id: string;
-  /** The canonical keyword exactly as it appears in the JD */
+  /** The canonical keyword as detected in the JD */
   keyword: string;
-  /** "hard" for technical skills, "soft" for interpersonal/behavioral skills */
+  /** "hard" for technical skills, "soft" for interpersonal/process skills */
   category: 'hard' | 'soft';
-  /** Optional semantically equivalent variants used to scan the CV */
+  /** Optional variants detected in the text */
   variants?: string[];
 }
 
 export interface KeywordMatchResult {
-  /** Keywords present in the JD that were found (or semantically matched) in the CV */
   matching_skills: SkillEntry[];
-  /** Keywords present in the JD that are absent from the CV */
   missing_skills: SkillEntry[];
 }
 
-const FALLBACK: KeywordMatchResult = { matching_skills: [], missing_skills: [] };
+/** Pre-defined Comprehensive Technical & Soft Skill Taxonomy */
+const TECH_LEXICON: Array<{ keyword: string; category: 'hard' | 'soft'; synonyms: string[] }> = [
+  // Languages
+  { keyword: 'Java', category: 'hard', synonyms: ['java 8', 'java 11', 'java 17', 'java 21'] },
+  { keyword: 'JavaScript', category: 'hard', synonyms: ['js', 'es6', 'ecmascript'] },
+  { keyword: 'TypeScript', category: 'hard', synonyms: ['ts'] },
+  { keyword: 'Python', category: 'hard', synonyms: ['python3', 'py'] },
+  { keyword: 'C++', category: 'hard', synonyms: ['cpp', 'c/c++'] },
+  { keyword: 'C#', category: 'hard', synonyms: ['csharp', '.net'] },
+  { keyword: 'Go', category: 'hard', synonyms: ['golang'] },
+  { keyword: 'PHP', category: 'hard', synonyms: [] },
+  { keyword: 'Rust', category: 'hard', synonyms: [] },
+  { keyword: 'SQL', category: 'hard', synonyms: ['pl/sql', 't-sql'] },
+  { keyword: 'HTML/CSS', category: 'hard', synonyms: ['html5', 'css3', 'scss', 'sass', 'tailwind'] },
+
+  // Frameworks & Libraries
+  { keyword: 'Spring Boot', category: 'hard', synonyms: ['spring', 'spring boot 3', 'spring mvc', 'spring data', 'spring security'] },
+  { keyword: 'React', category: 'hard', synonyms: ['reactjs', 'react.js', 'react native'] },
+  { keyword: 'Next.js', category: 'hard', synonyms: ['nextjs', 'next'] },
+  { keyword: 'Node.js', category: 'hard', synonyms: ['nodejs', 'express', 'express.js', 'nest.js', 'nestjs'] },
+  { keyword: 'Angular', category: 'hard', synonyms: ['angularjs', 'angular 2+'] },
+  { keyword: 'Vue.js', category: 'hard', synonyms: ['vue', 'vuejs', 'nuxt'] },
+  { keyword: 'Django', category: 'hard', synonyms: ['fastapi', 'flask'] },
+  { keyword: 'Hibernate', category: 'hard', synonyms: ['jpa', 'mybatis', 'prisma', 'typeorm'] },
+
+  // Databases & Storage
+  { keyword: 'PostgreSQL', category: 'hard', synonyms: ['postgres', 'pg'] },
+  { keyword: 'MySQL', category: 'hard', synonyms: ['mariadb'] },
+  { keyword: 'MongoDB', category: 'hard', synonyms: ['mongo', 'nosql'] },
+  { keyword: 'Redis', category: 'hard', synonyms: ['memcached'] },
+  { keyword: 'Oracle DB', category: 'hard', synonyms: ['oracle'] },
+  { keyword: 'Elasticsearch', category: 'hard', synonyms: ['elastic search', 'elk'] },
+
+  // Cloud, DevOps & Tools
+  { keyword: 'Docker', category: 'hard', synonyms: ['containerization', 'containers'] },
+  { keyword: 'Kubernetes', category: 'hard', synonyms: ['k8s'] },
+  { keyword: 'AWS', category: 'hard', synonyms: ['amazon web services', 's3', 'ec2', 'eks', 'lambda'] },
+  { keyword: 'Azure', category: 'hard', synonyms: ['microsoft azure'] },
+  { keyword: 'GCP', category: 'hard', synonyms: ['google cloud platform', 'google cloud'] },
+  { keyword: 'CI/CD', category: 'hard', synonyms: ['jenkins', 'github actions', 'gitlab ci', 'bitbucket pipelines'] },
+  { keyword: 'Git', category: 'hard', synonyms: ['github', 'gitlab', 'version control'] },
+  { keyword: 'Kafka', category: 'hard', synonyms: ['rabbitmq', 'event streaming', 'message broker'] },
+  { keyword: 'Microservices', category: 'hard', synonyms: ['distributed systems', 'microservice architecture'] },
+  { keyword: 'RESTful API', category: 'hard', synonyms: ['rest api', 'restful', 'graphql', 'grpc'] },
+
+  // Testing & Quality
+  { keyword: 'Unit Testing', category: 'hard', synonyms: ['junit', 'mockito', 'jest', 'vitest', 'cypress'] },
+
+  // Soft & Process Skills
+  { keyword: 'Agile / Scrum', category: 'soft', synonyms: ['agile', 'scrum', 'kanban', 'jira'] },
+  { keyword: 'Problem Solving', category: 'soft', synonyms: ['analytical skills', 'critical thinking'] },
+  { keyword: 'Communication', category: 'soft', synonyms: ['teamwork', 'collaboration', 'presentation'] },
+  { keyword: 'English', category: 'soft', synonyms: ['english communication', 'toeic', 'ielts'] },
+  { keyword: 'Leadership', category: 'soft', synonyms: ['mentoring', 'team lead', 'project management'] },
+];
+
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function containsTerm(text: string, term: string): boolean {
+  if (!text || !term) return false;
+  const escaped = escapeRegex(term);
+  const regex = new RegExp(`(?:^|\\b|_|\\s)${escaped}(?:$|\\b|_|\\s|\\.|,)`, 'i');
+  return regex.test(text);
+}
 
 /**
- * Extract and match skill keywords between a JD and a CV using an LLM call.
- *
- * @param rawResumeText  Pre-LLM plain text extracted from the candidate's CV/resume PDF.
- * @param rawJdText      Pre-LLM plain text extracted from the Job Description PDF/text.
- * @returns              A KeywordMatchResult categorising skills as matching or missing.
+ * Extract and match skill keywords locally using Lexicon & Regex (0 LLM Tokens).
  */
 export async function matchKeywords(
   rawResumeText: string,
   rawJdText: string
 ): Promise<KeywordMatchResult> {
-  const apiKey = process.env.LLM_API_KEY;
-  const apiUrl = process.env.LLM_API_URL || 'https://openrouter.ai/api/v1';
-  const model = process.env.LLM_MODEL || 'poolside/laguna-xs-2.1:free';
+  const start = Date.now();
+  const cvText = rawResumeText || '';
+  const jdText = rawJdText || '';
 
-  if (!apiKey) {
-    console.error('[matchKeywords] LLM_API_KEY is not set. Returning empty result.');
-    return FALLBACK;
+  const matching_skills: SkillEntry[] = [];
+  const missing_skills: SkillEntry[] = [];
+
+  let matchIdx = 1;
+  let missIdx = 1;
+
+  for (const entry of TECH_LEXICON) {
+    const allTerms = [entry.keyword, ...entry.synonyms];
+    const presentInJd = allTerms.some((t) => containsTerm(jdText, t));
+
+    if (presentInJd) {
+      const matchedVariant = allTerms.find((t) => containsTerm(cvText, t));
+
+      if (matchedVariant) {
+        matching_skills.push({
+          id: `ms${matchIdx++}`,
+          keyword: entry.keyword,
+          category: entry.category,
+          variants: matchedVariant.toLowerCase() !== entry.keyword.toLowerCase() ? [matchedVariant] : undefined,
+        });
+      } else {
+        missing_skills.push({
+          id: `msk${missIdx++}`,
+          keyword: entry.keyword,
+          category: entry.category,
+        });
+      }
+    }
   }
 
-  // Truncate inputs to avoid excessive token usage (~4000 chars each is enough)
-  const cvSnippet = rawResumeText.slice(0, 4000);
-  const jdSnippet = rawJdText.slice(0, 4000);
+  console.log(
+    `[matchKeywords Local Lexicon] Done in ${Date.now() - start}ms (0 Tokens). Matching: ${matching_skills.length}, Missing: ${missing_skills.length}`
+  );
 
-  const systemPrompt = `You are a technical recruiter assistant specialised in resume screening.
-Your task is to compare a Job Description (JD) against a Candidate Resume (CV) and identify skill keywords.
-
-You MUST return a valid JSON object strictly matching this schema (no markdown, no extra keys):
-{
-  "matching_skills": [
-    { "id": "ms1", "keyword": "string", "category": "hard" | "soft", "variants": ["string"] }
-  ],
-  "missing_skills": [
-    { "id": "msk1", "keyword": "string", "category": "hard" | "soft" }
-  ]
-}
-
-Rules:
-- Extract every distinct technical skill, tool, framework, methodology, certification, and soft skill from the JD.
-- For each keyword, check if it OR a close semantic variant (e.g. "ReactJS" vs "React") appears in the CV text.
-- If found (even as a variant): include it in "matching_skills" with any detected variant forms in the "variants" array.
-- If NOT found: include it in "missing_skills".
-- Classify "hard" for technical/tool/framework/language/platform skills.
-- Classify "soft" for interpersonal, communication, behavioural, or process skills.
-- IDs for matching_skills: ms1, ms2, ms3 ... (sequential).
-- IDs for missing_skills: msk1, msk2, msk3 ... (sequential).
-- Do NOT invent keywords not present in the JD.
-- Return ONLY the JSON object. No explanation, no markdown fences.`;
-
-  const userPrompt = `### JOB DESCRIPTION ###
-${jdSnippet}
-
-### CANDIDATE RESUME ###
-${cvSnippet}`;
-
-  try {
-    const response = await fetch(`${apiUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        // Enforce strict JSON output - avoids markdown fences and free-text responses
-        response_format: { type: 'json_object' },
-        temperature: 0.0,
-        max_tokens: 2048,
-      }),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error(`[matchKeywords] LLM API returned ${response.status}:`, errText);
-      return FALLBACK;
-    }
-
-    const data = await response.json();
-    const rawContent: string | undefined = data?.choices?.[0]?.message?.content;
-
-    if (!rawContent) {
-      console.error('[matchKeywords] LLM returned empty content.');
-      return FALLBACK;
-    }
-
-    // Parse and validate the returned JSON
-    let parsed: { matching_skills?: unknown[]; missing_skills?: unknown[] } | null = null;
-    try {
-      parsed = JSON.parse(rawContent) as { matching_skills?: unknown[]; missing_skills?: unknown[] };
-    } catch (parseErr) {
-      console.error('[matchKeywords] Failed to parse LLM JSON response:', parseErr, '\nRaw:', rawContent);
-      return FALLBACK;
-    }
-
-    // Basic structural validation before returning
-    const matchingSkills: SkillEntry[] = Array.isArray(parsed?.matching_skills)
-      ? (parsed.matching_skills as SkillEntry[]).filter(
-          (s) => typeof s?.id === 'string' && typeof s?.keyword === 'string'
-        )
-      : [];
-
-    const missingSkills: SkillEntry[] = Array.isArray(parsed?.missing_skills)
-      ? (parsed.missing_skills as SkillEntry[]).filter(
-          (s) => typeof s?.id === 'string' && typeof s?.keyword === 'string'
-        )
-      : [];
-
-    console.log(
-      `[matchKeywords] Done. Matching: ${matchingSkills.length}, Missing: ${missingSkills.length}`
-    );
-
-    return { matching_skills: matchingSkills, missing_skills: missingSkills };
-  } catch (err) {
-    console.error('[matchKeywords] Unexpected error during LLM call:', err);
-    return FALLBACK;
-  }
+  return { matching_skills, missing_skills };
 }

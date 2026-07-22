@@ -134,15 +134,29 @@ public class DatabaseSeeder implements CommandLineRunner {
 
         seedSettingIfAbsent(
                 "CRITERIA_BATCH_SIZE",
-                "5",
+                "10",
                 "Number of criteria sent per LLM batch call during evidence matching"
         );
+        // Force update existing setting if it was previously 5
+        settingRepository.findBySettingKey("CRITERIA_BATCH_SIZE").ifPresent(setting -> {
+            if ("5".equals(setting.getSettingValue())) {
+                setting.setSettingValue("10");
+                settingRepository.save(setting);
+            }
+        });
 
         seedSettingIfAbsent(
                 "SELF_CONSISTENCY_RUNS",
-                "3",
+                "1",
                 "Number of parallel self-consistency runs per criteria batch for majority voting"
         );
+        // Force update existing setting if it was previously 3
+        settingRepository.findBySettingKey("SELF_CONSISTENCY_RUNS").ifPresent(setting -> {
+            if ("3".equals(setting.getSettingValue())) {
+                setting.setSettingValue("1");
+                settingRepository.save(setting);
+            }
+        });
 
         seedSettingIfAbsent(
                 "MAX_CONCURRENT_LLM_CALLS",

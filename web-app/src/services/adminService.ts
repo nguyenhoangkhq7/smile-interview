@@ -4,23 +4,23 @@ import axiosClient from '@/lib/axiosClient';
 
 export interface JobCategoryDto {
   id: number;
+  code: string;
   name: string;
   parent_id: number | null;
-  parent_name: string | null;
 }
 
 export interface EvaluationCriteriaDto {
   id: number;
-  criteria_name: string;
-  prompt_instruction: string;
+  name: string;
+  category: string | null;
+  question_type: string | null;
+  prompt_instruction: string | null;
 }
 
 export interface CategoryCriteriaMappingDto {
-  job_category_id: number;
-  job_category_name: string | null;
+  category_id: number;
   criteria_id: number;
-  criteria_name: string | null;
-  seniority_level: string;
+  level: string;
   weight_percentage: number;
 }
 
@@ -34,19 +34,22 @@ export interface LevelDistributionRuleDto {
 }
 
 export interface SystemSettingDto {
+  id: number;
   setting_key: string;
   setting_value: string;
+  description: string | null;
+  updated_at: string | null;
 }
 
 // ─── Payload types for mutating operations ────────────────────────────────────
 
-export type CreateJobCategoryPayload = Pick<JobCategoryDto, 'name' | 'parent_id'>;
-export type UpdateJobCategoryPayload = Pick<JobCategoryDto, 'name' | 'parent_id'>;
+export type CreateJobCategoryPayload = Pick<JobCategoryDto, 'code' | 'name' | 'parent_id'>;
+export type UpdateJobCategoryPayload = Pick<JobCategoryDto, 'code' | 'name' | 'parent_id'>;
 
-export type CreateEvaluationCriteriaPayload = Pick<EvaluationCriteriaDto, 'criteria_name' | 'prompt_instruction'>;
-export type UpdateEvaluationCriteriaPayload = Pick<EvaluationCriteriaDto, 'criteria_name' | 'prompt_instruction'>;
+export type CreateEvaluationCriteriaPayload = Pick<EvaluationCriteriaDto, 'name' | 'category' | 'question_type' | 'prompt_instruction'>;
+export type UpdateEvaluationCriteriaPayload = Pick<EvaluationCriteriaDto, 'name' | 'category' | 'question_type' | 'prompt_instruction'>;
 
-export type CreateMappingPayload = Pick<CategoryCriteriaMappingDto, 'job_category_id' | 'criteria_id' | 'seniority_level' | 'weight_percentage'>;
+export type CreateMappingPayload = Pick<CategoryCriteriaMappingDto, 'category_id' | 'criteria_id' | 'level' | 'weight_percentage'>;
 export type UpdateMappingPayload = Pick<CategoryCriteriaMappingDto, 'weight_percentage'>;
 
 export type UpdateLevelRulePayload = Pick<LevelDistributionRuleDto, 'behavioral_pct' | 'technical_pct' | 'coding_pct' | 'system_design_pct'>;

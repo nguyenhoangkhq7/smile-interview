@@ -10,7 +10,9 @@ interface EvidenceItem {
 
 interface ImprovementItem {
   criteria_name: string;
-  suggestion: string;
+  actionable_advice?: string;
+  suggestion?: string;  // fallback / legacy
+  priority?: string;
 }
 
 export async function GET(request: NextRequest) {
@@ -195,7 +197,7 @@ export async function GET(request: NextRequest) {
 
     // Actionable improvement suggestions mapping
     const actionableImprovementSuggestions = (data.top_priority_improvements as ImprovementItem[] || [])
-      .map((item) => `[${item.criteria_name}] ${item.suggestion}`);
+      .map((item) => `[${item.criteria_name}] ${item.actionable_advice || item.suggestion || ''}`);
 
     return NextResponse.json({
       id: data.id,

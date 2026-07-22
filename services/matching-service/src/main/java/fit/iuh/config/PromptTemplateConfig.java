@@ -176,67 +176,78 @@ public final class PromptTemplateConfig {
      * @param criteriaInstructions formatted string of numbered criteria instructions from DB
      * @return complete zero-shot system prompt for the assessment LLM call
      */
-    public static String buildAssessmentSystemPrompt(String criteriaInstructions) {
+    public static String buildAssessmentSystemPrompt() {
         return """
                 Role: Evidence-Matching Engine.
-                Task: For each evaluation criterion listed below, search the CV for evidence that matches the JD requirement.
+                Task: For each evaluation criterion listed in the user prompt, search the CV for evidence that matches the JD requirement.
                 
-                RULES:
-                1. ZERO HALLUCINATION (CRITICAL): EXTRACT EXACT QUOTES ONLY. IF IT IS NOT EXPLICITLY WRITTEN IN THE CV, YOU MUST RETURN STATUS 'MISSING'. Do not invent, interpolate, or assume tech stacks like caching or streaming unless explicitly present.
-                2. SEMANTIC MATCHING: Contextual equivalents are valid matches, provided the underlying proof exists literally in the text.
-                3. STRICT JSON ONLY: Output ONLY a valid JSON object. No markdown wrappers, no explanations.
-                4. LANGUAGE: Keep "jd_requirement" and "cv_evidence" in Vietnamese for human readability. ALWAYS retain technical terms (Java, Spring Boot, Kubernetes, PostgreSQL, CI/CD) in English.
-                5. STRICT SCHEMA: The "status" field MUST BE exactly one of: "matched", "weak", "missing", or "not_applicable". You must NEVER return null.
-                6. BREVITY (CRITICAL): To prevent token truncation, keep "jd_requirement", "cv_evidence", and "reasoning" under 15 words each. Be extremely concise.
-                7. WEAK STATUS FORMULA: When status is "weak", the `cv_evidence` MUST strictly follow this exact template to prevent hallucination: "Tìm thấy từ khóa '[X]' trong phần '[Y]'. Hoàn toàn không có minh chứng áp dụng thực tế trong phần mô tả dự án."
-                8. REASONING: Every evidence item MUST include a "reasoning" field with 1-2 concise sentences explaining the status.
-                9. AD-HOC CRITERIA: After evaluating the main criteria, EXHAUSTIVELY scan the JD for clear, distinct requirements NOT covered by the criteria list, including but not limited to: technical skills, tools, or domain knowledge. Extract the most critical missing requirements (up to 4 items max). Do not stop at just 2-3 items, but do not exceed 4 to prevent truncation. Return them in the "additional_evidence_items" array. Keep reasoning to 1 short sentence. DO NOT include Years of Experience (YOE), Education/Degrees, GPA, or Certifications, as these are processed separately by the GATE extractor. DO NOT evaluate soft skills (Critical Thinking, Collaboration, Communication...) from resume text — these cannot be reliably assessed from static CV and will be handled via interview questions instead.
-                10. SOURCE SPAN (CRITICAL): For every item in `evidence_items`, you MUST include a "source_span" field containing an exact, near-verbatim excerpt (~10-40 words) taken directly from the CV Markdown as physical proof. Do not paraphrase or summarize. If status is 'missing', set "source_span" to null.
-                
-                EVALUATION CRITERIA (fetch from Rule Engine):
-                %s
+                MANDATORY EVALUATION RULES:
+                1. EXHAUSTIVE CV SCANNING (NO MISSING EVIDENCE): Before marking any criterion as 'missing', EXHAUSTIVELY scan ALL sections of the CV — including prose in '# Summary', '# Languages', '# Certifications', '# Additional Information', '# Infrastructure & Tools', as well as '# Projects' and '# Experience'. If relevant text exists but does not fully demonstrate practical depth, label it 'weak' with clear reasoning explaining what is missing, rather than defaulting to 'missing'.
+                2. NO OVER-REUSED SOURCE SPANS: Prefer distinct, specific quotes for distinct criteria. Do not rely on a single project sentence for more than 2 criteria.
+                3. DIRECT VS INDIRECT PROOF (NO OVER-INFERENCE): Before marking 'matched', verify: "Does this quote DIRECTLY prove the exact concept in `jd_requirement`?". If the proof is indirect (e.g. using JWT/Spring Boot implies OOP or Redis implies caching), mark it as 'weak' and explicitly state in `reasoning` that it is an indirect inference without explicit proof of core principles.
+                4. PRIORITIZE DIRECT EVIDENCE: When candidate text contains multiple snippets, ALWAYS select the snippet that EXPLICITLY NAMES the exact required technology/concept over indirect or related snippets.
+                5. STRICT NOT_APPLICABLE HANDLING & JD TRACING: If a requirement is NOT mentioned or implied in the input JD for the candidate level, set `importance: "NOT_APPLICABLE"` and `status: "not_applicable"`. DO NOT upgrade unmentioned criteria to 'REQUIRED' or fabricate 'expertise' requirements not present in the input JD. Items marked NOT_APPLICABLE will be assigned 0 weight and 0 penalty.
+                6. TRACE CRITERIA TO JD & LEVEL CALIBRATION: Calibrate difficulty against candidate seniority level (e.g. Support-level for Fresher vs Lead-level for Senior). Ensure extracted `jd_requirement` reflects the exact input JD text.
+                7. EXHAUSTIVE PREFERRED REQUIREMENTS (NICE-TO-HAVE): Exhaustively scan all sections of the JD (especially '# Preferred Qualifications', 'Nice to have', 'Lợi thế / Ưu tiên', including specific example projects like OTT-EDU, AI/ML, real-time systems). Every preferred item in JD MUST generate an entry in `additional_evidence_items` with `importance: "PREFERRED"`.
+                8. ZERO HALLUCINATION (CRITICAL): EXTRACT EXACT QUOTES ONLY FOR `source_span`. Do not invent or summarize `source_span`. If status is 'missing', set `source_span` to null.
+                9. AD-HOC CRITERIA DEDUPLICATION: DO NOT re-add any requirement in `additional_evidence_items` that is already covered by or conceptually identical to any item in the EVALUATION CRITERIA list above (e.g., if 'Data Structures & Algorithms', 'OOP', or 'Docker' is in the criteria list, DO NOT re-add them under any name variation).
+                10. CONSISTENT LANGUAGE & NO CHINESE CHARACTERS (CRITICAL): Write ALL `jd_requirement`, `cv_evidence`, and `reasoning` strictly in VIETNAMESE (retaining standard English technical terms like Java, Spring Boot, React, Docker, RESTful APIs, Git, SQL). NEVER output Chinese characters (中文, e.g. 提到), Japanese, or Korean under any circumstances. Replace any Chinese word like '提到' with 'nhắc đến' or 'đề cập'.
+                11. BREVITY (CRITICAL): Keep `jd_requirement`, `cv_evidence`, and `reasoning` concise (under 20 words each) to prevent token truncation.
                 
                 OUTPUT SCHEMA:
                 {
                   "evidence_items": [
                     {
-                      "criteria_id": <long — must match the ID from the criteria list above>,
-                      "criteria_name": "<string — exact criteria name from the list above>",
-                      "jd_requirement": "<specific requirement extracted from the JD for this criterion>",
-                      "cv_evidence": "<concrete evidence from the CV, or null if absent>",
+                      "criteria_id": <long — must match the ID from the criteria list in user prompt>,
+                      "criteria_name": "<string — exact criteria name from the criteria list>",
+                      "importance": "<REQUIRED|PREFERRED|NOT_APPLICABLE>",
+                      "jd_requirement": "<specific requirement extracted from the JD in Vietnamese>",
+                      "cv_evidence": "<concrete evidence from the CV in Vietnamese, or null if absent>",
                       "source_span": "<exact 10-40 word verbatim snippet quoted directly from CV Markdown, or null if missing>",
-                      "status": "<matched|weak|missing>",
-                      "reasoning": "<1-2 sentences explaining why this status was chosen>"
+                      "status": "<matched|weak|missing|not_applicable>",
+                      "reasoning": "<1-2 concise sentences in Vietnamese explaining why this status was chosen>"
                     }
                   ],
                   "additional_evidence_items": [
                     {
                       "criteria_name": "<Ad-hoc requirement name>",
-                      "jd_requirement": "<Extract from JD>",
-                      "cv_evidence": "<Extract from CV>",
+                      "importance": "<REQUIRED|PREFERRED>",
+                      "jd_requirement": "<Extract from JD in Vietnamese>",
+                      "cv_evidence": "<Extract from CV in Vietnamese>",
                       "status": "<matched|weak|missing>",
-                      "reasoning": "<1-2 sentences explaining status>"
+                      "reasoning": "<1-2 sentences in Vietnamese explaining status>"
                     }
                   ]
                 }
                 
                 STATUS DEFINITIONS:
-                - "matched": CV has strong, direct, explicit evidence demonstrating real-world depth (e.g., "Deployed on AWS with secure .env variable isolation per service" or "Agile process with clear Jira ticket conventions").
-                - "weak": Skill is listed in a Skills section without project context, or lacks practical depth (e.g., just mentioning "Jira" without showing process standardization, or just "AWS" without secure configurations).
-                - "missing": Requirement is completely absent from the CV. Look carefully across ALL sections, EXPLICITLY INCLUDING the "# Summary" prose paragraph and "Infrastructure & Tools" section. If a keyword is buried in the Summary, it is NOT missing.
-                - "not_applicable": The JD completely omits this requirement, AND it is not a strict industry necessity for the specific JD context. Use this instead of "missing" to avoid penalizing the candidate unfairly.
-                """.formatted(criteriaInstructions);
+                - "matched": CV has strong, direct, explicit evidence demonstrating real-world depth.
+                - "weak": Skill is listed in a Skills section without project context, or lacks practical depth.
+                - "missing": Requirement is completely absent from the CV. Look carefully across ALL sections.
+                - "not_applicable": The JD completely omits this requirement, AND it is not a strict industry necessity for the specific JD context.
+                
+                SELF-CHECKLIST BEFORE PRODUCING OUTPUT:
+                [✓] Have I scanned ALL sections (Summary, Languages, Certifications) before marking 'missing'?
+                [✓] Are direct evidence quotes selected over indirect inference?
+                [✓] Are all preferred/nice-to-have items in the JD included as PREFERRED criteria?
+                [✓] Are NOT_APPLICABLE items properly flagged without false penalization?
+                """;
+    }
+
+    public static String buildAssessmentSystemPrompt(String criteriaInstructions) {
+        return buildAssessmentSystemPrompt();
     }
 
     /**
-     * Builds the user-role message for the assessment call.
-     * Uses FULL Markdown documents — never chunk subsets.
+     * Builds the user-role message for the assessment call with Prompt Caching optimizations.
+     * Places the static CV and JD documents first, and appends the dynamic criteria batch at the end.
      *
-     * @param fullCvMarkdown  the complete CV Markdown from session_documents
-     * @param fullJdMarkdown  the complete JD Markdown from session_documents
+     * @param fullCvMarkdown       the complete CV Markdown
+     * @param fullJdMarkdown       the complete JD Markdown
+     * @param criteriaInstructions formatted string of criteria for this batch
      * @return formatted user prompt string
      */
-    public static String buildAssessmentUserPrompt(String fullCvMarkdown, String fullJdMarkdown) {
+    public static String buildAssessmentUserPrompt(String fullCvMarkdown, String fullJdMarkdown, String criteriaInstructions) {
         return """
                 ====== CANDIDATE RESUME (CV) — FULL DOCUMENT ======
                 %s
@@ -244,8 +255,15 @@ public final class PromptTemplateConfig {
                 ====== JOB DESCRIPTION (JD) — FULL DOCUMENT ======
                 %s
                 
-                Evaluate the CV against the JD using the criteria defined in the system prompt. Output ONLY the JSON object.
-                """.formatted(fullCvMarkdown, fullJdMarkdown);
+                ====== EVALUATION CRITERIA FOR THIS BATCH ======
+                %s
+                
+                Evaluate the CV against the JD for the criteria listed above. Output ONLY the JSON object.
+                """.formatted(fullCvMarkdown, fullJdMarkdown, criteriaInstructions);
+    }
+
+    public static String buildAssessmentUserPrompt(String fullCvMarkdown, String fullJdMarkdown) {
+        return buildAssessmentUserPrompt(fullCvMarkdown, fullJdMarkdown, "");
     }
 
     // =========================================================================
@@ -268,10 +286,9 @@ public final class PromptTemplateConfig {
             {
               "top_priority_improvements": [
                 {
-                  "criteria_id": <long (optional) — the related criteria_id if applicable, otherwise null>,
                   "criteria_name": "<string — the related criteria_name>",
-                  "suggestion": "<Highly detailed, actionable improvement suggestion (e.g., specific courses, project implementations, architectures)>",
-                  "priority_rank": <integer 1-3>
+                  "actionable_advice": "<Highly detailed, actionable improvement suggestion in Vietnamese (e.g., specific courses, concrete project implementations, architectures)>",
+                  "priority": "<HIGH|MEDIUM|LOW>"
                 }
               ]
             }

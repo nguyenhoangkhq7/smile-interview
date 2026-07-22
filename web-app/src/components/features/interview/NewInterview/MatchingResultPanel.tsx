@@ -23,6 +23,7 @@ interface KeywordMetadata {
 interface Criterion {
   status: string;
   criteria_name: string;
+  importance?: string;
   weight_used?: number;
   score_contribution?: number;
   jd_requirement?: string;
@@ -94,6 +95,20 @@ function CriterionItem({ item }: { item: Criterion }) {
     bg: 'bg-slate-50 border-slate-200', text: 'text-slate-600', label: item.status, icon: <AlertCircle size={14} />,
   };
 
+  const importanceBadge = item.importance === 'PREFERRED' ? (
+    <span className="rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-semibold text-purple-700 border border-purple-200">
+      Ưu tiên (Nice-to-have)
+    </span>
+  ) : item.importance === 'NOT_APPLICABLE' ? (
+    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 border border-slate-200">
+      Không áp dụng
+    </span>
+  ) : (
+    <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 border border-blue-200">
+      Bắt buộc (Must-have)
+    </span>
+  );
+
   return (
     <div className={`overflow-hidden rounded-lg border ${config.bg} bg-white shadow-sm`}>
       <div className={`flex flex-wrap items-center justify-between gap-2 border-b px-3.5 py-2.5 ${config.bg}`}>
@@ -102,10 +117,11 @@ function CriterionItem({ item }: { item: Criterion }) {
           <strong className="text-sm text-foreground">{item.criteria_name}</strong>
         </div>
         <div className="flex items-center gap-2">
-          {item.weight_used !== undefined && (
+          {importanceBadge}
+          {item.weight_used !== undefined && item.weight_used !== null && (
             <span className="rounded bg-white/60 px-1.5 py-0.5 text-[10px] text-muted-foreground border border-black/5">
               Hệ số: <b>{item.weight_used}</b>
-              {item.score_contribution !== undefined && <> | Điểm: <b>{item.score_contribution}</b></>}
+              {item.score_contribution !== undefined && item.score_contribution !== null && <> | Điểm: <b>{item.score_contribution}</b></>}
             </span>
           )}
           <Badge variant="outline" className={`text-[10px] font-bold ${config.text} border-current`}>{config.label}</Badge>
@@ -160,16 +176,41 @@ export function MatchingResultPanel({
     return names[key] || key.replace(/_/g, ' ').toUpperCase();
   }, []);
 
-  const filteredEvidence = (assessment.evidenceItems as Criterion[])?.filter((i) =>
-    criteriaFilter === 'all' || i.status === criteriaFilter
-  ) || [];
-  const filteredAdditional = (assessment.additionalEvidenceItems as Criterion[])?.filter((i) =>
-    criteriaFilter === 'all' || i.status === criteriaFilter
-  ) || [];
+  const sb = assessment.scoreBreakdown || {};
+  const mustHaveScore = sb.must_have_score ?? sb.mustHaveScore ?? assessment.competencyFitScore ?? 0;
+  const preferToHaveScore = sb.prefer_to_have_score ?? sb.preferToHaveScore ?? assessment.technicalDepthScore ?? 0;
+
+  const allItems = [
+    ...((assessment.evidenceItems as Criterion[]) || []),
+    ...((assessment.additionalEvidenceItems as Criterion[]) || []),
+  ];
+
+  const mustHaveCriteria = allItems.filter((i) => {
+    const imp = i.importance?.toUpperCase();
+    const isMust = imp === 'REQUIRED' || !imp || imp === 'MUST_HAVE';
+    const isNotApp = imp === 'NOT_APPLICABLE' || i.status === 'not_applicable';
+    const passesFilter = criteriaFilter === 'all' || i.status === criteriaFilter;
+    return isMust && !isNotApp && passesFilter;
+  });
+
+  const preferToHaveCriteria = allItems.filter((i) => {
+    const imp = i.importance?.toUpperCase();
+    const isPrefer = imp === 'PREFERRED' || imp === 'PREFER_TO_HAVE';
+    const isNotApp = imp === 'NOT_APPLICABLE' || i.status === 'not_applicable';
+    const passesFilter = criteriaFilter === 'all' || i.status === criteriaFilter;
+    return isPrefer && !isNotApp && passesFilter;
+  });
+
+  const notApplicableCriteria = allItems.filter((i) => {
+    const imp = i.importance?.toUpperCase();
+    const isNotApp = imp === 'NOT_APPLICABLE' || i.status === 'not_applicable';
+    const passesFilter = criteriaFilter === 'all' || i.status === criteriaFilter;
+    return isNotApp && passesFilter;
+  });
 
   return (
     <div className="space-y-6">
-      {}
+      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
         <div>
           <h2 className="text-2xl font-extrabold text-foreground">Kết quả phân tích độ tương thích</h2>
@@ -191,7 +232,7 @@ export function MatchingResultPanel({
         </div>
       </div>
 
-      {}
+      {/* Switch view */}
       {(rawCvText || rawJdText) && (
         <div className="flex justify-center">
           <div className="inline-flex rounded-xl bg-muted p-1 gap-1">
@@ -206,16 +247,16 @@ export function MatchingResultPanel({
         </div>
       )}
 
-      {}
+      {/* AI Cards View */}
       {activeView === 'ai-cards' && (
         <div className="space-y-8">
-          {}
+          {/* Score Rings */}
           <div className="flex flex-wrap justify-center gap-12">
-            <ScoreRing score={assessment.competencyFitScore} label="Competency Fit Score" color="#ea580c" />
-            <ScoreRing score={assessment.technicalDepthScore} label="Technical Depth Score" color="#7c3aed" />
+            <ScoreRing score={mustHaveScore} label="Must-Have Score (80%)" color="#ea580c" />
+            <ScoreRing score={preferToHaveScore} label="Prefer-To-Have Score (20%)" color="#7c3aed" />
           </div>
 
-          {}
+          {/* Badges overview */}
           <div className="flex flex-wrap justify-center gap-2">
             {[
               { label: 'Role', value: getDisplayRoleTitle(assessment.roleTypeDetected) },
@@ -230,7 +271,7 @@ export function MatchingResultPanel({
             ))}
           </div>
 
-          {}
+          {/* Gate Checks */}
           {assessment.eligibility?.gate_checks && assessment.eligibility.gate_checks.length > 0 && (
             <div className="rounded-xl border border-border bg-card p-5">
               <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">Kiểm tra điều kiện</h3>
@@ -247,7 +288,7 @@ export function MatchingResultPanel({
             </div>
           )}
 
-          {}
+          {/* Criteria List */}
           <div>
             <div className="mb-4 flex items-center justify-between">
               <h3 className="font-bold text-foreground">Ma trận kỹ năng (Criteria Alignment)</h3>
@@ -262,21 +303,36 @@ export function MatchingResultPanel({
               </div>
             </div>
 
-            {filteredEvidence.length > 0 && (
+            {mustHaveCriteria.length > 0 && (
               <div className="mb-6">
-                <p className="mb-3 text-xs font-bold uppercase tracking-wide text-muted-foreground">Must Have</p>
-                <div className="space-y-2">{filteredEvidence.map((item, i) => <CriterionItem key={i} item={item} />)}</div>
+                <p className="mb-3 text-xs font-bold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+                  <span className="size-2 rounded-full bg-blue-600 inline-block" />
+                  Must Have (Bắt buộc)
+                </p>
+                <div className="space-y-2">{mustHaveCriteria.map((item, i) => <CriterionItem key={i} item={item} />)}</div>
               </div>
             )}
-            {filteredAdditional.length > 0 && (
+            {preferToHaveCriteria.length > 0 && (
+              <div className="mb-6">
+                <p className="mb-3 text-xs font-bold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+                  <span className="size-2 rounded-full bg-purple-600 inline-block" />
+                  Prefer to Have (Điểm cộng / Ưu tiên)
+                </p>
+                <div className="space-y-2">{preferToHaveCriteria.map((item, i) => <CriterionItem key={i} item={item} />)}</div>
+              </div>
+            )}
+            {notApplicableCriteria.length > 0 && (
               <div>
-                <p className="mb-3 text-xs font-bold uppercase tracking-wide text-muted-foreground">Prefer to Have</p>
-                <div className="space-y-2">{filteredAdditional.map((item, i) => <CriterionItem key={i} item={item} />)}</div>
+                <p className="mb-3 text-xs font-bold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+                  <span className="size-2 rounded-full bg-slate-400 inline-block" />
+                  Không áp dụng
+                </p>
+                <div className="space-y-2">{notApplicableCriteria.map((item, i) => <CriterionItem key={i} item={item} />)}</div>
               </div>
             )}
           </div>
 
-          {}
+          {/* Section Wise Feedback */}
           {assessment.sectionWiseFeedback && Object.keys(assessment.sectionWiseFeedback).length > 0 && (
             <div className="rounded-xl border border-border bg-card p-5">
               <h3 className="mb-4 font-bold text-foreground">Phân tích từng phần</h3>

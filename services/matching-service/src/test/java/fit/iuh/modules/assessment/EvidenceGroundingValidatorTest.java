@@ -37,7 +37,7 @@ class EvidenceGroundingValidatorTest {
     void testHighGroundingMatch() {
         String span = "Designed and implemented high-throughput microservices using Spring Boot 3.3 and Java 21";
         EvidenceItem item = new EvidenceItem(
-                1L, "Tech Stack Alignment", "Java 21 & Spring Boot",
+                1L, "Tech Stack Alignment", "REQUIRED", "Java 21 & Spring Boot",
                 "Has Java 21 & Spring Boot 3.3", "matched",
                 "Found in CV", null, null, span, null, null, null, null
         );
@@ -55,7 +55,7 @@ class EvidenceGroundingValidatorTest {
     void testHallucinatedMatchedDowngradedToWeak() {
         String hallucinatedSpan = "Developed quantum computing algorithms with IBM Qiskit and Rust in production";
         EvidenceItem item = new EvidenceItem(
-                2L, "Quantum Tech Stack", "Quantum computing with Qiskit",
+                2L, "Quantum Tech Stack", "REQUIRED", "Quantum computing with Qiskit",
                 "Used Qiskit in production", "matched",
                 "Hallucinated evidence", null, null, hallucinatedSpan, null, null, null, null
         );
@@ -72,7 +72,7 @@ class EvidenceGroundingValidatorTest {
     void testHallucinatedWeakDowngradedToMissing() {
         String hallucinatedSpan = "Scrum Master certified by Scrum Alliance with 5 years agile coaching";
         EvidenceItem item = new EvidenceItem(
-                3L, "Scrum Coaching", "Scrum Master Certification",
+                3L, "Scrum Coaching", "REQUIRED", "Scrum Master Certification",
                 "Mentioned agile coaching", "weak",
                 "Hallucinated evidence", null, null, hallucinatedSpan, null, null, null, null
         );
@@ -87,7 +87,7 @@ class EvidenceGroundingValidatorTest {
     @DisplayName("Missing Status — Missing status does not require a source_span and keeps 1.0 grounding score")
     void testMissingStatusNoSpanRequired() {
         EvidenceItem item = new EvidenceItem(
-                4L, "Golang Experience", "Golang 1.22 requirement",
+                4L, "Golang Experience", "REQUIRED", "Golang 1.22 requirement",
                 null, "missing",
                 "Requirement completely absent", null, null, null, null, null, null, null
         );

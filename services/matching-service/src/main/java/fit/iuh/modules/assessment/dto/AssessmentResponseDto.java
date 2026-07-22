@@ -23,6 +23,9 @@ public record AssessmentResponseDto(
             @JsonProperty("criteria_name")
             String criteriaName,
 
+            @JsonProperty("importance")
+            String importance,
+
             @JsonProperty("jd_requirement")
             String jdRequirement,
 
@@ -61,6 +64,9 @@ public record AssessmentResponseDto(
     public record AdHocEvidenceItem(
             @JsonProperty("criteria_name")
             String criteriaName,
+
+            @JsonProperty("importance")
+            String importance,
 
             @JsonProperty("jd_requirement")
             String jdRequirement,

@@ -23,6 +23,7 @@ public class EvidenceGroundingValidator {
             return new AssessmentResponseDto.EvidenceItem(
                     item.criteriaId(),
                     item.criteriaName(),
+                    item.importance(),
                     item.jdRequirement(),
                     item.cvEvidence(),
                     item.status(),
@@ -49,6 +50,7 @@ public class EvidenceGroundingValidator {
             return new AssessmentResponseDto.EvidenceItem(
                     item.criteriaId(),
                     item.criteriaName(),
+                    item.importance(),
                     item.jdRequirement(),
                     item.cvEvidence(),
                     downgradedStatus,
@@ -66,6 +68,7 @@ public class EvidenceGroundingValidator {
         return new AssessmentResponseDto.EvidenceItem(
                 item.criteriaId(),
                 item.criteriaName(),
+                item.importance(),
                 item.jdRequirement(),
                 item.cvEvidence(),
                 item.status(),
