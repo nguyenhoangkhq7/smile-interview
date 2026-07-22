@@ -85,7 +85,27 @@ public record AssessmentResponseDto(
 
             /** MỚI — weight * points, đóng góp vào điểm tổng. (Populated by Java) */
             @JsonProperty("score_contribution")
-            Double scoreContribution
+            Double scoreContribution,
+
+            /** MỚI — Trích đoạn gần-nguyên-văn từ CV Markdown làm căn cứ chứng minh. */
+            @JsonProperty("source_span")
+            String sourceSpan,
+
+            /** MỚI — Điểm khớp grounding giữa source_span và CV gốc (0.0 - 1.0). */
+            @JsonProperty("grounding_score")
+            Double groundingScore,
+
+            /** MỚI — Phân bổ số phiếu bầu cho các trạng thái trong Self-Consistency. */
+            @JsonProperty("confidence_votes")
+            java.util.Map<String, Integer> confidenceVotes,
+
+            /** MỚI — Cờ đánh dấu phân loại có độ tin cậy thấp (khi hòa phiếu). */
+            @JsonProperty("low_confidence")
+            Boolean lowConfidence,
+
+            /** MỚI — Cờ đánh dấu cần kiểm tra thủ công (khi batch LLM bị lỗi). */
+            @JsonProperty("needs_manual_review")
+            Boolean needsManualReview
 
     ) {}
 

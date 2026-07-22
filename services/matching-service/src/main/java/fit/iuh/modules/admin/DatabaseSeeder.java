@@ -100,6 +100,12 @@ public class DatabaseSeeder implements CommandLineRunner {
         seedSettingIfMissing("DIFF_SENIOR_LEAD_MISSING", "medium");
         seedSettingIfMissing("DIFF_SENIOR_LEAD_WEAK", "medium");
         seedSettingIfMissing("DIFF_SENIOR_LEAD_MATCHED", "hard");
+
+        // Evidence-Matching Engine Settings
+        seedSettingIfMissing("EVIDENCE_GROUNDING_THRESHOLD", "0.75");
+        seedSettingIfMissing("CRITERIA_BATCH_SIZE", "5");
+        seedSettingIfMissing("SELF_CONSISTENCY_RUNS", "3");
+        seedSettingIfMissing("MAX_CONCURRENT_LLM_CALLS", "10");
     }
 
     private void seedSettingIfMissing(String key, String defaultValue) {

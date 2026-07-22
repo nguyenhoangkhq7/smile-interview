@@ -19,8 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import fit.iuh.modules.assessment.ScoringService.ScoringResult;
 
 /**
@@ -69,6 +68,10 @@ public class AssessmentService {
     private final SuggestedCriteriaService suggestedCriteriaService;
     private final GateExtractionService gateExtractionService;
     private final ObjectMapper objectMapper;
+    private final fit.iuh.modules.admin.SystemSettingRepository systemSettingRepository;
+    private final EvidenceGroundingValidator evidenceGroundingValidator;
+
+    private final java.util.concurrent.Semaphore globalLlmSemaphore = new java.util.concurrent.Semaphore(10, true);
 
     public AssessmentService(
             AppProperties appProperties,
@@ -80,7 +83,9 @@ public class AssessmentService {
             ScoringService scoringService,
             SuggestedCriteriaService suggestedCriteriaService,
             GateExtractionService gateExtractionService,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            fit.iuh.modules.admin.SystemSettingRepository systemSettingRepository,
+            EvidenceGroundingValidator evidenceGroundingValidator) {
         this.appProperties = appProperties;
         this.llmWebClient = llmWebClient;
         this.resumeAssessmentRepository = resumeAssessmentRepository;
@@ -91,6 +96,8 @@ public class AssessmentService {
         this.suggestedCriteriaService = suggestedCriteriaService;
         this.gateExtractionService = gateExtractionService;
         this.objectMapper = objectMapper;
+        this.systemSettingRepository = systemSettingRepository;
+        this.evidenceGroundingValidator = evidenceGroundingValidator;
     }
 
     // -------------------------------------------------------------------------
@@ -265,27 +272,15 @@ public class AssessmentService {
         log.info("[Assessment] Step 3 complete — fetched {} criteria from rule engine.", criteriaList.size());
 
         // ── Step 4a: LLM Assessment (Evidence-Matching Engine) ─────────────────
-        // Build system prompt by injecting dynamically fetched criteria instructions
-        String criteriaInstructions = buildCriteriaInstructions(criteriaList);
-        String systemPrompt = PromptTemplateConfig.buildAssessmentSystemPrompt(criteriaInstructions);
-        String userPrompt   = PromptTemplateConfig.buildAssessmentUserPrompt(fullCvMarkdown, fullJdMarkdown);
+        // Batched criteria evaluation + N-run Self-Consistency + Evidence Grounding Check
+        AssessmentResponseDto dto = runBatchedAssessmentWithSelfConsistency(
+                sessionId,
+                fullCvMarkdown,
+                fullJdMarkdown,
+                criteriaList
+        );
 
-        int maxAttempts = 3;
-        AssessmentResponseDto dto = null;
-        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-            try {
-                String llmJsonResponse = callLlmBlocking(systemPrompt, userPrompt);
-                dto = parseAssessmentDto(sessionId, llmJsonResponse);
-                break;
-            } catch (Exception e) {
-                log.warn("[Assessment] Step 4a LLM Call/Parse failed (attempt {}/{}): {}", attempt, maxAttempts, e.getMessage());
-                if (attempt >= maxAttempts) {
-                    throw e;
-                }
-            }
-        }
-
-        log.info("[Assessment] Step 4a complete — LLM returned {} evidence items.",
+        log.info("[Assessment] Step 4a complete — LLM returned {} grounded evidence items.",
                 dto.evidenceItems() != null ? dto.evidenceItems().size() : 0);
 
         // ── Step 4b: Java Scoring (ScoringService) ────────────────────────────
@@ -331,6 +326,7 @@ public class AssessmentService {
                 
                 log.info("[Assessment] Calling Phase 2 (Improvement Advisor) for {} weaknesses...", weaknesses.size());
                 
+                int maxAttempts = 3;
                 ImprovementResponseDto phase2Dto = null;
                 for (int attempt = 1; attempt <= maxAttempts; attempt++) {
                     try {
@@ -622,6 +618,259 @@ public class AssessmentService {
             throw new LlmApiException("LLM returned empty evaluation response.");
         }
         return response.getFirstChoiceContent().strip();
+    }
+
+    // -------------------------------------------------------------------------
+    // Task 1, 2, 3 — Batched Assessment, Self-Consistency & Concurrency Throttling
+    // -------------------------------------------------------------------------
+
+    private String callLlmBlockingWithSemaphore(String systemPrompt, String userPrompt) {
+        boolean acquired = false;
+        try {
+            acquired = globalLlmSemaphore.tryAcquire(60, java.util.concurrent.TimeUnit.SECONDS);
+            if (!acquired) {
+                throw new LlmApiException("System LLM concurrency limit reached. Please try again later.");
+            }
+            return callLlmBlocking(systemPrompt, userPrompt);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new LlmApiException("Interrupted waiting for LLM concurrency permit.", e);
+        } finally {
+            if (acquired) {
+                globalLlmSemaphore.release();
+            }
+        }
+    }
+
+    public AssessmentResponseDto runBatchedAssessmentWithSelfConsistency(
+            String sessionId,
+            String fullCvMarkdown,
+            String fullJdMarkdown,
+            List<CriteriaWeightProjection> criteriaList) {
+
+        int batchSize = systemSettingRepository != null ? systemSettingRepository.getInt("CRITERIA_BATCH_SIZE", 5) : 5;
+        int selfConsistencyRuns = systemSettingRepository != null ? systemSettingRepository.getInt("SELF_CONSISTENCY_RUNS", 3) : 3;
+        double groundingThreshold = systemSettingRepository != null ? systemSettingRepository.getDouble("EVIDENCE_GROUNDING_THRESHOLD", 0.75) : 0.75;
+
+        List<List<CriteriaWeightProjection>> batches = partitionCriteria(criteriaList, batchSize);
+        log.info("[Assessment] Processing {} criteria in {} batches (batch_size={}, self_consistency_runs={})...",
+                criteriaList.size(), batches.size(), batchSize, selfConsistencyRuns);
+
+        List<AssessmentResponseDto.EvidenceItem> aggregatedEvidenceItems = new java.util.ArrayList<>();
+        List<AssessmentResponseDto.AdHocEvidenceItem> aggregatedAdHocItems = new java.util.ArrayList<>();
+
+        List<java.util.concurrent.CompletableFuture<BatchResult>> batchFutures = new java.util.ArrayList<>();
+        for (int i = 0; i < batches.size(); i++) {
+            final int batchIndex = i + 1;
+            final List<CriteriaWeightProjection> batchCriteria = batches.get(i);
+
+            java.util.concurrent.CompletableFuture<BatchResult> future = java.util.concurrent.CompletableFuture.supplyAsync(() ->
+                    processBatchWithSelfConsistency(sessionId, fullCvMarkdown, fullJdMarkdown, batchCriteria, batchIndex, batches.size(), selfConsistencyRuns)
+            );
+            batchFutures.add(future);
+        }
+
+        java.util.concurrent.CompletableFuture.allOf(batchFutures.toArray(new java.util.concurrent.CompletableFuture[0])).join();
+
+        for (java.util.concurrent.CompletableFuture<BatchResult> f : batchFutures) {
+            BatchResult res = f.join();
+            if (res != null) {
+                if (res.evidenceItems() != null) {
+                    aggregatedEvidenceItems.addAll(res.evidenceItems());
+                }
+                if (res.adHocItems() != null) {
+                    aggregatedAdHocItems.addAll(res.adHocItems());
+                }
+            }
+        }
+
+        // Apply Evidence Grounding Check (Task 1)
+        List<AssessmentResponseDto.EvidenceItem> groundedItems = new java.util.ArrayList<>();
+        for (AssessmentResponseDto.EvidenceItem item : aggregatedEvidenceItems) {
+            AssessmentResponseDto.EvidenceItem grounded = evidenceGroundingValidator != null
+                    ? evidenceGroundingValidator.validateAndApply(item, fullCvMarkdown, groundingThreshold)
+                    : item;
+            groundedItems.add(grounded);
+        }
+
+        List<AssessmentResponseDto.AdHocEvidenceItem> distinctAdHoc = aggregatedAdHocItems.stream()
+                .filter(java.util.Objects::nonNull)
+                .filter(item -> item.criteriaName() != null)
+                .collect(java.util.stream.Collectors.toMap(
+                        AssessmentResponseDto.AdHocEvidenceItem::criteriaName,
+                        item -> item,
+                        (existing, replacement) -> existing
+                ))
+                .values().stream().toList();
+
+        return new AssessmentResponseDto(groundedItems, distinctAdHoc);
+    }
+
+    public record BatchResult(
+            List<AssessmentResponseDto.EvidenceItem> evidenceItems,
+            List<AssessmentResponseDto.AdHocEvidenceItem> adHocItems
+    ) {}
+
+    public BatchResult processBatchWithSelfConsistency(
+            String sessionId,
+            String fullCvMarkdown,
+            String fullJdMarkdown,
+            List<CriteriaWeightProjection> batchCriteria,
+            int batchIndex,
+            int totalBatches,
+            int selfConsistencyRuns) {
+
+        String criteriaInstructions = buildCriteriaInstructions(batchCriteria);
+        String systemPrompt = PromptTemplateConfig.buildAssessmentSystemPrompt(criteriaInstructions);
+        String userPrompt = PromptTemplateConfig.buildAssessmentUserPrompt(fullCvMarkdown, fullJdMarkdown);
+
+        List<java.util.concurrent.CompletableFuture<AssessmentResponseDto>> runFutures = new java.util.ArrayList<>();
+        for (int r = 1; r <= selfConsistencyRuns; r++) {
+            final int runIndex = r;
+            java.util.concurrent.CompletableFuture<AssessmentResponseDto> future = java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+                int maxAttempts = 3;
+                for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+                    try {
+                        String llmJsonResponse = callLlmBlockingWithSemaphore(systemPrompt, userPrompt);
+                        return parseAssessmentDto(sessionId, llmJsonResponse);
+                    } catch (Exception e) {
+                        log.warn("[Assessment] Batch {}/{} run {}/{} LLM call failed (attempt {}/{}): {}",
+                                batchIndex, totalBatches, runIndex, selfConsistencyRuns, attempt, maxAttempts, e.getMessage());
+                        if (attempt >= maxAttempts) {
+                            return null;
+                        }
+                    }
+                }
+                return null;
+            });
+            runFutures.add(future);
+        }
+
+        java.util.concurrent.CompletableFuture.allOf(runFutures.toArray(new java.util.concurrent.CompletableFuture[0])).join();
+
+        List<AssessmentResponseDto> successfulDtos = new java.util.ArrayList<>();
+        for (var f : runFutures) {
+            AssessmentResponseDto dto = f.join();
+            if (dto != null && dto.evidenceItems() != null && !dto.evidenceItems().isEmpty()) {
+                successfulDtos.add(dto);
+            }
+        }
+
+        // Batch Fallback if all N runs failed
+        if (successfulDtos.isEmpty()) {
+            log.warn("[BatchEngine] batch={}/{} | ALL_RUNS_FAILED | criteria_count={} | action=FALLBACK_MISSING_MANUAL_REVIEW",
+                    batchIndex, totalBatches, batchCriteria.size());
+
+            List<AssessmentResponseDto.EvidenceItem> fallbackItems = new java.util.ArrayList<>();
+            for (CriteriaWeightProjection c : batchCriteria) {
+                fallbackItems.add(new AssessmentResponseDto.EvidenceItem(
+                        c.getCriteriaId(),
+                        c.getCriteriaName(),
+                        c.getPromptInstruction(),
+                        null,
+                        "missing",
+                        "Lỗi hệ thống khi gọi LLM batch. Cần kiểm tra thủ công.",
+                        null,
+                        null,
+                        null,
+                        1.0,
+                        Map.of("missing", 0),
+                        false,
+                        true // needs_manual_review = true
+                ));
+            }
+            return new BatchResult(fallbackItems, List.of());
+        }
+
+        // Majority Vote Aggregation
+        List<AssessmentResponseDto.EvidenceItem> aggregatedBatchItems = new java.util.ArrayList<>();
+        List<AssessmentResponseDto.AdHocEvidenceItem> batchAdHoc = new java.util.ArrayList<>();
+
+        for (CriteriaWeightProjection c : batchCriteria) {
+            Map<String, Integer> votes = new java.util.HashMap<>();
+            votes.put("matched", 0);
+            votes.put("weak", 0);
+            votes.put("missing", 0);
+
+            Map<String, AssessmentResponseDto.EvidenceItem> statusToSampleItem = new java.util.HashMap<>();
+
+            for (AssessmentResponseDto dto : successfulDtos) {
+                if (dto.additionalEvidenceItems() != null) {
+                    batchAdHoc.addAll(dto.additionalEvidenceItems());
+                }
+                for (AssessmentResponseDto.EvidenceItem item : dto.evidenceItems()) {
+                    if (Objects.equals(item.criteriaId(), c.getCriteriaId())) {
+                        String st = item.status() != null ? item.status().toLowerCase(Locale.ROOT) : "missing";
+                        if (!votes.containsKey(st)) {
+                            st = "missing";
+                        }
+                        votes.put(st, votes.get(st) + 1);
+                        statusToSampleItem.putIfAbsent(st, item);
+                    }
+                }
+            }
+
+            // Determine winner status
+            int maxVotes = Collections.max(votes.values());
+            List<String> tiedStatuses = votes.entrySet().stream()
+                    .filter(e -> e.getValue() == maxVotes)
+                    .map(Map.Entry::getKey)
+                    .toList();
+
+            String winningStatus;
+            boolean lowConfidence;
+
+            if (tiedStatuses.size() == 1) {
+                winningStatus = tiedStatuses.get(0);
+                lowConfidence = false;
+            } else {
+                // Conservative tie-breaking: missing > weak > matched
+                if (tiedStatuses.contains("missing")) {
+                    winningStatus = "missing";
+                } else if (tiedStatuses.contains("weak")) {
+                    winningStatus = "weak";
+                } else {
+                    winningStatus = "matched";
+                }
+                lowConfidence = true;
+            }
+
+            AssessmentResponseDto.EvidenceItem sampleItem = statusToSampleItem.get(winningStatus);
+            if (sampleItem == null && !statusToSampleItem.isEmpty()) {
+                sampleItem = statusToSampleItem.values().iterator().next();
+            }
+
+            String jdReq = sampleItem != null ? sampleItem.jdRequirement() : c.getPromptInstruction();
+            String cvEv = sampleItem != null ? sampleItem.cvEvidence() : null;
+            String reasoning = sampleItem != null ? sampleItem.reasoning() : "Xác định từ cơ chế Self-Consistency majority vote.";
+            String sourceSpan = sampleItem != null ? sampleItem.sourceSpan() : null;
+
+            aggregatedBatchItems.add(new AssessmentResponseDto.EvidenceItem(
+                    c.getCriteriaId(),
+                    c.getCriteriaName(),
+                    jdReq,
+                    cvEv,
+                    winningStatus,
+                    reasoning,
+                    null,
+                    null,
+                    sourceSpan,
+                    null, // groundingScore populated in Step 4a validation filter
+                    votes,
+                    lowConfidence,
+                    false // needs_manual_review = false
+            ));
+        }
+
+        return new BatchResult(aggregatedBatchItems, batchAdHoc);
+    }
+
+    private List<List<CriteriaWeightProjection>> partitionCriteria(List<CriteriaWeightProjection> list, int size) {
+        List<List<CriteriaWeightProjection>> partitions = new java.util.ArrayList<>();
+        for (int i = 0; i < list.size(); i += size) {
+            partitions.add(list.subList(i, Math.min(i + size, list.size())));
+        }
+        return partitions;
     }
 
     // -------------------------------------------------------------------------
