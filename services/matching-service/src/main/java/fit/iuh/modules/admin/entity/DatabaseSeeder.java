@@ -137,17 +137,37 @@ public class DatabaseSeeder implements CommandLineRunner {
                 "5",
                 "Number of criteria sent per LLM batch call during evidence matching"
         );
+        // Force update existing setting to 5 for optimal LLM evaluation accuracy
+        settingRepository.findBySettingKey("CRITERIA_BATCH_SIZE").ifPresent(setting -> {
+            if ("10".equals(setting.getSettingValue())) {
+                setting.setSettingValue("5");
+                settingRepository.save(setting);
+            }
+        });
 
         seedSettingIfAbsent(
                 "SELF_CONSISTENCY_RUNS",
-                "3",
+                "1",
                 "Number of parallel self-consistency runs per criteria batch for majority voting"
         );
+        // Force update existing setting if it was previously 3
+        settingRepository.findBySettingKey("SELF_CONSISTENCY_RUNS").ifPresent(setting -> {
+            if ("3".equals(setting.getSettingValue())) {
+                setting.setSettingValue("1");
+                settingRepository.save(setting);
+            }
+        });
 
         seedSettingIfAbsent(
                 "MAX_CONCURRENT_LLM_CALLS",
                 "10",
                 "Global concurrency semaphore limit for LLM API calls"
+        );
+
+        seedSettingIfAbsent(
+                "INCLUDE_NOT_APPLICABLE_CRITERIA",
+                "false",
+                "Whether to include NOT_APPLICABLE criteria in assessment results (true = 360 degree audit, false = strict JD matching)"
         );
     }
 

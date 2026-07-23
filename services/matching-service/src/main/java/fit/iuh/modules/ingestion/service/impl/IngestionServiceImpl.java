@@ -1,5 +1,10 @@
 package fit.iuh.modules.ingestion.service.impl;
 
+import fit.iuh.modules.chunking.entity.DocumentChunk;
+import fit.iuh.modules.chunking.repository.DocumentChunkRepository;
+import fit.iuh.modules.chunking.service.ChunkerService;
+import fit.iuh.modules.chunking.service.ContextualEnrichmentService;
+import fit.iuh.modules.chunking.service.EmbeddingService;
 import fit.iuh.exception.IngestionException;
 import fit.iuh.modules.ingestion.dto.IngestionResponse;
 import fit.iuh.modules.ingestion.entity.DocumentType;
@@ -14,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Slf4j
@@ -24,6 +30,10 @@ public class IngestionServiceImpl implements IngestionService {
     private final PdfService pdfService;
     private final StandardizationService standardizationService;
     private final SessionDocumentRepository sessionDocumentRepository;
+    private final ChunkerService chunkerService;
+    private final ContextualEnrichmentService contextualEnrichmentService;
+    private final EmbeddingService embeddingService;
+    private final DocumentChunkRepository documentChunkRepository;
 
     @Override
     @Transactional
@@ -91,9 +101,37 @@ public class IngestionServiceImpl implements IngestionService {
 
         sessionDocumentRepository.saveAll(List.of(cvDoc, jdDoc));
 
+        // Step 3: Structure-Aware Chunking, Enrichment, and Ollama Batch Embedding
+        long step3Start = System.currentTimeMillis();
+        if (documentChunkRepository.existsBySessionId(sessionId)) {
+            documentChunkRepository.deleteBySessionId(sessionId);
+        }
+
+        List<DocumentChunk> cvChunks = chunkerService.chunk(markdownCv, sessionId, "cv");
+        List<DocumentChunk> jdChunks = chunkerService.chunk(markdownJd, sessionId, "jd");
+
+        long tChunking = System.currentTimeMillis() - step3Start;
+
+        long tEnrichStart = System.currentTimeMillis();
+        contextualEnrichmentService.enrich(cvChunks);
+        contextualEnrichmentService.enrich(jdChunks);
+        long tEnrichment = System.currentTimeMillis() - tEnrichStart;
+
+        long tEmbedStart = System.currentTimeMillis();
+        embeddingService.embedBatch(cvChunks);
+        embeddingService.embedBatch(jdChunks);
+        long tEmbedding = System.currentTimeMillis() - tEmbedStart;
+
+        List<DocumentChunk> allChunks = new ArrayList<>();
+        allChunks.addAll(cvChunks);
+        allChunks.addAll(jdChunks);
+
+        documentChunkRepository.saveAll(allChunks);
+        long step3Time = System.currentTimeMillis() - step3Start;
+
         long totalDurationMs = System.currentTimeMillis() - totalStartTime;
-        log.info("=== [INGESTION COMPLETE] sessionId={} in {}ms (Step1={}ms, Step2={}ms) ===",
-                sessionId, totalDurationMs, step1Time, step2Time);
+        log.info("=== [INGESTION COMPLETE] sessionId={} in {}ms (Step1={}ms, Step2={}ms, Step3={}ms [Chunking={}ms, Enrichment={}ms, Embedding={}ms], ChunksSaved={}) ===",
+                sessionId, totalDurationMs, step1Time, step2Time, step3Time, tChunking, tEnrichment, tEmbedding, allChunks.size());
 
         return IngestionResponse.builder()
                 .sessionId(sessionId)
@@ -132,5 +170,13 @@ public class IngestionServiceImpl implements IngestionService {
             throw new IngestionException(
                     "Job Description is required. Please provide a JD PDF file, text string, or markdown.");
         }
+    }
+
+    @Override
+    @Transactional
+    public void deleteSession(String sessionId) {
+        log.info("[Ingestion] Deleting documents and chunks for session: {}", sessionId);
+        documentChunkRepository.deleteBySessionId(sessionId);
+        sessionDocumentRepository.deleteAllBySessionId(sessionId);
     }
 }

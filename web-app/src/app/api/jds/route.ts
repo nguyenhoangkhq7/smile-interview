@@ -78,16 +78,22 @@ export async function POST(request: NextRequest) {
       
       if (file) {
         try {
-          const fileBuffer = Buffer.from(await file.arrayBuffer());
-          const base64Data = `data:${file.type || 'application/octet-stream'};base64,${fileBuffer.toString('base64')}`;
-          const uploadRes = await cloudinary.uploader.upload(base64Data, {
-            resource_type: 'raw',
-            public_id: file.name,
-            use_filename: true,
-            unique_filename: true,
-          });
-          fileUrl = uploadRes.secure_url;
-          cloudinaryId = uploadRes.public_id;
+          if (!process.env.CLOUDINARY_API_KEY) {
+            console.warn('[API JDs] CLOUDINARY_API_KEY is not set, using mock upload.');
+            fileUrl = `https://example.com/jds/${encodeURIComponent(file.name)}`;
+            cloudinaryId = `mock_jd_${Date.now()}_${encodeURIComponent(file.name)}`;
+          } else {
+            const fileBuffer = Buffer.from(await file.arrayBuffer());
+            const base64Data = `data:${file.type || 'application/octet-stream'};base64,${fileBuffer.toString('base64')}`;
+            const uploadRes = await cloudinary.uploader.upload(base64Data, {
+              resource_type: 'raw',
+              public_id: file.name,
+              use_filename: true,
+              unique_filename: true,
+            });
+            fileUrl = uploadRes.secure_url;
+            cloudinaryId = uploadRes.public_id;
+          }
         } catch (uploadError) {
           const uErr = uploadError as Error;
           console.error('[API JDs] Cloudinary upload failed:', uErr);
@@ -119,16 +125,22 @@ export async function POST(request: NextRequest) {
 
       if (file_content) {
         try {
-          const contentBuffer = Buffer.from(file_content, 'base64');
-          const base64Data = `data:application/octet-stream;base64,${contentBuffer.toString('base64')}`;
-          const uploadRes = await cloudinary.uploader.upload(base64Data, {
-            resource_type: 'raw',
-            public_id: finalTitle,
-            use_filename: true,
-            unique_filename: true,
-          });
-          fileUrl = uploadRes.secure_url;
-          cloudinaryId = uploadRes.public_id;
+          if (!process.env.CLOUDINARY_API_KEY) {
+            console.warn('[API JDs] CLOUDINARY_API_KEY is not set, using mock upload for file content.');
+            fileUrl = `https://example.com/jds/${encodeURIComponent(finalTitle)}`;
+            cloudinaryId = `mock_jd_${Date.now()}_${encodeURIComponent(finalTitle)}`;
+          } else {
+            const contentBuffer = Buffer.from(file_content, 'base64');
+            const base64Data = `data:application/octet-stream;base64,${contentBuffer.toString('base64')}`;
+            const uploadRes = await cloudinary.uploader.upload(base64Data, {
+              resource_type: 'raw',
+              public_id: finalTitle,
+              use_filename: true,
+              unique_filename: true,
+            });
+            fileUrl = uploadRes.secure_url;
+            cloudinaryId = uploadRes.public_id;
+          }
         } catch (uploadError) {
           const uErr = uploadError as Error;
           console.error('[API JDs] Cloudinary upload failed:', uErr);

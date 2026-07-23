@@ -40,14 +40,12 @@ export async function POST(
     const targetUrl = `${matchingServiceUrl}/api/v2/assess-resume/evaluate-session`;
 
     const payload = {
-      sessionId: id,
-      roleTitle: session.role_title || '',
-      interviewType: session.interview_type || 'Technical',
+      role_title: session.role_title || '',
+      interview_type: session.interview_type || 'Technical',
       turns: turns.map(t => ({
         question: t.question || '',
         answer: t.answer || '',
-        score: t.score || 0,
-        strengths: t.strengths || ''
+        score: t.score || 0
       }))
     };
 

@@ -27,34 +27,46 @@ public class SuggestedCriteriaServiceImpl implements SuggestedCriteriaService {
             return;
         }
 
+        // Deduplicate items within the input list by trimmed lower-case criteria name
+        java.util.Map<String, AssessmentResponseDto.AdHocEvidenceItem> uniqueItems = new java.util.LinkedHashMap<>();
         for (AssessmentResponseDto.AdHocEvidenceItem item : adHocItems) {
-            if (item.criteriaName() == null || item.criteriaName().isBlank()) continue;
+            if (item != null && item.criteriaName() != null && !item.criteriaName().isBlank()) {
+                String cleanName = item.criteriaName().trim();
+                uniqueItems.putIfAbsent(cleanName.toLowerCase(), item);
+            }
+        }
 
-            suggestedCriteriaRepository.findByJobCategoryAndCriteriaNameIgnoreCase(jobCategory, item.criteriaName())
-                    .ifPresentOrElse(
-                            existing -> {
-                                existing.setOccurrenceCount(existing.getOccurrenceCount() + 1);
-                                existing.setLastSeenAt(LocalDateTime.now());
-                                if (item.jdRequirement() != null &&
-                                    (existing.getSampleJdText() == null || item.jdRequirement().length() > existing.getSampleJdText().length())) {
-                                    existing.setSampleJdText(item.jdRequirement());
+        for (AssessmentResponseDto.AdHocEvidenceItem item : uniqueItems.values()) {
+            String cleanName = item.criteriaName().trim();
+            try {
+                suggestedCriteriaRepository.findByJobCategoryAndCriteriaNameIgnoreCase(jobCategory, cleanName)
+                        .ifPresentOrElse(
+                                existing -> {
+                                    existing.setOccurrenceCount(existing.getOccurrenceCount() + 1);
+                                    existing.setLastSeenAt(LocalDateTime.now());
+                                    if (item.jdRequirement() != null &&
+                                        (existing.getSampleJdText() == null || item.jdRequirement().length() > existing.getSampleJdText().length())) {
+                                        existing.setSampleJdText(item.jdRequirement());
+                                    }
+                                    suggestedCriteriaRepository.save(existing);
+                                    log.debug("[SuggestedCriteria] Incremented occurrence for: {}", cleanName);
+                                },
+                                () -> {
+                                    SuggestedCriteria newCriteria = SuggestedCriteria.builder()
+                                            .jobCategory(jobCategory)
+                                            .criteriaName(cleanName)
+                                            .occurrenceCount(1)
+                                            .lastSeenAt(LocalDateTime.now())
+                                            .sampleJdText(item.jdRequirement())
+                                            .promoted(false)
+                                            .build();
+                                    suggestedCriteriaRepository.saveAndFlush(newCriteria);
+                                    log.info("[SuggestedCriteria] New ad-hoc criteria recorded: {}", cleanName);
                                 }
-                                suggestedCriteriaRepository.save(existing);
-                                log.debug("[SuggestedCriteria] Incremented occurrence for: {}", item.criteriaName());
-                            },
-                            () -> {
-                                SuggestedCriteria newCriteria = SuggestedCriteria.builder()
-                                        .jobCategory(jobCategory)
-                                        .criteriaName(item.criteriaName())
-                                        .occurrenceCount(1)
-                                        .lastSeenAt(LocalDateTime.now())
-                                        .sampleJdText(item.jdRequirement())
-                                        .promoted(false)
-                                        .build();
-                                suggestedCriteriaRepository.save(newCriteria);
-                                log.info("[SuggestedCriteria] New ad-hoc criteria recorded: {}", item.criteriaName());
-                            }
-                    );
+                        );
+            } catch (Exception e) {
+                log.warn("[SuggestedCriteria] Duplicate constraint conflict recording ad-hoc criteria '{}': {}", cleanName, e.getMessage());
+            }
         }
     }
 }

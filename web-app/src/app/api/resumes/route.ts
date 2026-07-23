@@ -72,14 +72,22 @@ export async function POST(request: NextRequest) {
 
       let uploadRes;
       try {
-        const fileBuffer = Buffer.from(await file.arrayBuffer());
-        const base64Data = `data:${file.type || 'application/octet-stream'};base64,${fileBuffer.toString('base64')}`;
-        uploadRes = await cloudinary.uploader.upload(base64Data, {
-          resource_type: 'raw',
-          public_id: file.name,
-          use_filename: true,
-          unique_filename: true,
-        });
+        if (!process.env.CLOUDINARY_API_KEY) {
+          console.warn('[API Resumes] CLOUDINARY_API_KEY is not set, using mock upload.');
+          uploadRes = {
+            secure_url: `https://example.com/resumes/${encodeURIComponent(file.name)}`,
+            public_id: `mock_cv_${Date.now()}_${encodeURIComponent(file.name)}`,
+          };
+        } else {
+          const fileBuffer = Buffer.from(await file.arrayBuffer());
+          const base64Data = `data:${file.type || 'application/octet-stream'};base64,${fileBuffer.toString('base64')}`;
+          uploadRes = await cloudinary.uploader.upload(base64Data, {
+            resource_type: 'raw',
+            public_id: file.name,
+            use_filename: true,
+            unique_filename: true,
+          });
+        }
       } catch (uploadErrorVal) { const uploadError = uploadErrorVal as Error;
         console.error('[API Resumes] Cloudinary upload failed:', uploadError);
         return NextResponse.json({ error: `Cloudinary upload failed: ${uploadError.message || uploadError}` }, { status: 500 });
@@ -105,16 +113,22 @@ export async function POST(request: NextRequest) {
 
       if (file_content) {
         try {
-          const contentBuffer = Buffer.from(file_content, 'base64');
-          const base64Data = `data:application/octet-stream;base64,${contentBuffer.toString('base64')}`;
-          const uploadRes = await cloudinary.uploader.upload(base64Data, {
-            resource_type: 'raw',
-            public_id: file_name,
-            use_filename: true,
-            unique_filename: true,
-          });
-          fileUrl = uploadRes.secure_url;
-          cloudinaryId = uploadRes.public_id;
+          if (!process.env.CLOUDINARY_API_KEY) {
+            console.warn('[API Resumes] CLOUDINARY_API_KEY is not set, using mock upload for file content.');
+            fileUrl = `https://example.com/resumes/${encodeURIComponent(file_name)}`;
+            cloudinaryId = `mock_cv_${Date.now()}_${encodeURIComponent(file_name)}`;
+          } else {
+            const contentBuffer = Buffer.from(file_content, 'base64');
+            const base64Data = `data:application/octet-stream;base64,${contentBuffer.toString('base64')}`;
+            const uploadRes = await cloudinary.uploader.upload(base64Data, {
+              resource_type: 'raw',
+              public_id: file_name,
+              use_filename: true,
+              unique_filename: true,
+            });
+            fileUrl = uploadRes.secure_url;
+            cloudinaryId = uploadRes.public_id;
+          }
         } catch (uploadErrorVal) { const uploadError = uploadErrorVal as Error;
           console.error('[API Resumes] Cloudinary upload failed:', uploadError);
           return NextResponse.json({ error: `Cloudinary upload failed: ${uploadError.message || uploadError}` }, { status: 500 });

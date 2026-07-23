@@ -15,10 +15,10 @@ spring:
     hibernate:
       # 'validate' — Flyway owns the schema; Hibernate only validates entities match the DB
       ddl-auto: validate
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
-        format_sql: true
+        format_sql: false
         # Register custom Hibernate types (pgvector)
         dialect: org.hibernate.dialect.PostgreSQLDialect
     open-in-view: false
@@ -77,13 +77,19 @@ app:
     temperature: ${QUESTION_BANK_TEMPERATURE:0.4}
     max-retries: ${QUESTION_BANK_MAX_RETRIES:2}
 
+  ollama:
+    base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+    embedding-model: ${OLLAMA_EMBEDDING_MODEL:bge-m3}
+    context-model: ${OLLAMA_CONTEXT_MODEL:qwen2.5:3b-instruct}
+    vector-dimension: ${OLLAMA_VECTOR_DIMENSION:1024}
+
   # ============================================================
   # JWT Authentication
   # ============================================================
   jwt:
     # Base64-encoded HMAC-SHA256 key (≥ 256 bits).
     # Override in production via JWT_SECRET env variable.
-    secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+    secret: ${JWT_SECRET:dev_jwt_secret_key_for_local_testing_environment_only_do_not_use_in_production}
     # Token expiry in milliseconds (default: 24 hours)
     expiration-ms: ${JWT_EXPIRATION_MS:86400000}
 
@@ -92,6 +98,6 @@ app:
 # ============================================================
 logging:
   level:
-    fit.iuh: DEBUG
-    org.hibernate.SQL: DEBUG
-    org.hibernate.orm.jdbc.bind: TRACE
+    fit.iuh: INFO
+    org.hibernate.SQL: WARN
+    org.hibernate.orm.jdbc.bind: WARN

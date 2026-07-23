@@ -5,8 +5,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <!-- Downgraded to stable Spring Boot 3.3.0 for pgvector & langchain4j compatibility -->
-        <version>3.3.0</version>
+        <version>3.4.5</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>fit.iuh</groupId>
@@ -34,9 +33,24 @@
         <pdfbox.version>3.0.3</pdfbox.version>
         <pgvector.version>0.1.6</pgvector.version>
         <jjwt.version>0.11.5</jjwt.version>
+        
+        <!-- Security fixes for Trivy vulnerability scan -->
+        <jackson-bom.version>2.18.8</jackson-bom.version>
+        <netty.version>4.1.136.Final</netty.version>
+        <opennlp.version>2.5.9</opennlp.version>
+        <postgresql.version>42.7.12</postgresql.version>
+        <spring-framework.version>6.2.11</spring-framework.version>
+        <spring-security.version>6.4.5</spring-security.version>
+        <tomcat.version>10.1.55</tomcat.version>
     </properties>
 
     <dependencies>
+        <!-- Security fix: override opennlp-tools version used by langchain4j -->
+        <dependency>
+            <groupId>org.apache.opennlp</groupId>
+            <artifactId>opennlp-tools</artifactId>
+            <version>${opennlp.version}</version>
+        </dependency>
         <!-- ===== Web Layer ===== -->
         <!-- Spring MVC (REST API) -->
         <dependency>

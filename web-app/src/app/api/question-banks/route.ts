@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
     }
 
     const backendUrl = process.env.MATCHING_SERVICE_URL || 'http://localhost:8081';
-    const targetUrl = `${backendUrl}/api/v1/question-banks/generate`;
+    const targetUrl = `${backendUrl}/api/v1/question-bank/generate`;
 
     console.log(`[API Proxy QuestionBank] Forwarding to backend: ${targetUrl}`);
     const authHeader = request.headers.get('Authorization');
@@ -19,22 +19,26 @@ export async function POST(request: NextRequest) {
       headers['Authorization'] = authHeader;
     }
 
-    // Calculate total questions requested from categories
-    const totalQuestions =
-      (questionConfig.behavioural || 0) +
-      (questionConfig.technical || 0) +
-      (questionConfig.coding || 0) +
-      (questionConfig.systemDesign || 0) ||
-      5;
+    // Calculate total questions and distribution from categories
+    const behavioural = questionConfig.behavioural || 0;
+    const technical = questionConfig.technical || 0;
+    const coding = questionConfig.coding || 0;
+    const systemDesign = questionConfig.systemDesign || 0;
+    const total = behavioural + technical + coding + systemDesign || 5;
 
     const backendRes = await fetch(targetUrl, {
       method: 'POST',
       headers: headers,
       body: JSON.stringify({
-        session_id: sessionId,
-        question_config: {
-          totalQuestions: totalQuestions,
-          total_questions: totalQuestions
+        sessionId: sessionId,
+        questionConfig: {
+          total: total,
+          distribution: {
+            behavioral: behavioural,
+            technical: technical,
+            coding: coding,
+            system_design: systemDesign
+          }
         }
       })
     });

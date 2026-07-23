@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-smile_interview_db}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
@@ -32,20 +32,54 @@ services:
       timeout: 5s
       retries: 5
 
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama_local
+    restart: always
+    ports:
+      - "11434:11434"
+    environment:
+      - OLLAMA_MAX_LOADED_MODELS=2
+      - OLLAMA_NUM_PARALLEL=4
+    volumes:
+      - ollama_data:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    entrypoint: >
+      sh -c "
+      ollama serve &
+      sleep 5 &&
+      ollama pull bge-m3 &&
+      ollama pull qwen2.5:3b-instruct &&
+      tail -f /dev/null
+      "
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
   matching-service:
     build:
       context: ./services/matching-service
       dockerfile: Dockerfile
     container_name: matching_service
     restart: always
-    # ── Per-service .env — NO global root .env ──────────────────────────────
+    # ── Global Root .env + Per-service .env overrides ───────────────────────
     env_file:
+      - .env
       - ./services/matching-service/.env
     environment:
       # Override local DB/Redis URLs with Docker service names
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/smile_interview_db
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
+      OLLAMA_BASE_URL: http://ollama:11434
     ports:
       - "8081:8081"
     depends_on:
@@ -60,8 +94,9 @@ services:
       dockerfile: Dockerfile
     container_name: ai_inference_service
     restart: always
-    # ── Per-service .env — NO global root .env ──────────────────────────────
+    # ── Global Root .env + Per-service .env overrides ───────────────────────
     env_file:
+      - .env
       - ./services/ai-inference-service/.env
     ports:
       - "9091:9091"
@@ -110,8 +145,9 @@ services:
       dockerfile: Dockerfile
     container_name: streaming_service
     restart: always
-    # ── Per-service .env (already existed) ──────────────────────────────────
+    # ── Global Root .env + Per-service .env overrides ───────────────────────
     env_file:
+      - .env
       - ./services/streaming-service/.env
     environment:
       # Override local URLs with Docker service names
@@ -136,6 +172,7 @@ services:
     container_name: web_app
     restart: always
     env_file:
+      - .env
       - ./web-app/.env.local
     ports:
       - "3000:3000"
@@ -144,7 +181,7 @@ services:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: ${POSTGRES_PORT:-5432}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-smile_interview_db}
       MATCHING_SERVICE_URL: http://matching-service:8081
       # OpenRouter LLM for keyword matching BFF utility (matchKeywords.ts)
@@ -159,6 +196,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  ollama_data:
   # Named volume for HuggingFace model cache — survives container restarts/rebuilds
   whisper_models:
 

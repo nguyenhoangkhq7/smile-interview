@@ -45,8 +45,14 @@ public class ScoringServiceImpl implements ScoringService {
             log.info("[Scoring] Standard seniority level detected. pointsWeak={}", pointsWeak);
         }
 
-        double totalWeightUsed = 0.0;
-        double weightedPointsSum = 0.0;
+        double mustHaveWeightedSum = 0.0;
+        double mustHaveWeightSum = 0.0;
+        int mustHaveCount = 0;
+
+        double preferToHaveWeightedSum = 0.0;
+        double preferToHaveWeightSum = 0.0;
+        int preferToHaveCount = 0;
+
         List<AssessmentResponseDto.EvidenceItem> updatedItems = new ArrayList<>();
 
         if (evidenceItems != null && criteriaWeights != null && !criteriaWeights.isEmpty()) {
@@ -65,23 +71,32 @@ public class ScoringServiceImpl implements ScoringService {
                     continue;
                 }
 
-                double weight = weightMap.get(id);
-                double points = statusToPoints(item.status(), pointsWeak);
-                double scoreContribution = weight * points;
+                boolean isNotApp = "not_applicable".equalsIgnoreCase(item.status()) || "NOT_APPLICABLE".equalsIgnoreCase(item.importance());
 
-                if ("not_applicable".equalsIgnoreCase(item.status())) {
-                    log.debug("[Scoring] JD-Driven logic: criteria='{}' is not_applicable. Excluding weight.", item.criteriaName());
+                double weight = isNotApp ? 0.0 : weightMap.get(id);
+                double points = isNotApp ? 0.0 : statusToPoints(item.status(), pointsWeak);
+                double scoreContribution = isNotApp ? 0.0 : weight * points;
+
+                if (isNotApp) {
+                    log.debug("[Scoring] JD-Driven logic: criteria='{}' is NOT_APPLICABLE. Weight and contribution set to 0.0.", item.criteriaName());
+                } else if ("PREFERRED".equalsIgnoreCase(item.importance())) {
+                    preferToHaveWeightedSum += scoreContribution;
+                    preferToHaveWeightSum += weight;
+                    preferToHaveCount++;
+                    log.debug("[Scoring PREFERRED] criteria='{}' weight={} status='{}' points={} contribution={}",
+                            item.criteriaName(), weight, item.status(), points, scoreContribution);
                 } else {
-                    weightedPointsSum += scoreContribution;
-                    totalWeightUsed += weight;
+                    mustHaveWeightedSum += scoreContribution;
+                    mustHaveWeightSum += weight;
+                    mustHaveCount++;
+                    log.debug("[Scoring REQUIRED] criteria='{}' weight={} status='{}' points={} contribution={}",
+                            item.criteriaName(), weight, item.status(), points, scoreContribution);
                 }
-
-                log.debug("[Scoring] criteria='{}' weight={} status='{}' points={} contribution={}",
-                        item.criteriaName(), weight, item.status(), points, scoreContribution);
 
                 AssessmentResponseDto.EvidenceItem updated = new AssessmentResponseDto.EvidenceItem(
                         item.criteriaId(),
                         item.criteriaName(),
+                        item.importance(),
                         item.jdRequirement(),
                         item.cvEvidence(),
                         item.status(),
@@ -98,32 +113,52 @@ public class ScoringServiceImpl implements ScoringService {
             }
         }
 
-        double adHocPointsSum = 0.0;
-        int adHocCount = 0;
         if (adHocItems != null && !adHocItems.isEmpty()) {
             for (AssessmentResponseDto.AdHocEvidenceItem adHoc : adHocItems) {
-                if ("not_applicable".equalsIgnoreCase(adHoc.status())) continue;
-                adHocCount++;
-                adHocPointsSum += statusToPoints(adHoc.status(), pointsWeak);
+                if ("not_applicable".equalsIgnoreCase(adHoc.status()) || "NOT_APPLICABLE".equalsIgnoreCase(adHoc.importance())) {
+                    continue;
+                }
+
+                double points = statusToPoints(adHoc.status(), pointsWeak);
+
+                if ("PREFERRED".equalsIgnoreCase(adHoc.importance())) {
+                    double avgWeight = (preferToHaveWeightSum > 0 && preferToHaveCount > 0)
+                            ? (preferToHaveWeightSum / preferToHaveCount) : 10.0;
+                    double contribution = avgWeight * points;
+                    preferToHaveWeightedSum += contribution;
+                    preferToHaveWeightSum += avgWeight;
+                    preferToHaveCount++;
+                    log.debug("[Scoring AdHoc PREFERRED] criteria='{}' weight={} status='{}' points={}",
+                            adHoc.criteriaName(), avgWeight, adHoc.status(), points);
+                } else {
+                    double avgWeight = (mustHaveWeightSum > 0 && mustHaveCount > 0)
+                            ? (mustHaveWeightSum / mustHaveCount) : 10.0;
+                    double contribution = avgWeight * points;
+                    mustHaveWeightedSum += contribution;
+                    mustHaveWeightSum += avgWeight;
+                    mustHaveCount++;
+                    log.debug("[Scoring AdHoc REQUIRED] criteria='{}' weight={} status='{}' points={}",
+                            adHoc.criteriaName(), avgWeight, adHoc.status(), points);
+                }
             }
         }
 
         double mustHaveWeightRatio = systemSettingRepository.getDouble("MUST_HAVE_WEIGHT_RATIO", 0.8);
         double preferToHaveWeightRatio = systemSettingRepository.getDouble("PREFER_TO_HAVE_WEIGHT_RATIO", 0.2);
 
-        double rawMustHaveScore = totalWeightUsed > 0.0 ? (weightedPointsSum / totalWeightUsed) * 100.0 : 0.0;
-        double rawAdHocScore = adHocCount > 0 ? (adHocPointsSum / adHocCount) * 100.0 : rawMustHaveScore;
+        double rawMustHaveScore = mustHaveWeightSum > 0.0 ? (mustHaveWeightedSum / mustHaveWeightSum) * 100.0 : 0.0;
+        double rawPreferToHaveScore = preferToHaveWeightSum > 0.0 ? (preferToHaveWeightedSum / preferToHaveWeightSum) * 100.0 : rawMustHaveScore;
 
-        double finalScoreDouble = (rawMustHaveScore * mustHaveWeightRatio) + (rawAdHocScore * preferToHaveWeightRatio);
+        double finalScoreDouble = (rawMustHaveScore * mustHaveWeightRatio) + (rawPreferToHaveScore * preferToHaveWeightRatio);
         int finalScore = (int) Math.round(finalScoreDouble);
 
-        log.info("[Scoring] Calculation complete: rawMustHave={}/100 (weight={}), rawAdHoc={}/100 (weight={}) -> overall_match_score={}",
-                Math.round(rawMustHaveScore), mustHaveWeightRatio, Math.round(rawAdHocScore), preferToHaveWeightRatio, finalScore);
+        log.info("[Scoring] Calculation complete: rawMustHave={}/100 (weight={}), rawPreferToHave={}/100 (weight={}) -> overall_match_score={}",
+                Math.round(rawMustHaveScore), mustHaveWeightRatio, Math.round(rawPreferToHaveScore), preferToHaveWeightRatio, finalScore);
 
         AssessmentResponse.ScoreBreakdown breakdown = new AssessmentResponse.ScoreBreakdown(
                 (int) Math.round(rawMustHaveScore),
                 mustHaveWeightRatio,
-                (int) Math.round(rawAdHocScore),
+                (int) Math.round(rawPreferToHaveScore),
                 preferToHaveWeightRatio,
                 finalScore
         );

@@ -31,14 +31,17 @@ public class QuestionGenerationServiceImpl implements QuestionGenerationService 
     private final WebClient llmWebClient;
     private final AppProperties props;
     private final ObjectMapper objectMapper;
+    private final fit.iuh.modules.chunking.service.RetrievalService retrievalService;
 
     public QuestionGenerationServiceImpl(
             @Qualifier("llmWebClient") WebClient llmWebClient,
             AppProperties props,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            fit.iuh.modules.chunking.service.RetrievalService retrievalService) {
         this.llmWebClient = llmWebClient;
         this.props = props;
         this.objectMapper = objectMapper;
+        this.retrievalService = retrievalService;
     }
 
     @Override

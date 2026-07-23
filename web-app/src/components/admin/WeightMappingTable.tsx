@@ -48,9 +48,9 @@ interface CategoryTreeNodeData {
 
 interface MappingEditorState {
   mode: 'create' | 'edit';
-  job_category_id: number;
+  job_category_id: number;   // maps to category_id in backend
   criteria_id: number;
-  seniority_level: SeniorityLevel;
+  seniority_level: SeniorityLevel;  // maps to level in backend
   weight_percentage: number;
 }
 
@@ -123,14 +123,14 @@ function buildCategoryTree(
   const mappedCriteriaByCategory = new Map<number, Map<number, MappingLeafNode>>();
 
   mappings.forEach((mapping) => {
-    const categoryNode = categoryNodes.get(mapping.job_category_id);
+    const categoryNode = categoryNodes.get(mapping.category_id);
     const criteriaItem = criteriaById.get(mapping.criteria_id);
     if (!categoryNode || !criteriaItem) return;
 
-    let categoryMap = mappedCriteriaByCategory.get(mapping.job_category_id);
+    let categoryMap = mappedCriteriaByCategory.get(mapping.category_id);
     if (!categoryMap) {
       categoryMap = new Map();
-      mappedCriteriaByCategory.set(mapping.job_category_id, categoryMap);
+      mappedCriteriaByCategory.set(mapping.category_id, categoryMap);
     }
 
     let leafNode = categoryMap.get(mapping.criteria_id);
@@ -142,7 +142,7 @@ function buildCategoryTree(
       categoryMap.set(mapping.criteria_id, leafNode);
     }
 
-    leafNode.mappingsByLevel[mapping.seniority_level as SeniorityLevel] = mapping;
+    leafNode.mappingsByLevel[mapping.level as SeniorityLevel] = mapping;
   });
 
   const sortTree = (nodes: CategoryTreeNodeData[]) => {
@@ -150,7 +150,7 @@ function buildCategoryTree(
     nodes.forEach((node) => {
       node.children.sort((left, right) => formatCategoryLabel(left.category.name).localeCompare(formatCategoryLabel(right.category.name)));
       node.mappedCriteria = Array.from(mappedCriteriaByCategory.get(node.category.id)?.values() ?? [])
-        .sort((left, right) => left.criteria.criteria_name.localeCompare(right.criteria.criteria_name));
+        .sort((left, right) => left.criteria.name.localeCompare(right.criteria.name));
       sortTree(node.children);
     });
   };
@@ -182,9 +182,9 @@ function findMappingForLevel(
 ) {
   return mappings.find(
     (mapping) =>
-      mapping.job_category_id === jobCategoryId &&
+      mapping.category_id === jobCategoryId &&
       mapping.criteria_id === criteriaId &&
-      mapping.seniority_level === seniorityLevel
+      mapping.level === seniorityLevel
   ) ?? null;
 }
 
@@ -295,8 +295,8 @@ function CriteriaBadgePopover({ criteriaCount, mappedCriteria }: CriteriaBadgePo
                   className="flex items-start gap-2 py-0.5 text-xs text-slate-200 hover:text-white transition-colors"
                 >
                   <span className="text-teal-400/80 select-none">•</span>
-                  <span className="font-medium truncate" title={leaf.criteria.criteria_name}>
-                    {leaf.criteria.criteria_name}
+                  <span className="font-medium truncate" title={leaf.criteria.name}>
+                    {leaf.criteria.name}
                   </span>
                 </div>
               ))}
@@ -455,7 +455,7 @@ function CategoryTreeNode({
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <FileText size={15} className="text-emerald-400 shrink-0 shadow-[0_0_8px_rgba(52,211,153,0.15)]" />
-                            <p className="text-sm font-semibold text-white tracking-wide">{leaf.criteria.criteria_name}</p>
+                            <p className="text-sm font-semibold text-white tracking-wide">{leaf.criteria.name}</p>
                             <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.1em] ${
                               isSet
                                 ? 'border-teal-400/20 bg-teal-500/10 text-teal-300'
@@ -546,7 +546,7 @@ function MappingEditorModal({
   categoryOptions: CategoryOption[];
 }) {
   const selectedCategoryLabel = categoryOptions.find((option) => option.value === draft.job_category_id)?.label ?? 'Select category';
-  const selectedCriteriaLabel = criteria.find((item) => item.id === draft.criteria_id)?.criteria_name ?? 'Select criteria';
+  const selectedCriteriaLabel = criteria.find((item) => item.id === draft.criteria_id)?.name ?? 'Select criteria';
 
   const selectStyle = {
     backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E")`,
@@ -603,7 +603,7 @@ function MappingEditorModal({
               >
                 {criteria.map((item) => (
                   <option key={item.id} value={item.id}>
-                    {item.criteria_name}
+                    {item.name}
                   </option>
                 ))}
               </select>
@@ -671,7 +671,7 @@ export default function WeightMappingTable({ mappings, categories, criteria, onR
   const treeData = useMemo(() => buildCategoryTree(categories, criteria, mappings), [categories, criteria, mappings]);
   const categoryOptions = useMemo(() => collectCategoryOptions(treeData), [treeData]);
   const visibleMappingCount = useMemo(
-    () => mappings.filter((mapping) => mapping.seniority_level === selectedLevel).length,
+    () => mappings.filter((mapping) => mapping.level === selectedLevel).length,
     [mappings, selectedLevel]
   );
 
@@ -756,9 +756,9 @@ export default function WeightMappingTable({ mappings, categories, criteria, onR
       );
 
       const payload: CreateMappingPayload = {
-        job_category_id: editorState.job_category_id,
+        category_id: editorState.job_category_id,
         criteria_id: editorState.criteria_id,
-        seniority_level: editorState.seniority_level,
+        level: editorState.seniority_level,
         weight_percentage: editorState.weight_percentage,
       };
 

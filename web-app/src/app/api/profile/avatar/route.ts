@@ -31,16 +31,23 @@ export async function POST(request: NextRequest) {
     }
 
     // Convert file to base64 for Cloudinary
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const base64Data = `data:${file.type};base64,${buffer.toString('base64')}`;
+    let avatarUrl;
 
-    console.log(`[API Avatar] Uploading avatar to Cloudinary for user ${authUserId}...`);
-    const uploadRes = await cloudinary.uploader.upload(base64Data, {
-      folder: 'smile-interview/avatars',
-    });
+    if (!process.env.CLOUDINARY_API_KEY) {
+      console.warn('[API Avatar] CLOUDINARY_API_KEY is not set, using mock avatar.');
+      avatarUrl = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150';
+    } else {
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const base64Data = `data:${file.type};base64,${buffer.toString('base64')}`;
 
-    const avatarUrl = uploadRes.secure_url;
-    console.log(`[API Avatar] Cloudinary upload success. URL: ${avatarUrl}`);
+      console.log(`[API Avatar] Uploading avatar to Cloudinary for user ${authUserId}...`);
+      const uploadRes = await cloudinary.uploader.upload(base64Data, {
+        folder: 'smile-interview/avatars',
+      });
+
+      avatarUrl = uploadRes.secure_url;
+      console.log(`[API Avatar] Cloudinary upload success. URL: ${avatarUrl}`);
+    }
 
     // Update the database users table
     await query(

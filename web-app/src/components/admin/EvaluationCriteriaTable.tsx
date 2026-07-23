@@ -12,7 +12,7 @@ interface Props {
   onRefresh: () => void;
 }
 
-const emptyForm: CreateEvaluationCriteriaPayload = { criteria_name: '', prompt_instruction: '' };
+const emptyForm: CreateEvaluationCriteriaPayload = { name: '', category: null, question_type: null, prompt_instruction: '' };
 
 export default function EvaluationCriteriaTable({ criteria, onRefresh }: Props) {
   const [modalOpen, setModalOpen] = useState(false);
@@ -30,7 +30,7 @@ export default function EvaluationCriteriaTable({ criteria, onRefresh }: Props) 
 
   const openEdit = (crit: EvaluationCriteriaDto) => {
     setEditTarget(crit);
-    setForm({ criteria_name: crit.criteria_name, prompt_instruction: crit.prompt_instruction });
+    setForm({ name: crit.name, category: crit.category, question_type: crit.question_type, prompt_instruction: crit.prompt_instruction });
     setModalOpen(true);
   };
 
@@ -51,8 +51,8 @@ export default function EvaluationCriteriaTable({ criteria, onRefresh }: Props) 
   };
 
   const handleSave = async () => {
-    if (!form.criteria_name.trim()) { toast.error('Tên tiêu chí không được để trống'); return; }
-    if (!form.prompt_instruction.trim()) { toast.error('Prompt instruction không được để trống'); return; }
+    if (!form.name.trim()) { toast.error('Tên tiêu chí không được để trống'); return; }
+    if (!form.prompt_instruction?.trim()) { toast.error('Prompt instruction không được để trống'); return; }
     setSaving(true);
     try {
       if (editTarget) {
@@ -119,7 +119,7 @@ export default function EvaluationCriteriaTable({ criteria, onRefresh }: Props) 
               return (
                 <tr key={crit.id} className="border-b border-slate-800 transition-colors hover:bg-white/[0.03]">
                   <td className="px-6 py-4 align-middle font-mono text-xs text-slate-500 whitespace-nowrap">{crit.id}</td>
-                  <td className="px-6 py-4 align-middle whitespace-nowrap text-sm text-slate-200 font-medium">{crit.criteria_name}</td>
+                  <td className="px-6 py-4 align-middle whitespace-nowrap text-sm text-slate-200 font-medium">{crit.name}</td>
                   <td className="max-w-2xl px-6 py-4 align-middle">
                     <button
                       type="button"
@@ -194,8 +194,8 @@ export default function EvaluationCriteriaTable({ criteria, onRefresh }: Props) 
             <label className="block text-sm text-slate-400 mb-1.5">Tên tiêu chí <span className="text-red-400">*</span></label>
             <input
               className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30 transition-colors"
-              value={form.criteria_name}
-              onChange={(e) => setForm({ ...form, criteria_name: e.target.value })}
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
               placeholder="VD: Tech Stack Alignment"
             />
           </div>
@@ -207,7 +207,7 @@ export default function EvaluationCriteriaTable({ criteria, onRefresh }: Props) 
             <textarea
               rows={10}
               className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-mono focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30 transition-colors resize-y"
-              value={form.prompt_instruction}
+              value={form.prompt_instruction ?? ''}
               onChange={(e) => setForm({ ...form, prompt_instruction: e.target.value })}
               placeholder={'Tech Stack Alignment:\n- status="matched" if candidate lists ≥ 3 core required technologies from JD...\n- status="weak" if...\n- status="missing" if...'}
             />
@@ -229,13 +229,13 @@ export default function EvaluationCriteriaTable({ criteria, onRefresh }: Props) 
         <Modal
           open={Boolean(viewCriteria)}
           onClose={() => setViewCriteria(null)}
-          title={`Chi tiết Prompt Instruction - ${viewCriteria.criteria_name}`}
+          title={`Chi tiết Prompt Instruction - ${viewCriteria.name}`}
           size="lg"
         >
           <div className="space-y-4">
             <div className="rounded-xl border border-slate-700/60 bg-slate-900/50 p-4">
               <h4 className="text-xs uppercase tracking-wider text-slate-500 font-semibold mb-1">Tên tiêu chí</h4>
-              <p className="text-sm font-medium text-white">{viewCriteria.criteria_name}</p>
+              <p className="text-sm font-medium text-white">{viewCriteria.name}</p>
             </div>
             <div className="rounded-xl border border-slate-700/60 bg-slate-900/50 p-4">
               <h4 className="text-xs uppercase tracking-wider text-slate-500 font-semibold mb-2">Prompt Instruction</h4>

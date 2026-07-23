@@ -12,7 +12,7 @@ interface Props {
   onRefresh: () => void;
 }
 
-const emptyForm: CreateJobCategoryPayload = { name: '', parent_id: null };
+const emptyForm: CreateJobCategoryPayload = { code: '', name: '', parent_id: null };
 
 export default function JobCategoryTable({ categories, onRefresh }: Props) {
   const [modalOpen, setModalOpen] = useState(false);
@@ -29,11 +29,12 @@ export default function JobCategoryTable({ categories, onRefresh }: Props) {
 
   const openEdit = (cat: JobCategoryDto) => {
     setEditTarget(cat);
-    setForm({ name: cat.name, parent_id: cat.parent_id });
+    setForm({ code: cat.code, name: cat.name, parent_id: cat.parent_id });
     setModalOpen(true);
   };
 
   const handleSave = async () => {
+    if (!form.code.trim()) { toast.error('Mã danh mục (code) không được để trống'); return; }
     if (!form.name.trim()) { toast.error('Tên danh mục không được để trống'); return; }
     setSaving(true);
     try {
@@ -109,6 +110,7 @@ export default function JobCategoryTable({ categories, onRefresh }: Props) {
           <thead>
             <tr className="border-b border-slate-800 bg-white/[0.03]">
               <th className="min-w-[80px] px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">ID</th>
+              <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Code</th>
               <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Tên</th>
               <th className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Danh mục cha</th>
               <th className="w-28 px-6 py-4 text-right text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Hành động</th>
@@ -121,8 +123,9 @@ export default function JobCategoryTable({ categories, onRefresh }: Props) {
              {displayedCategories.map((cat) => (
               <tr key={cat.id} className="border-b border-slate-800 transition-colors hover:bg-white/[0.03]">
                 <td className="px-6 py-4 align-middle font-mono text-xs text-slate-500 whitespace-nowrap">{cat.id}</td>
+                 <td className="px-6 py-4 align-middle font-mono text-xs text-teal-400 whitespace-nowrap">{cat.code}</td>
                 <td className="px-6 py-4 align-middle text-sm text-slate-200 font-medium">{cat.name}</td>
-                <td className="px-6 py-4 align-middle text-sm text-slate-400">{cat.parent_name ?? <span className="italic text-slate-500">Root</span>}</td>
+                <td className="px-6 py-4 align-middle text-sm text-slate-400">{categories.find(c => c.id === cat.parent_id)?.name ?? <span className="italic text-slate-500">Root</span>}</td>
                 <td className="px-6 py-4 align-middle">
                   <div className="flex items-center justify-end gap-2">
                     <ActionIconButton
@@ -178,12 +181,21 @@ export default function JobCategoryTable({ categories, onRefresh }: Props) {
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editTarget ? 'Sửa danh mục' : 'Thêm danh mục'}>
         <div className="space-y-4">
           <div>
+            <label className="block text-sm text-slate-400 mb-1.5">Mã danh mục (code) <span className="text-red-400">*</span></label>
+            <input
+              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30 transition-colors font-mono"
+              value={form.code}
+              onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
+              placeholder="VD: BACKEND, AI_ML, QA_TESTING"
+            />
+          </div>
+          <div>
             <label className="block text-sm text-slate-400 mb-1.5">Tên danh mục <span className="text-red-400">*</span></label>
             <input
               className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30 transition-colors"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="VD: BACKEND"
+              placeholder="VD: Backend Development"
             />
           </div>
           <div>
