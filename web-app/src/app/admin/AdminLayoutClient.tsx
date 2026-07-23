@@ -29,7 +29,7 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
 
   return (
     <AdminRoute>
-      <div className="relative flex h-screen w-full overflow-hidden bg-slate-950 text-slate-200">
+      <div className="relative dark flex h-screen w-full overflow-hidden bg-slate-950 text-slate-200">
         {/* Premium background gradient effect */}
         <div
           aria-hidden="true"
