@@ -13,6 +13,8 @@ public interface AssessmentService {
 
     AssessmentResponse assessResumeBlocking(String sessionId, boolean forceRefresh, String fromSessionId);
 
+    AssessmentResponse assessResumeBlocking(String sessionId, boolean forceRefresh, String fromSessionId, Boolean includeNotApplicable);
+
     String evaluateSession(InterviewEvaluationRequest request);
 
     AssessmentResponseDto runBatchedAssessmentWithSelfConsistency(

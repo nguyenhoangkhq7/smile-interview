@@ -19,6 +19,9 @@ public class AppProperties {
     /** Question Bank generation configuration. */
     private QuestionBank questionBank = new QuestionBank();
 
+    /** Local Ollama configuration. */
+    private Ollama ollama = new Ollama();
+
     // -------------------------------------------------------------------------
     // Nested config classes
     // -------------------------------------------------------------------------
@@ -56,5 +59,20 @@ public class AppProperties {
 
         /** Maximum retry attempts when LLM returns invalid JSON. */
         private int maxRetries = 2;
+    }
+
+    @Data
+    public static class Ollama {
+        /** Ollama base URL. */
+        private String baseUrl = "http://localhost:11434";
+
+        /** Model used for embeddings. */
+        private String embeddingModel = "bge-m3";
+
+        /** Small model used for contextual enrichment. */
+        private String contextModel = "qwen2.5:3b-instruct";
+
+        /** Vector dimension of the embedding model. */
+        private int vectorDimension = 1024;
     }
 }

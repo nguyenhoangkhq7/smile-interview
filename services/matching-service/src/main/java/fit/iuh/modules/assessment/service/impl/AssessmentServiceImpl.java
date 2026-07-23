@@ -50,6 +50,7 @@ public class AssessmentServiceImpl implements AssessmentService {
     private final ObjectMapper objectMapper;
     private final SystemSettingRepository systemSettingRepository;
     private final EvidenceGroundingValidator evidenceGroundingValidator;
+    private final fit.iuh.modules.chunking.service.RetrievalService retrievalService;
 
     private final Semaphore globalLlmSemaphore = new Semaphore(10, true);
 
@@ -65,7 +66,8 @@ public class AssessmentServiceImpl implements AssessmentService {
             GateExtractionService gateExtractionService,
             ObjectMapper objectMapper,
             SystemSettingRepository systemSettingRepository,
-            EvidenceGroundingValidator evidenceGroundingValidator) {
+            EvidenceGroundingValidator evidenceGroundingValidator,
+            fit.iuh.modules.chunking.service.RetrievalService retrievalService) {
         this.appProperties = appProperties;
         this.llmWebClient = llmWebClient;
         this.resumeAssessmentRepository = resumeAssessmentRepository;
@@ -78,18 +80,25 @@ public class AssessmentServiceImpl implements AssessmentService {
         this.objectMapper = objectMapper;
         this.systemSettingRepository = systemSettingRepository;
         this.evidenceGroundingValidator = evidenceGroundingValidator;
+        this.retrievalService = retrievalService;
     }
 
     @Override
     @Transactional
     public AssessmentResponse assessResumeBlocking(String sessionId, boolean forceRefresh) {
-        return assessResumeBlocking(sessionId, forceRefresh, null);
+        return assessResumeBlocking(sessionId, forceRefresh, null, null);
     }
 
     @Override
     @Transactional
     public AssessmentResponse assessResumeBlocking(String sessionId, boolean forceRefresh, String fromSessionId) {
-        log.info("[Assessment] Request for sessionId={}, forceRefresh={}, fromSessionId={}", sessionId, forceRefresh, fromSessionId);
+        return assessResumeBlocking(sessionId, forceRefresh, fromSessionId, null);
+    }
+
+    @Override
+    @Transactional
+    public AssessmentResponse assessResumeBlocking(String sessionId, boolean forceRefresh, String fromSessionId, Boolean includeNotApplicable) {
+        log.info("[Assessment] Request for sessionId={}, forceRefresh={}, fromSessionId={}, includeNotApplicable={}", sessionId, forceRefresh, fromSessionId, includeNotApplicable);
 
         if (!forceRefresh) {
             var cached = resumeAssessmentRepository.findBySessionId(sessionId);
@@ -218,6 +227,21 @@ public class AssessmentServiceImpl implements AssessmentService {
                     .findCriteriaTreeByCategory("SOFTWARE_ENGINEERING", "ALL");
         }
 
+        // Determine if we should include NOT_APPLICABLE criteria (360 degree audit vs strict JD matching)
+        boolean shouldIncludeNotApp = includeNotApplicable != null
+                ? includeNotApplicable
+                : (systemSettingRepository != null && systemSettingRepository.getBoolean("INCLUDE_NOT_APPLICABLE_CRITERIA", false));
+
+        // PRE-FILTERING: If strict JD matching, pre-filter criteria list BEFORE LLM calls!
+        if (!shouldIncludeNotApp) {
+            List<CriteriaWeightProjection> preFiltered = preFilterCriteriaForJd(fullJdMarkdown, criteriaList);
+            log.info("[Assessment] PRE-FILTERING: Reduced criteria count from {} down to {} for JD matching (sessionId={})",
+                    criteriaList.size(), preFiltered.size(), sessionId);
+            if (!preFiltered.isEmpty()) {
+                criteriaList = preFiltered;
+            }
+        }
+
         long startBatches = System.currentTimeMillis();
         AssessmentResponseDto dto = runBatchedAssessmentWithSelfConsistency(
                 sessionId,
@@ -232,6 +256,26 @@ public class AssessmentServiceImpl implements AssessmentService {
                 dto.additionalEvidenceItems()
         );
         dto = new AssessmentResponseDto(dto.evidenceItems(), filteredAdHoc);
+
+        if (!shouldIncludeNotApp) {
+            List<AssessmentResponseDto.EvidenceItem> filteredEvidence = dto.evidenceItems() != null
+                    ? dto.evidenceItems().stream()
+                            .filter(item -> item != null
+                                    && !"NOT_APPLICABLE".equalsIgnoreCase(item.importance())
+                                    && !"not_applicable".equalsIgnoreCase(item.status()))
+                            .collect(Collectors.toList())
+                    : List.of();
+
+            List<AssessmentResponseDto.AdHocEvidenceItem> filteredAdHocList = dto.additionalEvidenceItems() != null
+                    ? dto.additionalEvidenceItems().stream()
+                            .filter(item -> item != null
+                                    && !"NOT_APPLICABLE".equalsIgnoreCase(item.importance())
+                                    && !"not_applicable".equalsIgnoreCase(item.status()))
+                            .collect(Collectors.toList())
+                    : List.of();
+
+            dto = new AssessmentResponseDto(filteredEvidence, filteredAdHocList);
+        }
 
         ScoringResult scoringResult = scoringService.calculateWithBreakdown(
                 dto.evidenceItems(),
@@ -370,12 +414,12 @@ public class AssessmentServiceImpl implements AssessmentService {
             String fullJdMarkdown,
             List<CriteriaWeightProjection> criteriaList) {
 
-        int batchSize = systemSettingRepository != null ? systemSettingRepository.getInt("CRITERIA_BATCH_SIZE", 10) : 10;
+        int batchSize = systemSettingRepository != null ? systemSettingRepository.getInt("CRITERIA_BATCH_SIZE", 5) : 5;
         int selfConsistencyRuns = systemSettingRepository != null ? systemSettingRepository.getInt("SELF_CONSISTENCY_RUNS", 1) : 1;
         double groundingThreshold = systemSettingRepository != null ? systemSettingRepository.getDouble("EVIDENCE_GROUNDING_THRESHOLD", 0.75) : 0.75;
 
         List<List<CriteriaWeightProjection>> batches = partitionCriteria(criteriaList, batchSize);
-        log.debug("[Assessment] Processing {} criteria in {} batches (batch_size={}, self_consistency_runs={})...",
+        log.info("[Assessment] Processing {} criteria in {} batches (batch_size={}, self_consistency_runs={})...",
                 criteriaList.size(), batches.size(), batchSize, selfConsistencyRuns);
 
         List<AssessmentResponseDto.EvidenceItem> aggregatedEvidenceItems = new ArrayList<>();
@@ -441,9 +485,29 @@ public class AssessmentServiceImpl implements AssessmentService {
             int totalBatches,
             int selfConsistencyRuns) {
 
+        List<String> batchSkills = batchCriteria.stream()
+                .map(CriteriaWeightProjection::getCriteriaName)
+                .filter(Objects::nonNull)
+                .toList();
+
+        String cvContextToUse = fullCvMarkdown;
+        if (retrievalService != null) {
+            try {
+                String retrieved = retrievalService.retrieveRelevantCvContext(sessionId, batchSkills, 5);
+                if (retrieved != null && !retrieved.isBlank()) {
+                    cvContextToUse = retrieved;
+                    log.info("[Assessment] Batch {}/{} prompt using retrieved CV context ({} chars vs full {} chars)",
+                            batchIndex, totalBatches, cvContextToUse.length(), fullCvMarkdown.length());
+                }
+            } catch (Exception e) {
+                log.warn("[Assessment] Retrieval failed for batch {}/{}, falling back to full CV: {}",
+                        batchIndex, totalBatches, e.getMessage());
+            }
+        }
+
         String criteriaInstructions = buildCriteriaInstructions(batchCriteria);
         String systemPrompt = PromptTemplateConfig.buildAssessmentSystemPrompt();
-        String userPrompt = PromptTemplateConfig.buildAssessmentUserPrompt(fullCvMarkdown, fullJdMarkdown, criteriaInstructions);
+        String userPrompt = PromptTemplateConfig.buildAssessmentUserPrompt(cvContextToUse, fullJdMarkdown, criteriaInstructions);
 
         List<CompletableFuture<AssessmentResponseDto>> runFutures = new ArrayList<>();
         for (int r = 1; r <= selfConsistencyRuns; r++) {
@@ -954,6 +1018,91 @@ public class AssessmentServiceImpl implements AssessmentService {
             return !intersection.isEmpty();
         }
 
+        return false;
+    }
+
+    private List<CriteriaWeightProjection> preFilterCriteriaForJd(
+            String fullJdMarkdown,
+            List<CriteriaWeightProjection> criteriaList) {
+
+        if (fullJdMarkdown == null || fullJdMarkdown.isBlank() || criteriaList == null || criteriaList.isEmpty()) {
+            return criteriaList != null ? criteriaList : List.of();
+        }
+
+        String jdLower = fullJdMarkdown.toLowerCase(Locale.ROOT);
+
+        return criteriaList.stream()
+                .filter(criteria -> isCriteriaRelevantToJd(jdLower, criteria))
+                .collect(Collectors.toList());
+    }
+
+    private boolean isCriteriaRelevantToJd(String jdLower, CriteriaWeightProjection criteria) {
+        if (criteria == null || criteria.getCriteriaName() == null) {
+            return false;
+        }
+
+        String nameLower = criteria.getCriteriaName().toLowerCase(Locale.ROOT);
+
+        // 1. Direct name or sub-phrase match
+        if (jdLower.contains(nameLower)) {
+            return true;
+        }
+
+        // 2. Tokenize criteria name and check key technical terms
+        String[] keywords = nameLower.split("[^a-zA-Z0-9+#]+");
+        int matchedKeywords = 0;
+
+        for (String kw : keywords) {
+            if (kw.length() <= 2 && !isSpecialShortTechTerm(kw)) {
+                continue; // Skip trivial short words
+            }
+            if (jdLower.contains(kw)) {
+                matchedKeywords++;
+            }
+        }
+
+        if (matchedKeywords > 0) {
+            return true;
+        }
+
+        // 3. Synonym / Tech domain relevance check
+        return checkSynonymRelevance(jdLower, nameLower);
+    }
+
+    private boolean isSpecialShortTechTerm(String kw) {
+        return Set.of("c", "go", "qa", "db", "ui", "ai", "ml", "ci", "cd", "js", "ts", "r8", "s3", "ec2").contains(kw);
+    }
+
+    private boolean checkSynonymRelevance(String jdLower, String nameLower) {
+        if (nameLower.contains("database") || nameLower.contains("sql")) {
+            return jdLower.contains("postgres") || jdLower.contains("mysql") || jdLower.contains("oracle")
+                    || jdLower.contains("mongodb") || jdLower.contains("redis") || jdLower.contains("database")
+                    || jdLower.contains("sql") || jdLower.contains("jpa") || jdLower.contains("hibernate") || jdLower.contains("orm");
+        }
+        if (nameLower.contains("api") || nameLower.contains("rest")) {
+            return jdLower.contains("api") || jdLower.contains("rest") || jdLower.contains("graphql")
+                    || jdLower.contains("endpoint") || jdLower.contains("http") || jdLower.contains("grpc");
+        }
+        if (nameLower.contains("testing") || nameLower.contains("qa") || nameLower.contains("tdd")) {
+            return jdLower.contains("test") || jdLower.contains("junit") || jdLower.contains("jest")
+                    || jdLower.contains("cypress") || jdLower.contains("selenium") || jdLower.contains("postman");
+        }
+        if (nameLower.contains("ci/cd") || nameLower.contains("pipeline") || nameLower.contains("devops")) {
+            return jdLower.contains("ci/cd") || jdLower.contains("pipeline") || jdLower.contains("jenkins")
+                    || jdLower.contains("github actions") || jdLower.contains("gitlab") || jdLower.contains("docker");
+        }
+        if (nameLower.contains("agile") || nameLower.contains("sdlc")) {
+            return jdLower.contains("agile") || jdLower.contains("scrum") || jdLower.contains("kanban")
+                    || jdLower.contains("sprint") || jdLower.contains("jira") || jdLower.contains("sdlc");
+        }
+        if (nameLower.contains("solid") || nameLower.contains("clean code")) {
+            return jdLower.contains("solid") || jdLower.contains("clean code") || jdLower.contains("maintainable")
+                    || jdLower.contains("refactor") || jdLower.contains("design pattern");
+        }
+        if (nameLower.contains("microservice") || nameLower.contains("architecture")) {
+            return jdLower.contains("microservice") || jdLower.contains("architecture") || jdLower.contains("distributed")
+                    || jdLower.contains("system design") || jdLower.contains("event-driven") || jdLower.contains("kafka");
+        }
         return false;
     }
 }

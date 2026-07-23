@@ -134,13 +134,13 @@ public class DatabaseSeeder implements CommandLineRunner {
 
         seedSettingIfAbsent(
                 "CRITERIA_BATCH_SIZE",
-                "10",
+                "5",
                 "Number of criteria sent per LLM batch call during evidence matching"
         );
-        // Force update existing setting if it was previously 5
+        // Force update existing setting to 5 for optimal LLM evaluation accuracy
         settingRepository.findBySettingKey("CRITERIA_BATCH_SIZE").ifPresent(setting -> {
-            if ("5".equals(setting.getSettingValue())) {
-                setting.setSettingValue("10");
+            if ("10".equals(setting.getSettingValue())) {
+                setting.setSettingValue("5");
                 settingRepository.save(setting);
             }
         });
@@ -162,6 +162,12 @@ public class DatabaseSeeder implements CommandLineRunner {
                 "MAX_CONCURRENT_LLM_CALLS",
                 "10",
                 "Global concurrency semaphore limit for LLM API calls"
+        );
+
+        seedSettingIfAbsent(
+                "INCLUDE_NOT_APPLICABLE_CRITERIA",
+                "false",
+                "Whether to include NOT_APPLICABLE criteria in assessment results (true = 360 degree audit, false = strict JD matching)"
         );
     }
 

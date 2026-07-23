@@ -34,4 +34,10 @@ public interface SystemSettingRepository extends JpaRepository<SystemSetting, Lo
                 })
                 .orElse(defaultValue);
     }
+
+    default boolean getBoolean(String settingKey, boolean defaultValue) {
+        return findBySettingKey(settingKey)
+                .map(setting -> Boolean.parseBoolean(setting.getSettingValue()))
+                .orElse(defaultValue);
+    }
 }

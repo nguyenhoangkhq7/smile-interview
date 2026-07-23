@@ -3,7 +3,10 @@ import dotenv from 'dotenv';
 import app from './app.js';
 import { initSocket } from './socket.js';
 import { connectRedis } from './config/redis.js';
+import path from 'path';
 
+// Load root .env first, then local .env overrides
+dotenv.config({ path: path.resolve(process.cwd(), '../../.env') });
 dotenv.config();
 
 const PORT = process.env.PORT || 8001;

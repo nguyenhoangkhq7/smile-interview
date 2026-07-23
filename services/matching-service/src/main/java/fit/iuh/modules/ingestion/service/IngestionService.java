@@ -12,4 +12,6 @@ public interface IngestionService {
             String jdText,
             String resumeMarkdown,
             String jdMarkdown);
+
+    void deleteSession(String sessionId);
 }

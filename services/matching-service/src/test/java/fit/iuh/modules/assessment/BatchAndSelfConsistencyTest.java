@@ -40,7 +40,7 @@ class BatchAndSelfConsistencyTest {
     @BeforeEach
     void setUp() {
         assessmentService = new AssessmentServiceImpl(
-                null, null, null, null, null, null, null, null, null, null, null, new EvidenceGroundingValidator()
+                null, null, null, null, null, null, null, null, null, null, null, new EvidenceGroundingValidator(), null
         );
     }
 
