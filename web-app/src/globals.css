@@ -2,6 +2,8 @@
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
+@custom-variant data-horizontal (&[data-orientation="horizontal"], &[data-horizontal]);
+@custom-variant data-vertical (&[data-orientation="vertical"], &[data-vertical]);
 
 /* ── shadcn/ui Design Tokens — mapped to brand palette ── */
 @theme inline {
