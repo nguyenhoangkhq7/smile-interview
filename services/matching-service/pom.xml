@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.3.13</version>
+        <version>3.4.3</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>fit.iuh</groupId>
@@ -38,10 +38,10 @@
         <jackson-bom.version>2.18.8</jackson-bom.version>
         <netty.version>4.1.136.Final</netty.version>
         <opennlp.version>2.5.9</opennlp.version>
-        <postgresql.version>42.7.11</postgresql.version>
-        <spring-framework.version>6.1.14</spring-framework.version>
-        <spring-security.version>6.3.8</spring-security.version>
-        <tomcat.version>10.1.36</tomcat.version>
+        <postgresql.version>42.7.12</postgresql.version>
+        <spring-framework.version>6.1.18</spring-framework.version>
+        <spring-security.version>6.3.9</spring-security.version>
+        <tomcat.version>10.1.55</tomcat.version>
     </properties>
 
     <dependencies>
