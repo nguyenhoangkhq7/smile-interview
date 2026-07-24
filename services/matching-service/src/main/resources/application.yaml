@@ -89,7 +89,7 @@ app:
   jwt:
     # Base64-encoded HMAC-SHA256 key (≥ 256 bits).
     # Override in production via JWT_SECRET env variable.
-    secret: ${JWT_SECRET:dev_jwt_secret_key_for_local_testing_environment_only_do_not_use_in_production}
+    secret: ${JWT_SECRET:c3VwZXJzZWNyZXRrZXlmb3JkZXZlbG9wbWVudGVudmlyb25tZW50MjU2Yml0cw==}
     # Token expiry in milliseconds (default: 24 hours)
     expiration-ms: ${JWT_EXPIRATION_MS:86400000}
 
