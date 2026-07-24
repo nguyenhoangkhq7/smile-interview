@@ -2,6 +2,7 @@ package fit.iuh.modules.chunking.repository;
 
 import fit.iuh.modules.chunking.entity.DocumentChunk;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -14,7 +15,9 @@ public interface DocumentChunkRepository extends JpaRepository<DocumentChunk, UU
 
     List<DocumentChunk> findBySessionIdAndDocType(String sessionId, String docType);
 
-    void deleteBySessionId(String sessionId);
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM DocumentChunk c WHERE c.sessionId = :sessionId")
+    void deleteBySessionId(@Param("sessionId") String sessionId);
 
     boolean existsBySessionId(String sessionId);
 

@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+import org.springframework.data.domain.Persistable;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -23,10 +24,9 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class DocumentChunk {
+public class DocumentChunk implements Persistable<UUID> {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", updatable = false, nullable = false)
     private UUID id;
 
@@ -58,8 +58,18 @@ public class DocumentChunk {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @Override
+    public boolean isNew() {
+        return this.createdAt == null;
+    }
+
     @PrePersist
     void onPrePersist() {
-        this.createdAt = LocalDateTime.now();
+        if (this.id == null) {
+            this.id = UUID.randomUUID();
+        }
+        if (this.createdAt == null) {
+            this.createdAt = LocalDateTime.now();
+        }
     }
 }
