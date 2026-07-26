@@ -39,10 +39,7 @@ public class EmbeddingServiceImpl implements EmbeddingService {
 
         List<String> inputTexts = new ArrayList<>();
         for (DocumentChunk chunk : chunks) {
-            String textToEmbed = (chunk.getEnrichedContent() != null && !chunk.getEnrichedContent().isBlank())
-                    ? chunk.getEnrichedContent()
-                    : chunk.getContent();
-            inputTexts.add(textToEmbed);
+            inputTexts.add(chunk.getContent() != null ? chunk.getContent() : "");
         }
 
         try {

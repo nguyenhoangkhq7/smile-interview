@@ -30,22 +30,25 @@ public class RetrievalServiceImpl implements RetrievalService {
         }
 
         // 1. Dense Vector Search
-        float[] queryVector = embeddingService.embedQuery(queryText);
-        String vectorString = formatVectorForPg(queryVector);
-
         List<DocumentChunk> denseResults = Collections.emptyList();
         try {
+            float[] queryVector = embeddingService.embedQuery(queryText);
+            String vectorString = formatVectorForPg(queryVector);
             denseResults = documentChunkRepository.searchDense(sessionId, docType, vectorString, Math.max(topK * 2, 10));
+            if (denseResults == null) denseResults = Collections.emptyList();
         } catch (Exception e) {
-            log.error("[Retrieval] Dense vector search failed for session={}: {}", sessionId, e.getMessage(), e);
+            log.warn("[Retrieval] Dense vector search warning for session={}: {}", sessionId, e.getMessage());
         }
 
         // 2. Sparse Keyword Search (FTS / ILIKE)
         List<DocumentChunk> sparseResults = Collections.emptyList();
         try {
-            sparseResults = documentChunkRepository.searchSparse(sessionId, docType, queryText, Math.max(topK * 2, 10));
+            String cleanQuery = queryText.replaceAll("[^a-zA-Z0-9\\s]", " ").replaceAll("\\s+", " ").trim();
+            if (cleanQuery.isBlank()) cleanQuery = queryText;
+            sparseResults = documentChunkRepository.searchSparse(sessionId, docType, cleanQuery, Math.max(topK * 2, 10));
+            if (sparseResults == null) sparseResults = Collections.emptyList();
         } catch (Exception e) {
-            log.error("[Retrieval] Sparse keyword search failed for session={}: {}", sessionId, e.getMessage(), e);
+            log.warn("[Retrieval] Sparse keyword search warning for session={}: {}", sessionId, e.getMessage());
         }
 
         // 3. RRF Rank Fusion (in Java)
@@ -94,7 +97,7 @@ public class RetrievalServiceImpl implements RetrievalService {
 
         for (String skill : criteriaSkills) {
             if (skill == null || skill.isBlank()) continue;
-            List<DocumentChunk> matches = retrieveRelevantChunks(sessionId, "cv", skill, 3);
+            List<DocumentChunk> matches = retrieveRelevantChunks(sessionId, "cv", skill, 2);
             for (DocumentChunk m : matches) {
                 if (selectedChunkIds.add(m.getId())) {
                     retrievedChildChunks.add(m);

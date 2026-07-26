@@ -100,90 +100,90 @@ ON CONFLICT (id) DO NOTHING;
 -- 2. Insert Evaluation Criteria
 INSERT INTO evaluation_criteria (id, name, category, question_type, prompt_instruction) VALUES
 -- Mobile L1 & L2 (unreplaced)
-(2201, 'Mobile App Lifecycle & State', 'technical', 'technical', 'Evaluate understanding of mobile app lifecycles (foreground/background), state management, and resource constraints. Status="matched|weak|missing".'),
-(3201, 'iOS Memory Management & Swift', 'technical', 'technical', 'Evaluate understanding of iOS memory management (ARC, weak/unowned), Swift Protocol-Oriented Programming, and concurrency (GCD/async-await). Status="matched|weak|missing".'),
+(2201, 'Mobile App Lifecycle & State', 'technical', 'technical', 'Evaluate understanding of mobile app lifecycles (foreground/background), state management, and resource constraints.'),
+(3201, 'iOS Memory Management & Swift', 'technical', 'technical', 'Evaluate understanding of iOS memory management (ARC, weak/unowned), Swift Protocol-Oriented Programming, and concurrency (GCD/async-await).'),
 
 -- Data L1 & L3 (unreplaced)
-(2301, 'Data Modeling & Pipeline Fundamentals', 'technical', 'technical', 'Evaluate understanding of ETL/ELT pipelines, data modeling (star schema, snowflake), and data quality checks. Status="matched|weak|missing".'),
-(3301, 'Spark & Kafka Streaming', 'technical', 'technical', 'Evaluate experience building distributed pipelines using Apache Spark and building scalable real-time streaming with Kafka. Status="matched|weak|missing".'),
+(2301, 'Data Modeling & Pipeline Fundamentals', 'technical', 'technical', 'Evaluate understanding of ETL/ELT pipelines, data modeling (star schema, snowflake), and data quality checks.'),
+(3301, 'Spark & Kafka Streaming', 'technical', 'technical', 'Evaluate experience building distributed pipelines using Apache Spark and building scalable real-time streaming with Kafka.'),
 
 -- ML L1 & L3 (unreplaced)
-(2401, 'Machine Learning Fundamentals', 'technical', 'technical', 'Evaluate foundational ML knowledge including classification, regression, clustering, and evaluation metrics (F1, AUC). Status="matched|weak|missing".'),
-(3401, 'LLM RAG Pipelines & Vectors', 'technical', 'technical', 'Evaluate understanding of LLM RAG pipelines, chunking strategies, embeddings, vector databases (e.g., pgvector, Pinecone), and prompt engineering. Status="matched|weak|missing".'),
+(2401, 'Machine Learning Fundamentals', 'technical', 'technical', 'Evaluate foundational ML knowledge including classification, regression, clustering, and evaluation metrics (F1, AUC).'),
+(3401, 'LLM RAG Pipelines & Vectors', 'technical', 'technical', 'Evaluate understanding of LLM RAG pipelines, chunking strategies, embeddings, vector databases (e.g., pgvector, Pinecone), and prompt engineering.'),
 
 -- Security L1 & L2 (unreplaced)
-(2601, 'Security Fundamentals & Threat Modeling', 'technical', 'technical', 'Evaluate knowledge of basic cryptography, identity and access management, and threat modeling methodologies. Status="matched|weak|missing".'),
-(3601, 'OWASP Top 10 & AppSec', 'technical', 'technical', 'Evaluate mastery of the OWASP Top 10, performing code reviews for security vulnerabilities, and implementing SAST/DAST tools in pipelines. Status="matched|weak|missing".'),
+(2601, 'Security Fundamentals & Threat Modeling', 'technical', 'technical', 'Evaluate knowledge of basic cryptography, identity and access management, and threat modeling methodologies.'),
+(3601, 'OWASP Top 10 & AppSec', 'technical', 'technical', 'Evaluate mastery of the OWASP Top 10, performing code reviews for security vulnerabilities, and implementing SAST/DAST tools in pipelines.'),
 
 -- QA L1 & L2 & L3 (unreplaced)
-(2701, 'Testing Fundamentals', 'technical', 'technical', 'Evaluate knowledge of testing pyramids, test planning, bug lifecycle, and edge case identification. Status="matched|weak|missing".'),
-(3701, 'UI/API Test Automation', 'technical', 'technical', 'Evaluate experience with automation frameworks, page object models, and API testing (RestAssured/Postman). Status="matched|weak|missing".'),
-(3702, 'Selenium & Cypress Mastery', 'technical', 'technical', 'Evaluate mastery of web element locators, explicit waits, Cypress custom commands, and handling flaky tests. Status="matched|weak|missing".'),
+(2701, 'Testing Fundamentals', 'technical', 'technical', 'Evaluate knowledge of testing pyramids, test planning, bug lifecycle, and edge case identification.'),
+(3701, 'UI/API Test Automation', 'technical', 'technical', 'Evaluate experience with automation frameworks, page object models, and API testing (RestAssured/Postman).'),
+(3702, 'Selenium & Cypress Mastery', 'technical', 'technical', 'Evaluate mastery of web element locators, explicit waits, Cypress custom commands, and handling flaky tests.'),
 
 -- System L1 & L2 (unreplaced)
-(2801, 'Computer Architecture & OS', 'technical', 'technical', 'Evaluate understanding of low-level memory, pointers, bitwise operations, RTOS concepts, and hardware interaction. Status="matched|weak|missing".'),
-(3801, 'C/C++ Systems Programming', 'technical', 'technical', 'Evaluate expertise in C/C++ system programming, memory leaks (Valgrind), mutexes, IPC, and optimizing for resource constraints. Status="matched|weak|missing".'),
+(2801, 'Computer Architecture & OS', 'technical', 'technical', 'Evaluate understanding of low-level memory, pointers, bitwise operations, RTOS concepts, and hardware interaction.'),
+(3801, 'C/C++ Systems Programming', 'technical', 'technical', 'Evaluate expertise in C/C++ system programming, memory leaks (Valgrind), mutexes, IPC, and optimizing for resource constraints.'),
 
 -- Root L1
 (10101, 'Data Structures & Algorithms', 'technical', 'technical', 'Evaluate knowledge of fundamental data structures (arrays, linked lists, hash tables, trees, graphs) and algorithms (sorting, searching, Big O notation). Status must be "matched" if demonstrated, "weak" if basic, "missing" if absent.'),
 (10102, 'Object-Oriented Programming (OOP)', 'technical', 'technical', 'Evaluate understanding of OOP principles (Encapsulation, Inheritance, Polymorphism, Abstraction) and common design patterns. Status must be "matched" if demonstrated, "weak" if basic, "missing" if absent.'),
-(10103, 'Database Fundamentals', 'technical', 'technical', 'Evaluate basic knowledge of databases (SQL vs NoSQL), schema design, simple queries, and normal forms. Status="matched|weak|missing".'),
+(10103, 'Database Fundamentals', 'technical', 'technical', 'Evaluate basic knowledge of databases (SQL vs NoSQL), schema design, simple queries, and normal forms.'),
 (10104, 'Agile & SDLC Practices', 'technical', 'technical', 'Evaluate mentions of Agile, Scrum, Kanban, sprints, or CI/CD phases. Status must be "matched" if experienced, "weak" if barely mentioned, "missing" if absent.'),
 
 -- Backend
-(10201, 'API Design (REST/GraphQL)', 'technical', 'technical', 'Evaluate experience designing RESTful APIs (HTTP methods, status codes, URIs) or GraphQL endpoints. Status="matched|weak|missing".'),
-(10202, 'Database Modeling & SQL', 'technical', 'technical', 'Evaluate ability to design DB schemas, write complex queries, use transactions, and optimize indexes. Status="matched|weak|missing".'),
-(10203, 'Message Queuing Basics', 'technical', 'technical', 'Evaluate understanding of async communication, publish/subscribe patterns, and basic message brokers (RabbitMQ/Kafka). Status="matched|weak|missing".'),
+(10201, 'API Design (REST/GraphQL)', 'technical', 'technical', 'Evaluate experience designing RESTful APIs (HTTP methods, status codes, URIs) or GraphQL endpoints.'),
+(10202, 'Database Modeling & SQL', 'technical', 'technical', 'Evaluate ability to design DB schemas, write complex queries, use transactions, and optimize indexes.'),
+(10203, 'Message Queuing Basics', 'technical', 'technical', 'Evaluate understanding of async communication, publish/subscribe patterns, and basic message brokers (RabbitMQ/Kafka).'),
 
 -- Java Ecosystem
-(10301, 'Java Core Language', 'technical', 'technical', 'Evaluate knowledge of Java syntax, collections framework, exception handling, and streams. Status="matched|weak|missing".'),
-(10302, 'JVM Internals & Garbage Collection', 'technical', 'technical', 'Evaluate understanding of JVM architecture, memory management, and Garbage Collection tuning. Status="matched|weak|missing".'),
-(10303, 'Java Concurrency', 'technical', 'technical', 'Evaluate experience with multithreading, synchronization, ExecutorService, and CompletableFuture. Status="matched|weak|missing".'),
-(10304, 'Build Tools (Maven/Gradle)', 'technical', 'technical', 'Evaluate experience managing dependencies, build lifecycles, and plugins using Maven or Gradle. Status="matched|weak|missing".'),
+(10301, 'Java Core Language', 'technical', 'technical', 'Evaluate knowledge of Java syntax, collections framework, exception handling, and streams.'),
+(10302, 'JVM Internals & Garbage Collection', 'technical', 'technical', 'Evaluate understanding of JVM architecture, memory management, and Garbage Collection tuning.'),
+(10303, 'Java Concurrency', 'technical', 'technical', 'Evaluate experience with multithreading, synchronization, ExecutorService, and CompletableFuture.'),
+(10304, 'Build Tools (Maven/Gradle)', 'technical', 'technical', 'Evaluate experience managing dependencies, build lifecycles, and plugins using Maven or Gradle.'),
 
 -- Spring Boot
-(10401, 'Spring Core (IoC/DI)', 'technical', 'technical', 'Evaluate mastery of Inversion of Control, Dependency Injection, bean scopes, and context configuration. Status="matched|weak|missing".'),
-(10402, 'Spring Data JPA/Hibernate', 'technical', 'technical', 'Evaluate experience with ORM mapping, entity relationships, Spring Data repositories, and lazy/eager fetching. Status="matched|weak|missing".'),
-(10403, 'Spring Security', 'technical', 'technical', 'Evaluate ability to implement authentication and authorization, JWT, OAuth2, and security filter chains. Status="matched|weak|missing".'),
-(10404, 'Spring Boot Actuator & Observability', 'technical', 'technical', 'Evaluate experience configuring health checks, metrics, tracing, and logging in Spring Boot. Status="matched|weak|missing".'),
-(10405, 'Spring WebFlux (Reactive)', 'technical', 'technical', 'Evaluate understanding of reactive programming, Project Reactor, Mono/Flux, and non-blocking I/O. Status="matched|weak|missing".'),
+(10401, 'Spring Core (IoC/DI)', 'technical', 'technical', 'Evaluate mastery of Inversion of Control, Dependency Injection, bean scopes, and context configuration.'),
+(10402, 'Spring Data JPA/Hibernate', 'technical', 'technical', 'Evaluate experience with ORM mapping, entity relationships, Spring Data repositories, and lazy/eager fetching.'),
+(10403, 'Spring Security', 'technical', 'technical', 'Evaluate ability to implement authentication and authorization, JWT, OAuth2, and security filter chains.'),
+(10404, 'Spring Boot Actuator & Observability', 'technical', 'technical', 'Evaluate experience configuring health checks, metrics, tracing, and logging in Spring Boot.'),
+(10405, 'Spring WebFlux (Reactive)', 'technical', 'technical', 'Evaluate understanding of reactive programming, Project Reactor, Mono/Flux, and non-blocking I/O.'),
 
 -- Node Ecosystem
-(10501, 'Event Loop & Async/Await', 'technical', 'technical', 'Evaluate deep understanding of the Node.js event loop phases, micro/macro tasks, Promises, and async/await. Status="matched|weak|missing".'),
-(10502, 'V8 Memory Management', 'technical', 'technical', 'Evaluate understanding of V8 engine internals, memory limits, heap allocation, and preventing memory leaks. Status="matched|weak|missing".'),
-(10503, 'Node Streams & Buffers', 'technical', 'technical', 'Evaluate experience processing large files or data streams using Streams API and Buffers. Status="matched|weak|missing".'),
-(10504, 'Package Management', 'technical', 'technical', 'Evaluate experience with npm/yarn/pnpm, handling package.json, semantic versioning, and resolving conflicts. Status="matched|weak|missing".'),
+(10501, 'Event Loop & Async/Await', 'technical', 'technical', 'Evaluate deep understanding of the Node.js event loop phases, micro/macro tasks, Promises, and async/await.'),
+(10502, 'V8 Memory Management', 'technical', 'technical', 'Evaluate understanding of V8 engine internals, memory limits, heap allocation, and preventing memory leaks.'),
+(10503, 'Node Streams & Buffers', 'technical', 'technical', 'Evaluate experience processing large files or data streams using Streams API and Buffers.'),
+(10504, 'Package Management', 'technical', 'technical', 'Evaluate experience with npm/yarn/pnpm, handling package.json, semantic versioning, and resolving conflicts.'),
 
 -- NestJS
-(10601, 'NestJS Architecture (Modules/DI)', 'technical', 'technical', 'Evaluate experience structuring NestJS applications, defining Modules, and utilizing Dependency Injection. Status="matched|weak|missing".'),
-(10602, 'Guards, Interceptors, Pipes', 'technical', 'technical', 'Evaluate ability to implement custom routing logic, request validation (Pipes), authentication (Guards), and request/response transformation (Interceptors). Status="matched|weak|missing".'),
-(10603, 'TypeORM/Prisma Integration', 'technical', 'technical', 'Evaluate experience integrating NestJS with ORMs like TypeORM or Prisma for database interactions. Status="matched|weak|missing".'),
-(10604, 'NestJS Microservices', 'technical', 'technical', 'Evaluate experience building microservices with NestJS using transports like TCP, Redis, or Kafka. Status="matched|weak|missing".'),
+(10601, 'NestJS Architecture (Modules/DI)', 'technical', 'technical', 'Evaluate experience structuring NestJS applications, defining Modules, and utilizing Dependency Injection.'),
+(10602, 'Guards, Interceptors, Pipes', 'technical', 'technical', 'Evaluate ability to implement custom routing logic, request validation (Pipes), authentication (Guards), and request/response transformation (Interceptors).'),
+(10603, 'TypeORM/Prisma Integration', 'technical', 'technical', 'Evaluate experience integrating NestJS with ORMs like TypeORM or Prisma for database interactions.'),
+(10604, 'NestJS Microservices', 'technical', 'technical', 'Evaluate experience building microservices with NestJS using transports like TCP, Redis, or Kafka.'),
 
 -- Frontend
-(10701, 'Semantic HTML & CSS', 'technical', 'technical', 'Evaluate mastery of semantic HTML5 tags, CSS3, Flexbox/Grid layouts, and responsive design. Status="matched|weak|missing".'),
-(10702, 'DOM Manipulation & Browser APIs', 'technical', 'technical', 'Evaluate vanilla JavaScript skills, DOM event handling, Web Storage, and Fetch API. Status="matched|weak|missing".'),
-(10703, 'Web Performance Basics', 'technical', 'technical', 'Evaluate knowledge of Critical Rendering Path, minimizing layout thrashing, and basic asset optimization. Status="matched|weak|missing".'),
+(10701, 'Semantic HTML & CSS', 'technical', 'technical', 'Evaluate mastery of semantic HTML5 tags, CSS3, Flexbox/Grid layouts, and responsive design.'),
+(10702, 'DOM Manipulation & Browser APIs', 'technical', 'technical', 'Evaluate vanilla JavaScript skills, DOM event handling, Web Storage, and Fetch API.'),
+(10703, 'Web Performance Basics', 'technical', 'technical', 'Evaluate knowledge of Critical Rendering Path, minimizing layout thrashing, and basic asset optimization.'),
 
 -- React
-(10801, 'Component Architecture & Lifecycle', 'technical', 'technical', 'Evaluate understanding of React components, props/state, component lifecycle, and virtual DOM. Status="matched|weak|missing".'),
-(10802, 'Advanced Hook Patterns', 'technical', 'technical', 'Evaluate proficiency with custom hooks, useReducer, useContext, and managing complex side effects (useEffect). Status="matched|weak|missing".'),
-(10803, 'State Management (Redux/Zustand)', 'technical', 'technical', 'Evaluate experience with global state management libraries like Redux, Zustand, or Jotai. Status="matched|weak|missing".'),
-(10804, 'React Performance (Memo/useCallback)', 'technical', 'technical', 'Evaluate ability to profile React apps, prevent unnecessary re-renders using memoization techniques (useMemo, useCallback, React.memo). Status="matched|weak|missing".'),
-(10805, 'SSR/SSG (Next.js)', 'technical', 'technical', 'Evaluate understanding of Server-Side Rendering, Static Site Generation, and basic Next.js features. Status="matched|weak|missing".'),
+(10801, 'Component Architecture & Lifecycle', 'technical', 'technical', 'Evaluate understanding of React components, props/state, component lifecycle, and virtual DOM.'),
+(10802, 'Advanced Hook Patterns', 'technical', 'technical', 'Evaluate proficiency with custom hooks, useReducer, useContext, and managing complex side effects (useEffect).'),
+(10803, 'State Management (Redux/Zustand)', 'technical', 'technical', 'Evaluate experience with global state management libraries like Redux, Zustand, or Jotai.'),
+(10804, 'React Performance (Memo/useCallback)', 'technical', 'technical', 'Evaluate ability to profile React apps, prevent unnecessary re-renders using memoization techniques (useMemo, useCallback, React.memo).'),
+(10805, 'SSR/SSG (Next.js)', 'technical', 'technical', 'Evaluate understanding of Server-Side Rendering, Static Site Generation, and basic Next.js features.'),
 
 -- DevOps
-(10901, 'Linux Administration', 'technical', 'technical', 'Evaluate proficiency in Linux OS, process management, file permissions, and system monitoring. Status="matched|weak|missing".'),
-(10902, 'Shell Scripting', 'technical', 'technical', 'Evaluate ability to write Bash/Shell scripts for automating system tasks. Status="matched|weak|missing".'),
-(10903, 'CI/CD Fundamentals', 'technical', 'technical', 'Evaluate understanding of Continuous Integration and Continuous Deployment pipelines. Status="matched|weak|missing".'),
-(10904, 'Docker & Containerization', 'technical', 'technical', 'Evaluate experience creating Dockerfiles, building images, and managing containers. Status="matched|weak|missing".'),
+(10901, 'Linux Administration', 'technical', 'technical', 'Evaluate proficiency in Linux OS, process management, file permissions, and system monitoring.'),
+(10902, 'Shell Scripting', 'technical', 'technical', 'Evaluate ability to write Bash/Shell scripts for automating system tasks.'),
+(10903, 'CI/CD Fundamentals', 'technical', 'technical', 'Evaluate understanding of Continuous Integration and Continuous Deployment pipelines.'),
+(10904, 'Docker & Containerization', 'technical', 'technical', 'Evaluate experience creating Dockerfiles, building images, and managing containers.'),
 
 -- AWS Infra
-(11001, 'AWS Compute & Auto-scaling', 'technical', 'technical', 'Evaluate experience with EC2, Auto Scaling Groups, and serverless compute (Lambda). Status="matched|weak|missing".'),
-(11002, 'AWS IAM & Security Policies', 'technical', 'technical', 'Evaluate ability to design least-privilege IAM roles, policies, and managing access to AWS resources. Status="matched|weak|missing".'),
-(11003, 'VPC & Networking', 'technical', 'technical', 'Evaluate knowledge of VPCs, subnets, route tables, security groups, and NAT gateways. Status="matched|weak|missing".'),
-(11004, 'AWS Storage Strategies', 'technical', 'technical', 'Evaluate experience choosing and configuring AWS storage services (S3, EBS, EFS) for different use cases. Status="matched|weak|missing".'),
-(11005, 'Cost Optimization & Monitoring', 'technical', 'technical', 'Evaluate experience using AWS CloudWatch, Cost Explorer, and optimizing infrastructure spend. Status="matched|weak|missing".')
+(11001, 'AWS Compute & Auto-scaling', 'technical', 'technical', 'Evaluate experience with EC2, Auto Scaling Groups, and serverless compute (Lambda).'),
+(11002, 'AWS IAM & Security Policies', 'technical', 'technical', 'Evaluate ability to design least-privilege IAM roles, policies, and managing access to AWS resources.'),
+(11003, 'VPC & Networking', 'technical', 'technical', 'Evaluate knowledge of VPCs, subnets, route tables, security groups, and NAT gateways.'),
+(11004, 'AWS Storage Strategies', 'technical', 'technical', 'Evaluate experience choosing and configuring AWS storage services (S3, EBS, EFS) for different use cases.'),
+(11005, 'Cost Optimization & Monitoring', 'technical', 'technical', 'Evaluate experience using AWS CloudWatch, Cost Explorer, and optimizing infrastructure spend.')
 ON CONFLICT (id) DO NOTHING;
 
 -- 3. Insert Category Criteria Mappings

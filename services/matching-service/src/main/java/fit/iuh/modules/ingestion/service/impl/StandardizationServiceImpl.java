@@ -1,10 +1,10 @@
 package fit.iuh.modules.ingestion.service.impl;
 
 import fit.iuh.config.AppProperties;
-import fit.iuh.config.PromptTemplateConfig;
 import fit.iuh.dto.chat.LlmChatRequest;
 import fit.iuh.dto.chat.LlmChatResponse;
 import fit.iuh.exception.LlmApiException;
+import fit.iuh.modules.ingestion.prompt.IngestionPrompts;
 import fit.iuh.modules.ingestion.service.StandardizationService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -32,13 +32,13 @@ public class StandardizationServiceImpl implements StandardizationService {
     @Override
     public String standardizeCv(String rawCvText) {
         log.info("Standardizing CV ({} chars) via LLM API...", rawCvText.length());
-        return callLlmApi(PromptTemplateConfig.SYSTEM_PROMPT_CV, rawCvText, "CV");
+        return callLlmApi(IngestionPrompts.SYSTEM_PROMPT_CV, rawCvText, "CV");
     }
 
     @Override
     public String standardizeJd(String rawJdText) {
         log.info("Standardizing JD ({} chars) via LLM API...", rawJdText.length());
-        return callLlmApi(PromptTemplateConfig.SYSTEM_PROMPT_JD, rawJdText, "JD");
+        return callLlmApi(IngestionPrompts.SYSTEM_PROMPT_JD, rawJdText, "JD");
     }
 
     private String callLlmApi(String systemPrompt, String userContent, String documentLabel) {

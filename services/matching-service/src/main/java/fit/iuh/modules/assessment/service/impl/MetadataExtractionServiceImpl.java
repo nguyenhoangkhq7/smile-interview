@@ -4,12 +4,12 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fit.iuh.config.AppProperties;
-import fit.iuh.config.PromptTemplateConfig;
 import fit.iuh.dto.chat.LlmChatRequest;
 import fit.iuh.dto.chat.LlmChatResponse;
 import fit.iuh.exception.LlmApiException;
 import fit.iuh.modules.assessment.entity.JobCategory;
 import fit.iuh.modules.assessment.entity.SeniorityLevel;
+import fit.iuh.modules.assessment.prompt.AssessmentPrompts;
 import fit.iuh.modules.assessment.service.MetadataExtractionService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -57,7 +57,7 @@ public class MetadataExtractionServiceImpl implements MetadataExtractionService 
                 .stream(false)
                 .responseFormat(JSON_RESPONSE_FORMAT)
                 .messages(List.of(
-                        LlmChatRequest.Message.system(PromptTemplateConfig.SYSTEM_PROMPT_METADATA_EXTRACTION),
+                        LlmChatRequest.Message.system(AssessmentPrompts.SYSTEM_PROMPT_METADATA_EXTRACTION),
                         LlmChatRequest.Message.user(truncatedJd)
                 ))
                 .build();
@@ -98,6 +98,17 @@ public class MetadataExtractionServiceImpl implements MetadataExtractionService 
                 return parseAndMapToEnums(rawJson);
 
             } catch (WebClientResponseException e) {
+                if (e.getStatusCode().value() == 400 && request.getResponseFormat() != null) {
+                    log.warn("[MetadataExtraction] Model '{}' rejected response_format (400 Bad Request). Retrying without response_format...", appProperties.getLlm().getModel());
+                    request = LlmChatRequest.builder()
+                            .model(appProperties.getLlm().getModel())
+                            .maxTokens(METADATA_MAX_TOKENS)
+                            .temperature(0.1)
+                            .stream(false)
+                            .messages(request.getMessages())
+                            .build();
+                    continue;
+                }
                 if (e.getStatusCode().value() == 429 && attempt < maxAttempts) {
                     log.warn("[MetadataExtraction] Rate limit (429) — retrying in 15s...");
                     sleepQuietly(15_000);

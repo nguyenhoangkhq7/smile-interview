@@ -4,13 +4,13 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fit.iuh.config.AppProperties;
-import fit.iuh.config.PromptTemplateConfig;
 import fit.iuh.dto.chat.LlmChatRequest;
 import fit.iuh.dto.chat.LlmChatResponse;
 import fit.iuh.modules.assessment.entity.Eligibility;
 import fit.iuh.modules.assessment.entity.EligibilityStatus;
 import fit.iuh.modules.assessment.entity.GateCheck;
 import fit.iuh.modules.assessment.entity.Importance;
+import fit.iuh.modules.assessment.prompt.AssessmentPrompts;
 import fit.iuh.modules.assessment.service.GateExtractionService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -77,7 +77,23 @@ public class GateExtractionServiceImpl implements GateExtractionService {
     @Override
     public Eligibility evaluateEligibility(String jdContent, String cvContent) {
         log.info("[GateExtraction] Extracting GATE requirements from JD...");
-        List<GateCheckDto> rawGates = extractGateFromJd(jdContent, cvContent);
+        List<GateCheckDto> rawGates = null;
+        boolean extractionFailed = false;
+
+        try {
+            rawGates = extractGateFromJd(jdContent, cvContent);
+        } catch (Exception e) {
+            log.error("[GateExtraction] Extraction threw exception, marking evaluation UNCERTAIN: {}", e.getMessage());
+            extractionFailed = true;
+        }
+
+        if (extractionFailed || rawGates == null) {
+            log.warn("[GateExtraction] LLM extraction failed. Gracefully falling back to UNCERTAIN status for manual review.");
+            return Eligibility.builder()
+                    .status(EligibilityStatus.UNCERTAIN)
+                    .gateChecks(List.of())
+                    .build();
+        }
 
         double candidateYoe = calculateCandidateYoe(cvContent);
         log.info("[GateExtraction] Calculated Candidate YOE: {} years", candidateYoe);
@@ -122,32 +138,57 @@ public class GateExtractionServiceImpl implements GateExtractionService {
     private List<GateCheckDto> extractGateFromJd(String jdMarkdown, String cvMarkdown) {
         String userPrompt = "====== JOB DESCRIPTION ======\n" + jdMarkdown + "\n\n====== CANDIDATE CV ======\n" + cvMarkdown;
 
-        LlmChatRequest request = LlmChatRequest.builder()
+        LlmChatRequest requestWithFormat = LlmChatRequest.builder()
                 .model(appProperties.getLlm().getModel())
                 .stream(false)
                 .temperature(0.1)
                 .responseFormat(java.util.Map.of("type", "json_object"))
                 .messages(List.of(
-                        LlmChatRequest.Message.system(PromptTemplateConfig.SYSTEM_PROMPT_GATE_EXTRACTION),
+                        LlmChatRequest.Message.system(AssessmentPrompts.SYSTEM_PROMPT_GATE_EXTRACTION),
                         LlmChatRequest.Message.user(userPrompt)
                 ))
                 .build();
 
+        String responseBody = null;
         try {
-            String responseBody = llmWebClient.post()
+            responseBody = llmWebClient.post()
                     .uri(llmChatPath)
-                    .bodyValue(request)
+                    .bodyValue(requestWithFormat)
                     .retrieve()
                     .bodyToMono(String.class)
                     .block();
+        } catch (org.springframework.web.reactive.function.client.WebClientResponseException.BadRequest ex) {
+            log.warn("[GateExtraction] Model '{}' rejected response_format (400 Bad Request). Retrying without response_format...", appProperties.getLlm().getModel());
+            LlmChatRequest fallbackRequest = LlmChatRequest.builder()
+                    .model(appProperties.getLlm().getModel())
+                    .stream(false)
+                    .temperature(0.1)
+                    .messages(List.of(
+                            LlmChatRequest.Message.system(AssessmentPrompts.SYSTEM_PROMPT_GATE_EXTRACTION),
+                            LlmChatRequest.Message.user(userPrompt)
+                    ))
+                    .build();
 
+            responseBody = llmWebClient.post()
+                    .uri(llmChatPath)
+                    .bodyValue(fallbackRequest)
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
+        } catch (Exception e) {
+            log.error("[GateExtraction] Failed to extract GATE from JD: {}", e.getMessage(), e);
+            throw e;
+        }
+
+        try {
             LlmChatResponse response = objectMapper.readValue(responseBody, LlmChatResponse.class);
-            String json = response.getFirstChoiceContent().replaceAll("(?s)^```json\\s*", "").replaceAll("(?s)\\s*```$", "").strip();
+            String rawContent = response.getFirstChoiceContent();
+            String json = rawContent.replaceAll("(?s)^```(?:json)?\\s*", "").replaceAll("(?s)\\s*```$", "").strip();
             GateExtractionDto dto = objectMapper.readValue(json, GateExtractionDto.class);
             return dto.getGateRequirements() != null ? dto.getGateRequirements() : List.of();
         } catch (Exception e) {
-            log.error("[GateExtraction] Failed to extract GATE from JD: {}", e.getMessage(), e);
-            return List.of();
+            log.error("[GateExtraction] Parsing GATE extraction response failed: {}", e.getMessage());
+            throw new RuntimeException("Failed to parse LLM Gate response", e);
         }
     }
 

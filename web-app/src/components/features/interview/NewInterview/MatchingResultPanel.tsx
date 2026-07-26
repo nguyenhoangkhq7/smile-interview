@@ -159,35 +159,36 @@ export function MatchingResultPanel({
   onRefreshAssessment, onReset, onContinue,
 }: Props) {
   const derivedKeywords = extractKeywordsFromEvaluation(
-    assessment.evidenceItems || [],
-    assessment.additionalEvidenceItems || [],
+    assessment.mustHaveEvidenceItems || assessment.evidenceItems || [],
+    assessment.preferToHaveEvidenceItems || assessment.additionalEvidenceItems || [],
   );
   const keywords = keywordMetadata ?? { matching_skills: derivedKeywords.matchingSkills, variation_skills: derivedKeywords.variationSkills, missing_skills: derivedKeywords.missingSkills };
 
   const getSectionName = useCallback((key: string) => {
     const names: Record<string, string> = {
-      cs_fundamentals: 'Kiến thức Khoa học Máy tính cốt lõi',
-      tech_stack_alignment: 'Mức độ tương thích Tech Stack',
-      project_technical_depth: 'Chiều sâu kỹ thuật trong các dự án',
-      engineering_practices: 'Quy trình và Thực hành Kỹ nghệ',
-      experience_evaluation: 'Đánh giá kinh nghiệm làm việc',
-      education_and_certifications: 'Đánh giá học vấn & chứng chỉ',
+      overall_match_score: 'Độ Phù Hợp Tổng Thể',
+      must_have: 'Tiêu Chí Bắt Buộc (Must-Have)',
+      prefer_to_have: 'Tiêu Chí Ưu Tiên (Prefer-to-Have)',
+      eligibility: 'Điều Kiện Cần (Gate Check)',
     };
     return names[key] || key.replace(/_/g, ' ').toUpperCase();
   }, []);
 
   const sb = assessment.scoreBreakdown || {};
-  const mustHaveScore = sb.must_have_score ?? sb.mustHaveScore ?? assessment.competencyFitScore ?? 0;
-  const preferToHaveScore = sb.prefer_to_have_score ?? sb.preferToHaveScore ?? assessment.technicalDepthScore ?? 0;
+  const mustHaveScore = sb.raw_must_have_score ?? sb.must_have_score ?? sb.mustHaveScore ?? assessment.competencyFitScore ?? 0;
+  const preferToHaveScore = sb.raw_prefer_to_have_score ?? sb.prefer_to_have_score ?? sb.preferToHaveScore ?? assessment.technicalDepthScore ?? 0;
+
+  const mustHaveItems = (assessment.mustHaveEvidenceItems || assessment.evidenceItems || []) as Criterion[];
+  const preferToHaveItems = (assessment.preferToHaveEvidenceItems || assessment.additionalEvidenceItems || []) as Criterion[];
 
   const allItems = [
-    ...((assessment.evidenceItems as Criterion[]) || []),
-    ...((assessment.additionalEvidenceItems as Criterion[]) || []),
+    ...mustHaveItems,
+    ...preferToHaveItems,
   ];
 
   const mustHaveCriteria = allItems.filter((i) => {
     const imp = i.importance?.toUpperCase();
-    const isMust = imp === 'REQUIRED' || !imp || imp === 'MUST_HAVE';
+    const isMust = imp === 'REQUIRED' || imp === 'MUST_HAVE' || (!imp && mustHaveItems.includes(i));
     const isNotApp = imp === 'NOT_APPLICABLE' || i.status === 'not_applicable';
     const passesFilter = criteriaFilter === 'all' || i.status === criteriaFilter;
     return isMust && !isNotApp && passesFilter;
@@ -195,7 +196,7 @@ export function MatchingResultPanel({
 
   const preferToHaveCriteria = allItems.filter((i) => {
     const imp = i.importance?.toUpperCase();
-    const isPrefer = imp === 'PREFERRED' || imp === 'PREFER_TO_HAVE';
+    const isPrefer = imp === 'PREFERRED' || imp === 'PREFER_TO_HAVE' || (!imp && preferToHaveItems.includes(i));
     const isNotApp = imp === 'NOT_APPLICABLE' || i.status === 'not_applicable';
     const passesFilter = criteriaFilter === 'all' || i.status === criteriaFilter;
     return isPrefer && !isNotApp && passesFilter;

@@ -3,7 +3,6 @@ package fit.iuh.modules.ingestion.service.impl;
 import fit.iuh.modules.chunking.entity.DocumentChunk;
 import fit.iuh.modules.chunking.repository.DocumentChunkRepository;
 import fit.iuh.modules.chunking.service.ChunkerService;
-import fit.iuh.modules.chunking.service.ContextualEnrichmentService;
 import fit.iuh.modules.chunking.service.EmbeddingService;
 import fit.iuh.exception.IngestionException;
 import fit.iuh.modules.ingestion.dto.IngestionResponse;
@@ -31,7 +30,6 @@ public class IngestionServiceImpl implements IngestionService {
     private final StandardizationService standardizationService;
     private final SessionDocumentRepository sessionDocumentRepository;
     private final ChunkerService chunkerService;
-    private final ContextualEnrichmentService contextualEnrichmentService;
     private final EmbeddingService embeddingService;
     private final DocumentChunkRepository documentChunkRepository;
 
@@ -48,10 +46,15 @@ public class IngestionServiceImpl implements IngestionService {
         validateInputs(sessionId, cvFile, jdFile, jdText, resumeMarkdown, jdMarkdown);
 
         long totalStartTime = System.currentTimeMillis();
-        log.info("=== [INGESTION START] sessionId={} ===", sessionId);
+        log.info("""
+                
+                ================================================================================
+                >>> [PIPELINE START] INGESTION | Session: {}
+                ================================================================================
+                """, sessionId);
 
         if (sessionDocumentRepository.existsBySessionId(sessionId)) {
-            log.warn("Existing full documents found for session={}. Deleting before re-ingestion.", sessionId);
+            log.warn("[INGEST] Existing documents found for session={}. Deleting old session documents.", sessionId);
             sessionDocumentRepository.deleteAllBySessionId(sessionId);
         }
 
@@ -60,32 +63,41 @@ public class IngestionServiceImpl implements IngestionService {
         String rawCvText = null;
         String markdownCv = null;
         if (resumeMarkdown != null && !resumeMarkdown.isBlank()) {
-            log.info("CV Cache Hit: Bypassing PDF text extraction.");
+            log.info("[INGEST STEP 1/3] CV Cache Hit: Using pre-extracted Markdown ({} chars).", resumeMarkdown.length());
             markdownCv = resumeMarkdown;
         } else {
             rawCvText = pdfService.extractText(cvFile);
+            log.info("[INGEST STEP 1/3] PDF Extraction: Extracted CV raw text ({} chars from file '{}').",
+                    rawCvText != null ? rawCvText.length() : 0, cvFile != null ? cvFile.getOriginalFilename() : "N/A");
         }
 
         String rawJdText = null;
         String markdownJd = null;
         if (jdMarkdown != null && !jdMarkdown.isBlank()) {
-            log.info("JD Cache Hit: Bypassing PDF text extraction.");
+            log.info("[INGEST STEP 1/3] JD Cache Hit: Using pre-extracted Markdown ({} chars).", jdMarkdown.length());
             markdownJd = jdMarkdown;
         } else if (jdFile != null && !jdFile.isEmpty()) {
             rawJdText = pdfService.extractText(jdFile);
+            log.info("[INGEST STEP 1/3] PDF Extraction: Extracted JD raw text ({} chars from file '{}').",
+                    rawJdText != null ? rawJdText.length() : 0, jdFile.getOriginalFilename());
         } else {
             rawJdText = jdText;
+            log.info("[INGEST STEP 1/3] Raw Input: Provided JD raw text ({} chars).", rawJdText != null ? rawJdText.length() : 0);
         }
         long step1Time = System.currentTimeMillis() - step1Start;
 
         long step2Start = System.currentTimeMillis();
         if (markdownCv == null) {
+            log.info("[INGEST STEP 2/3] LLM Standardization: Standardizing CV text to Markdown...");
             markdownCv = standardizationService.standardizeCv(rawCvText);
         }
         if (markdownJd == null) {
+            log.info("[INGEST STEP 2/3] LLM Standardization: Standardizing JD text to Markdown...");
             markdownJd = standardizationService.standardizeJd(rawJdText);
         }
         long step2Time = System.currentTimeMillis() - step2Start;
+        log.info("[INGEST STEP 2/3] Standardization Complete: CV Markdown ({} chars), JD Markdown ({} chars).",
+                markdownCv.length(), markdownJd.length());
 
         SessionDocument cvDoc = SessionDocument.builder()
                 .sessionId(sessionId)
@@ -111,11 +123,8 @@ public class IngestionServiceImpl implements IngestionService {
         List<DocumentChunk> jdChunks = chunkerService.chunk(markdownJd, sessionId, "jd");
 
         long tChunking = System.currentTimeMillis() - step3Start;
-
-        long tEnrichStart = System.currentTimeMillis();
-        contextualEnrichmentService.enrich(cvChunks);
-        contextualEnrichmentService.enrich(jdChunks);
-        long tEnrichment = System.currentTimeMillis() - tEnrichStart;
+        log.info("[INGEST STEP 3/3] Structure-Aware Chunking: Created {} CV Chunks, {} JD Chunks (in {}ms).",
+                cvChunks.size(), jdChunks.size(), tChunking);
 
         long tEmbedStart = System.currentTimeMillis();
         embeddingService.embedBatch(cvChunks);
@@ -130,8 +139,16 @@ public class IngestionServiceImpl implements IngestionService {
         long step3Time = System.currentTimeMillis() - step3Start;
 
         long totalDurationMs = System.currentTimeMillis() - totalStartTime;
-        log.info("=== [INGESTION COMPLETE] sessionId={} in {}ms (Step1={}ms, Step2={}ms, Step3={}ms [Chunking={}ms, Enrichment={}ms, Embedding={}ms], ChunksSaved={}) ===",
-                sessionId, totalDurationMs, step1Time, step2Time, step3Time, tChunking, tEnrichment, tEmbedding, allChunks.size());
+        log.info("""
+                
+                ================================================================================
+                <<< [PIPELINE COMPLETE] INGESTION | Session: {} in {}ms
+                    • Step 1 (Text Extraction): {}ms
+                    • Step 2 (LLM Standardization): {}ms
+                    • Step 3 (Chunking & Embedding): {}ms [Chunking: {}ms, Embedding: {}ms]
+                    • Total Chunks Persisted to pgvector: {}
+                ================================================================================
+                """, sessionId, totalDurationMs, step1Time, step2Time, step3Time, tChunking, tEmbedding, allChunks.size());
 
         return IngestionResponse.builder()
                 .sessionId(sessionId)

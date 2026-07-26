@@ -34,6 +34,8 @@ export interface ScoreBreakdown {
   prefer_to_have_score?: number;
   prefer_to_have_weight_ratio?: number;
   overall_match_score?: number;
+  raw_must_have_score?: number;
+  raw_prefer_to_have_score?: number;
   mustHaveScore?: number;
   mustHaveWeightRatio?: number;
   preferToHaveScore?: number;
@@ -57,6 +59,8 @@ export interface AssessmentResponse {
   actionableImprovementSuggestions: string[];
   cached: boolean;
   createdAt: string;
+  mustHaveEvidenceItems?: unknown[];
+  preferToHaveEvidenceItems?: unknown[];
   evidenceItems?: unknown[];
   additionalEvidenceItems?: unknown[];
   scoreBreakdown?: ScoreBreakdown | null;
