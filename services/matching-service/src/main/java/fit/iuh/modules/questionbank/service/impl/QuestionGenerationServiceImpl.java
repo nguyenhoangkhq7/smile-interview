@@ -5,12 +5,12 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fit.iuh.config.AppProperties;
-import fit.iuh.config.PromptTemplateConfig;
 import fit.iuh.dto.chat.LlmChatRequest;
 import fit.iuh.dto.chat.LlmChatResponse;
 import fit.iuh.exception.LlmApiException;
 import fit.iuh.exception.QuestionBankException;
 import fit.iuh.modules.questionbank.dto.*;
+import fit.iuh.modules.questionbank.prompt.QuestionBankPrompts;
 import fit.iuh.modules.questionbank.service.QuestionGenerationService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -67,7 +67,7 @@ public class QuestionGenerationServiceImpl implements QuestionGenerationService 
         };
 
         String systemPrompt = String.format(
-                PromptTemplateConfig.SYSTEM_PROMPT_QUESTION_GENERATION,
+                QuestionBankPrompts.SYSTEM_PROMPT_QUESTION_GENERATION,
                 context.getCandidateLevel() != null ? context.getCandidateLevel().name() : "MID",
                 context.getRoleType() != null ? context.getRoleType().name() : "OTHER",
                 context.getTargetDomain() != null ? context.getTargetDomain() : "other",
@@ -76,8 +76,8 @@ public class QuestionGenerationServiceImpl implements QuestionGenerationService 
                 context.getTechStackPossessed() != null ? String.join(", ", context.getTechStackPossessed()) : "None",
                 context.getTechStackRequired() != null ? String.join(", ", context.getTechStackRequired()) : "None",
                 typeFullName,
-                PromptTemplateConfig.getTypeInstructions(type),
-                PromptTemplateConfig.getTypeSpecificOutputFields(type)
+                QuestionBankPrompts.getTypeInstructions(type),
+                QuestionBankPrompts.getTypeSpecificOutputFields(type)
         );
 
         String evidenceItemsText = buildEvidenceAssignmentsText(assignments);
@@ -199,7 +199,7 @@ public class QuestionGenerationServiceImpl implements QuestionGenerationService 
         };
 
         String systemPrompt = String.format(
-                PromptTemplateConfig.SYSTEM_PROMPT_QUESTION_GENERATION,
+                QuestionBankPrompts.SYSTEM_PROMPT_QUESTION_GENERATION,
                 context.getCandidateLevel() != null ? context.getCandidateLevel().name() : "MID",
                 context.getRoleType() != null ? context.getRoleType().name() : "OTHER",
                 context.getTargetDomain() != null ? context.getTargetDomain() : "other",
@@ -208,8 +208,8 @@ public class QuestionGenerationServiceImpl implements QuestionGenerationService 
                 context.getTechStackPossessed() != null ? String.join(", ", context.getTechStackPossessed()) : "None",
                 context.getTechStackRequired() != null ? String.join(", ", context.getTechStackRequired()) : "None",
                 typeFullName,
-                PromptTemplateConfig.getTypeInstructions(type),
-                PromptTemplateConfig.getTypeSpecificOutputFields(type)
+                QuestionBankPrompts.getTypeInstructions(type),
+                QuestionBankPrompts.getTypeSpecificOutputFields(type)
         );
 
         String existingTopics = existingQuestions.stream()

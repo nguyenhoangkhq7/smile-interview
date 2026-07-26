@@ -52,11 +52,20 @@ public class ResumeAssessment {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "evidence_items_json", nullable = false, columnDefinition = "jsonb")
-    private List<AssessmentResponseDto.EvidenceItem> evidenceItems;
+    private List<AssessmentResponseDto.EvidenceItem> mustHaveEvidenceItems;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "additional_evidence_items_json", columnDefinition = "jsonb")
-    private List<AssessmentResponseDto.AdHocEvidenceItem> additionalEvidenceItems;
+    private List<AssessmentResponseDto.AdHocEvidenceItem> preferToHaveEvidenceItems;
+
+    public List<AssessmentResponseDto.EvidenceItem> getEvidenceItems() {
+        return mustHaveEvidenceItems;
+    }
+
+    public List<AssessmentResponseDto.AdHocEvidenceItem> getAdditionalEvidenceItems() {
+        return preferToHaveEvidenceItems;
+    }
+
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "top_priority_improvements_json", columnDefinition = "jsonb")

@@ -346,8 +346,8 @@ public class QuestionBankServiceImpl implements QuestionBankService {
             log.error("[QuestionBank] Failed to load evaluation criteria for question types", e);
         }
 
-        if (assessment.getEvidenceItems() != null) {
-            assessment.getEvidenceItems().stream()
+        if (assessment.getMustHaveEvidenceItems() != null) {
+            assessment.getMustHaveEvidenceItems().stream()
                     .filter(item -> !"not_applicable".equalsIgnoreCase(item.status()))
                     .sorted(Comparator.comparingDouble(
                             (AssessmentResponseDto.EvidenceItem item) ->
@@ -366,9 +366,9 @@ public class QuestionBankServiceImpl implements QuestionBankService {
                     )));
         }
 
-        if (assessment.getAdditionalEvidenceItems() != null && pairs.size() < MAX_EVIDENCE_ITEMS) {
+        if (assessment.getPreferToHaveEvidenceItems() != null && pairs.size() < MAX_EVIDENCE_ITEMS) {
             int remaining = MAX_EVIDENCE_ITEMS - pairs.size();
-            assessment.getAdditionalEvidenceItems().stream()
+            assessment.getPreferToHaveEvidenceItems().stream()
                     .filter(item -> !"not_applicable".equalsIgnoreCase(item.status()))
                     .limit(remaining)
                     .forEach(item -> pairs.add(new EvidenceItemPair(

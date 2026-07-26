@@ -151,10 +151,9 @@ export async function GET(request: NextRequest) {
     const yearsOfExperienceEstimate = expMap[data.seniority_level] || data.seniority_level || 'N/A';
 
     // Map evidence items to strong / gap / missing categories, combining both core and ad-hoc evidence items
-    const allEvidence = [
-      ...(data.evidence_items || []),
-      ...(data.additional_evidence_items || [])
-    ];
+    const mustHave = data.must_have_evidence_items || data.evidence_items || [];
+    const preferToHave = data.prefer_to_have_evidence_items || data.additional_evidence_items || [];
+    const allEvidence = [...mustHave, ...preferToHave];
 
     const strongAreas = (allEvidence as EvidenceItem[])
       .filter((item) => item.status === 'matched')
@@ -215,8 +214,10 @@ export async function GET(request: NextRequest) {
       actionableImprovementSuggestions,
       cached: data.cached || false,
       createdAt: data.created_at || '',
-      evidenceItems: data.evidence_items || [],
-      additionalEvidenceItems: data.additional_evidence_items || [],
+      mustHaveEvidenceItems: mustHave,
+      preferToHaveEvidenceItems: preferToHave,
+      evidenceItems: mustHave,
+      additionalEvidenceItems: preferToHave,
       scoreBreakdown: data.score_breakdown || null,
       topPriorityImprovements: data.top_priority_improvements || [],
       eligibility: data.eligibility || null

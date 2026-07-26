@@ -1,5 +1,6 @@
 package fit.iuh.modules.assessment.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -8,12 +9,23 @@ import java.util.Map;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record AssessmentResponseDto(
-        @JsonProperty("evidence_items")
-        List<EvidenceItem> evidenceItems,
+        @JsonProperty("must_have_evidence_items")
+        @JsonAlias({"must_have_evidence_items", "evidence_items"})
+        List<EvidenceItem> mustHaveEvidenceItems,
 
-        @JsonProperty("additional_evidence_items")
-        List<AdHocEvidenceItem> additionalEvidenceItems
+        @JsonProperty("prefer_to_have_evidence_items")
+        @JsonAlias({"prefer_to_have_evidence_items", "additional_evidence_items"})
+        List<AdHocEvidenceItem> preferToHaveEvidenceItems
 ) {
+
+    public List<EvidenceItem> evidenceItems() {
+        return mustHaveEvidenceItems;
+    }
+
+    public List<AdHocEvidenceItem> additionalEvidenceItems() {
+        return preferToHaveEvidenceItems;
+    }
+
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record EvidenceItem(
@@ -43,9 +55,6 @@ public record AssessmentResponseDto(
 
             @JsonProperty("score_contribution")
             Double scoreContribution,
-
-            @JsonProperty("source_span")
-            String sourceSpan,
 
             @JsonProperty("grounding_score")
             Double groundingScore,
@@ -78,9 +87,6 @@ public record AssessmentResponseDto(
             String status,
 
             @JsonProperty("reasoning")
-            String reasoning,
-
-            @JsonProperty("source_span")
-            String sourceSpan
+            String reasoning
     ) {}
 }

@@ -69,9 +69,6 @@ public class AppProperties {
         /** Model used for embeddings. */
         private String embeddingModel = "bge-m3";
 
-        /** Small model used for contextual enrichment. */
-        private String contextModel = "qwen2.5:3b-instruct";
-
         /** Vector dimension of the embedding model. */
         private int vectorDimension = 1024;
     }

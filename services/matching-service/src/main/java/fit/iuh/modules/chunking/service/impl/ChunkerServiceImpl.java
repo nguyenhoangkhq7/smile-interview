@@ -92,8 +92,12 @@ public class ChunkerServiceImpl implements ChunkerService {
 
         if ("cv".equalsIgnoreCase(docType)) {
             // Process Technical Projects with Parent-Child Domain Chunking
-            if (h1Sections.containsKey("Technical Projects")) {
-                String projectsSection = h1Sections.get("Technical Projects");
+            Optional<Map.Entry<String, String>> projectsSectionEntry = h1Sections.entrySet().stream()
+                    .filter(e -> e.getKey().matches("(?i).*(project|dự án).*"))
+                    .findFirst();
+
+            if (projectsSectionEntry.isPresent()) {
+                String projectsSection = projectsSectionEntry.get().getValue();
                 Map<String, String> projectBlocks = splitByHeading(projectsSection, 2);
 
                 for (var entry : projectBlocks.entrySet()) {
@@ -108,7 +112,7 @@ public class ChunkerServiceImpl implements ChunkerService {
             // Process Flat Sections (Summary, Skills, Experience, Education, Certifications)
             for (var entry : h1Sections.entrySet()) {
                 String sectionName = entry.getKey();
-                if ("Technical Projects".equalsIgnoreCase(sectionName)) continue;
+                if (sectionName.matches("(?i).*(project|dự án).*")) continue;
 
                 chunks.add(DocumentChunk.builder()
                         .sessionId(sessionId)
@@ -200,6 +204,18 @@ public class ChunkerServiceImpl implements ChunkerService {
         return fields;
     }
 
+    private List<String> getFieldByKeywords(Map<String, List<String>> fields, String... keywords) {
+        for (var entry : fields.entrySet()) {
+            String key = entry.getKey().toLowerCase();
+            for (String kw : keywords) {
+                if (key.contains(kw.toLowerCase())) {
+                    return entry.getValue();
+                }
+            }
+        }
+        return List.of();
+    }
+
     private void buildProjectChunks(
             String projName,
             Map<String, List<String>> fields,
@@ -207,11 +223,16 @@ public class ChunkerServiceImpl implements ChunkerService {
             String docType,
             List<DocumentChunk> outChunks) {
 
-        String role = String.join(" ", fields.getOrDefault("Role/Duration", List.of()));
-        String stack = String.join(" ", fields.getOrDefault("Tech Stack", List.of()));
-        String overview = String.join(" ", fields.getOrDefault("Overview", List.of()));
+        String cleanProjName = projName != null ? projName.strip() : "";
+        String role = String.join(" ", getFieldByKeywords(fields, "role", "duration", "vai trò", "thời gian"));
+        String stack = String.join(" ", getFieldByKeywords(fields, "stack", "công nghệ"));
+        String overview = String.join(" ", getFieldByKeywords(fields, "overview", "tổng quan"));
 
-        String parentContent = String.format("Dự án: %s. %s. Vai trò: %s. Tech Stack: %s.", projName, overview, role, stack).strip();
+        String parentContent = String.format("Dự án: %s. %s | Vai trò: %s",
+                cleanProjName, overview, role).strip();
+        if (role.isBlank()) {
+            parentContent = String.format("Dự án: %s. %s", cleanProjName, overview).strip();
+        }
         UUID parentId = UUID.randomUUID();
 
         DocumentChunk parentChunk = DocumentChunk.builder()
@@ -227,8 +248,20 @@ public class ChunkerServiceImpl implements ChunkerService {
 
         outChunks.add(parentChunk);
 
-        List<String> archBullets = fields.getOrDefault("Architecture & Contributions", List.of());
-        List<String> featureBullets = fields.getOrDefault("Features & Optimizations", List.of());
+        List<String> archBullets = getFieldByKeywords(fields, "architecture", "contribution", "kiến trúc", "đóng góp");
+        List<String> featureBullets = getFieldByKeywords(fields, "feature", "optimization", "tính năng", "tối ưu");
+
+        if (archBullets.isEmpty() && featureBullets.isEmpty()) {
+            List<String> fallbackBullets = fields.entrySet().stream()
+                    .filter(e -> !e.getKey().toLowerCase().matches("(?i).*(role|duration|stack|overview|vai trò|thời gian|công nghệ|tổng quan).*"))
+                    .flatMap(e -> e.getValue().stream())
+                    .collect(Collectors.toList());
+            if (fallbackBullets.isEmpty()) {
+                // If still empty, just grab everything
+                fallbackBullets = fields.values().stream().flatMap(List::stream).collect(Collectors.toList());
+            }
+            featureBullets = fallbackBullets;
+        }
 
         List<MergedBullet> mergedItems = mergeParaphrases(archBullets, featureBullets);
 
@@ -241,7 +274,7 @@ public class ChunkerServiceImpl implements ChunkerService {
 
         for (var entry : domainGroups.entrySet()) {
             List<String> domains = entry.getKey();
-            String childContent = String.format("Dự án %s — %s", projName, String.join(" ", entry.getValue()));
+            String childContent = String.format("[%s] %s", cleanProjName, String.join(" ", entry.getValue()));
 
             DocumentChunk childChunk = DocumentChunk.builder()
                     .id(UUID.randomUUID())

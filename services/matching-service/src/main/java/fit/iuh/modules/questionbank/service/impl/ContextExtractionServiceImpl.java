@@ -3,13 +3,13 @@ package fit.iuh.modules.questionbank.service.impl;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fit.iuh.config.AppProperties;
-import fit.iuh.config.PromptTemplateConfig;
 import fit.iuh.dto.chat.LlmChatRequest;
 import fit.iuh.dto.chat.LlmChatResponse;
 import fit.iuh.exception.LlmApiException;
 import fit.iuh.exception.QuestionBankException;
 import fit.iuh.modules.assessment.entity.SeniorityLevel;
 import fit.iuh.modules.questionbank.dto.CandidateContextDto;
+import fit.iuh.modules.questionbank.prompt.QuestionBankPrompts;
 import fit.iuh.modules.questionbank.service.ContextExtractionService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -44,7 +44,7 @@ public class ContextExtractionServiceImpl implements ContextExtractionService {
     public CandidateContextDto extractContext(String cvMarkdown, String jdMarkdown, String assessmentJson) {
         log.info("[ContextExtraction] Extracting candidate context via LLM...");
 
-        String userPrompt = PromptTemplateConfig.buildContextExtractionUserPrompt(cvMarkdown, jdMarkdown, assessmentJson);
+        String userPrompt = QuestionBankPrompts.buildContextExtractionUserPrompt(cvMarkdown, jdMarkdown, assessmentJson);
 
         LlmChatRequest request = LlmChatRequest.builder()
                 .model(props.getLlm().getModel())
@@ -53,7 +53,7 @@ public class ContextExtractionServiceImpl implements ContextExtractionService {
                 .stream(false)
                 .responseFormat(JSON_RESPONSE_FORMAT)
                 .messages(List.of(
-                        LlmChatRequest.Message.system(PromptTemplateConfig.SYSTEM_PROMPT_CONTEXT_EXTRACTION),
+                        LlmChatRequest.Message.system(QuestionBankPrompts.SYSTEM_PROMPT_CONTEXT_EXTRACTION),
                         LlmChatRequest.Message.user(userPrompt)
                 ))
                 .build();

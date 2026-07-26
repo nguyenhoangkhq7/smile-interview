@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 public class AssessmentController {
 
     private final AssessmentService assessmentService;
+    private final fit.iuh.modules.assessment.service.InterviewEvaluationService interviewEvaluationService;
 
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<AssessmentResponse> assessResume(
@@ -34,7 +35,7 @@ public class AssessmentController {
     @PostMapping(value = "/evaluate-session", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<String> evaluateSession(@RequestBody InterviewEvaluationRequest request) {
         log.info("Received interview evaluation request for roleTitle={}", request.roleTitle());
-        String evaluationJson = assessmentService.evaluateSession(request);
+        String evaluationJson = interviewEvaluationService.evaluateSession(request);
         return ResponseEntity.ok(evaluationJson);
     }
 }

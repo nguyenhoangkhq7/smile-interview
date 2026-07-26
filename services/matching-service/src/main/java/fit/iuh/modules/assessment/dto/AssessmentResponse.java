@@ -33,11 +33,11 @@ public class AssessmentResponse {
     @JsonProperty("eligibility")
     private Eligibility eligibility;
 
-    @JsonProperty("evidence_items")
-    private List<AssessmentResponseDto.EvidenceItem> evidenceItems;
+    @JsonProperty("must_have_evidence_items")
+    private List<AssessmentResponseDto.EvidenceItem> mustHaveEvidenceItems;
 
-    @JsonProperty("additional_evidence_items")
-    private List<AssessmentResponseDto.AdHocEvidenceItem> additionalEvidenceItems;
+    @JsonProperty("prefer_to_have_evidence_items")
+    private List<AssessmentResponseDto.AdHocEvidenceItem> preferToHaveEvidenceItems;
 
     @JsonProperty("score_breakdown")
     private ScoreBreakdown scoreBreakdown;
@@ -58,8 +58,8 @@ public class AssessmentResponse {
             @JsonProperty("must_have_weight_ratio")
             double mustHaveWeightRatio,
 
-            @JsonProperty("raw_ad_hoc_score")
-            int rawAdHocScore,
+            @JsonProperty("raw_prefer_to_have_score")
+            int rawPreferToHaveScore,
 
             @JsonProperty("prefer_to_have_weight_ratio")
             double preferToHaveWeightRatio,

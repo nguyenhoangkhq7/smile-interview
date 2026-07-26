@@ -46,6 +46,8 @@ export interface SessionHistoryItem {
   actionableSuggestions?: string[];
   resumeId?: number;
   jdId?: number;
+  mustHaveEvidenceItems?: unknown[];
+  preferToHaveEvidenceItems?: unknown[];
   evidenceItems?: unknown[];
   additionalEvidenceItems?: unknown[];
   scoreBreakdown?: unknown;

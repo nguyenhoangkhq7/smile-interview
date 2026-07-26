@@ -38,8 +38,8 @@ class EvidenceGroundingValidatorTest {
         String span = "Designed and implemented high-throughput microservices using Spring Boot 3.3 and Java 21";
         EvidenceItem item = new EvidenceItem(
                 1L, "Tech Stack Alignment", "REQUIRED", "Java 21 & Spring Boot",
-                "Has Java 21 & Spring Boot 3.3", "matched",
-                "Found in CV", null, null, span, null, null, null, null
+                span, "matched",
+                "Found in CV", null, null, null, null, null, null
         );
 
         EvidenceItem result = validator.validateAndApply(item, SAMPLE_CV_MARKDOWN, 0.75);
@@ -56,8 +56,8 @@ class EvidenceGroundingValidatorTest {
         String hallucinatedSpan = "Developed quantum computing algorithms with IBM Qiskit and Rust in production";
         EvidenceItem item = new EvidenceItem(
                 2L, "Quantum Tech Stack", "REQUIRED", "Quantum computing with Qiskit",
-                "Used Qiskit in production", "matched",
-                "Hallucinated evidence", null, null, hallucinatedSpan, null, null, null, null
+                hallucinatedSpan, "matched",
+                "Hallucinated evidence", null, null, null, null, null, null
         );
 
         EvidenceItem result = validator.validateAndApply(item, SAMPLE_CV_MARKDOWN, 0.75);
@@ -73,8 +73,8 @@ class EvidenceGroundingValidatorTest {
         String hallucinatedSpan = "Scrum Master certified by Scrum Alliance with 5 years agile coaching";
         EvidenceItem item = new EvidenceItem(
                 3L, "Scrum Coaching", "REQUIRED", "Scrum Master Certification",
-                "Mentioned agile coaching", "weak",
-                "Hallucinated evidence", null, null, hallucinatedSpan, null, null, null, null
+                hallucinatedSpan, "weak",
+                "Hallucinated evidence", null, null, null, null, null, null
         );
 
         EvidenceItem result = validator.validateAndApply(item, SAMPLE_CV_MARKDOWN, 0.75);
@@ -89,7 +89,7 @@ class EvidenceGroundingValidatorTest {
         EvidenceItem item = new EvidenceItem(
                 4L, "Golang Experience", "REQUIRED", "Golang 1.22 requirement",
                 null, "missing",
-                "Requirement completely absent", null, null, null, null, null, null, null
+                "Requirement completely absent", null, null, null, null, null, null
         );
 
         EvidenceItem result = validator.validateAndApply(item, SAMPLE_CV_MARKDOWN, 0.75);

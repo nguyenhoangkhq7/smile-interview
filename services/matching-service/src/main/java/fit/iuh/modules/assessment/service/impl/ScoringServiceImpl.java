@@ -63,17 +63,31 @@ public class ScoringServiceImpl implements ScoringService {
                             (existing, replacement) -> existing
                     ));
 
+            // Pre-compute average weights so JD-extra criteria (criteria_id=null) can
+            // receive a fair contribution instead of being silently skipped.
+            double avgDbWeight = weightMap.values().stream()
+                    .mapToDouble(Double::doubleValue)
+                    .average()
+                    .orElse(10.0);
+
             for (AssessmentResponseDto.EvidenceItem item : evidenceItems) {
                 Long id = item.criteriaId();
-                if (id == null || !weightMap.containsKey(id)) {
-                    log.warn("[Scoring] Evidence item references unknown criteria_id={}. Skipping.", id);
-                    updatedItems.add(item);
-                    continue;
-                }
 
                 boolean isNotApp = "not_applicable".equalsIgnoreCase(item.status()) || "NOT_APPLICABLE".equalsIgnoreCase(item.importance());
 
-                double weight = isNotApp ? 0.0 : weightMap.get(id);
+                double weight;
+                if (isNotApp) {
+                    weight = 0.0;
+                } else if (id != null && weightMap.containsKey(id)) {
+                    weight = weightMap.get(id);
+                } else {
+                    // JD extra criteria or criteria not in weight map:
+                    // use the average DB weight so they contribute proportionally.
+                    weight = avgDbWeight;
+                    log.debug("[Scoring] criteria='{}' (id={}) not in weightMap — using avgDbWeight={}",
+                            item.criteriaName(), id, avgDbWeight);
+                }
+
                 double points = isNotApp ? 0.0 : statusToPoints(item.status(), pointsWeak);
                 double scoreContribution = isNotApp ? 0.0 : weight * points;
 
@@ -103,7 +117,6 @@ public class ScoringServiceImpl implements ScoringService {
                         item.reasoning(),
                         weight,
                         scoreContribution,
-                        item.sourceSpan(),
                         item.groundingScore(),
                         item.confidenceVotes(),
                         item.lowConfidence(),
