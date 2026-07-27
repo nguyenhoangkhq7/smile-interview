@@ -129,6 +129,20 @@ public class AssessmentServiceImpl implements AssessmentService {
                 fullJdMarkdown
         );
 
+        // Record ad-hoc criteria discovered in the JD BEFORE assessment.
+        // Purpose: track JD skill trends regardless of CV evaluation outcome.
+        // We convert JdExtraCriteria → AdHocEvidenceItem with null CV fields
+        // since the CV has not been evaluated yet at this stage.
+        try {
+            List<AssessmentResponseDto.AdHocEvidenceItem> jdExtrasForRecording = bundle.jdExtras().stream()
+                    .map(e -> new AssessmentResponseDto.AdHocEvidenceItem(
+                            e.name(), e.importance(), e.promptInstruction(), null, null, null))
+                    .collect(Collectors.toList());
+            suggestedCriteriaService.recordAdHocCriteria(metadata.category(), jdExtrasForRecording);
+        } catch (Exception e) {
+            log.warn("[Assessment] Non-blocking warning recording ad-hoc criteria (pre-assessment): {}", e.getMessage());
+        }
+
         List<CriteriaWeightProjection> criteriaList = criteriaLoaderService.loadAndFilterCriteria(
                 metadata.category().name(),
                 metadata.level().name(),
@@ -183,12 +197,6 @@ public class AssessmentServiceImpl implements AssessmentService {
         );
 
         Eligibility eligibility = gateExtractionService.evaluateEligibility(fullJdMarkdown, fullCvMarkdown);
-
-        try {
-            suggestedCriteriaService.recordAdHocCriteria(metadata.category(), dto.preferToHaveEvidenceItems());
-        } catch (Exception e) {
-            log.warn("[Assessment] Non-blocking warning recording ad-hoc criteria: {}", e.getMessage());
-        }
 
         List<Map<String, String>> weaknesses = new ArrayList<>();
         if (scoringResult.evidenceItems() != null) {
@@ -565,7 +573,11 @@ public class AssessmentServiceImpl implements AssessmentService {
             }
         }
 
-        return new AssessmentResponseDto(aggregatedEvidenceItems, aggregatedAdHocItems);
+        // Bug 2 fix: Deduplicate evidence items by criteriaId to prevent duplicates
+        // when the same criteria appears in multiple batches due to LLM or partition issues.
+        List<AssessmentResponseDto.EvidenceItem> deduplicatedEvidenceItems = deduplicateEvidenceItems(aggregatedEvidenceItems);
+
+        return new AssessmentResponseDto(deduplicatedEvidenceItems, aggregatedAdHocItems);
     }
 
     private record CriteriaInstructionItem(Long criteriaId, String name, String label, String promptInstruction) {}
@@ -636,7 +648,12 @@ public class AssessmentServiceImpl implements AssessmentService {
 
         // Majority voting across selfConsistencyRuns for each instruction item
         List<AssessmentResponseDto.EvidenceItem> aggregatedBatchItems = new ArrayList<>();
-        List<AssessmentResponseDto.AdHocEvidenceItem> batchAdHoc = new ArrayList<>();
+        // Bug 1 fix: Collect ad-hoc from first successful run only to prevent duplication
+        // across multiple self-consistency runs. Ad-hoc items are non-deterministic; picking
+        // one representative run is sufficient.
+        List<AssessmentResponseDto.AdHocEvidenceItem> batchAdHoc = successfulDtos.get(0).preferToHaveEvidenceItems() != null
+                ? new ArrayList<>(successfulDtos.get(0).preferToHaveEvidenceItems())
+                : new ArrayList<>();
 
         for (CriteriaInstructionItem item : batchItems) {
             if (item.criteriaId() != null) {
@@ -649,12 +666,13 @@ public class AssessmentServiceImpl implements AssessmentService {
                 Map<String, AssessmentResponseDto.EvidenceItem> statusToSampleItem = new HashMap<>();
 
                 for (AssessmentResponseDto dto : successfulDtos) {
-                    if (dto.preferToHaveEvidenceItems() != null) {
-                        batchAdHoc.addAll(dto.preferToHaveEvidenceItems());
-                    }
                     if (dto.mustHaveEvidenceItems() != null) {
                         for (AssessmentResponseDto.EvidenceItem ev : dto.mustHaveEvidenceItems()) {
-                            if (Objects.equals(ev.criteriaId(), item.criteriaId())) {
+                            // Bug 3 fix: Match by criteriaId first; fall back to criteriaName
+                            // because some LLM responses omit criteria_id from the output JSON.
+                            boolean matched = Objects.equals(ev.criteriaId(), item.criteriaId())
+                                    || (ev.criteriaId() == null && item.name().equalsIgnoreCase(ev.criteriaName()));
+                            if (matched) {
                                 String st = ev.status() != null ? ev.status().toLowerCase(Locale.ROOT) : "missing";
                                 if (!votes.containsKey(st)) st = "missing";
                                 votes.put(st, votes.get(st) + 1);
@@ -690,20 +708,13 @@ public class AssessmentServiceImpl implements AssessmentService {
                         null, null, null, votes, lowConfidence, false
                 ));
             } else {
-                // JD Extra Criteria (ad-hoc): take items directly
-                for (AssessmentResponseDto dto : successfulDtos) {
-                    if (dto.mustHaveEvidenceItems() != null) {
-                        for (AssessmentResponseDto.EvidenceItem ev : dto.mustHaveEvidenceItems()) {
-                            if (ev.criteriaId() == null && item.name().equalsIgnoreCase(ev.criteriaName())) {
-                                aggregatedBatchItems.add(ev);
-                            }
-                        }
-                    }
-                    if (dto.preferToHaveEvidenceItems() != null) {
-                        for (AssessmentResponseDto.AdHocEvidenceItem adHoc : dto.preferToHaveEvidenceItems()) {
-                            if (item.name().equalsIgnoreCase(adHoc.criteriaName())) {
-                                batchAdHoc.add(adHoc);
-                            }
+                // JD Extra Criteria (ad-hoc): collect from first successful run only
+                // to keep parity with the batchAdHoc deduplication strategy above.
+                AssessmentResponseDto firstDto = successfulDtos.get(0);
+                if (firstDto.mustHaveEvidenceItems() != null) {
+                    for (AssessmentResponseDto.EvidenceItem ev : firstDto.mustHaveEvidenceItems()) {
+                        if (ev.criteriaId() == null && item.name().equalsIgnoreCase(ev.criteriaName())) {
+                            aggregatedBatchItems.add(ev);
                         }
                     }
                 }
@@ -711,6 +722,32 @@ public class AssessmentServiceImpl implements AssessmentService {
         }
 
         return new BatchResult(aggregatedBatchItems, batchAdHoc);
+    }
+
+    /**
+     * Bug 2 fix: Deduplicates evidence items by criteriaId to prevent the same criteria
+     * from appearing multiple times when batches overlap or LLM returns duplicate entries.
+     * Items with null criteriaId are deduplicated by criteriaName (case-insensitive).
+     */
+    private List<AssessmentResponseDto.EvidenceItem> deduplicateEvidenceItems(
+            List<AssessmentResponseDto.EvidenceItem> items) {
+        if (items == null || items.isEmpty()) return List.of();
+
+        Map<String, AssessmentResponseDto.EvidenceItem> seen = new LinkedHashMap<>();
+        for (AssessmentResponseDto.EvidenceItem item : items) {
+            String key = item.criteriaId() != null
+                    ? "id:" + item.criteriaId()
+                    : "name:" + (item.criteriaName() != null ? item.criteriaName().toLowerCase(Locale.ROOT).trim() : "");
+            seen.putIfAbsent(key, item);
+        }
+
+        int originalSize = items.size();
+        int deduplicatedSize = seen.size();
+        if (originalSize != deduplicatedSize) {
+            log.warn("[Assessment] Deduplicated evidence items: {} → {} (removed {} duplicates)",
+                    originalSize, deduplicatedSize, originalSize - deduplicatedSize);
+        }
+        return new ArrayList<>(seen.values());
     }
 
     private List<List<CriteriaInstructionItem>> partitionInstructionItems(List<CriteriaInstructionItem> list, int maxBatchSize) {

@@ -140,19 +140,52 @@ public class JdCriteriaClassifierServiceImpl implements JdCriteriaClassifierServ
         // Use LinkedHashMap keyed by normalised name to deduplicate jd_extras across batches
         Map<String, JdExtraCriteria> extrasMap = new LinkedHashMap<>();
 
+        // Build a full set of all DB criteria names (lowercase) to prevent LLM from re-extracting
+        // as jd_extras any criteria that are already tracked in the database.
+        Set<String> allDbCriteriaNames = dbCriteria.stream()
+                .map(c -> c.getCriteriaName().toLowerCase(Locale.ROOT).trim())
+                .collect(Collectors.toSet());
+
+        // Concise name hint to include in the batch-1 prompt so LLM is aware of all DB criteria.
+        String allDbNamesHint = dbCriteria.stream()
+                .map(CriteriaWeightProjection::getCriteriaName)
+                .collect(Collectors.joining("; "));
+
         for (int batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
             List<CriteriaWeightProjection> batch = batches.get(batchIndex);
-            try {
-                callClassifierBatch(systemPrompt, jdMarkdown, batch, batchIndex + 1, totalBatches,
-                        importanceMap, extrasMap);
-            } catch (Exception e) {
-                log.warn("[JdCriteriaClassifier] Batch {}/{} failed ({}). Defaulting batch criteria to 'preferred'.",
-                        batchIndex + 1, totalBatches, e.getMessage());
+            int maxBatchRetries = 2;
+            boolean batchSuccess = false;
+            for (int attempt = 1; attempt <= maxBatchRetries; attempt++) {
+                try {
+                    callClassifierBatch(systemPrompt, jdMarkdown, batch, batchIndex + 1, totalBatches,
+                            importanceMap, extrasMap, allDbNamesHint);
+                    batchSuccess = true;
+                    break;
+                } catch (Exception e) {
+                    if (attempt < maxBatchRetries) {
+                        log.warn("[JdCriteriaClassifier] Batch {}/{} attempt {}/{} failed ({}). Retrying...",
+                                batchIndex + 1, totalBatches, attempt, maxBatchRetries, e.getMessage());
+                    } else {
+                        log.warn("[JdCriteriaClassifier] Batch {}/{} failed after {} attempts ({}). Defaulting batch criteria to 'preferred'.",
+                                batchIndex + 1, totalBatches, maxBatchRetries, e.getMessage());
+                    }
+                }
+            }
+            if (!batchSuccess) {
                 // Safe fallback: mark entire failed batch as preferred so nothing gets dropped
                 for (CriteriaWeightProjection c : batch) {
                     importanceMap.putIfAbsent(c.getCriteriaId(), "preferred");
                 }
             }
+        }
+
+        // Post-processing: remove jd_extras whose name duplicates an existing DB criterion.
+        // This is the hard-enforcement guard — the LLM hint above is the soft guard.
+        int extrasBefore = extrasMap.size();
+        extrasMap.entrySet().removeIf(entry -> isAdHocDuplicateOfDbCriteria(entry.getKey(), allDbCriteriaNames));
+        if (extrasMap.size() < extrasBefore) {
+            log.info("[JdCriteriaClassifier] Removed {} jd_extras duplicating existing DB criteria (kept {}).",
+                    extrasBefore - extrasMap.size(), extrasMap.size());
         }
 
         // ── Build final classified list with post-processing ─────────────────────
@@ -212,7 +245,8 @@ public class JdCriteriaClassifierServiceImpl implements JdCriteriaClassifierServ
             int batchNum,
             int totalBatches,
             Map<Long, String> importanceMap,
-            Map<String, JdExtraCriteria> extrasMap) {
+            Map<String, JdExtraCriteria> extrasMap,
+            String allDbNamesHint) {
 
         StringBuilder criteriaListText = new StringBuilder();
         for (CriteriaWeightProjection c : batch) {
@@ -224,8 +258,14 @@ public class JdCriteriaClassifierServiceImpl implements JdCriteriaClassifierServ
 
         // Only ask for jd_extras in the first batch to avoid duplicates.
         // Subsequent batches only classify; extras from batch 1 cover the full JD.
+        // The allDbNamesHint gives LLM awareness of ALL database criteria (across all batches)
+        // so it does not re-extract skills already tracked in the database.
         String extrasNote = (batchNum == 1)
-                ? "Classify each criterion AND extract any JD extras not represented in the list."
+                ? ("Classify each criterion AND extract JD extras for skills in the JD that are "
+                        + "NOT already covered by the complete database (all batches combined): ["
+                        + allDbNamesHint + "]. "
+                        + "Do NOT extract extras with the same or similar meaning as any name in that list. "
+                        + "jd_extras importance must be \"required\" or \"preferred\" only.")
                 : "Classify each criterion ONLY. Set jd_extras to an empty array [].";
 
         String userPrompt = """
@@ -280,7 +320,8 @@ public class JdCriteriaClassifierServiceImpl implements JdCriteriaClassifierServ
                 }
             }
         } catch (Exception e) {
-            log.error("[JdCriteriaClassifier] Failed to parse JSON for batch {}/{}: {}", batchNum, totalBatches, e.getMessage());
+            // Propagate so the caller's retry loop can attempt again before falling back to 'preferred'.
+            throw new RuntimeException("[JdCriteriaClassifier] Failed to parse classifier JSON for batch " + batchNum + "/" + totalBatches + ": " + e.getMessage(), e);
         }
     }
 
@@ -293,5 +334,22 @@ public class JdCriteriaClassifierServiceImpl implements JdCriteriaClassifierServ
             partitions.add(list.subList(i, Math.min(i + batchSize, list.size())));
         }
         return partitions;
+    }
+
+    /**
+     * Returns true if the ad-hoc extra name (already lowercase-trimmed) duplicates
+     * an existing DB criterion. Uses exact match and meaningful substring overlap.
+     * This prevents jd_extras from re-extracting criteria already tracked in the database.
+     */
+    private boolean isAdHocDuplicateOfDbCriteria(String adHocNameLower, Set<String> dbNameSet) {
+        for (String dbName : dbNameSet) {
+            if (dbName.equals(adHocNameLower)) return true;
+            // Substring overlap of >= 5 chars is considered a duplicate
+            if ((dbName.contains(adHocNameLower) || adHocNameLower.contains(dbName))
+                    && Math.min(dbName.length(), adHocNameLower.length()) >= 5) {
+                return true;
+            }
+        }
+        return false;
     }
 }
