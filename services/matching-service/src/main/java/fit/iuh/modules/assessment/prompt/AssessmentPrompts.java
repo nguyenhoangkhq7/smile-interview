@@ -17,7 +17,8 @@ public final class AssessmentPrompts {
             3. Differentiate between "REQUIRED" (must-have) and "PREFERRED" (nice-to-have).
             4. Evaluate the CV against each requirement. Provide a clear 'actual_value' extracted from the CV (e.g., 'Currently a 4th-year student expected to graduate in 2026', 'Bachelor of IT').
             5. Set 'status' to 'met' or 'not_met'.
-            6. Output ONLY a valid JSON object matching the schema.
+            6. ALL output text fields (required_value, actual_value) MUST be written in English.
+            7. Output ONLY a valid JSON object matching the schema.
             
             OUTPUT SCHEMA:
             {
@@ -25,8 +26,8 @@ public final class AssessmentPrompts {
                 {
                   "criteria_name": "<E.g., Years of Experience, Education, GPA, Certification>",
                   "importance": "<REQUIRED|PREFERRED>",
-                  "required_value": "<Exact requirement from JD, e.g., '5+ years', 'Bachelor in CS', 'Final-year student'>",
-                  "actual_value": "<The actual evidence found in the CV, semantically matching the requirement>",
+                  "required_value": "<Exact requirement from JD in English, e.g., '5+ years', 'Bachelor in CS', 'Final-year student'>",
+                  "actual_value": "<The actual evidence found in the CV in English, semantically matching the requirement>",
                   "status": "<met|not_met>"
                 }
               ]
@@ -42,7 +43,7 @@ public final class AssessmentPrompts {
             1. STRICT JSON ONLY: Output ONLY the JSON object below. No explanations, no markdown wrappers.
             2. ENUM CONSTRAINT: Values MUST be one of the allowed options listed.
             3. ZERO HALLUCINATION: Base classification strictly on explicit JD content.
-            4. JD TITLE & TOP LINES PRIORITY: Chỉ tìm thông tin cấp bậc và lĩnh vực ở 10 dòng đầu tiên của JD. Nếu JD có chữ 'Fresher', bắt buộc trả về 'FRESHER'.
+            4. JD TITLE & TOP LINES PRIORITY: Look for seniority level and domain only in the first 10 lines of the JD. If the JD contains the word 'Fresher', you MUST return 'FRESHER'.
             
             OUTPUT SCHEMA:
             {
@@ -80,20 +81,20 @@ public final class AssessmentPrompts {
                 RULES:
                 1. EVIDENCE EVALUATION: Set status to 'matched' for direct proof; 'weak' for indirect proof or listed skills without project context; 'missing' if absent from provided CV chunks. For criteria not mentioned in JD (if present in prompt), set status to 'not_applicable'.
                 2. ZERO HALLUCINATION (CRITICAL): `cv_evidence` MUST be based strictly on the provided CV context chunks. Do NOT invent evidence.
-                3. STRICT LATIN & VIETNAMESE SCRIPT ONLY: Write `jd_requirement`, `cv_evidence`, and `reasoning` strictly in standard Vietnamese using Latin alphabet. Retain standard English technical terms (e.g. index, database, Spring Boot). ABSOLUTELY NEVER output Russian/Cyrillic, Chinese, or non-Latin alphabets.
-                4. CONCISE JD REQUIREMENT: Write a short, 5-15 word summary for `jd_requirement` strictly reflecting the criterion name and instruction provided in the user prompt. Do NOT invent unmentioned requirements.
+                3. ENGLISH OUTPUT (CRITICAL): Write ALL text fields (`jd_requirement`, `cv_evidence`, `reasoning`) in clear, professional English. Standard technical terms (Spring Boot, PostgreSQL, Docker, etc.) must remain in English as-is. ABSOLUTELY NEVER output Russian/Cyrillic, Chinese, or any non-Latin script.
+                4. CONCISE JD REQUIREMENT: Write a short, 5-15 word English summary for `jd_requirement` strictly reflecting the criterion name and instruction provided in the user prompt. Do NOT invent unmentioned requirements.
                 5. NO DEGENERATE REPETITION (CRITICAL): NEVER repeat the exact same sentence or project quote consecutively.
                 6. STRICT RAW JSON (CRITICAL): Start output directly with '{' and end with '}'. NEVER write conversational preamble like 'We evaluated...' or markdown wrappers.
-                7. STRICT CRITERIA BOUNDARY: Evaluate ONLY the criteria explicitly provided in the user prompt batch. ABSOLUTELY DO NOT invent or extract unmentioned bonus criteria/skills from the CV that are not part of the provided criteria batch. `jd_requirement` MUST be provided for every evaluated item based on the prompt instruction.
+                7. STRICT CRITERIA BOUNDARY: Evaluate ONLY the criteria explicitly provided in the user prompt batch. ABSOLUTELY DO NOT invent or extract unmentioned bonus criteria/skills from the CV. `jd_requirement` MUST be provided for every evaluated item based on the prompt instruction.
                 8. IMPORTANCE LABELS: Each criterion in prompt is prefixed with [REQUIRED], [PREFERRED], or [NOT_IN_JD].
-                   - [REQUIRED]  -> place evaluation result in `must_have_evidence_items` with importance="REQUIRED" (applies to DB criteria and JD extras).
-                   - [PREFERRED] -> place evaluation result in `prefer_to_have_evidence_items` with importance="PREFERRED" (applies to DB criteria and JD extras).
+                   - [REQUIRED]  -> place evaluation result in `must_have_evidence_items` with importance="REQUIRED".
+                   - [PREFERRED] -> place evaluation result in `prefer_to_have_evidence_items` with importance="PREFERRED".
                    - [NOT_IN_JD] -> place evaluation result in `prefer_to_have_evidence_items` with importance="NOT_APPLICABLE" and status="not_applicable".
                    - For JD Extra criteria (no DB ID), set `criteria_id` to null.
                 9. ENGLISH LANGUAGE PROFICIENCY SPECIAL RULE: If evaluating an "English Language Proficiency" or similar language criterion:
-                   - A CV written in English or containing English-language technical sections is 'weak' evidence (indirect signal), NOT 'matched'.
-                   - 'matched' requires explicit proof: e.g. English certifications (IELTS, TOEIC score), stated English communication experience, international project communication.
-                   - Set `needs_manual_review` to true for all English proficiency evaluations — spoken English MUST be verified in the interview.
+                   - A CV written in English is 'weak' evidence (indirect signal), NOT 'matched'.
+                   - 'matched' requires explicit proof: e.g. IELTS/TOEIC score, stated English communication experience, international project communication.
+                   - Set `needs_manual_review` to true — spoken English MUST be verified in the interview.
                    - NEVER set status to 'missing' if the CV is written entirely in English; use 'weak' as the floor.
 
                 OUTPUT SCHEMA:
@@ -103,10 +104,10 @@ public final class AssessmentPrompts {
                       "criteria_id": <long or null — exact ID from prompt if available>,
                       "criteria_name": "<string — exact criteria name>",
                       "importance": "REQUIRED",
-                      "jd_requirement": "<concise requirement summary from criterion in Vietnamese, e.g. 'Tối ưu hoá CSDL và Index'>",
-                      "cv_evidence": "<concrete evidence from CV context chunks in Vietnamese, or null if missing>",
+                      "jd_requirement": "<concise English requirement summary, e.g. 'Design DB schemas and write complex SQL queries'>",
+                      "cv_evidence": "<concrete English evidence extracted from CV context chunks, or null if missing>",
                       "status": "<matched|weak|missing>",
-                      "reasoning": "<1 concise sentence in Vietnamese explaining status>"
+                      "reasoning": "<1 concise English sentence explaining the status verdict>"
                     }
                   ],
                   "prefer_to_have_evidence_items": [
@@ -114,10 +115,10 @@ public final class AssessmentPrompts {
                       "criteria_id": <long or null — exact ID from prompt if available>,
                       "criteria_name": "<string — exact criteria name>",
                       "importance": "<PREFERRED|NOT_APPLICABLE>",
-                      "jd_requirement": "<concise requirement summary from criterion in Vietnamese>",
-                      "cv_evidence": "<concrete evidence from CV context chunks in Vietnamese, or null if missing>",
+                      "jd_requirement": "<concise English requirement summary>",
+                      "cv_evidence": "<concrete English evidence from CV context chunks, or null if missing>",
                       "status": "<matched|weak|missing|not_applicable>",
-                      "reasoning": "<1 sentence in Vietnamese explaining status>"
+                      "reasoning": "<1 concise English sentence explaining the status verdict>"
                     }
                   ]
                 }
@@ -137,7 +138,7 @@ public final class AssessmentPrompts {
                 ====== EVALUATION CRITERIA FOR THIS BATCH ======
                 %s
                 
-                Evaluate the candidate's CV context chunks against the evaluation criteria listed above. Output ONLY the JSON object.
+                Evaluate the candidate's CV context chunks against the evaluation criteria listed above. All output text must be in English. Output ONLY the JSON object.
                 """.formatted(cvContextMarkdown, criteriaInstructions);
     }
 
@@ -151,9 +152,9 @@ public final class AssessmentPrompts {
             Task: Review the technical weaknesses of a candidate (missing or weak criteria) and provide highly detailed, actionable advice to help them pass the interview.
             
             RULES:
-            1. BE DETAILED: Do not hold back on tokens. Provide in-depth advice, learning paths, or concrete project implementation ideas.
+            1. BE DETAILED: Provide in-depth advice, concrete learning paths, and specific project implementation ideas. Do not hold back.
             2. ZERO HALLUCINATION: Base advice ONLY on the missing/weak criteria provided.
-            3. LANGUAGE: Write suggestions in Vietnamese for human readability. Keep technical terms in English.
+            3. ENGLISH OUTPUT (CRITICAL): Write ALL advice fields in clear, professional English. Technical terms (Spring Boot, JUnit, Docker, etc.) must remain in English as-is.
             4. STRICT JSON ONLY: Output ONLY a valid JSON object matching the schema below. No markdown wrappers.
             
             OUTPUT SCHEMA:
@@ -161,7 +162,7 @@ public final class AssessmentPrompts {
               "top_priority_improvements": [
                 {
                   "criteria_name": "<string — the related criteria_name>",
-                  "actionable_advice": "<Highly detailed, actionable improvement suggestion in Vietnamese (e.g., specific courses, concrete project implementations, architectures)>",
+                  "actionable_advice": "<Highly detailed, actionable English improvement suggestion (e.g., specific courses, concrete project implementations, architectures to study)>",
                   "priority": "<HIGH|MEDIUM|LOW>"
                 }
               ]
@@ -173,7 +174,7 @@ public final class AssessmentPrompts {
                 ====== CANDIDATE WEAKNESSES ======
                 %s
                 
-                Based on these weaknesses, generate detailed and actionable improvement suggestions. Output ONLY the JSON object.
+                Based on these weaknesses, generate detailed and actionable improvement suggestions in English. Output ONLY the JSON object.
                 """.formatted(missingAndWeakItemsJson);
     }
 
@@ -185,24 +186,23 @@ public final class AssessmentPrompts {
             RULES:
             1. STRICT JSON ONLY: Output ONLY the valid JSON object below. No markdown, no conversational text.
             2. ZERO HALLUCINATION: Base evaluation strictly on the provided Q&A content.
-            3. LANGUAGE: All feedback fields ("overallFeedback", "strengths", "improvements", "suggestedAnswer",
-               "actionableSuggestions") MUST be in Vietnamese. Keep technical terms in English.
+            3. ENGLISH OUTPUT (CRITICAL): ALL feedback fields ("overallFeedback", "strengths", "improvements", "suggestedAnswer", "actionableSuggestions") MUST be written in clear, professional English. Technical terms must remain in English as-is.
             
             OUTPUT SCHEMA:
             {
               "overallScore": <integer 0-100>,
-              "overallFeedback": "<3-4 sentence summary: strongest area + biggest weakness + hiring recommendation>",
+              "overallFeedback": "<3-4 sentence English summary: strongest area + biggest weakness + hiring recommendation>",
               "strongAreas": ["<skill 1>", "<skill 2>", "<skill 3>"],
               "gapAreas": ["<gap 1>", "<gap 2>", "<gap 3>"],
-              "actionableSuggestions": ["<suggestion 1>", "<suggestion 2>", "<suggestion 3>"],
+              "actionableSuggestions": ["<English suggestion 1>", "<English suggestion 2>", "<English suggestion 3>"],
               "evaluatedQuestions": [
                 {
                   "question": "<question text>",
                   "answer": "<candidate's answer>",
                   "score": <integer 1-10>,
-                  "strengths": "<what was good about this answer>",
-                  "improvements": "<what was lacking or incorrect>",
-                  "suggestedAnswer": "<model answer for this question>"
+                  "strengths": "<English description of what was good about this answer>",
+                  "improvements": "<English description of what was lacking or incorrect>",
+                  "suggestedAnswer": "<English model answer for this question>"
                 }
               ]
             }
