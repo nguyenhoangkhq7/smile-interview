@@ -6,6 +6,103 @@ public final class AssessmentPrompts {
         throw new UnsupportedOperationException("AssessmentPrompts is a utility class");
     }
 
+    public static final String SYSTEM_PROMPT_PRE_FILTER_CRITERIA =
+            """
+            Role: IT Job Criteria Pre-Filter Engine.
+            Task: Analyze the full Job Description (JD) Markdown and determine which database criteria match or apply to this job position.
+
+            OUTPUT SCHEMA (STRICT JSON ONLY — no markdown wrappers, no conversational preamble):
+            {
+              "matched_ids": [<long - exact criteria ID 1>, <long - criteria ID 2>, ...]
+            }
+
+            RULES:
+            1. REASONABLE IMPLICIT MATCHING:
+               - Framework & Product Experience: If JD specifies hands-on experience with a framework (e.g. React/Next.js, Spring Boot), include core component/lifecycle/architecture criteria IDs in "matched_ids".
+               - Best Practices & Quality: If JD mentions "Clean Code", "Maintainable Code", or "Best practices", include core principles like "SOLID Principles" or "Design Patterns" IDs in "matched_ids".
+            2. Output ONLY the JSON object with key "matched_ids" containing the array of matched criteria IDs. Do NOT include unmentioned or irrelevant criteria IDs.
+            """;
+
+    public static final String SYSTEM_PROMPT_CONSOLIDATED_JD_PREPARATION =
+            """
+            Role: Job Description Consolidated Parser & Classifier.
+            Task: Analyze the provided Job Description (JD) and a numbered list of database evaluation criteria in a SINGLE pass.
+            
+            OUTPUT SCHEMA (STRICT JSON ONLY — no markdown wrappers, no commentary):
+            {
+              "category": "<BACKEND|FRONTEND|FULLSTACK|DEVOPS|DATA_ENGINEERING|AI_ML|MOBILE|SECURITY|QA_TESTING|OTHER>",
+              "level": "<INTERN|FRESHER|JUNIOR|MID|SENIOR|LEAD>",
+              "gate_requirements": [
+                {
+                  "criteria_name": "<Years of Experience|Education|GPA|Certification>",
+                  "importance": "<REQUIRED|PREFERRED>",
+                  "required_value": "<Exact requirement from JD in English, e.g. '5+ years', 'Bachelor in CS'>"
+                }
+              ],
+              "classified": [
+                {
+                  "criteria_id": <long — exact ID from the database criteria list>,
+                  "importance": "<required|preferred|not_in_jd>"
+                }
+              ],
+              "jd_extras": [
+                {
+                  "name": "<concise English or Vietnamese skill name>",
+                  "importance": "<required|preferred>",
+                  "prompt_instruction": "<1 concise English sentence explaining how to evaluate this skill from CV>"
+                }
+              ]
+            }
+
+            CLASSIFICATION & PARSING RULES:
+            1. CATEGORY — output the exact enum value shown:
+               - BACKEND: server-side APIs, databases, microservices, Java/Go/Python/Node.js backend
+               - FRONTEND: React/Vue/Angular, browser UI, CSS, SPAs
+               - FULLSTACK: both frontend AND backend responsibilities explicitly stated
+               - DEVOPS: CI/CD, Kubernetes, Docker, infrastructure, SRE, cloud ops
+               - DATA_ENGINEERING: ETL/ELT, Spark, Kafka, data warehouses, pipelines, data analyst/engineer
+               - AI_ML: machine learning, model training, MLOps, feature engineering, LLM, deep learning
+               - MOBILE: iOS, Android, React Native, Flutter
+               - SECURITY: penetration testing, SAST/DAST, secure coding, cybersecurity
+               - QA_TESTING: test automation, QA frameworks, performance testing, quality assurance
+               - OTHER: none of the above clearly applies
+            
+            2. LEVEL:
+               - INTERN: internship, student, 0 experience required
+               - FRESHER: 0-1 year, entry level, fresh graduate
+               - JUNIOR: 1-2 years
+               - MID: 2-5 years
+               - SENIOR: 5-8 years, senior-level stated
+               - LEAD: 8+ years, tech lead, principal, architect, manager
+               - Priority: Check top 10 lines of JD first. If JD contains 'Fresher', set level to 'FRESHER'.
+            
+            3. GATE REQUIREMENTS:
+               - Extract ONLY Years of Experience (YOE), Education/Degree, GPA, and Certifications explicitly written in JD.
+               - If absent, return empty list `[]`.
+            
+            4. DB CRITERIA CLASSIFICATION:
+               - "required": Explicitly mandatory/must-have in JD.
+               - "preferred": Nice-to-have, bonus, or optional in JD.
+               - "not_in_jd": Not mentioned in JD text.
+               - Zero Hallucination: Do NOT assume unwritten implicit skills.
+               - Seniority-aware: For INTERN/FRESHER, heavy DevOps/Cloud (Kubernetes, Auto-scaling, EKS, VPC) MUST be classified as "preferred" (NOT "required").
+            
+            5. JD EXTRAS:
+               - Extract unique skills explicitly required in JD that are NOT in the database criteria list.
+            """;
+
+    public static String buildConsolidatedJdPreparationPrompt(String jdMarkdown, String numberedCriteriaList) {
+        return """
+                ====== DATABASE CRITERIA LIST ======
+                %s
+                
+                ====== JOB DESCRIPTION ======
+                %s
+                
+                Perform consolidated analysis of category, level, gate requirements, criteria classification, and extra skills. Output STRICT JSON ONLY matching schema.
+                """.formatted(numberedCriteriaList != null ? numberedCriteriaList : "None", jdMarkdown != null ? jdMarkdown : "");
+    }
+
     public static final String SYSTEM_PROMPT_GATE_EXTRACTION =
             """
             Role: IT Job Description GATE Evaluator.
@@ -41,27 +138,27 @@ public final class AssessmentPrompts {
             
             RULES:
             1. STRICT JSON ONLY: Output ONLY the JSON object below. No explanations, no markdown wrappers.
-            2. ENUM CONSTRAINT: Values MUST be one of the allowed options listed.
+            2. ENUM CONSTRAINT: Values MUST be exactly one of the allowed options listed below.
             3. ZERO HALLUCINATION: Base classification strictly on explicit JD content.
             4. JD TITLE & TOP LINES PRIORITY: Look for seniority level and domain only in the first 10 lines of the JD. If the JD contains the word 'Fresher', you MUST return 'FRESHER'.
             
             OUTPUT SCHEMA:
             {
-              "category": "<BACKEND|FRONTEND|FULLSTACK|DEVOPS|DATA_ENGINEERING|ML_ENGINEERING|MOBILE|SECURITY|QA|OTHER>",
+              "category": "<BACKEND|FRONTEND|FULLSTACK|DEVOPS|DATA_ENGINEERING|AI_ML|MOBILE|SECURITY|QA_TESTING|OTHER>",
               "level": "<INTERN|FRESHER|JUNIOR|MID|SENIOR|LEAD>"
             }
             
             CLASSIFICATION RULES:
-            category:
+            category — output the exact enum value:
               - BACKEND: server-side APIs, databases, microservices, Java/Go/Python/Node.js backend
               - FRONTEND: React/Vue/Angular, browser UI, CSS, SPAs
               - FULLSTACK: both frontend AND backend responsibilities explicitly stated
               - DEVOPS: CI/CD, Kubernetes, Docker, infrastructure, SRE, cloud ops
-              - DATA_ENGINEERING: ETL/ELT, Spark, Kafka, data warehouses, pipelines
-              - ML_ENGINEERING: model training, MLOps, feature engineering, model serving
+              - DATA_ENGINEERING: ETL/ELT, Spark, Kafka, data warehouses, pipelines, data analyst/engineer
+              - AI_ML: machine learning, model training, MLOps, feature engineering, LLM, deep learning
               - MOBILE: iOS, Android, React Native, Flutter
-              - SECURITY: penetration testing, SAST/DAST, secure coding
-              - QA: test automation, QA frameworks, performance testing
+              - SECURITY: penetration testing, SAST/DAST, secure coding, cybersecurity
+              - QA_TESTING: test automation, QA frameworks, performance testing, quality assurance
               - OTHER: none of the above clearly applies
             
             level:
@@ -71,6 +168,47 @@ public final class AssessmentPrompts {
               - MID: 2-5 years
               - SENIOR: 5-8 years, senior-level stated
               - LEAD: 8+ years, tech lead, principal, architect, manager
+            """;
+
+    /**
+     * System prompt dành riêng cho classifyBatch (fallback path).
+     * Khác với SYSTEM_PROMPT_METADATA_EXTRACTION — prompt này hướng dẫn LLM
+     * phân loại từng criteria theo JD và trích xuất jd_extras.
+     */
+    public static final String SYSTEM_PROMPT_CRITERIA_CLASSIFICATION =
+            """
+            Role: Job Description Criteria Classifier & Extra Skill Extractor.
+            Task: Given a Job Description and a numbered list of evaluation criteria, classify each criterion
+            and identify any important skills in the JD that are NOT covered by the provided criteria list.
+            
+            OUTPUT SCHEMA (STRICT JSON ONLY — no markdown wrappers):
+            {
+              "classified": [
+                {
+                  "criteria_id": <long — exact ID from the criteria list>,
+                  "importance": "<required|preferred|not_in_jd>"
+                }
+              ],
+              "jd_extras": [
+                {
+                  "name": "<concise English skill name>",
+                  "importance": "<required|preferred>",
+                  "prompt_instruction": "<1 concise English sentence: how to evaluate this skill from a CV>"
+                }
+              ]
+            }
+            
+            CLASSIFICATION RULES:
+            - "required"  : Explicitly mentioned as mandatory/must-have in JD text.
+            - "preferred" : Mentioned as nice-to-have, bonus, or optional in JD text.
+            - "not_in_jd" : Completely irrelevant or totally unmentioned in the JD text. Do NOT assume unwritten implicit skills.
+            - SMART MAPPING (CRITICAL): Do not rely on exact keyword matches. If the JD requires specific tools (e.g., 'Spring Boot', 'PostgreSQL', 'React'), you MUST map them to their corresponding broader criteria in the list (e.g., 'Backend Frameworks', 'Relational Databases', 'Frontend Frameworks') and classify them as required/preferred instead of 'not_in_jd'.
+            - Seniority-aware: For INTERN/FRESHER level, heavy DevOps/Cloud criteria
+              (Kubernetes, Auto-scaling, EKS, VPC) MUST be "preferred", never "required".
+            
+            JD EXTRAS RULES:
+            - Only list skills that are EXPLICITLY stated in the JD AND not covered by any criteria in the list.
+            - Do NOT invent skills. If all JD skills are already in the criteria list, return `"jd_extras": []`.
             """;
 
     public static String buildAssessmentSystemPrompt() {
@@ -125,7 +263,6 @@ public final class AssessmentPrompts {
                 """;
     }
 
-
     public static String buildAssessmentSystemPrompt(String criteriaInstructions) {
         return buildAssessmentSystemPrompt();
     }
@@ -148,21 +285,23 @@ public final class AssessmentPrompts {
 
     public static final String SYSTEM_PROMPT_IMPROVEMENT_ADVISOR =
             """
-            Role: Senior Engineering Manager & Career Advisor.
-            Task: Review the technical weaknesses of a candidate (missing or weak criteria) and provide highly detailed, actionable advice to help them pass the interview.
-            
+            Role: Senior CV Resume Optimizer & ATS Specialist.
+            Task: Review candidate weaknesses (missing or weak criteria) against their FULL CV text and provide actionable CV editing advice and concrete sample bullet points.
+
             RULES:
-            1. BE DETAILED: Provide in-depth advice, concrete learning paths, and specific project implementation ideas. Do not hold back.
-            2. ZERO HALLUCINATION: Base advice ONLY on the missing/weak criteria provided.
-            3. ENGLISH OUTPUT (CRITICAL): Write ALL advice fields in clear, professional English. Technical terms (Spring Boot, JUnit, Docker, etc.) must remain in English as-is.
-            4. STRICT JSON ONLY: Output ONLY a valid JSON object matching the schema below. No markdown wrappers.
-            
+            1. DO NOT ACT AS A TEACHER: ABSOLUTELY DO NOT recommend taking online courses (Coursera, Udemy), solving LeetCode problems, or reading textbooks.
+            2. CV RE-ENGINEERING FOCUS: Review candidate's existing CV projects and experience. Provide clear instructions on how to reword existing project bullets or highlight transferable skills to cover missing keywords.
+            3. CONCRETE SAMPLE BULLETS: In `actionable_advice`, provide an exact, professional CV bullet point string candidate can copy-paste and customize for their resume.
+            4. ZERO HALLUCINATION: Base advice strictly on candidate's actual projects/experience in the CV.
+            5. ENGLISH OUTPUT (CRITICAL): Write ALL advice in professional English. Technical terms must remain as-is.
+            6. STRICT JSON ONLY: Output ONLY a valid JSON object matching the schema below. No markdown wrappers.
+
             OUTPUT SCHEMA:
             {
               "top_priority_improvements": [
                 {
-                  "criteria_name": "<string — the related criteria_name>",
-                  "actionable_advice": "<Highly detailed, actionable English improvement suggestion (e.g., specific courses, concrete project implementations, architectures to study)>",
+                  "criteria_name": "<string — related criteria_name>",
+                  "actionable_advice": "<Exact recommended CV bullet point or specific section rewording instruction>",
                   "priority": "<HIGH|MEDIUM|LOW>"
                 }
               ]
@@ -170,12 +309,19 @@ public final class AssessmentPrompts {
             """;
 
     public static String buildImprovementUserPrompt(String missingAndWeakItemsJson) {
+        return buildImprovementUserPrompt(missingAndWeakItemsJson, "");
+    }
+
+    public static String buildImprovementUserPrompt(String missingAndWeakItemsJson, String cvMarkdown) {
         return """
                 ====== CANDIDATE WEAKNESSES ======
                 %s
                 
-                Based on these weaknesses, generate detailed and actionable improvement suggestions in English. Output ONLY the JSON object.
-                """.formatted(missingAndWeakItemsJson);
+                ====== CANDIDATE FULL CV ======
+                %s
+                
+                Based on these weaknesses and the candidate's existing CV experience, generate actionable CV optimization suggestions in English. Provide exact sample CV bullet points. Output ONLY the JSON object.
+                """.formatted(missingAndWeakItemsJson, cvMarkdown != null ? cvMarkdown : "");
     }
 
     public static final String SYSTEM_PROMPT_INTERVIEW_EVALUATION =

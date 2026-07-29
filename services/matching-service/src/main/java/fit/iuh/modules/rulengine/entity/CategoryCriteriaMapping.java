@@ -40,4 +40,7 @@ public class CategoryCriteriaMapping {
 
     @Column(name = "weight_percentage", nullable = false)
     private Double weightPercentage;
+
+    @Column(name = "level_prompt_instruction", columnDefinition = "TEXT")
+    private String levelPromptInstruction;
 }

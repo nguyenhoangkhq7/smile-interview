@@ -30,4 +30,12 @@ public class EvaluationCriteria {
 
     @Column(name = "prompt_instruction", columnDefinition = "TEXT")
     private String promptInstruction;
+
+    /**
+     * Pre-computed embedding vector stored as JSON array string (e.g. "[0.012,-0.045,...]").
+     * Populated once at startup by CriteriaEmbeddingInitializer and reused at runtime.
+     * Null means the embedding has not been computed yet.
+     */
+    @Column(name = "embedding", columnDefinition = "TEXT")
+    private String embedding;
 }

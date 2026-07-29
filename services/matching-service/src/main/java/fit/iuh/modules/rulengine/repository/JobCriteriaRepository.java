@@ -15,7 +15,10 @@ public interface JobCriteriaRepository extends JpaRepository<CategoryCriteriaMap
         Long getCriteriaId();
         String getCriteriaName();
         String getPromptInstruction();
+        String getLevelPromptInstruction();
         Double getWeightPercentage();
+        /** Pre-computed embedding JSON string from evaluation_criteria.embedding column. May be null. */
+        String getEmbedding();
     }
 
     @Query(value = """
@@ -31,10 +34,12 @@ public interface JobCriteriaRepository extends JpaRepository<CategoryCriteriaMap
                 INNER JOIN category_tree ct ON c.id = ct.parent_id
             )
             SELECT
-                ec.id                 AS criteriaId,
-                ec.name               AS criteriaName,
-                ec.prompt_instruction AS promptInstruction,
-                m.weight_percentage   AS weightPercentage
+                ec.id                     AS criteriaId,
+                ec.name                   AS criteriaName,
+                ec.prompt_instruction     AS promptInstruction,
+                m.level_prompt_instruction AS levelPromptInstruction,
+                m.weight_percentage       AS weightPercentage,
+                ec.embedding              AS embedding
             FROM category_criteria_mapping m
             JOIN evaluation_criteria ec ON m.evaluation_criteria_id = ec.id
             JOIN category_tree ct ON m.job_category_id = ct.id

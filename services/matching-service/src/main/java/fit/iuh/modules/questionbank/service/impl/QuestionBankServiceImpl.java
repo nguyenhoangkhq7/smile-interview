@@ -41,6 +41,7 @@ public class QuestionBankServiceImpl implements QuestionBankService {
     private final SemanticCacheKeyGenerator cacheKeyGenerator;
     private final SemanticCacheService cacheService;
     private final EvaluationCriteriaRepository evaluationCriteriaRepository;
+    private final fit.iuh.config.AppProperties appProperties;
 
     @Override
     @Transactional
@@ -346,6 +347,9 @@ public class QuestionBankServiceImpl implements QuestionBankService {
             log.error("[QuestionBank] Failed to load evaluation criteria for question types", e);
         }
 
+        int maxEvidenceItems = (appProperties != null && appProperties.getQuestionBank() != null && appProperties.getQuestionBank().getMaxEvidenceItems() > 0)
+                ? appProperties.getQuestionBank().getMaxEvidenceItems() : 15;
+
         if (assessment.getMustHaveEvidenceItems() != null) {
             assessment.getMustHaveEvidenceItems().stream()
                     .filter(item -> !"not_applicable".equalsIgnoreCase(item.status()))
@@ -353,7 +357,7 @@ public class QuestionBankServiceImpl implements QuestionBankService {
                             (AssessmentResponseDto.EvidenceItem item) ->
                                     item.weightUsed() != null ? item.weightUsed() : 0.0
                     ).reversed())
-                    .limit(MAX_EVIDENCE_ITEMS)
+                    .limit(maxEvidenceItems)
                     .forEach(item -> pairs.add(new EvidenceItemPair(
                             item.criteriaId(),
                             item.criteriaName(),
@@ -366,8 +370,8 @@ public class QuestionBankServiceImpl implements QuestionBankService {
                     )));
         }
 
-        if (assessment.getPreferToHaveEvidenceItems() != null && pairs.size() < MAX_EVIDENCE_ITEMS) {
-            int remaining = MAX_EVIDENCE_ITEMS - pairs.size();
+        if (assessment.getPreferToHaveEvidenceItems() != null && pairs.size() < maxEvidenceItems) {
+            int remaining = maxEvidenceItems - pairs.size();
             assessment.getPreferToHaveEvidenceItems().stream()
                     .filter(item -> !"not_applicable".equalsIgnoreCase(item.status()))
                     .limit(remaining)

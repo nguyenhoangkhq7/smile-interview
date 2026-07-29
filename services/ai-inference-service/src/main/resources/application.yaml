@@ -6,15 +6,15 @@ spring:
       enabled: true
 
 openrouter:
-  api-key: ${OPENROUTER_API_KEY:mock-key}
-  base-url: ${OPENROUTER_BASE_URL:https://openrouter.ai/api/v1}
+  api-key: ${LLM_API_KEY:${OPENROUTER_API_KEY:mock-key}}
+  base-url: ${LLM_API_URL:${OPENROUTER_BASE_URL:https://openrouter.ai/api/v1}}
   model:
-    evaluation: ${OPENROUTER_EVAL_MODEL:google/gemini-2.5-flash}
-    final-report: ${OPENROUTER_FINAL_REPORT_MODEL:google/gemini-2.5-flash}
+    evaluation: ${LLM_MODEL_REALTIME_EVALUATION:${OPENROUTER_EVAL_MODEL:${LLM_MODEL:google/gemini-2.0-flash-001}}}
+    final-report: ${LLM_MODEL_FINAL_REPORT:${OPENROUTER_FINAL_REPORT_MODEL:${LLM_MODEL:google/gemini-2.0-flash-001}}}
 
 llm:
-  timeout-seconds: ${LLM_TIMEOUT_SECONDS:20}
-  final-report-timeout-seconds: ${LLM_FINAL_REPORT_TIMEOUT_SECONDS:60}
+  timeout-seconds: ${LLM_TIMEOUT_SECONDS:60}
+  final-report-timeout-seconds: ${LLM_FINAL_REPORT_TIMEOUT_SECONDS:180}
 
 grpc:
   server:

@@ -62,20 +62,87 @@ server:
 # ============================================================
 app:
   llm:
-    api-key: ${LLM_API_KEY}
-    api-url: ${LLM_API_URL:https://api.groq.com}
-    chat-path: ${LLM_CHAT_PATH:/openai/v1/chat/completions}
-    model: ${LLM_MODEL:llama-3.3-70b-versatile}
+    api-key: ${LLM_API_KEY:}
+    api-url: ${LLM_API_URL:https://openrouter.ai/api/v1}
+    chat-path: ${LLM_CHAT_PATH:/chat/completions}
+    model: ${LLM_MODEL:google/gemini-2.0-flash-001}
     # Timeout in seconds for LLM API calls
     timeout-seconds: ${LLM_TIMEOUT_SECONDS:60}
     # Max tokens in LLM response
     max-tokens: ${LLM_MAX_TOKENS:8192}
+    # Default temperature for LLM API calls
+    temperature: ${LLM_TEMPERATURE:0.2}
+    # Global LLM concurrency & retry infrastructure settings
+    global-concurrency: ${LLM_GLOBAL_CONCURRENCY:10}
+    concurrency-timeout-seconds: ${LLM_CONCURRENCY_TIMEOUT_SECONDS:60}
+    max-retries: ${LLM_MAX_RETRIES:3}
+    rate-limit-sleep-ms: ${LLM_RATE_LIMIT_SLEEP_MS:35000}
+    # Task-specific LLM configurations (model, max-tokens, timeout-seconds, temperature)
+    tasks:
+      standardization:
+        model: ${LLM_MODEL_STANDARDIZATION:${app.llm.model}}
+        max-tokens: ${LLM_MAX_TOKENS_STANDARDIZATION:4096}
+        timeout-seconds: ${LLM_TIMEOUT_STANDARDIZATION:45}
+        temperature: ${LLM_TEMPERATURE_STANDARDIZATION:0.1}
+      metadata-extraction:
+        model: ${LLM_MODEL_METADATA_EXTRACTION:${app.llm.model}}
+        max-tokens: ${LLM_MAX_TOKENS_METADATA_EXTRACTION:512}
+        timeout-seconds: ${LLM_TIMEOUT_METADATA_EXTRACTION:15}
+        temperature: ${LLM_TEMPERATURE_METADATA_EXTRACTION:0.1}
+      criteria-classification:
+        model: ${LLM_MODEL_CRITERIA_CLASSIFICATION:${app.llm.model}}
+        max-tokens: ${LLM_MAX_TOKENS_CRITERIA_CLASSIFICATION:1536}
+        timeout-seconds: ${LLM_TIMEOUT_CRITERIA_CLASSIFICATION:25}
+        temperature: ${LLM_TEMPERATURE_CRITERIA_CLASSIFICATION:0.1}
+      gate-extraction:
+        model: ${LLM_MODEL_GATE_EXTRACTION:${app.llm.model}}
+        max-tokens: ${LLM_MAX_TOKENS_GATE_EXTRACTION:1024}
+        timeout-seconds: ${LLM_TIMEOUT_GATE_EXTRACTION:20}
+        temperature: ${LLM_TEMPERATURE_GATE_EXTRACTION:0.1}
+      assessment:
+        model: ${LLM_MODEL_ASSESSMENT:${app.llm.model}}
+        max-tokens: ${LLM_MAX_TOKENS_ASSESSMENT:4096}
+        timeout-seconds: ${LLM_TIMEOUT_ASSESSMENT:45}
+        temperature: ${LLM_TEMPERATURE_ASSESSMENT:0.2}
+      improvement:
+        model: ${LLM_MODEL_IMPROVEMENT:${app.llm.model}}
+        max-tokens: ${LLM_MAX_TOKENS_IMPROVEMENT:2048}
+        timeout-seconds: ${LLM_TIMEOUT_IMPROVEMENT:30}
+        temperature: ${LLM_TEMPERATURE_IMPROVEMENT:0.3}
+      question-generation:
+        model: ${LLM_MODEL_QUESTION_GENERATION:${app.llm.model}}
+        max-tokens: ${LLM_MAX_TOKENS_QUESTION_GENERATION:8192}
+        timeout-seconds: ${LLM_TIMEOUT_QUESTION_GENERATION:90}
+        temperature: ${LLM_TEMPERATURE_QUESTION_GENERATION:0.4}
+      interview-evaluation:
+        model: ${LLM_MODEL_INTERVIEW_EVALUATION:${app.llm.model}}
+        max-tokens: ${LLM_MAX_TOKENS_INTERVIEW_EVALUATION:4096}
+        timeout-seconds: ${LLM_TIMEOUT_INTERVIEW_EVALUATION:60}
+        temperature: ${LLM_TEMPERATURE_INTERVIEW_EVALUATION:0.3}
 
+    # Legacy model mapping compatibility
+    models:
+      standardization: ${LLM_MODEL_STANDARDIZATION:${app.llm.model}}
+      metadata-extraction: ${LLM_MODEL_METADATA_EXTRACTION:${app.llm.model}}
+      criteria-classification: ${LLM_MODEL_CRITERIA_CLASSIFICATION:${app.llm.model}}
+      gate-extraction: ${LLM_MODEL_GATE_EXTRACTION:${app.llm.model}}
+      assessment: ${LLM_MODEL_ASSESSMENT:${app.llm.model}}
+      question-generation: ${LLM_MODEL_QUESTION_GENERATION:${app.llm.model}}
+      interview-evaluation: ${LLM_MODEL_INTERVIEW_EVALUATION:${app.llm.model}}
+
+  assessment:
+    classifier-batch-size: ${ASSESSMENT_CLASSIFIER_BATCH_SIZE:15}
+    metadata-jd-truncate-length: ${ASSESSMENT_METADATA_TRUNCATE_LENGTH:600}
+    jaccard-dedup-threshold: ${ASSESSMENT_JACCARD_DEDUP_THRESHOLD:0.6}
 
   question-bank:
+    max-evidence-items: ${QUESTION_BANK_MAX_EVIDENCE_ITEMS:15}
     max-tokens: ${QUESTION_BANK_MAX_TOKENS:8192}
     temperature: ${QUESTION_BANK_TEMPERATURE:0.4}
     max-retries: ${QUESTION_BANK_MAX_RETRIES:2}
+
+  chunking:
+    bullet-merge-threshold: ${CHUNKING_BULLET_MERGE_THRESHOLD:0.15}
 
   ollama:
     base-url: ${OLLAMA_BASE_URL:http://localhost:11434}

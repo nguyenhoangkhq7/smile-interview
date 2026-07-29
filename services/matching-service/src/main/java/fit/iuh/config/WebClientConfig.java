@@ -16,7 +16,7 @@ import java.time.Duration;
  *
  * <p>A pre-configured {@link WebClient} bean is provided:
  * <ul>
- *   <li>{@link #llmWebClient()} — for CV/JD Markdown standardization via Groq LLM API</li>
+ *   <li>{@link #llmWebClient()} — for LLM inference via OpenAI-compatible API</li>
  * </ul>
  *
  * <p>The client is configured with:

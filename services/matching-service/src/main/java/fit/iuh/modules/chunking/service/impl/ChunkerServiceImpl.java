@@ -14,6 +14,16 @@ import java.util.stream.Collectors;
 @Service
 public class ChunkerServiceImpl implements ChunkerService {
 
+    private final fit.iuh.config.AppProperties appProperties;
+
+    public ChunkerServiceImpl() {
+        this.appProperties = new fit.iuh.config.AppProperties();
+    }
+
+    public ChunkerServiceImpl(fit.iuh.config.AppProperties appProperties) {
+        this.appProperties = appProperties;
+    }
+
     private static final Map<String, List<String>> ONTOLOGY = Map.ofEntries(
             Map.entry("frontend", List.of(
                     "Next.js", "React", "Vue", "Nuxt", "Angular", "Svelte", "SvelteKit", "Remix", "Astro", "SolidJS",
@@ -298,6 +308,9 @@ public class ChunkerServiceImpl implements ChunkerService {
                 .map(b -> new MergedBullet(b, new ArrayList<>()))
                 .collect(Collectors.toList());
 
+        double threshold = (appProperties != null && appProperties.getChunking() != null && appProperties.getChunking().getBulletMergeThreshold() > 0.0)
+                ? appProperties.getChunking().getBulletMergeThreshold() : 0.15;
+
         for (String fb : featureBullets) {
             int bestIdx = -1;
             double bestScore = 0.0;
@@ -308,7 +321,7 @@ public class ChunkerServiceImpl implements ChunkerService {
                     bestIdx = i;
                 }
             }
-            if (bestIdx >= 0 && bestScore >= 0.15) {
+            if (bestIdx >= 0 && bestScore >= threshold) {
                 merged.get(bestIdx).alts.add(fb);
             } else {
                 merged.add(new MergedBullet(fb, new ArrayList<>()));

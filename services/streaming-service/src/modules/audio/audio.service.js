@@ -8,7 +8,7 @@
 const WHISPER_API_URL =
   process.env.WHISPER_API_URL ||
   'https://api.openai.com/v1/audio/transcriptions';
-const WHISPER_API_KEY = process.env.WHISPER_API_KEY;
+const WHISPER_API_KEY = process.env.WHISPER_API_KEY || process.env.GROQ_API_KEY || process.env.LLM_API_KEY;
 
 /**
  * Transcribes an audio file buffer by forwarding it to the Whisper API.

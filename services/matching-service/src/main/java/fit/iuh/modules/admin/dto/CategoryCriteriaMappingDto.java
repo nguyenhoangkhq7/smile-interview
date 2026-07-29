@@ -7,5 +7,6 @@ public record CategoryCriteriaMappingDto(
         @NotNull(message = "category_id is required") @JsonProperty("category_id") Long categoryId,
         @NotNull(message = "criteria_id is required") @JsonProperty("criteria_id") Long criteriaId,
         @JsonProperty("level") String level,
-        @NotNull(message = "weight_percentage is required") @JsonProperty("weight_percentage") Double weightPercentage
+        @NotNull(message = "weight_percentage is required") @JsonProperty("weight_percentage") Double weightPercentage,
+        @JsonProperty("level_prompt_instruction") String levelPromptInstruction
 ) {}

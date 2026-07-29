@@ -3,6 +3,7 @@ package fit.iuh.modules.assessment.controller;
 import fit.iuh.modules.assessment.dto.AssessmentResponse;
 import fit.iuh.modules.assessment.dto.InterviewEvaluationRequest;
 import fit.iuh.modules.assessment.service.AssessmentService;
+import fit.iuh.modules.assessment.service.InterviewEvaluationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -16,7 +17,7 @@ import org.springframework.web.bind.annotation.*;
 public class AssessmentController {
 
     private final AssessmentService assessmentService;
-    private final fit.iuh.modules.assessment.service.InterviewEvaluationService interviewEvaluationService;
+    private final InterviewEvaluationService interviewEvaluationService;
 
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<AssessmentResponse> assessResume(
