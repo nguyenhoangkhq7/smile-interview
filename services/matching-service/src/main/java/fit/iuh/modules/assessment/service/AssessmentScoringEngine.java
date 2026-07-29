@@ -1,13 +1,14 @@
-package fit.iuh.modules.assessment.service.impl;
+package fit.iuh.modules.assessment.service;
 
 import fit.iuh.modules.admin.repository.SystemSettingRepository;
 import fit.iuh.modules.assessment.dto.AssessmentResponse;
 import fit.iuh.modules.assessment.dto.AssessmentResponseDto;
 import fit.iuh.modules.assessment.entity.SeniorityLevel;
-import fit.iuh.modules.assessment.service.ScoringService;
+import fit.iuh.modules.ontology.dto.GraphMatchResult;
+import fit.iuh.modules.ontology.service.SkillKnowledgeGraphService;
 import fit.iuh.modules.rulengine.repository.JobCriteriaRepository.CriteriaWeightProjection;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -15,18 +16,35 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * High-cohesion service responsible for score calculation, weight breakdowns,
+ * seniority-level adjustments, and Ontology graph matching score boosts.
+ */
 @Slf4j
 @Service
-@RequiredArgsConstructor
-public class ScoringServiceImpl implements ScoringService {
+public class AssessmentScoringEngine {
 
     private static final double DEFAULT_WEAK_COEFF = 0.3;
     private static final double POINTS_MATCHED = 1.0;
     private static final double POINTS_MISSING = 0.0;
 
     private final SystemSettingRepository systemSettingRepository;
+    private final SkillKnowledgeGraphService skillKnowledgeGraphService;
 
-    @Override
+    public record ScoringResult(
+            int overallScore,
+            AssessmentResponse.ScoreBreakdown breakdown,
+            List<AssessmentResponseDto.EvidenceItem> updatedItems
+    ) {}
+
+    @Autowired
+    public AssessmentScoringEngine(
+            SystemSettingRepository systemSettingRepository,
+            @Autowired(required = false) SkillKnowledgeGraphService skillKnowledgeGraphService) {
+        this.systemSettingRepository = systemSettingRepository;
+        this.skillKnowledgeGraphService = skillKnowledgeGraphService;
+    }
+
     public ScoringResult calculateWithBreakdown(
             List<AssessmentResponseDto.EvidenceItem> evidenceItems,
             List<AssessmentResponseDto.AdHocEvidenceItem> adHocItems,
@@ -35,14 +53,14 @@ public class ScoringServiceImpl implements ScoringService {
 
         double pointsWeak;
         if (seniorityLevel == SeniorityLevel.INTERN || seniorityLevel == SeniorityLevel.FRESHER) {
-            pointsWeak = systemSettingRepository.getDouble("WEAK_COEFF_INTERN_FRESHER", 0.5);
-            log.info("[Scoring] Intern/Fresher seniority level detected. pointsWeak={}", pointsWeak);
+            pointsWeak = getSettingDouble("WEAK_COEFF_INTERN_FRESHER", 0.5);
+            log.info("[AssessmentScoringEngine] Intern/Fresher seniority level. pointsWeak={}", pointsWeak);
         } else if (seniorityLevel == SeniorityLevel.SENIOR || seniorityLevel == SeniorityLevel.LEAD) {
-            pointsWeak = systemSettingRepository.getDouble("WEAK_COEFF_SENIOR_LEAD", 0.1);
-            log.info("[Scoring] Senior/Lead seniority level detected. pointsWeak={}", pointsWeak);
+            pointsWeak = getSettingDouble("WEAK_COEFF_SENIOR_LEAD", 0.1);
+            log.info("[AssessmentScoringEngine] Senior/Lead seniority level. pointsWeak={}", pointsWeak);
         } else {
-            pointsWeak = systemSettingRepository.getDouble("STATUS_WEAK_COEFF", DEFAULT_WEAK_COEFF);
-            log.info("[Scoring] Standard seniority level detected. pointsWeak={}", pointsWeak);
+            pointsWeak = getSettingDouble("STATUS_WEAK_COEFF", DEFAULT_WEAK_COEFF);
+            log.info("[AssessmentScoringEngine] Standard seniority level. pointsWeak={}", pointsWeak);
         }
 
         double mustHaveWeightedSum = 0.0;
@@ -63,8 +81,6 @@ public class ScoringServiceImpl implements ScoringService {
                             (existing, replacement) -> existing
                     ));
 
-            // Pre-compute average weights so JD-extra criteria (criteria_id=null) can
-            // receive a fair contribution instead of being silently skipped.
             double avgDbWeight = weightMap.values().stream()
                     .mapToDouble(Double::doubleValue)
                     .average()
@@ -72,7 +88,6 @@ public class ScoringServiceImpl implements ScoringService {
 
             for (AssessmentResponseDto.EvidenceItem item : evidenceItems) {
                 Long id = item.criteriaId();
-
                 boolean isNotApp = "not_applicable".equalsIgnoreCase(item.status()) || "NOT_APPLICABLE".equalsIgnoreCase(item.importance());
 
                 double weight;
@@ -81,30 +96,39 @@ public class ScoringServiceImpl implements ScoringService {
                 } else if (id != null && weightMap.containsKey(id)) {
                     weight = weightMap.get(id);
                 } else {
-                    // JD extra criteria or criteria not in weight map:
-                    // use the average DB weight so they contribute proportionally.
                     weight = avgDbWeight;
-                    log.debug("[Scoring] criteria='{}' (id={}) not in weightMap — using avgDbWeight={}",
-                            item.criteriaName(), id, avgDbWeight);
                 }
 
                 double points = isNotApp ? 0.0 : statusToPoints(item.status(), pointsWeak);
+
+                // Ontology Graph Matching Enhancement
+                GraphMatchResult graphResult = null;
+                if (!isNotApp && skillKnowledgeGraphService != null) {
+                    graphResult = skillKnowledgeGraphService.matchSkills(item.criteriaName(), item.cvEvidence());
+                    if (graphResult != null && graphResult.similarityScore() > points) {
+                        log.info("[OntologyBoost] criteria='{}' score boosted from {} to {} via graph: {}",
+                                item.criteriaName(), String.format("%.2f", points),
+                                String.format("%.2f", graphResult.similarityScore()), graphResult.relationPath());
+                        points = graphResult.similarityScore();
+                    }
+                }
+
                 double scoreContribution = isNotApp ? 0.0 : weight * points;
+                String finalReasoning = item.reasoning();
+                if (graphResult != null && graphResult.similarityScore() > 0.0 && graphResult.relationPath() != null) {
+                    finalReasoning = (finalReasoning != null ? finalReasoning + " | " : "") + "[Ontology: " + graphResult.relationPath() + "]";
+                }
 
                 if (isNotApp) {
-                    log.debug("[Scoring] JD-Driven logic: criteria='{}' is NOT_APPLICABLE. Weight and contribution set to 0.0.", item.criteriaName());
+                    log.debug("[ScoringEngine] NOT_APPLICABLE criteria='{}'", item.criteriaName());
                 } else if ("PREFERRED".equalsIgnoreCase(item.importance())) {
                     preferToHaveWeightedSum += scoreContribution;
                     preferToHaveWeightSum += weight;
                     preferToHaveCount++;
-                    log.debug("[Scoring PREFERRED] criteria='{}' weight={} status='{}' points={} contribution={}",
-                            item.criteriaName(), weight, item.status(), points, scoreContribution);
                 } else {
                     mustHaveWeightedSum += scoreContribution;
                     mustHaveWeightSum += weight;
                     mustHaveCount++;
-                    log.debug("[Scoring REQUIRED] criteria='{}' weight={} status='{}' points={} contribution={}",
-                            item.criteriaName(), weight, item.status(), points, scoreContribution);
                 }
 
                 AssessmentResponseDto.EvidenceItem updated = new AssessmentResponseDto.EvidenceItem(
@@ -114,7 +138,7 @@ public class ScoringServiceImpl implements ScoringService {
                         item.jdRequirement(),
                         item.cvEvidence(),
                         item.status(),
-                        item.reasoning(),
+                        finalReasoning,
                         weight,
                         scoreContribution,
                         item.groundingScore(),
@@ -141,8 +165,6 @@ public class ScoringServiceImpl implements ScoringService {
                     preferToHaveWeightedSum += contribution;
                     preferToHaveWeightSum += avgWeight;
                     preferToHaveCount++;
-                    log.debug("[Scoring AdHoc PREFERRED] criteria='{}' weight={} status='{}' points={}",
-                            adHoc.criteriaName(), avgWeight, adHoc.status(), points);
                 } else {
                     double avgWeight = (mustHaveWeightSum > 0 && mustHaveCount > 0)
                             ? (mustHaveWeightSum / mustHaveCount) : 10.0;
@@ -150,14 +172,12 @@ public class ScoringServiceImpl implements ScoringService {
                     mustHaveWeightedSum += contribution;
                     mustHaveWeightSum += avgWeight;
                     mustHaveCount++;
-                    log.debug("[Scoring AdHoc REQUIRED] criteria='{}' weight={} status='{}' points={}",
-                            adHoc.criteriaName(), avgWeight, adHoc.status(), points);
                 }
             }
         }
 
-        double mustHaveWeightRatio = systemSettingRepository.getDouble("MUST_HAVE_WEIGHT_RATIO", 0.8);
-        double preferToHaveWeightRatio = systemSettingRepository.getDouble("PREFER_TO_HAVE_WEIGHT_RATIO", 0.2);
+        double mustHaveWeightRatio = getSettingDouble("MUST_HAVE_WEIGHT_RATIO", 0.8);
+        double preferToHaveWeightRatio = getSettingDouble("PREFER_TO_HAVE_WEIGHT_RATIO", 0.2);
 
         double rawMustHaveScore = mustHaveWeightSum > 0.0 ? (mustHaveWeightedSum / mustHaveWeightSum) * 100.0 : 0.0;
         double rawPreferToHaveScore = preferToHaveWeightSum > 0.0 ? (preferToHaveWeightedSum / preferToHaveWeightSum) * 100.0 : rawMustHaveScore;
@@ -165,8 +185,8 @@ public class ScoringServiceImpl implements ScoringService {
         double finalScoreDouble = (rawMustHaveScore * mustHaveWeightRatio) + (rawPreferToHaveScore * preferToHaveWeightRatio);
         int finalScore = (int) Math.round(finalScoreDouble);
 
-        log.info("[Scoring] Calculation complete: rawMustHave={}/100 (weight={}), rawPreferToHave={}/100 (weight={}) -> overall_match_score={}",
-                Math.round(rawMustHaveScore), mustHaveWeightRatio, Math.round(rawPreferToHaveScore), preferToHaveWeightRatio, finalScore);
+        log.info("[ScoringEngine] Overall match score: {} (MustHave={}, PreferToHave={})",
+                finalScore, Math.round(rawMustHaveScore), Math.round(rawPreferToHaveScore));
 
         AssessmentResponse.ScoreBreakdown breakdown = new AssessmentResponse.ScoreBreakdown(
                 (int) Math.round(rawMustHaveScore),
@@ -186,10 +206,11 @@ public class ScoringServiceImpl implements ScoringService {
             case "weak" -> pointsWeak;
             case "missing" -> POINTS_MISSING;
             case "not_applicable" -> 0.0;
-            default -> {
-                log.warn("[Scoring] Unknown status '{}' — treating as missing.", status);
-                yield POINTS_MISSING;
-            }
+            default -> POINTS_MISSING;
         };
+    }
+
+    private double getSettingDouble(String key, double defaultValue) {
+        return systemSettingRepository != null ? systemSettingRepository.getDouble(key, defaultValue) : defaultValue;
     }
 }

@@ -1,7 +1,6 @@
 package fit.iuh.modules.assessment;
 
 import fit.iuh.modules.assessment.service.AssessmentService;
-import fit.iuh.modules.assessment.service.EvidenceGroundingValidator;
 import fit.iuh.modules.assessment.service.impl.AssessmentServiceImpl;
 import fit.iuh.modules.rulengine.repository.JobCriteriaRepository.CriteriaWeightProjection;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,12 +34,16 @@ class BatchAndSelfConsistencyTest {
         public String getPromptInstruction() { return promptInstruction; }
         @Override
         public Double getWeightPercentage() { return weightPercentage; }
+        @Override
+        public String getEmbedding() { return null; }
+        @Override
+        public String getLevelPromptInstruction() { return null; }
     }
 
     @BeforeEach
     void setUp() {
         assessmentService = new AssessmentServiceImpl(
-                null, null, null, null, null, null, null, null, null, null, null, new EvidenceGroundingValidator(), null
+                null, null, null, null, null, null, null, new fit.iuh.config.AppProperties()
         );
     }
 

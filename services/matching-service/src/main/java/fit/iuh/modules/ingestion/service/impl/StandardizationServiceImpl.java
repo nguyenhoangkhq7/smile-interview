@@ -42,18 +42,22 @@ public class StandardizationServiceImpl implements StandardizationService {
     }
 
     private String callLlmApi(String systemPrompt, String userContent, String documentLabel) {
+        var taskConfig = appProperties.getLlm().getTasks().getStandardization();
+        String model = appProperties.getLlm().resolveModel(taskConfig);
+        int maxTokens = appProperties.getLlm().resolveMaxTokens(taskConfig);
+        double temperature = appProperties.getLlm().resolveTemperature(taskConfig);
+        long timeoutSeconds = appProperties.getLlm().resolveTimeoutSeconds(taskConfig);
+
         LlmChatRequest request = LlmChatRequest.builder()
-                .model(appProperties.getLlm().getModel())
-                .maxTokens(appProperties.getLlm().getMaxTokens())
-                .temperature(0.1)
+                .model(model)
+                .maxTokens(maxTokens)
+                .temperature(temperature)
                 .stream(false)
                 .messages(List.of(
                         LlmChatRequest.Message.system(systemPrompt),
                         LlmChatRequest.Message.user(userContent)
                 ))
                 .build();
-
-        long timeoutSeconds = appProperties.getLlm().getTimeoutSeconds();
 
         try {
             LlmChatResponse response = llmWebClient.post()

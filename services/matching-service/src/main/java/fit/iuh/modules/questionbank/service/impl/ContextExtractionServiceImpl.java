@@ -46,8 +46,9 @@ public class ContextExtractionServiceImpl implements ContextExtractionService {
 
         String userPrompt = QuestionBankPrompts.buildContextExtractionUserPrompt(cvMarkdown, jdMarkdown, assessmentJson);
 
+        String model = props.getLlm().resolveModel(props.getLlm().getModels().getQuestionGeneration());
         LlmChatRequest request = LlmChatRequest.builder()
-                .model(props.getLlm().getModel())
+                .model(model)
                 .maxTokens(props.getLlm().getMaxTokens())
                 .temperature(0.1)
                 .stream(false)

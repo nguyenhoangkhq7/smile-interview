@@ -51,10 +51,15 @@ public class InterviewEvaluationServiceImpl implements InterviewEvaluationServic
             userPrompt.append("Điểm sơ bộ: ").append(t.score() != null ? t.score() : 0).append("/10\n\n");
         }
 
+        var taskConfig = appProperties.getLlm().getTasks().getInterviewEvaluation();
+        String model = appProperties.getLlm().resolveModel(taskConfig);
+        int maxTokens = appProperties.getLlm().resolveMaxTokens(taskConfig);
+        double temperature = appProperties.getLlm().resolveTemperature(taskConfig);
+
         LlmChatRequest llmRequest = LlmChatRequest.builder()
-                .model(appProperties.getLlm().getModel())
-                .maxTokens(appProperties.getLlm().getMaxTokens())
-                .temperature(0.3)
+                .model(model)
+                .maxTokens(maxTokens)
+                .temperature(temperature)
                 .stream(false)
                 .responseFormat(JSON_RESPONSE_FORMAT)
                 .messages(List.of(

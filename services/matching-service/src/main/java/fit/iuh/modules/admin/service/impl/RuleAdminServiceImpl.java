@@ -6,6 +6,7 @@ import fit.iuh.modules.admin.entity.SystemSetting;
 import fit.iuh.modules.admin.repository.LevelDistributionRuleRepository;
 import fit.iuh.modules.admin.repository.SystemSettingRepository;
 import fit.iuh.modules.admin.service.RuleAdminService;
+import fit.iuh.modules.assessment.service.CriteriaEmbeddingInitializer;
 import fit.iuh.modules.rulengine.entity.CategoryCriteriaMapping;
 import fit.iuh.modules.rulengine.entity.EvaluationCriteria;
 import fit.iuh.modules.rulengine.entity.JobCategoryEntity;
@@ -14,6 +15,7 @@ import fit.iuh.modules.rulengine.repository.EvaluationCriteriaRepository;
 import fit.iuh.modules.rulengine.repository.JobCategoryEntityRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,7 +24,6 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class RuleAdminServiceImpl implements RuleAdminService {
 
     private final JobCategoryEntityRepository jobCategoryRepository;
@@ -30,6 +31,23 @@ public class RuleAdminServiceImpl implements RuleAdminService {
     private final CategoryCriteriaMappingRepository mappingRepository;
     private final LevelDistributionRuleRepository levelRuleRepository;
     private final SystemSettingRepository settingRepository;
+    private final CriteriaEmbeddingInitializer criteriaEmbeddingInitializer;
+
+    @Autowired
+    public RuleAdminServiceImpl(
+            JobCategoryEntityRepository jobCategoryRepository,
+            EvaluationCriteriaRepository criteriaRepository,
+            CategoryCriteriaMappingRepository mappingRepository,
+            LevelDistributionRuleRepository levelRuleRepository,
+            SystemSettingRepository settingRepository,
+            @Autowired(required = false) CriteriaEmbeddingInitializer criteriaEmbeddingInitializer) {
+        this.jobCategoryRepository = jobCategoryRepository;
+        this.criteriaRepository = criteriaRepository;
+        this.mappingRepository = mappingRepository;
+        this.levelRuleRepository = levelRuleRepository;
+        this.settingRepository = settingRepository;
+        this.criteriaEmbeddingInitializer = criteriaEmbeddingInitializer;
+    }
 
     @Override
     @Transactional(readOnly = true)
@@ -114,6 +132,12 @@ public class RuleAdminServiceImpl implements RuleAdminService {
 
         EvaluationCriteria saved = criteriaRepository.save(entity);
         log.info("[AdminService] Created EvaluationCriteria id={}, name={}", saved.getId(), saved.getName());
+
+        // Asynchronously compute and persist embedding for the new criteria
+        if (criteriaEmbeddingInitializer != null) {
+            criteriaEmbeddingInitializer.computeAndPersistEmbedding(saved);
+        }
+
         return toCriteriaDto(saved);
     }
 
@@ -128,8 +152,17 @@ public class RuleAdminServiceImpl implements RuleAdminService {
         entity.setQuestionType(dto.questionType() != null ? dto.questionType().strip() : entity.getQuestionType());
         entity.setPromptInstruction(dto.promptInstruction() != null ? dto.promptInstruction().strip() : entity.getPromptInstruction());
 
+        // Nullify existing embedding so computeAndPersistEmbedding will recompute it
+        entity.setEmbedding(null);
+
         EvaluationCriteria updated = criteriaRepository.save(entity);
         log.info("[AdminService] Updated EvaluationCriteria id={}", updated.getId());
+
+        // Recompute embedding for updated text
+        if (criteriaEmbeddingInitializer != null) {
+            criteriaEmbeddingInitializer.computeAndPersistEmbedding(updated);
+        }
+
         return toCriteriaDto(updated);
     }
 
@@ -168,6 +201,7 @@ public class RuleAdminServiceImpl implements RuleAdminService {
                 .evaluationCriteria(criteria)
                 .level(level)
                 .weightPercentage(dto.weightPercentage())
+                .levelPromptInstruction(dto.levelPromptInstruction())
                 .build();
 
         CategoryCriteriaMapping saved = mappingRepository.save(entity);
@@ -185,6 +219,9 @@ public class RuleAdminServiceImpl implements RuleAdminService {
                         String.format("Mapping not found for categoryId=%d, criteriaId=%d, level=%s", categoryId, criteriaId, level)));
 
         entity.setWeightPercentage(dto.weightPercentage());
+        if (dto.levelPromptInstruction() != null) {
+            entity.setLevelPromptInstruction(dto.levelPromptInstruction());
+        }
         CategoryCriteriaMapping updated = mappingRepository.save(entity);
         log.info("[AdminService] Updated Mapping weight to {} for categoryId={}, criteriaId={}, level={}",
                 updated.getWeightPercentage(), categoryId, criteriaId, level);
@@ -266,7 +303,8 @@ public class RuleAdminServiceImpl implements RuleAdminService {
                 e.getJobCategory().getId(),
                 e.getEvaluationCriteria().getId(),
                 e.getLevel(),
-                e.getWeightPercentage()
+                e.getWeightPercentage(),
+                e.getLevelPromptInstruction()
         );
     }
 

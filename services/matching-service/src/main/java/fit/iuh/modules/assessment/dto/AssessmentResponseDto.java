@@ -18,15 +18,6 @@ public record AssessmentResponseDto(
         List<AdHocEvidenceItem> preferToHaveEvidenceItems
 ) {
 
-    public List<EvidenceItem> evidenceItems() {
-        return mustHaveEvidenceItems;
-    }
-
-    public List<AdHocEvidenceItem> additionalEvidenceItems() {
-        return preferToHaveEvidenceItems;
-    }
-
-
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record EvidenceItem(
             @JsonProperty("criteria_id")
@@ -71,6 +62,9 @@ public record AssessmentResponseDto(
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record AdHocEvidenceItem(
+            @JsonProperty("criteria_id")
+            Long criteriaId,
+
             @JsonProperty("criteria_name")
             String criteriaName,
 

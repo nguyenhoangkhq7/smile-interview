@@ -29,9 +29,29 @@ public final class TextSanitizationUtil {
         if (rawResponse == null || rawResponse.isBlank()) {
             return "";
         }
-        return rawResponse
+        String cleaned = rawResponse
                 .replaceAll("(?s)^```(?:json)?\\s*", "")
                 .replaceAll("(?s)\\s*```$", "")
                 .strip();
+
+        int firstBrace = cleaned.indexOf('{');
+        int firstBracket = cleaned.indexOf('[');
+        int start = -1;
+        if (firstBrace != -1 && firstBracket != -1) {
+            start = Math.min(firstBrace, firstBracket);
+        } else if (firstBrace != -1) {
+            start = firstBrace;
+        } else if (firstBracket != -1) {
+            start = firstBracket;
+        }
+
+        int lastBrace = cleaned.lastIndexOf('}');
+        int lastBracket = cleaned.lastIndexOf(']');
+        int end = Math.max(lastBrace, lastBracket);
+
+        if (start != -1 && end != -1 && end > start) {
+            return cleaned.substring(start, end + 1).strip();
+        }
+        return cleaned;
     }
 }

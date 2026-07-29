@@ -31,17 +31,15 @@ public class QuestionGenerationServiceImpl implements QuestionGenerationService 
     private final WebClient llmWebClient;
     private final AppProperties props;
     private final ObjectMapper objectMapper;
-    private final fit.iuh.modules.chunking.service.RetrievalService retrievalService;
+
 
     public QuestionGenerationServiceImpl(
             @Qualifier("llmWebClient") WebClient llmWebClient,
             AppProperties props,
-            ObjectMapper objectMapper,
-            fit.iuh.modules.chunking.service.RetrievalService retrievalService) {
+            ObjectMapper objectMapper) {
         this.llmWebClient = llmWebClient;
         this.props = props;
         this.objectMapper = objectMapper;
-        this.retrievalService = retrievalService;
     }
 
     @Override
@@ -95,13 +93,21 @@ public class QuestionGenerationServiceImpl implements QuestionGenerationService 
         int attempts = 0;
         int maxAttempts = props.getQuestionBank().getMaxRetries() + 1;
 
+        var taskConfig = props.getLlm().getTasks().getQuestionGeneration();
+        String model = props.getLlm().resolveModel(taskConfig);
+        int maxTokens = taskConfig != null && taskConfig.getMaxTokens() != null && taskConfig.getMaxTokens() > 0
+                ? taskConfig.getMaxTokens() : props.getQuestionBank().getMaxTokens();
+        double temperature = taskConfig != null && taskConfig.getTemperature() != null && taskConfig.getTemperature() >= 0.0
+                ? taskConfig.getTemperature() : props.getQuestionBank().getTemperature();
+        Duration timeout = Duration.ofSeconds(props.getLlm().resolveTimeoutSeconds(taskConfig));
+
         while (attempts < maxAttempts) {
             attempts++;
             try {
                 LlmChatRequest request = LlmChatRequest.builder()
-                        .model(props.getLlm().getModel())
-                        .maxTokens(props.getQuestionBank().getMaxTokens())
-                        .temperature(props.getQuestionBank().getTemperature())
+                        .model(model)
+                        .maxTokens(maxTokens)
+                        .temperature(temperature)
                         .stream(false)
                         .responseFormat(JSON_RESPONSE_FORMAT)
                         .messages(List.of(
@@ -109,8 +115,6 @@ public class QuestionGenerationServiceImpl implements QuestionGenerationService 
                                 LlmChatRequest.Message.user(userPrompt)
                         ))
                         .build();
-
-                Duration timeout = Duration.ofSeconds(props.getLlm().getTimeoutSeconds());
 
                 LlmChatResponse response = llmWebClient.post()
                         .uri(props.getLlm().getChatPath())
@@ -229,10 +233,18 @@ public class QuestionGenerationServiceImpl implements QuestionGenerationService 
                 Do not generate any questions on the existing topics listed above.
                 """.formatted(evidenceItemsText, existingTopics, type, difficulty);
 
+        var taskConfig = props.getLlm().getTasks().getQuestionGeneration();
+        String model = props.getLlm().resolveModel(taskConfig);
+        int maxTokens = taskConfig != null && taskConfig.getMaxTokens() != null && taskConfig.getMaxTokens() > 0
+                ? taskConfig.getMaxTokens() : props.getQuestionBank().getMaxTokens();
+        double temperature = (taskConfig != null && taskConfig.getTemperature() != null && taskConfig.getTemperature() >= 0.0
+                ? taskConfig.getTemperature() : props.getQuestionBank().getTemperature()) + 0.1;
+        Duration timeout = Duration.ofSeconds(props.getLlm().resolveTimeoutSeconds(taskConfig));
+
         LlmChatRequest request = LlmChatRequest.builder()
-                .model(props.getLlm().getModel())
-                .maxTokens(props.getQuestionBank().getMaxTokens())
-                .temperature(props.getQuestionBank().getTemperature() + 0.1)
+                .model(model)
+                .maxTokens(maxTokens)
+                .temperature(temperature)
                 .stream(false)
                 .responseFormat(JSON_RESPONSE_FORMAT)
                 .messages(List.of(
@@ -240,8 +252,6 @@ public class QuestionGenerationServiceImpl implements QuestionGenerationService 
                         LlmChatRequest.Message.user(userPrompt)
                 ))
                 .build();
-
-        Duration timeout = Duration.ofSeconds(props.getLlm().getTimeoutSeconds());
 
         int attempts = 0;
         int maxAttempts = 3;
