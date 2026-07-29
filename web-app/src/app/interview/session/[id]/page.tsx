@@ -15,6 +15,8 @@ import { CameraOff, Info, Timer, Radio, Volume2, Circle } from 'lucide-react';
 
 export default function InterviewSessionPage() {
   const {
+    id,
+    session,
     sessionState,
     chatLog,
     socketConnected,
@@ -98,6 +100,8 @@ export default function InterviewSessionPage() {
           setShowInfoBanner={setShowInfoBanner}
           handleDownloadVideo={handleDownloadVideo}
           handleGoToResults={handleGoToResults}
+          questions={session?.questions}
+          sessionId={id}
         />
       </ProtectedRoute>
     );
@@ -106,7 +110,7 @@ export default function InterviewSessionPage() {
   return (
     <ProtectedRoute>
       <div className="flex flex-col h-screen bg-slate-50 overflow-hidden font-sans">
-        {}
+        
         <header className="border-b border-border bg-card px-6 py-3 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-4">
             <Link href="/history">

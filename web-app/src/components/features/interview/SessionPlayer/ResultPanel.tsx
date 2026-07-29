@@ -1,8 +1,9 @@
 'use client';
 
-import { CheckCircle, Download, Info, X, ArrowRight } from 'lucide-react';
+import { CheckCircle, Download, Info, X, ArrowRight, FileSpreadsheet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
+import { exportQuestionBankToCSV } from '@/lib/exportUtils';
 
 interface ResultPanelProps {
   recordedBlob: Blob | null;
@@ -10,6 +11,8 @@ interface ResultPanelProps {
   setShowInfoBanner: (v: boolean) => void;
   handleDownloadVideo: () => void;
   handleGoToResults: () => void;
+  questions?: any[];
+  sessionId?: string;
 }
 
 export function ResultPanel({
@@ -18,6 +21,8 @@ export function ResultPanel({
   setShowInfoBanner,
   handleDownloadVideo,
   handleGoToResults,
+  questions,
+  sessionId,
 }: ResultPanelProps) {
   return (
     <div className="min-h-screen w-screen bg-background text-foreground flex flex-col font-sans animate-fade-up">
@@ -64,6 +69,17 @@ export function ResultPanel({
                   </div>
                 )}
               </div>
+            )}
+
+            {questions && questions.length > 0 && (
+              <Button
+                onClick={() => exportQuestionBankToCSV(questions, sessionId || '')}
+                variant="outline"
+                className="w-full border-emerald-600/30 text-emerald-700 hover:bg-emerald-50 font-bold h-11 rounded-xl shadow-sm flex items-center justify-center gap-2"
+              >
+                <FileSpreadsheet size={16} />
+                <span>📥 Xuất danh sách câu hỏi (CSV)</span>
+              </Button>
             )}
 
             <Button onClick={handleGoToResults} className="w-full bg-brand-orange hover:bg-brand-orange-hover text-white font-extrabold h-11 rounded-xl shadow-lg shadow-brand-orange/20 flex items-center justify-center gap-1.5 border-none">
