@@ -2,6 +2,7 @@ package fit.iuh.modules.questionbank.service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fit.iuh.exception.QuestionBankException;
+import fit.iuh.exception.ResourceNotFoundException;
 import fit.iuh.modules.assessment.dto.AssessmentResponseDto;
 import fit.iuh.modules.assessment.entity.ResumeAssessment;
 import fit.iuh.modules.assessment.entity.SeniorityLevel;
@@ -313,6 +314,18 @@ public class QuestionBankServiceImpl implements QuestionBankService {
             responses.add(toResponseDto(qb));
         }
         return responses;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public QuestionBankResponseDto getQuestionBankBySessionId(String sessionId) {
+        log.info("[QuestionBank] Retrieving latest question bank for sessionId: {}", sessionId);
+        return questionBankRepo.findBySessionIdOrderByCreatedAtDesc(sessionId)
+                .stream()
+                .findFirst()
+                .map(this::toResponseDto)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "QuestionBank", "sessionId", sessionId));
     }
 
     @Override

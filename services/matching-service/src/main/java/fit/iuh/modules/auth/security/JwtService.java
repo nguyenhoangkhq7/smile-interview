@@ -52,7 +52,7 @@ public class JwtService {
         extraClaims.put("id",       user.getId().toString());
         extraClaims.put("email",    user.getEmail());
         extraClaims.put("username", user.getDisplayUsername());
-        extraClaims.put("role",     user.getRole());
+        extraClaims.put("role",     user.getRole() != null ? user.getRole().name() : "USER");
 
         return buildToken(extraClaims, user.getEmail());
     }

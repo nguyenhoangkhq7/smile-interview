@@ -23,6 +23,10 @@ export interface SessionHistoryItem {
   roleTitle: string;
   cvFilename: string;
   jdFilename: string;
+  cvFileUrl?: string;
+  jdFileUrl?: string;
+  cvExtractedText?: string;
+  jdExtractedText?: string;
   overallScore?: number;
   status: 'Completed' | 'In progress' | 'Not started';
   questions: QuestionFeedback[];
