@@ -1,11 +1,13 @@
 package fit.iuh.modules.assessment.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import fit.iuh.modules.assessment.entity.Eligibility;
+import fit.iuh.modules.assessment.entity.EligibilityStatus;
 import fit.iuh.modules.assessment.entity.JobCategory;
 import fit.iuh.modules.assessment.entity.SeniorityLevel;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -13,6 +15,8 @@ import java.util.UUID;
 
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class AssessmentResponse {
 
     @JsonProperty("id")
@@ -31,7 +35,10 @@ public class AssessmentResponse {
     private Integer overallMatchScore;
 
     @JsonProperty("eligibility")
-    private Eligibility eligibility;
+    private EligibilityStatus eligibility;
+
+    @JsonProperty("gate_evidence_items")
+    private List<AssessmentResponseDto.EvidenceItem> gateEvidenceItems;
 
     @JsonProperty("must_have_evidence_items")
     private List<AssessmentResponseDto.EvidenceItem> mustHaveEvidenceItems;

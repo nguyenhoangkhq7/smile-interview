@@ -39,6 +39,12 @@ export async function POST(
     const resumeIdStr = formData.get('resumeId') as string | null;
     const jdIdStr = formData.get('jdId') as string | null;
 
+    if (jdText && jdText.trim().startsWith('%PDF-')) {
+      return NextResponse.json({ 
+        error: 'Nội dung mô tả công việc (JD Text) không hợp lệ vì chứa mã nguồn của file PDF. Vui lòng chuyển sang tab "Tải tệp JD" để upload file PDF thay vì dán nội dung.' 
+      }, { status: 400 });
+    }
+
     let finalResumeId: number | null = resumeIdStr ? parseInt(resumeIdStr, 10) : null;
     let finalJdId: number | null = jdIdStr ? parseInt(jdIdStr, 10) : null;
 
@@ -256,13 +262,17 @@ export async function POST(
       const backendUrl = process.env.MATCHING_SERVICE_URL || 'http://localhost:8081';
       const backendFormData = new FormData();
 
-      if (cvFileToSend) {
+      if (cvFile) {
+        backendFormData.append('cvFile', cvFile);
+      } else if (cvFileToSend) {
         backendFormData.append('cvFile', cvFileToSend, cvFileName || 'cv.pdf');
       }
       if (cvMarkdownToSend) {
         backendFormData.append('resumeMarkdown', cvMarkdownToSend);
       }
-      if (jdFileToSend && jdFileName) {
+      if (jdFile) {
+        backendFormData.append('jdFile', jdFile);
+      } else if (jdFileToSend && jdFileName) {
         backendFormData.append('jdFile', jdFileToSend, jdFileName);
       } else if (jdMarkdownToSend) {
         backendFormData.append('jdMarkdown', jdMarkdownToSend);

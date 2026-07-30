@@ -38,7 +38,7 @@ public class AssessmentLlmRunner {
 
     private static final Map<String, String> JSON_RESPONSE_FORMAT = Map.of("type", "json_object");
 
-    private static final int DEFAULT_BATCH_SIZE = 5;
+    private static final int DEFAULT_BATCH_SIZE = 10;
     private static final int DEFAULT_SELF_CONSISTENCY_RUNS = 1;
     private static final double DEFAULT_GROUNDING_THRESHOLD = 0.75;
     private static final int DEFAULT_BATCH_CONCURRENCY = 3;
@@ -104,16 +104,21 @@ public class AssessmentLlmRunner {
         double temperature = appProperties.getLlm().resolveTemperature(taskConfig);
         int timeoutSec = Math.max(180, appProperties.getLlm().resolveTimeoutSeconds(taskConfig));
 
+        List<LlmChatRequest.Message> messagesList = new ArrayList<>();
+        if (systemPrompt != null && !systemPrompt.isBlank()) {
+            messagesList.add(LlmChatRequest.Message.system(systemPrompt));
+        }
+        if (userPrompt != null && !userPrompt.isBlank()) {
+            messagesList.add(LlmChatRequest.Message.user(userPrompt));
+        }
+
         LlmChatRequest request = LlmChatRequest.builder()
                 .model(targetModel)
                 .maxTokens(maxTokens)
                 .temperature(temperature)
                 .stream(false)
                 .responseFormat(JSON_RESPONSE_FORMAT)
-                .messages(List.of(
-                        LlmChatRequest.Message.system(systemPrompt),
-                        LlmChatRequest.Message.user(userPrompt)
-                ))
+                .messages(messagesList)
                 .build();
 
         int maxRetries = appProperties.getLlm().getMaxRetries() > 0
@@ -194,6 +199,7 @@ public class AssessmentLlmRunner {
                             item.importance(),
                             TextSanitizationUtil.sanitizeLanguageText(item.jdRequirement()),
                             TextSanitizationUtil.sanitizeLanguageText(item.cvEvidence()),
+                            TextSanitizationUtil.sanitizeLanguageText(item.cvQuote()),
                             item.status(),
                             TextSanitizationUtil.sanitizeLanguageText(item.reasoning()),
                             item.weightUsed(),
@@ -216,6 +222,7 @@ public class AssessmentLlmRunner {
                             item.importance(),
                             TextSanitizationUtil.sanitizeLanguageText(item.jdRequirement()),
                             TextSanitizationUtil.sanitizeLanguageText(item.cvEvidence()),
+                            TextSanitizationUtil.sanitizeLanguageText(item.cvQuote()),
                             item.status(),
                             TextSanitizationUtil.sanitizeLanguageText(item.reasoning())
                     ))
@@ -346,8 +353,11 @@ public class AssessmentLlmRunner {
 
         StringBuilder sb = new StringBuilder();
         for (CriteriaInstructionItem item : batchItems) {
-            sb.append("- ").append(item.label()).append(" ")
-                    .append(item.name()).append(": ")
+            sb.append("- ").append(item.label());
+            if (item.criteriaId() != null) {
+                sb.append(" [ID: ").append(item.criteriaId()).append("]");
+            }
+            sb.append(" ").append(item.name()).append(": ")
                     .append(item.promptInstruction() != null ? item.promptInstruction() : "")
                     .append("\n");
         }
@@ -377,9 +387,14 @@ public class AssessmentLlmRunner {
         }
 
         Map<Long, String> labelMap = new HashMap<>();
+        Map<String, Long> nameToIdMap = new HashMap<>();
+
         for (CriteriaInstructionItem item : batchItems) {
             if (item.criteriaId() != null) {
                 labelMap.put(item.criteriaId(), item.label());
+                if (item.name() != null && !item.name().isBlank()) {
+                    nameToIdMap.put(item.name().trim().toLowerCase(Locale.ROOT), item.criteriaId());
+                }
             }
         }
 
@@ -389,27 +404,62 @@ public class AssessmentLlmRunner {
         for (AssessmentResponseDto dto : runDtos) {
             if (dto.mustHaveEvidenceItems() != null) {
                 for (AssessmentResponseDto.EvidenceItem item : dto.mustHaveEvidenceItems()) {
-                    if (item.criteriaId() != null) {
-                        groupedById.computeIfAbsent(item.criteriaId(), k -> new ArrayList<>()).add(item);
+                    Long cid = item.criteriaId();
+                    if (cid == null && item.criteriaName() != null) {
+                        cid = nameToIdMap.get(item.criteriaName().trim().toLowerCase(Locale.ROOT));
+                    }
+                    if (cid != null) {
+                        AssessmentResponseDto.EvidenceItem resolved = new AssessmentResponseDto.EvidenceItem(
+                                cid, item.criteriaName(), item.importance(), item.jdRequirement(),
+                                item.cvEvidence(), item.cvQuote(), item.status(), item.reasoning(),
+                                item.weightUsed(), item.scoreContribution(), item.groundingScore(),
+                                item.confidenceVotes(), item.lowConfidence(), item.needsManualReview()
+                        );
+                        groupedById.computeIfAbsent(cid, k -> new ArrayList<>()).add(resolved);
                     }
                 }
             }
             if (dto.preferToHaveEvidenceItems() != null) {
                 for (AssessmentResponseDto.AdHocEvidenceItem item : dto.preferToHaveEvidenceItems()) {
-                    if (item.criteriaId() != null) {
+                    Long cid = item.criteriaId();
+                    if (cid == null && item.criteriaName() != null) {
+                        cid = nameToIdMap.get(item.criteriaName().trim().toLowerCase(Locale.ROOT));
+                    }
+                    if (cid != null) {
                         AssessmentResponseDto.EvidenceItem converted = new AssessmentResponseDto.EvidenceItem(
-                                item.criteriaId(),
+                                cid,
                                 item.criteriaName(),
                                 item.importance() != null ? item.importance() : "PREFERRED",
                                 item.jdRequirement(),
                                 item.cvEvidence(),
+                                item.cvQuote(),
                                 item.status(),
                                 item.reasoning(),
                                 null, null, null, null, null, null
                         );
-                        groupedById.computeIfAbsent(item.criteriaId(), k -> new ArrayList<>()).add(converted);
+                        groupedById.computeIfAbsent(cid, k -> new ArrayList<>()).add(converted);
                     }
                 }
+            }
+        }
+
+        // Fallback for any DB criteria in this batch that LLM missed or returned without matching ID
+        for (CriteriaInstructionItem item : batchItems) {
+            if (item.criteriaId() != null && !groupedById.containsKey(item.criteriaId())) {
+                log.warn("[AssessmentLlmRunner] Fallback: criterion id {} ('{}') was omitted by LLM. Inserting default missing item.",
+                        item.criteriaId(), item.name());
+                AssessmentResponseDto.EvidenceItem fallbackItem = new AssessmentResponseDto.EvidenceItem(
+                        item.criteriaId(),
+                        item.name(),
+                        parseLabelToImportance(item.label()),
+                        item.name(),
+                        null,
+                        null,
+                        "missing",
+                        "Criterion evaluated as missing (not directly addressed in CV)",
+                        null, null, null, null, false, false
+                );
+                groupedById.put(item.criteriaId(), List.of(fallbackItem));
             }
         }
 
@@ -447,6 +497,7 @@ public class AssessmentLlmRunner {
                     importance,
                     sample.jdRequirement(),
                     sample.cvEvidence(),
+                    sample.cvQuote(),
                     winningStatus,
                     sample.reasoning(),
                     sample.weightUsed(),
@@ -468,7 +519,11 @@ public class AssessmentLlmRunner {
             if (dto.preferToHaveEvidenceItems() != null) {
                 for (AssessmentResponseDto.AdHocEvidenceItem item : dto.preferToHaveEvidenceItems()) {
                     if (item != null && item.criteriaId() == null && item.criteriaName() != null && !item.criteriaName().isBlank()) {
-                        preferToHaveItems.add(item);
+                        // Ensure it's not a DB criterion name
+                        String normName = item.criteriaName().trim().toLowerCase(Locale.ROOT);
+                        if (!nameToIdMap.containsKey(normName)) {
+                            preferToHaveItems.add(item);
+                        }
                     }
                 }
             }

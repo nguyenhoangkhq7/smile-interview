@@ -7,10 +7,12 @@ CREATE EXTENSION IF NOT EXISTS vector;
 CREATE TABLE IF NOT EXISTS document_chunks (
     id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     session_id       VARCHAR(128) NOT NULL,
+    resume_id        UUID REFERENCES resumes(id) ON DELETE CASCADE,
+    job_description_id UUID REFERENCES job_descriptions(id) ON DELETE CASCADE,
     doc_type         VARCHAR(10) NOT NULL,        -- 'cv' | 'jd'
     parent_id        UUID,                        -- NULL for parent overview chunk
     chunk_type       VARCHAR(50) NOT NULL,        -- 'project_overview' | 'domain_child' | 'flat_section'
-    domain           JSONB,                       -- e.g. ["security", "database"]
+    domain           TEXT,                        -- e.g. ["security", "database"]
     content          TEXT NOT NULL,               -- Exact raw CV/JD content (used for Assessment & Grounding)
     enriched_content TEXT,                        -- Context-enriched content (used ONLY for embedding generation)
     embedding        VECTOR(1024),                -- Fixed 1024 dimensions for maximum speed

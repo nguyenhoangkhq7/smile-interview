@@ -1,7 +1,5 @@
 package fit.iuh.modules.assessment.entity;
 
-import fit.iuh.modules.assessment.dto.AssessmentResponseDto;
-import fit.iuh.modules.assessment.dto.ImprovementResponseDto;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -11,6 +9,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -46,30 +45,21 @@ public class ResumeAssessment {
     @Column(name = "overall_match_score", nullable = false)
     private Integer overallMatchScore;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "eligibility_json", columnDefinition = "jsonb")
-    private Eligibility eligibility;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "eligibility", length = 50)
+    private EligibilityStatus eligibility;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "evidence_items_json", nullable = false, columnDefinition = "jsonb")
-    private List<AssessmentResponseDto.EvidenceItem> mustHaveEvidenceItems;
+    @OneToMany(mappedBy = "assessment", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<EvidenceItem> evidenceItems = new ArrayList<>();
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "additional_evidence_items_json", columnDefinition = "jsonb")
-    private List<AssessmentResponseDto.AdHocEvidenceItem> preferToHaveEvidenceItems;
+    @OneToMany(mappedBy = "assessment", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<ScoreBreakdown> scoreBreakdowns = new ArrayList<>();
 
-    public List<AssessmentResponseDto.EvidenceItem> getEvidenceItems() {
-        return mustHaveEvidenceItems;
-    }
-
-    public List<AssessmentResponseDto.AdHocEvidenceItem> getAdditionalEvidenceItems() {
-        return preferToHaveEvidenceItems;
-    }
-
-
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "top_priority_improvements_json", columnDefinition = "jsonb")
-    private List<ImprovementResponseDto.ImprovementItem> topPriorityImprovements;
+    @OneToMany(mappedBy = "assessment", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Improvement> improvements = new ArrayList<>();
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

@@ -38,7 +38,7 @@ class EvidenceGroundingValidatorTest {
         String span = "Designed and implemented high-throughput microservices using Spring Boot 3.3 and Java 21";
         EvidenceItem item = new EvidenceItem(
                 1L, "Tech Stack Alignment", "REQUIRED", "Java 21 & Spring Boot",
-                span, "matched",
+                span, span, "matched",
                 "Found in CV", null, null, null, null, null, null
         );
 
@@ -56,7 +56,7 @@ class EvidenceGroundingValidatorTest {
         String hallucinatedSpan = "Developed quantum computing algorithms with IBM Qiskit and Rust in production";
         EvidenceItem item = new EvidenceItem(
                 2L, "Quantum Tech Stack", "REQUIRED", "Quantum computing with Qiskit",
-                hallucinatedSpan, "matched",
+                hallucinatedSpan, hallucinatedSpan, "matched",
                 "Hallucinated evidence", null, null, null, null, null, null
         );
 
@@ -73,7 +73,7 @@ class EvidenceGroundingValidatorTest {
         String hallucinatedSpan = "Scrum Master certified by Scrum Alliance with 5 years agile coaching";
         EvidenceItem item = new EvidenceItem(
                 3L, "Scrum Coaching", "REQUIRED", "Scrum Master Certification",
-                hallucinatedSpan, "weak",
+                hallucinatedSpan, hallucinatedSpan, "weak",
                 "Hallucinated evidence", null, null, null, null, null, null
         );
 
@@ -88,7 +88,7 @@ class EvidenceGroundingValidatorTest {
     void testMissingStatusNoSpanRequired() {
         EvidenceItem item = new EvidenceItem(
                 4L, "Golang Experience", "REQUIRED", "Golang 1.22 requirement",
-                null, "missing",
+                null, null, "missing",
                 "Requirement completely absent", null, null, null, null, null, null
         );
 

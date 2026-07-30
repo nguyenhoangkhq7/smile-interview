@@ -43,7 +43,7 @@ public class DocumentChunk implements Persistable<UUID> {
     private String chunkType; // "project_overview" | "domain_child" | "flat_section"
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "domain", columnDefinition = "jsonb")
+    @Column(name = "domain", columnDefinition = "text")
     private List<String> domain;
 
     @Column(name = "content", nullable = false, columnDefinition = "text")

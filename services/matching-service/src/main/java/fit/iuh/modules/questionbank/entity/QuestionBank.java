@@ -1,9 +1,7 @@
 package fit.iuh.modules.questionbank.entity;
 
 import fit.iuh.modules.questionbank.dto.CandidateContextDto;
-import fit.iuh.modules.questionbank.dto.QuestionBankMetadataDto;
 import fit.iuh.modules.questionbank.dto.QuestionConfigDto;
-import fit.iuh.modules.questionbank.dto.QuestionDto;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -13,14 +11,15 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 @Entity
 @Table(
-        name = "question_banks",
+        name = "session_questions",
         indexes = {
-                @Index(name = "idx_qb_session_id", columnList = "session_id")
+                @Index(name = "idx_sq_session_id", columnList = "session_id")
         }
 )
 @Data
@@ -37,20 +36,20 @@ public class QuestionBank {
     @Column(name = "session_id", nullable = false, length = 128)
     private String sessionId;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "metadata", columnDefinition = "jsonb")
-    private QuestionBankMetadataDto metadata;
+    @OneToMany(mappedBy = "questionBank", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<SessionMetadata> metadataItems = new ArrayList<>();
+
+    @OneToMany(mappedBy = "questionBank", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Question> questions = new ArrayList<>();
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "question_bank_json", nullable = false, columnDefinition = "jsonb")
-    private List<QuestionDto> questionBankJson;
-
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "question_config", columnDefinition = "jsonb")
+    @Column(name = "question_config", columnDefinition = "text")
     private QuestionConfigDto questionConfig;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "candidate_context", columnDefinition = "jsonb")
+    @Column(name = "candidate_context", columnDefinition = "text")
     private CandidateContextDto candidateContext;
 
     @Column(name = "total_questions")

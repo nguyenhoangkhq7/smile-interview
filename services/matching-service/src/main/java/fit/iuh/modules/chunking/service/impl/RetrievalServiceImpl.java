@@ -33,9 +33,13 @@ public class RetrievalServiceImpl implements RetrievalService {
         List<DocumentChunk> denseResults = Collections.emptyList();
         try {
             float[] queryVector = embeddingService.embedQuery(queryText);
-            String vectorString = formatVectorForPg(queryVector);
-            denseResults = documentChunkRepository.searchDense(sessionId, docType, vectorString, Math.max(topK * 2, 10));
-            if (denseResults == null) denseResults = Collections.emptyList();
+            if (queryVector != null) {
+                String vectorString = formatVectorForPg(queryVector);
+                denseResults = documentChunkRepository.searchDense(sessionId, docType, vectorString, Math.max(topK * 2, 10));
+                if (denseResults == null) denseResults = Collections.emptyList();
+            } else {
+                log.warn("[Retrieval] EmbedQuery returned null (Ollama might be down). Skipping dense search for query='{}'", queryText);
+            }
         } catch (Exception e) {
             log.warn("[Retrieval] Dense vector search warning for session={}: {}", sessionId, e.getMessage());
         }
@@ -127,15 +131,41 @@ public class RetrievalServiceImpl implements RetrievalService {
             }
         }
 
+        // Group child chunks by parentId
+        Map<UUID, List<DocumentChunk>> groupedChunks = new LinkedHashMap<>();
+        List<DocumentChunk> flatChunks = new ArrayList<>();
+        
+        for (DocumentChunk child : retrievedChildChunks) {
+            if (child.getParentId() != null) {
+                groupedChunks.computeIfAbsent(child.getParentId(), k -> new ArrayList<>()).add(child);
+            } else {
+                flatChunks.add(child);
+            }
+        }
+
         StringBuilder sb = new StringBuilder();
         sb.append("====== CANDIDATE CV (RELEVANT CONTEXT CHUNKS) ======\n");
 
-        for (DocumentChunk child : retrievedChildChunks) {
-            if (child.getParentId() != null && parentContentMap.containsKey(child.getParentId())) {
-                sb.append("[PROJECT CONTEXT]: ").append(parentContentMap.get(child.getParentId())).append("\n");
+        for (Map.Entry<UUID, List<DocumentChunk>> entry : groupedChunks.entrySet()) {
+            UUID pId = entry.getKey();
+            List<DocumentChunk> children = entry.getValue();
+
+            if (parentContentMap.containsKey(pId)) {
+                sb.append("[PROJECT CONTEXT]: ").append(parentContentMap.get(pId)).append("\n");
+                for (DocumentChunk child : children) {
+                    sb.append("- [SPECIFIC CV SNIPPET]: ").append(child.getContent()).append("\n");
+                }
+                sb.append("\n");
+            } else {
+                for (DocumentChunk child : children) {
+                    sb.append("- [SPECIFIC CV SNIPPET]: ").append(child.getContent()).append("\n");
+                }
+                sb.append("\n");
             }
-            // STRICT SAFEGUARD: Use content (original CV text), NEVER enrichedContent
-            sb.append("[SPECIFIC CV SNIPPET]: ").append(child.getContent()).append("\n\n");
+        }
+
+        for (DocumentChunk flat : flatChunks) {
+            sb.append("[GENERAL SNIPPET]: ").append(flat.getContent()).append("\n\n");
         }
 
         return sb.toString().strip();

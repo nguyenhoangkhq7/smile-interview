@@ -6,9 +6,8 @@ import fit.iuh.modules.assessment.dto.AssessmentResponseDto;
 import fit.iuh.modules.assessment.entity.ResumeAssessment;
 import fit.iuh.modules.assessment.entity.SeniorityLevel;
 import fit.iuh.modules.assessment.repository.ResumeAssessmentRepository;
-import fit.iuh.modules.ingestion.entity.DocumentType;
-import fit.iuh.modules.ingestion.entity.SessionDocument;
-import fit.iuh.modules.ingestion.repository.SessionDocumentRepository;
+import fit.iuh.modules.session.entity.Session;
+import fit.iuh.modules.session.repository.SessionRepository;
 import fit.iuh.modules.questionbank.dto.*;
 import fit.iuh.modules.questionbank.entity.QuestionBank;
 import fit.iuh.modules.questionbank.repository.QuestionBankRepository;
@@ -35,7 +34,7 @@ public class QuestionBankServiceImpl implements QuestionBankService {
     private final QuestionGenerationService questionGenerationService;
     private final DifficultyDistributor difficultyDistributor;
     private final ResumeAssessmentRepository assessmentRepo;
-    private final SessionDocumentRepository documentRepo;
+    private final SessionRepository sessionRepository;
     private final QuestionBankRepository questionBankRepo;
     private final ObjectMapper objectMapper;
     private final SemanticCacheKeyGenerator cacheKeyGenerator;
@@ -94,12 +93,20 @@ public class QuestionBankServiceImpl implements QuestionBankService {
                 .collect(Collectors.toList());
         List<String> techStackRequired = extractTechKeywords(rawTechRequired);
 
-        SessionDocument cvDoc = documentRepo.findBySessionIdAndDocumentType(sessionId, DocumentType.CV)
-                .orElseThrow(() -> new QuestionBankException("CV document not found for session: " + sessionId));
-        SessionDocument jdDoc = documentRepo.findBySessionIdAndDocumentType(sessionId, DocumentType.JD)
-                .orElseThrow(() -> new QuestionBankException("JD document not found for session: " + sessionId));
+        Session session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new QuestionBankException("Session not found: " + sessionId));
 
-        String targetDomain = detectTargetDomain(cvDoc.getMarkdownContent(), jdDoc.getMarkdownContent());
+        if (session.getResume() == null || session.getResume().getParsedContent() == null) {
+            throw new QuestionBankException("CV document not found for session: " + sessionId);
+        }
+        if (session.getJobDescription() == null || session.getJobDescription().getParsedContent() == null) {
+            throw new QuestionBankException("JD document not found for session: " + sessionId);
+        }
+
+        String targetDomain = detectTargetDomain(
+                session.getResume().getParsedContent(), 
+                session.getJobDescription().getParsedContent()
+        );
 
         CandidateContextDto context = CandidateContextDto.builder()
                 .candidateLevel(assessment.getSeniorityLevel())
@@ -251,12 +258,44 @@ public class QuestionBankServiceImpl implements QuestionBankService {
 
         QuestionBank entity = QuestionBank.builder()
                 .sessionId(sessionId)
-                .metadata(metadata)
-                .questionBankJson(allQuestions)
                 .questionConfig(config)
                 .candidateContext(context)
                 .totalQuestions(total)
                 .build();
+
+        List<fit.iuh.modules.questionbank.entity.SessionMetadata> metaEntities = new ArrayList<>();
+        try {
+            metaEntities.add(fit.iuh.modules.questionbank.entity.SessionMetadata.builder().questionBank(entity).metadataKey("candidateLevel").metadataValue(metadata.getCandidateLevel()).build());
+            metaEntities.add(fit.iuh.modules.questionbank.entity.SessionMetadata.builder().questionBank(entity).metadataKey("overallMatch").metadataValue(metadata.getOverallMatch()).build());
+            if (metadata.getYearsOfExperience() != null) {
+                metaEntities.add(fit.iuh.modules.questionbank.entity.SessionMetadata.builder().questionBank(entity).metadataKey("yearsOfExperience").metadataValue(String.valueOf(metadata.getYearsOfExperience())).build());
+            }
+            metaEntities.add(fit.iuh.modules.questionbank.entity.SessionMetadata.builder().questionBank(entity).metadataKey("roleType").metadataValue(metadata.getRoleType()).build());
+            metaEntities.add(fit.iuh.modules.questionbank.entity.SessionMetadata.builder().questionBank(entity).metadataKey("targetDomain").metadataValue(metadata.getTargetDomain()).build());
+            metaEntities.add(fit.iuh.modules.questionbank.entity.SessionMetadata.builder().questionBank(entity).metadataKey("strongAreas").metadataValue(objectMapper.writeValueAsString(metadata.getStrongAreas())).build());
+            metaEntities.add(fit.iuh.modules.questionbank.entity.SessionMetadata.builder().questionBank(entity).metadataKey("gapAreas").metadataValue(objectMapper.writeValueAsString(metadata.getGapAreas())).build());
+            metaEntities.add(fit.iuh.modules.questionbank.entity.SessionMetadata.builder().questionBank(entity).metadataKey("difficultyDistribution").metadataValue(objectMapper.writeValueAsString(metadata.getDifficultyDistribution())).build());
+            metaEntities.add(fit.iuh.modules.questionbank.entity.SessionMetadata.builder().questionBank(entity).metadataKey("totalQuestions").metadataValue(String.valueOf(metadata.getTotalQuestions())).build());
+            metaEntities.add(fit.iuh.modules.questionbank.entity.SessionMetadata.builder().questionBank(entity).metadataKey("generationRationale").metadataValue(metadata.getGenerationRationale()).build());
+        } catch (Exception e) {
+            log.warn("[QuestionBank] Failed to serialize metadata: {}", e.getMessage());
+        }
+        entity.setMetadataItems(metaEntities);
+
+        List<fit.iuh.modules.questionbank.entity.Question> questionEntities = new ArrayList<>();
+        for (QuestionDto dto : allQuestions) {
+            questionEntities.add(fit.iuh.modules.questionbank.entity.Question.builder()
+                    .questionBank(entity)
+                    .id(dto.getId())
+                    .category(dto.getType())
+                    .questionType(dto.getType())
+                    .expectedCompetency(dto.getExpectedCompetency())
+                    .questionText(dto.getQuestion())
+                    .expectedAnswer(dto.getEvaluationCriteria())
+                    .difficulty(dto.getDifficulty())
+                    .build());
+        }
+        entity.setQuestions(questionEntities);
 
         entity = questionBankRepo.save(entity);
         log.info("[QuestionBank] Saved generated QuestionBank id={} for session={}", entity.getId(), sessionId);
@@ -293,15 +332,17 @@ public class QuestionBankServiceImpl implements QuestionBankService {
         QuestionBank bank = questionBankRepo.findById(questionBankId)
                 .orElseThrow(() -> new QuestionBankException("Question bank not found: " + questionBankId));
 
-        List<QuestionDto> questions = bank.getQuestionBankJson();
-        QuestionDto target = null;
-        for (QuestionDto q : questions) {
-            if (q.getId().equalsIgnoreCase(questionId)) {
-                target = q;
-                break;
+        List<fit.iuh.modules.questionbank.entity.Question> questions = bank.getQuestions();
+        fit.iuh.modules.questionbank.entity.Question targetEntity = null;
+        if (questions != null) {
+            for (var q : questions) {
+                if (questionId.equalsIgnoreCase(q.getId())) {
+                    targetEntity = q;
+                    break;
+                }
             }
         }
-        if (target == null) {
+        if (targetEntity == null) {
             throw new QuestionBankException("Question with ID " + questionId + " not found in bank " + questionBankId);
         }
 
@@ -311,21 +352,22 @@ public class QuestionBankServiceImpl implements QuestionBankService {
                         "Assessment not found for session " + sessionId + ". Cannot regenerate."));
 
         List<EvidenceItemPair> allEvidencePairs = buildEvidencePairs(assessment);
+        
+        QuestionBankResponseDto dto = toResponseDto(bank);
+        List<QuestionDto> dtoList = dto.getQuestionBank();
 
         QuestionDto regenerated = questionGenerationService.regenerateSingle(
-                target.getType(),
-                target.getDifficulty(),
+                targetEntity.getQuestionType(),
+                targetEntity.getDifficulty(),
                 bank.getCandidateContext(),
                 allEvidencePairs,
-                questions
+                dtoList
         );
 
-        regenerated.setId(questionId);
+        targetEntity.setQuestionText(regenerated.getQuestion());
+        targetEntity.setExpectedAnswer(regenerated.getEvaluationCriteria());
+        targetEntity.setExpectedCompetency(regenerated.getExpectedCompetency());
 
-        int index = questions.indexOf(target);
-        questions.set(index, regenerated);
-
-        bank.setQuestionBankJson(questions);
         bank = questionBankRepo.save(bank);
 
         log.info("[QuestionBank] Question {} successfully regenerated in bank {}", questionId, questionBankId);
@@ -350,38 +392,42 @@ public class QuestionBankServiceImpl implements QuestionBankService {
         int maxEvidenceItems = (appProperties != null && appProperties.getQuestionBank() != null && appProperties.getQuestionBank().getMaxEvidenceItems() > 0)
                 ? appProperties.getQuestionBank().getMaxEvidenceItems() : 15;
 
-        if (assessment.getMustHaveEvidenceItems() != null) {
-            assessment.getMustHaveEvidenceItems().stream()
-                    .filter(item -> !"not_applicable".equalsIgnoreCase(item.status()))
-                    .sorted(Comparator.comparingDouble(
-                            (AssessmentResponseDto.EvidenceItem item) ->
-                                    item.weightUsed() != null ? item.weightUsed() : 0.0
-                    ).reversed())
+        if (assessment.getEvidenceItems() != null) {
+            List<fit.iuh.modules.assessment.entity.EvidenceItem> mustHave = assessment.getEvidenceItems().stream()
+                    .filter(e -> !"PREFERRED".equalsIgnoreCase(e.getImportance()))
+                    .collect(Collectors.toList());
+                    
+            mustHave.stream()
+                    .filter(item -> !"not_applicable".equalsIgnoreCase(item.getStatus()))
                     .limit(maxEvidenceItems)
                     .forEach(item -> pairs.add(new EvidenceItemPair(
-                            item.criteriaId(),
-                            item.criteriaName(),
-                            item.jdRequirement(),
-                            item.cvEvidence(),
-                            item.status(),
-                            item.reasoning(),
-                            item.weightUsed(),
-                            criteriaIdToTypeMap.getOrDefault(item.criteriaId(), "technical")
+                            item.getCriteriaId() != null ? item.getCriteriaId().longValue() : null,
+                            item.getCriteriaName(),
+                            item.getJdRequirement(),
+                            item.getCvEvidence(),
+                            item.getStatus(),
+                            item.getReasoning(),
+                            10.0, // Default weight since it's not stored
+                            criteriaIdToTypeMap.getOrDefault(item.getCriteriaId() != null ? item.getCriteriaId().longValue() : null, "technical")
                     )));
         }
 
-        if (assessment.getPreferToHaveEvidenceItems() != null && pairs.size() < maxEvidenceItems) {
+        if (assessment.getEvidenceItems() != null && pairs.size() < maxEvidenceItems) {
             int remaining = maxEvidenceItems - pairs.size();
-            assessment.getPreferToHaveEvidenceItems().stream()
-                    .filter(item -> !"not_applicable".equalsIgnoreCase(item.status()))
+            List<fit.iuh.modules.assessment.entity.EvidenceItem> preferToHave = assessment.getEvidenceItems().stream()
+                    .filter(e -> "PREFERRED".equalsIgnoreCase(e.getImportance()))
+                    .collect(Collectors.toList());
+                    
+            preferToHave.stream()
+                    .filter(item -> !"not_applicable".equalsIgnoreCase(item.getStatus()))
                     .limit(remaining)
                     .forEach(item -> pairs.add(new EvidenceItemPair(
                             null,
-                            item.criteriaName(),
-                            item.jdRequirement(),
-                            item.cvEvidence(),
-                            item.status(),
-                            item.reasoning(),
+                            item.getCriteriaName(),
+                            item.getJdRequirement(),
+                            item.getCvEvidence(),
+                            item.getStatus(),
+                            item.getReasoning(),
                             null,
                             "technical"
                     )));
@@ -435,11 +481,60 @@ public class QuestionBankServiceImpl implements QuestionBankService {
     }
 
     private QuestionBankResponseDto toResponseDto(QuestionBank entity) {
+        QuestionBankMetadataDto metadataDto = null;
+        if (entity.getMetadataItems() != null && !entity.getMetadataItems().isEmpty()) {
+            Map<String, String> metaMap = entity.getMetadataItems().stream()
+                    .collect(Collectors.toMap(
+                            fit.iuh.modules.questionbank.entity.SessionMetadata::getMetadataKey,
+                            fit.iuh.modules.questionbank.entity.SessionMetadata::getMetadataValue,
+                            (v1, v2) -> v2
+                    ));
+            try {
+                Map<String, String> diffMap = new HashMap<>();
+                if (metaMap.containsKey("difficultyDistribution")) {
+                    diffMap = objectMapper.readValue(metaMap.get("difficultyDistribution"), Map.class);
+                }
+                List<String> strongAreas = metaMap.containsKey("strongAreas")
+                        ? objectMapper.readValue(metaMap.get("strongAreas"), List.class) : List.of();
+                List<String> gapAreas = metaMap.containsKey("gapAreas")
+                        ? objectMapper.readValue(metaMap.get("gapAreas"), List.class) : List.of();
+
+                metadataDto = QuestionBankMetadataDto.builder()
+                        .candidateLevel(metaMap.get("candidateLevel"))
+                        .overallMatch(metaMap.get("overallMatch"))
+                        .yearsOfExperience(metaMap.containsKey("yearsOfExperience") ? Integer.parseInt(metaMap.get("yearsOfExperience")) : null)
+                        .roleType(metaMap.get("roleType"))
+                        .targetDomain(metaMap.get("targetDomain"))
+                        .strongAreas(strongAreas)
+                        .gapAreas(gapAreas)
+                        .difficultyDistribution(diffMap)
+                        .totalQuestions(metaMap.containsKey("totalQuestions") ? Integer.parseInt(metaMap.get("totalQuestions")) : 0)
+                        .generationRationale(metaMap.get("generationRationale"))
+                        .build();
+            } catch (Exception e) {
+                log.warn("[QuestionBank] Failed to parse metadata for bank {}: {}", entity.getId(), e.getMessage());
+            }
+        }
+
+        List<QuestionDto> questionDtos = new ArrayList<>();
+        if (entity.getQuestions() != null) {
+            for (var q : entity.getQuestions()) {
+                QuestionDto dto = new QuestionDto();
+                dto.setId(q.getId());
+                dto.setQuestion(q.getQuestionText());
+                dto.setEvaluationCriteria(q.getExpectedAnswer());
+                dto.setDifficulty(q.getDifficulty());
+                dto.setType(q.getQuestionType());
+                dto.setExpectedCompetency(q.getExpectedCompetency());
+                questionDtos.add(dto);
+            }
+        }
+
         return QuestionBankResponseDto.builder()
                 .id(entity.getId())
                 .sessionId(entity.getSessionId())
-                .metadata(entity.getMetadata())
-                .questionBank(entity.getQuestionBankJson())
+                .metadata(metadataDto)
+                .questionBank(questionDtos)
                 .createdAt(entity.getCreatedAt())
                 .build();
     }

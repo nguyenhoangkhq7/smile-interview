@@ -80,6 +80,11 @@ public class StandardizationServiceImpl implements StandardizationService {
                         "LLM API returned blank text for " + documentLabel + " standardization.");
             }
 
+            if (markdownOutput.equals("INVALID_JD")) {
+                throw new LlmApiException(
+                        "LLM could not extract any valid Job Description information from the provided input text. Please ensure the JD is not empty or corrupted.");
+            }
+
             if (response.getUsage() != null) {
                 var usage = response.getUsage();
                 log.info("[LLM_USAGE] Document={} | Model={} | PromptTokens={} | CompletionTokens={} | TotalTokens={}",

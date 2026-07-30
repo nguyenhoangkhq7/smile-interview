@@ -35,25 +35,31 @@ public class EvidenceGroundingValidator {
         if (item == null) return null;
 
         String cvEvidence = item.cvEvidence();
-        if (cvEvidence == null || cvEvidence.isBlank() || cvMarkdown == null || cvMarkdown.isBlank()) {
+        String cvQuote = item.cvQuote();
+
+        if ((cvEvidence == null || cvEvidence.isBlank()) && (cvQuote == null || cvQuote.isBlank())) {
             Double score = item.groundingScore() != null ? item.groundingScore() : 1.0;
             return new AssessmentResponseDto.EvidenceItem(
                     item.criteriaId(), item.criteriaName(), item.importance(), item.jdRequirement(),
-                    item.cvEvidence(), item.status(), item.reasoning(), item.weightUsed(),
+                    item.cvEvidence(), item.cvQuote(), item.status(), item.reasoning(), item.weightUsed(),
                     item.scoreContribution(), score, item.confidenceVotes(), item.lowConfidence(), item.needsManualReview()
             );
         }
 
-        double sim = calculateFuzzySimilarity(cvEvidence, cvMarkdown);
+        double simEvidence = calculateFuzzySimilarity(cvEvidence, cvMarkdown);
+        double simQuote = calculateFuzzySimilarity(cvQuote, cvMarkdown);
+        double sim = Math.max(simEvidence, simQuote);
 
-        if (sim < groundingThreshold) {
+        boolean quoteHallucinated = cvQuote != null && !cvQuote.isBlank() && simQuote < 0.35;
+
+        if (sim < groundingThreshold || quoteHallucinated) {
             String originalStatus = item.status();
             String downgradedStatus = downgradeStatus(originalStatus);
-            log.warn("[GroundingCheck] criteria_id={} | status={} -> {} | score={} < threshold={}",
-                    item.criteriaId(), originalStatus, downgradedStatus, sim, groundingThreshold);
+            log.warn("[GroundingCheck] criteria_id={} | status={} -> {} | score={} < threshold={} (quoteHallucinated={})",
+                    item.criteriaId(), originalStatus, downgradedStatus, sim, groundingThreshold, quoteHallucinated);
             return new AssessmentResponseDto.EvidenceItem(
                     item.criteriaId(), item.criteriaName(), item.importance(), item.jdRequirement(),
-                    item.cvEvidence(), downgradedStatus,
+                    item.cvEvidence(), item.cvQuote(), downgradedStatus,
                     item.reasoning() + " [Canh bao: Bang chung tu CV co do tin cay thap (" + String.format("%.2f", sim) + ").]",
                     item.weightUsed(), item.scoreContribution(), sim,
                     item.confidenceVotes(), item.lowConfidence(), true
@@ -62,7 +68,7 @@ public class EvidenceGroundingValidator {
 
         return new AssessmentResponseDto.EvidenceItem(
                 item.criteriaId(), item.criteriaName(), item.importance(), item.jdRequirement(),
-                item.cvEvidence(), item.status(), item.reasoning(), item.weightUsed(),
+                item.cvEvidence(), item.cvQuote(), item.status(), item.reasoning(), item.weightUsed(),
                 item.scoreContribution(), sim, item.confidenceVotes(), item.lowConfidence(), item.needsManualReview()
         );
     }

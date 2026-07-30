@@ -137,6 +137,7 @@ public class AssessmentScoringEngine {
                         item.importance(),
                         item.jdRequirement(),
                         item.cvEvidence(),
+                        item.cvQuote(),
                         item.status(),
                         finalReasoning,
                         weight,

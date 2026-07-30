@@ -30,6 +30,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.time.Duration;
 import java.time.LocalDate;
@@ -73,6 +74,7 @@ public class AssessmentCriteriaPreparer {
     private final EmbeddingService embeddingService;
     private final SuggestedCriteriaRepository suggestedCriteriaRepository;
     private final CriteriaEmbeddingInitializer criteriaEmbeddingInitializer;
+    private final StringRedisTemplate stringRedisTemplate;
 
     @Value("${app.llm.chat-path:/v1/chat/completions}")
     private String llmChatPath;
@@ -96,7 +98,8 @@ public class AssessmentCriteriaPreparer {
             @Autowired(required = false) DocumentChunkRepository documentChunkRepository,
             @Autowired(required = false) EmbeddingService embeddingService,
             SuggestedCriteriaRepository suggestedCriteriaRepository,
-            @Autowired(required = false) CriteriaEmbeddingInitializer criteriaEmbeddingInitializer) {
+            @Autowired(required = false) CriteriaEmbeddingInitializer criteriaEmbeddingInitializer,
+            StringRedisTemplate stringRedisTemplate) {
         this.appProperties = appProperties;
         this.llmWebClient = llmWebClient;
         this.objectMapper = objectMapper;
@@ -105,13 +108,16 @@ public class AssessmentCriteriaPreparer {
         this.embeddingService = embeddingService;
         this.suggestedCriteriaRepository = suggestedCriteriaRepository;
         this.criteriaEmbeddingInitializer = criteriaEmbeddingInitializer;
+        this.stringRedisTemplate = stringRedisTemplate;
     }
 
     // =========================================================================
     // 1. SMART 2-STEP PHASE 1 JD PREPARATION
     // =========================================================================
 
-    public PreparedJdBundle prepareJdConsolidatedSinglePass(String fullJdMarkdown) {
+    public PreparedJdBundle prepareJdConsolidatedSinglePass(String jdId, String fullJdMarkdown) {
+        if (fullJdMarkdown == null) fullJdMarkdown = "";
+
         // Step 1: Extract exact Job Category & Seniority Level from JD
         log.info("[Phase1-3Pass] Step 1/3: Extracting Category & Level from JD...");
         MetadataResult metadata = extractMetadata(fullJdMarkdown);
@@ -656,11 +662,16 @@ public class AssessmentCriteriaPreparer {
     // 4. GATE EXTRACTION & ELIGIBILITY EVALUATION
     // =========================================================================
 
-    public Eligibility evaluateEligibility(String jdContent, String cvContent) {
+    public record EligibilityEvaluationResult(
+            EligibilityStatus status,
+            List<fit.iuh.modules.assessment.dto.AssessmentResponseDto.EvidenceItem> gateItems
+    ) {}
+
+    public EligibilityEvaluationResult evaluateEligibility(String jdContent, String cvContent) {
         return evaluateEligibilityWithRawGates(null, jdContent, cvContent);
     }
 
-    public Eligibility evaluateEligibilityWithRawGates(List<GateCheckDto> preExtractedGates, String jdContent, String cvContent) {
+    public EligibilityEvaluationResult evaluateEligibilityWithRawGates(List<GateCheckDto> preExtractedGates, String jdContent, String cvContent) {
         log.info("[CriteriaPreparer] Extracting GATE requirements from JD...");
         List<GateCheckDto> rawGates = (preExtractedGates != null && !preExtractedGates.isEmpty())
                 ? preExtractedGates
@@ -675,46 +686,59 @@ public class AssessmentCriteriaPreparer {
         }
 
         if (rawGates == null || rawGates.isEmpty()) {
-            return Eligibility.builder().status(EligibilityStatus.UNCERTAIN).gateChecks(List.of()).build();
+            return new EligibilityEvaluationResult(EligibilityStatus.PARTIAL, List.of());
         }
 
         double candidateYoe = calculateCandidateYoe(cvContent);
-        List<GateCheck> checks = new ArrayList<>();
         boolean failedRequired = false;
+        List<fit.iuh.modules.assessment.dto.AssessmentResponseDto.EvidenceItem> gateItems = new java.util.ArrayList<>();
 
         for (GateCheckDto dto : rawGates) {
             String name = dto.getCriteriaName();
             Importance imp = parseImportance(dto.getImportance());
             String reqVal = dto.getRequiredValue();
 
-            if (name != null && name.toLowerCase().contains("experience")) {
+            boolean evaluated = false;
+            boolean pass = false;
+            String cvEvidence = "Not Evaluated";
+
+            if (name != null && (name.toLowerCase().contains("experience") || name.toLowerCase().contains("yoe"))) {
                 double reqYoe = parseRequiredYoe(reqVal);
-                boolean pass = candidateYoe >= reqYoe;
-                if (!pass && imp == Importance.REQUIRED) failedRequired = true;
-
-                checks.add(GateCheck.builder()
-                        .criteriaName(name)
-                        .importance(imp)
-                        .requiredValue(reqVal != null ? reqVal : String.valueOf(reqYoe))
-                        .actualValue(String.format("%.1f years", candidateYoe))
-                        .status(pass ? "met" : "not_met")
-                        .build());
-            } else if (name != null && name.toLowerCase().contains("degree")) {
+                pass = candidateYoe >= reqYoe;
+                cvEvidence = candidateYoe > 0 ? candidateYoe + " years of experience" : "No explicitly quantifiable experience found";
+                evaluated = true;
+            } else if (name != null && (name.toLowerCase().contains("degree") || name.toLowerCase().contains("education") || name.toLowerCase().contains("academic") || name.toLowerCase().contains("university") || name.toLowerCase().contains("bachelor"))) {
                 boolean hasDegree = checkDegreeInCv(cvContent);
-                if (!hasDegree && imp == Importance.REQUIRED) failedRequired = true;
-
-                checks.add(GateCheck.builder()
-                        .criteriaName(name)
-                        .importance(imp)
-                        .requiredValue(reqVal != null ? reqVal : "Bachelor Degree")
-                        .actualValue(hasDegree ? "Degree found" : "No degree found")
-                        .status(hasDegree ? "met" : "not_met")
-                        .build());
+                pass = hasDegree;
+                cvEvidence = hasDegree ? "Degree/Education mentioned in CV" : "No relevant education/degree found in CV";
+                evaluated = true;
             }
+
+            if (evaluated) {
+                if (!pass && imp == Importance.REQUIRED) failedRequired = true;
+            } else {
+                // Cannot auto-evaluate this gate with simple heuristics. 
+                // Default to pass = true to avoid unfairly rejecting candidates, but mark for manual review.
+                pass = true;
+                cvEvidence = "Manual verification required";
+            }
+
+            gateItems.add(new fit.iuh.modules.assessment.dto.AssessmentResponseDto.EvidenceItem(
+                    null,
+                    name,
+                    "GATE",
+                    reqVal,
+                    cvEvidence,
+                    null,
+                    evaluated ? (pass ? "Pass" : "Not Pass") : "Not Evaluated",
+                    evaluated ? (pass ? "Candidate meets the gate requirement." : "Candidate does not meet the gate requirement.") 
+                              : "System heuristics currently only auto-evaluate YOE and Degree gates. Please manually verify this requirement.",
+                    null, null, null, null, null, null
+            ));
         }
 
-        EligibilityStatus finalStatus = failedRequired ? EligibilityStatus.NOT_ELIGIBLE : EligibilityStatus.ELIGIBLE;
-        return Eligibility.builder().status(finalStatus).gateChecks(checks).build();
+        EligibilityStatus finalStatus = failedRequired ? EligibilityStatus.NOT_ELIGIBILITY : EligibilityStatus.ELIGIBILITY;
+        return new EligibilityEvaluationResult(finalStatus, gateItems);
     }
 
     private List<GateCheckDto> extractGateFromJd(String jdContent, String cvContent) {

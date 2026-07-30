@@ -6,9 +6,12 @@ import fit.iuh.modules.chunking.service.ChunkerService;
 import fit.iuh.modules.chunking.service.EmbeddingService;
 import fit.iuh.exception.IngestionException;
 import fit.iuh.modules.ingestion.dto.IngestionResponse;
-import fit.iuh.modules.ingestion.entity.DocumentType;
-import fit.iuh.modules.ingestion.entity.SessionDocument;
-import fit.iuh.modules.ingestion.repository.SessionDocumentRepository;
+import fit.iuh.modules.session.entity.Session;
+import fit.iuh.modules.session.entity.Resume;
+import fit.iuh.modules.session.entity.JobDescription;
+import fit.iuh.modules.session.repository.SessionRepository;
+import fit.iuh.modules.session.repository.ResumeRepository;
+import fit.iuh.modules.session.repository.JobDescriptionRepository;
 import fit.iuh.modules.ingestion.service.IngestionService;
 import fit.iuh.modules.ingestion.service.PdfService;
 import fit.iuh.modules.ingestion.service.StandardizationService;
@@ -20,6 +23,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -28,10 +32,14 @@ public class IngestionServiceImpl implements IngestionService {
 
     private final PdfService pdfService;
     private final StandardizationService standardizationService;
-    private final SessionDocumentRepository sessionDocumentRepository;
+    private final SessionRepository sessionRepository;
+    private final ResumeRepository resumeRepository;
+    private final JobDescriptionRepository jobDescriptionRepository;
     private final ChunkerService chunkerService;
     private final EmbeddingService embeddingService;
     private final DocumentChunkRepository documentChunkRepository;
+
+
 
     @Override
     @Transactional
@@ -53,10 +61,16 @@ public class IngestionServiceImpl implements IngestionService {
                 ================================================================================
                 """, sessionId);
 
-        if (sessionDocumentRepository.existsBySessionId(sessionId)) {
-            log.warn("[INGEST] Existing documents found for session={}. Deleting old session documents.", sessionId);
-            sessionDocumentRepository.deleteAllBySessionId(sessionId);
-        }
+        Session session = sessionRepository.findById(sessionId)
+                .orElseGet(() -> {
+                    log.info("[INGESTION] Session '{}' not found in database. Auto-creating a new session.", sessionId);
+                    Session newSession = Session.builder()
+                            .id(sessionId)
+                            .status("In progress")
+                            .startedAt(java.time.LocalDateTime.now())
+                            .build();
+                    return sessionRepository.save(newSession);
+                });
 
         long step1Start = System.currentTimeMillis();
 
@@ -88,10 +102,16 @@ public class IngestionServiceImpl implements IngestionService {
 
         long step2Start = System.currentTimeMillis();
         if (markdownCv == null) {
+            if (rawCvText == null || rawCvText.trim().isEmpty()) {
+                throw new IngestionException("Extracted CV text is empty. The PDF might be corrupted or image-only.");
+            }
             log.info("[INGEST STEP 2/3] LLM Standardization: Standardizing CV text to Markdown...");
             markdownCv = standardizationService.standardizeCv(rawCvText);
         }
         if (markdownJd == null) {
+            if (rawJdText == null || rawJdText.trim().isEmpty()) {
+                throw new IngestionException("Extracted JD text is empty. The provided file or text might be corrupted, image-only, or invalid.");
+            }
             log.info("[INGEST STEP 2/3] LLM Standardization: Standardizing JD text to Markdown...");
             markdownJd = standardizationService.standardizeJd(rawJdText);
         }
@@ -99,19 +119,35 @@ public class IngestionServiceImpl implements IngestionService {
         log.info("[INGEST STEP 2/3] Standardization Complete: CV Markdown ({} chars), JD Markdown ({} chars).",
                 markdownCv.length(), markdownJd.length());
 
-        SessionDocument cvDoc = SessionDocument.builder()
-                .sessionId(sessionId)
-                .documentType(DocumentType.CV)
-                .markdownContent(markdownCv)
-                .build();
+        Resume resume = session.getResume();
+        if (resume == null) {
+            resume = Resume.builder()
+                    .id(UUID.randomUUID())
+                    .fileName(cvFile != null ? cvFile.getOriginalFilename() : "Direct_Input_CV")
+                    .createdAt(java.time.LocalDateTime.now())
+                    .build();
+            log.info("[INGESTION] Auto-created new Resume record with ID: {}", resume.getId());
+        }
+        resume.setParsedContent(markdownCv);
+        resume.setRawText(rawCvText);
+        resume = resumeRepository.save(resume);
+        session.setResume(resume);
 
-        SessionDocument jdDoc = SessionDocument.builder()
-                .sessionId(sessionId)
-                .documentType(DocumentType.JD)
-                .markdownContent(markdownJd)
-                .build();
+        JobDescription jd = session.getJobDescription();
+        if (jd == null) {
+            jd = JobDescription.builder()
+                    .id(UUID.randomUUID())
+                    .title(jdFile != null ? jdFile.getOriginalFilename() : "Direct_Input_JD")
+                    .createdAt(java.time.LocalDateTime.now())
+                    .build();
+            log.info("[INGESTION] Auto-created new JobDescription record with ID: {}", jd.getId());
+        }
+        jd.setParsedContent(markdownJd);
+        jd.setRawText(rawJdText);
+        jd = jobDescriptionRepository.save(jd);
+        session.setJobDescription(jd);
 
-        sessionDocumentRepository.saveAll(List.of(cvDoc, jdDoc));
+        sessionRepository.save(session);
 
         // Step 3: Structure-Aware Chunking, Enrichment, and Ollama Batch Embedding
         long step3Start = System.currentTimeMillis();
@@ -194,6 +230,5 @@ public class IngestionServiceImpl implements IngestionService {
     public void deleteSession(String sessionId) {
         log.info("[Ingestion] Deleting documents and chunks for session: {}", sessionId);
         documentChunkRepository.deleteBySessionId(sessionId);
-        sessionDocumentRepository.deleteAllBySessionId(sessionId);
     }
 }

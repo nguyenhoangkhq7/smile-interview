@@ -2,12 +2,14 @@ package fit.iuh.modules.assessment.dto;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;
 import java.util.Map;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record AssessmentResponseDto(
         @JsonProperty("must_have_evidence_items")
         @JsonAlias({"must_have_evidence_items", "evidence_items"})
@@ -19,6 +21,7 @@ public record AssessmentResponseDto(
 ) {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public record EvidenceItem(
             @JsonProperty("criteria_id")
             Long criteriaId,
@@ -35,32 +38,36 @@ public record AssessmentResponseDto(
             @JsonProperty("cv_evidence")
             String cvEvidence,
 
+            @JsonProperty(value = "cv_quote", access = JsonProperty.Access.WRITE_ONLY)
+            String cvQuote,
+
             @JsonProperty("status")
             String status,
 
             @JsonProperty("reasoning")
             String reasoning,
 
-            @JsonProperty("weight_used")
+            @JsonProperty(value = "weight_used", access = JsonProperty.Access.WRITE_ONLY)
             Double weightUsed,
 
-            @JsonProperty("score_contribution")
+            @JsonProperty(value = "score_contribution", access = JsonProperty.Access.WRITE_ONLY)
             Double scoreContribution,
 
-            @JsonProperty("grounding_score")
+            @JsonProperty(value = "grounding_score", access = JsonProperty.Access.WRITE_ONLY)
             Double groundingScore,
 
-            @JsonProperty("confidence_votes")
+            @JsonProperty(value = "confidence_votes", access = JsonProperty.Access.WRITE_ONLY)
             Map<String, Integer> confidenceVotes,
 
-            @JsonProperty("low_confidence")
+            @JsonProperty(value = "low_confidence", access = JsonProperty.Access.WRITE_ONLY)
             Boolean lowConfidence,
 
-            @JsonProperty("needs_manual_review")
+            @JsonProperty(value = "needs_manual_review", access = JsonProperty.Access.WRITE_ONLY)
             Boolean needsManualReview
     ) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public record AdHocEvidenceItem(
             @JsonProperty("criteria_id")
             Long criteriaId,
@@ -76,6 +83,9 @@ public record AssessmentResponseDto(
 
             @JsonProperty("cv_evidence")
             String cvEvidence,
+
+            @JsonProperty(value = "cv_quote", access = JsonProperty.Access.WRITE_ONLY)
+            String cvQuote,
 
             @JsonProperty("status")
             String status,

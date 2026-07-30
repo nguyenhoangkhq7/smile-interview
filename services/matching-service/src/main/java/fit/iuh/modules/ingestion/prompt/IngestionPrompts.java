@@ -15,7 +15,7 @@ public final class IngestionPrompts {
             1. ZERO HALLUCINATION: Preserve facts exactly. Never invent metrics, skills, or experience.
             2. OMIT MISSING DATA: If any section or field is missing in the input, omit it completely. DO NOT write "Not Provided".
             3. TONE: Refine wording for professional clarity using action verbs. Focus on backend/architecture impact, but do not embellish. NEVER omit technical keywords (e.g., React, Node, AWS) when summarizing prose.
-            4. OUTPUT: Output ONLY the Markdown code. No conversational text.
+            4. OUTPUT FORMAT: Use the Markdown schema below as your structure. You MUST replace all bracketed placeholders (like [Full Name] or [...]) with actual data extracted from the resume. Do NOT output the literal brackets. If a section has no data, do not include that section.
 
             OUTPUT SCHEMA:
             # Contact
@@ -64,7 +64,7 @@ public final class IngestionPrompts {
             1. ZERO HALLUCINATION: Extract only explicitly stated facts. Never invent requirements or tech stacks.
             2. OMIT MISSING DATA: If a field or section is not mentioned in the JD, omit it completely. DO NOT write "Not Provided".
             3. NO FLUFF: Prioritize engineering details over marketing content. Strip out generic corporate buzzwords.
-            4. OUTPUT: Output ONLY the exact Markdown code schema below. Do not add conversational text.
+            4. OUTPUT FORMAT: Use the Markdown schema below as your structure. You MUST replace all bracketed placeholders (like [Job Title] or [...]) with actual data extracted from the Job Description. Do NOT output the literal brackets or the placeholder instructions. If a section has no data, do not include that section. If the input text contains no job description information, output exactly: "INVALID_JD"
 
             OUTPUT SCHEMA:
             # Position Overview

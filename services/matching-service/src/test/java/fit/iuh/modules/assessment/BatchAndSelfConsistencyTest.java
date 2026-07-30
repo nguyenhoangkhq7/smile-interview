@@ -43,7 +43,7 @@ class BatchAndSelfConsistencyTest {
     @BeforeEach
     void setUp() {
         assessmentService = new AssessmentServiceImpl(
-                null, null, null, null, null, null, null, new fit.iuh.config.AppProperties()
+                null, null, null, null, null, null, null, new fit.iuh.config.AppProperties(), null
         );
     }
 

@@ -91,6 +91,24 @@ public class ChunkerServiceImpl implements ChunkerService {
             "a", "an", "the", "and", "to", "of", "with", "for", "using", "from", "is", "in", "on", "via", "that", "this", "by"
     );
 
+    private static final Map<String, Pattern> COMPILED_ONTOLOGY = new HashMap<>();
+
+    static {
+        for (var entry : ONTOLOGY.entrySet()) {
+            String domain = entry.getKey();
+            List<String> patterns = new ArrayList<>();
+            for (String kw : entry.getValue()) {
+                if (kw.contains("\\b") || kw.contains("^")) {
+                    patterns.add(kw);
+                } else {
+                    patterns.add("\\b" + Pattern.quote(kw) + "\\b");
+                }
+            }
+            String combinedPattern = "(?i)(" + String.join("|", patterns) + ")";
+            COMPILED_ONTOLOGY.put(domain, Pattern.compile(combinedPattern));
+        }
+    }
+
     @Override
     public List<DocumentChunk> chunk(String markdownContent, String sessionId, String docType) {
         if (markdownContent == null || markdownContent.isBlank()) {
@@ -161,31 +179,23 @@ public class ChunkerServiceImpl implements ChunkerService {
         Pattern pattern = Pattern.compile("^" + Pattern.quote(marker) + "(.+)$", Pattern.MULTILINE);
         Matcher matcher = pattern.matcher(text);
 
-        List<Integer> starts = new ArrayList<>();
+        List<Integer> matchStarts = new ArrayList<>();
+        List<Integer> contentStarts = new ArrayList<>();
         List<String> titles = new ArrayList<>();
 
         while (matcher.find()) {
             titles.add(matcher.group(1).trim());
-            starts.add(matcher.end());
+            matchStarts.add(matcher.start());
+            contentStarts.add(matcher.end());
         }
 
         for (int i = 0; i < titles.size(); i++) {
-            int start = starts.get(i);
-            int end = (i + 1 < titles.size()) ? matcherStart(pattern, text, i + 1) : text.length();
+            int start = contentStarts.get(i);
+            int end = (i + 1 < titles.size()) ? matchStarts.get(i + 1) : text.length();
             result.put(titles.get(i), text.substring(start, end).strip());
         }
 
         return result;
-    }
-
-    private int matcherStart(Pattern pattern, String text, int index) {
-        Matcher m = pattern.matcher(text);
-        int count = 0;
-        while (m.find()) {
-            if (count == index) return m.start();
-            count++;
-        }
-        return text.length();
     }
 
     private Map<String, List<String>> parseProjectFields(String body) {
@@ -348,7 +358,7 @@ public class ChunkerServiceImpl implements ChunkerService {
     private Set<String> extractWords(String text) {
         if (text == null) return Collections.emptySet();
         Set<String> words = new HashSet<>();
-        Matcher m = Pattern.compile("[a-zA-Z]+").matcher(text.toLowerCase());
+        Matcher m = Pattern.compile("[\\p{L}\\p{N}]+").matcher(text.toLowerCase());
         while (m.find()) {
             String w = m.group();
             if (!STOPWORDS.contains(w)) {
@@ -362,15 +372,9 @@ public class ChunkerServiceImpl implements ChunkerService {
         if (text == null || text.isBlank()) return List.of("general");
 
         Set<String> tags = new TreeSet<>();
-        for (var entry : ONTOLOGY.entrySet()) {
-            String domain = entry.getKey();
-            for (String kw : entry.getValue()) {
-                String patternString = (kw.contains("\\b") || kw.contains("^")) ? kw : "(?i)\\b" + Pattern.quote(kw) + "\\b";
-                Pattern p = Pattern.compile(patternString, Pattern.CASE_INSENSITIVE);
-                if (p.matcher(text).find()) {
-                    tags.add(domain);
-                    break;
-                }
+        for (var entry : COMPILED_ONTOLOGY.entrySet()) {
+            if (entry.getValue().matcher(text).find()) {
+                tags.add(entry.getKey());
             }
         }
 

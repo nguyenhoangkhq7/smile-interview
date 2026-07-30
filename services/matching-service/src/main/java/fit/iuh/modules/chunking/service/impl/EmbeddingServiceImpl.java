@@ -80,7 +80,7 @@ public class EmbeddingServiceImpl implements EmbeddingService {
     @Override
     public float[] embedQuery(String queryText) {
         if (queryText == null || queryText.isBlank()) {
-            return new float[1024];
+            return null;
         }
 
         String model = resolveEmbeddingModel();
@@ -108,7 +108,7 @@ public class EmbeddingServiceImpl implements EmbeddingService {
             log.error("[Embedding] Error embedding query string: {}", e.getMessage());
         }
 
-        return new float[1024];
+        return null;
     }
 
     private String resolveEmbeddingModel() {
@@ -123,7 +123,7 @@ public class EmbeddingServiceImpl implements EmbeddingService {
 
     private float[] normalizeTo1024(float[] vector) {
         if (vector == null) {
-            return new float[1024];
+            return null;
         }
         if (vector.length == 1024) {
             return vector;

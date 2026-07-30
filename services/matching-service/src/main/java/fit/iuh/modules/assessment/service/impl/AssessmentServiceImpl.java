@@ -4,22 +4,23 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import fit.iuh.exception.LlmApiException;
 import fit.iuh.modules.admin.repository.SystemSettingRepository;
 import fit.iuh.modules.assessment.dto.*;
-import fit.iuh.modules.assessment.entity.Eligibility;
+import fit.iuh.modules.assessment.entity.EligibilityStatus;
 import fit.iuh.modules.assessment.entity.ResumeAssessment;
 import fit.iuh.modules.assessment.repository.ResumeAssessmentRepository;
 import fit.iuh.modules.assessment.service.*;
 import fit.iuh.modules.assessment.service.AssessmentCriteriaPreparer.MetadataResult;
 import fit.iuh.modules.assessment.service.AssessmentCriteriaPreparer.PreparedJdBundle;
 import fit.iuh.modules.assessment.service.AssessmentScoringEngine.ScoringResult;
-import fit.iuh.modules.ingestion.entity.DocumentType;
-import fit.iuh.modules.ingestion.entity.SessionDocument;
-import fit.iuh.modules.ingestion.repository.SessionDocumentRepository;
+import fit.iuh.modules.session.entity.Session;
+import fit.iuh.modules.session.repository.SessionRepository;
 import fit.iuh.modules.rulengine.repository.JobCriteriaRepository.CriteriaWeightProjection;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
+import java.time.Duration;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -37,13 +38,35 @@ public class AssessmentServiceImpl implements AssessmentService {
     private static final String IMPORTANCE_NOT_APPLICABLE = "NOT_APPLICABLE";
 
     private final ResumeAssessmentRepository resumeAssessmentRepository;
-    private final SessionDocumentRepository sessionDocumentRepository;
+    private final SessionRepository sessionRepository;
     private final SystemSettingRepository systemSettingRepository;
     private final AssessmentCriteriaPreparer criteriaPreparer;
     private final AssessmentLlmRunner llmRunner;
     private final AssessmentScoringEngine scoringEngine;
     private final ObjectMapper objectMapper;
     private final fit.iuh.config.AppProperties appProperties;
+    private final StringRedisTemplate stringRedisTemplate;
+
+    public record CriteriaWeightDto(
+            Long criteriaId,
+            String criteriaName,
+            String promptInstruction,
+            String levelPromptInstruction,
+            Double weightPercentage,
+            String embedding
+    ) implements CriteriaWeightProjection {
+        @Override public Long getCriteriaId() { return criteriaId; }
+        @Override public String getCriteriaName() { return criteriaName; }
+        @Override public String getPromptInstruction() { return promptInstruction; }
+        @Override public String getLevelPromptInstruction() { return levelPromptInstruction; }
+        @Override public Double getWeightPercentage() { return weightPercentage; }
+        @Override public String getEmbedding() { return embedding; }
+    }
+
+    public record JdPhase1And4Bundle(
+            PreparedJdBundle preparedJd,
+            List<CriteriaWeightDto> criteriaList
+    ) {}
 
     @Override
     @Transactional
@@ -76,51 +99,37 @@ public class AssessmentServiceImpl implements AssessmentService {
         }
 
         // Step 2: Load ingested CV and JD documents
-        log.info("[STEP 2/7] Loading ingested CV and JD Markdown documents from DB for sessionId: {}...", sessionId);
-        SessionDocument cvDoc = sessionDocumentRepository
-                .findBySessionIdAndDocumentType(sessionId, DocumentType.CV)
-                .orElseThrow(() -> new LlmApiException("No CV found for session '" + sessionId + "'. Please ingest files first."));
+        Session session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new LlmApiException("Session not found: " + sessionId));
 
-        SessionDocument jdDoc = sessionDocumentRepository
-                .findBySessionIdAndDocumentType(sessionId, DocumentType.JD)
-                .orElseThrow(() -> new LlmApiException("No JD found for session '" + sessionId + "'. Please ingest files first."));
-
-        String fullCvMarkdown = cvDoc.getMarkdownContent();
-        String fullJdMarkdown = jdDoc.getMarkdownContent();
-        log.info("[STEP 2/7] [DEBUG] CV Loaded: ID={}, Size={} chars | JD Loaded: ID={}, Size={} chars",
-                cvDoc.getId(), fullCvMarkdown.length(), jdDoc.getId(), fullJdMarkdown.length());
-
-        // Step 3: Phase 1 — 3-Pass LLM JD Preparation (Metadata + Gates + Classification)
-        log.info("[STEP 3/7] Phase 1 — Preparing JD (3-Pass LLM: Metadata, Gates & Classification)...");
-        PreparedJdBundle preparedJd = criteriaPreparer.prepareJdConsolidatedSinglePass(fullJdMarkdown);
-        MetadataResult metadata = preparedJd.metadata();
-        ClassifiedCriteriaBundle bundle = preparedJd.bundle();
-
-        log.info("[STEP 3/7] [DEBUG] Metadata Result -> Category: {}, Seniority Level: {}", metadata.category(), metadata.level());
-        if (preparedJd.rawGateRequirements() != null) {
-            log.info("[STEP 3/7] [DEBUG] Extracted Gate Requirements ({}) -> {}",
-                    preparedJd.rawGateRequirements().size(),
-                    preparedJd.rawGateRequirements().stream().map(g -> g.getCriteriaName() + ": " + g.getRequiredValue()).collect(Collectors.joining("; ")));
+        if (session.getResume() == null || session.getResume().getParsedContent() == null) {
+            throw new LlmApiException("No parsed CV found for session '" + sessionId + "'. Please ingest files first.");
         }
-        log.info("[STEP 3/7] [DEBUG] Criteria Classification -> DB Criteria: {}, JD Extra Ad-hoc: {}",
-                bundle.dbCriteria().size(), bundle.jdExtras().size());
+        if (session.getJobDescription() == null || session.getJobDescription().getParsedContent() == null) {
+            throw new LlmApiException("No parsed JD found for session '" + sessionId + "'. Please ingest files first.");
+        }
+
+        String fullCvMarkdown = session.getResume().getParsedContent();
+        String fullJdMarkdown = session.getJobDescription().getParsedContent();
+        log.info("[STEP 2/7] [DEBUG] CV Loaded: Size={} chars | JD Loaded: Size={} chars",
+                 fullCvMarkdown.length(), fullJdMarkdown.length());
 
         boolean shouldIncludeNotApp = includeNotApplicable != null
                 ? includeNotApplicable
                 : (systemSettingRepository != null && systemSettingRepository.getBoolean("INCLUDE_NOT_APPLICABLE_CRITERIA", false));
 
-        // Step 4: Record ad-hoc criteria discovered in JD prior to assessment
-        log.info("[STEP 4/7] Recording discovered Ad-hoc criteria and loading domain criteria tree for Category: {}, Level: {}...", metadata.category(), metadata.level());
-        recordAdHocCriteriaPreAssessment(metadata, bundle);
-
-        List<CriteriaWeightProjection> criteriaList = criteriaPreparer.loadAndFilterCriteria(
-                metadata.category().name(),
-                metadata.level().name(),
-                sessionId,
+        // Execute Step 3 and Step 4 with caching
+        JdPhase1And4Bundle phase1And4Bundle = executeAndCachePhase1And4(
+                session.getJobDescription().getId().toString(),
                 fullJdMarkdown,
+                sessionId,
                 shouldIncludeNotApp
         );
-        log.info("[STEP 4/7] [DEBUG] Loaded {} criteria weights from DB for Category={} Level={}", criteriaList.size(), metadata.category(), metadata.level());
+
+        PreparedJdBundle preparedJd = phase1And4Bundle.preparedJd();
+        MetadataResult metadata = preparedJd.metadata();
+        ClassifiedCriteriaBundle bundle = preparedJd.bundle();
+        List<CriteriaWeightProjection> criteriaList = new ArrayList<>(phase1And4Bundle.criteriaList());
 
         // Step 5: Phase 2 — Batched LLM assessment pipeline with self-consistency voting
         log.info("[STEP 5/7] Phase 2 — Running Batched LLM assessment pipeline with self-consistency voting for sessionId: {}...", sessionId);
@@ -151,11 +160,11 @@ public class AssessmentServiceImpl implements AssessmentService {
                 metadata.level()
         );
 
-        Eligibility eligibility = criteriaPreparer.evaluateEligibilityWithRawGates(
+        var eligibilityResult = criteriaPreparer.evaluateEligibilityWithRawGates(
                 preparedJd.rawGateRequirements(), fullJdMarkdown, fullCvMarkdown);
+        EligibilityStatus eligibility = eligibilityResult.status();
         log.info("[STEP 6/7] [DEBUG] Scoring Result -> Overall Score: {}%, Category Breakdown: {}", scoringResult.overallScore(), scoringResult.breakdown());
-        log.info("[STEP 6/7] [DEBUG] Eligibility Check -> Status: {}, Checks: {}", eligibility.getStatus(),
-                eligibility.getGateChecks() != null ? eligibility.getGateChecks().stream().map(c -> c.getCriteriaName() + " (" + c.getStatus() + ")").collect(Collectors.joining(", ")) : "[]");
+        log.info("[STEP 6/7] [DEBUG] Eligibility Check -> Status: {}", eligibility);
 
         // Step 7: Generate grounded improvement recommendations and persist assessment
         log.info("[STEP 7/7] Generating resume improvements and persisting assessment entity for sessionId: {}...", sessionId);
@@ -166,14 +175,66 @@ public class AssessmentServiceImpl implements AssessmentService {
         log.info("[STEP 7/7] [DEBUG] Top Improvements Generated ({}) -> {}", improvements.size(),
                 improvements.stream().map(ImprovementResponseDto.ImprovementItem::criteriaName).collect(Collectors.joining("; ")));
 
-        ResumeAssessment entity = buildAndPersistEntity(sessionId, metadata, scoringResult, dto.preferToHaveEvidenceItems(), improvements, eligibility);
+        ResumeAssessment entity = buildAndPersistEntity(sessionId, metadata, scoringResult, dto.preferToHaveEvidenceItems(), eligibilityResult.gateItems(), improvements, eligibility);
         log.info("[STEP 7/7] [DEBUG] Entity Persisted Successfully -> ID: {}, SessionId: {}", entity.getId(), entity.getSessionId());
 
         AssessmentResponse response = toResponse(entity, false);
         response.setScoreBreakdown(scoringResult.breakdown());
         log.info("[PIPELINE COMPLETE] Assessment successfully saved and returned for sessionId: {} | Final Score: {}% | Eligibility: {}",
-                sessionId, scoringResult.overallScore(), eligibility.getStatus());
+                sessionId, scoringResult.overallScore(), eligibility);
         return response;
+    }
+
+    private JdPhase1And4Bundle executeAndCachePhase1And4(String jdId, String fullJdMarkdown, String sessionId, boolean shouldIncludeNotApp) {
+        String cacheKey = "jd_p1_p4:v1:" + jdId + ":" + shouldIncludeNotApp;
+        try {
+            String cachedData = stringRedisTemplate.opsForValue().get(cacheKey);
+            if (cachedData != null) {
+                log.info("[Phase1+4-Cache] HIT! Reusing Phase 1 & 4 profile for JD {} (0ms, 0 LLM calls).", jdId);
+                return objectMapper.readValue(cachedData, JdPhase1And4Bundle.class);
+            }
+        } catch (Exception e) {
+            log.warn("[Phase1+4-Cache] Warning: Failed to read from Redis for cacheKey {}: {}", cacheKey, e.getMessage());
+        }
+
+        // Run Step 3
+        log.info("[STEP 3/7] Phase 1 — Preparing JD (3-Pass LLM: Metadata, Gates & Classification)...");
+        PreparedJdBundle preparedJd = criteriaPreparer.prepareJdConsolidatedSinglePass(jdId, fullJdMarkdown);
+        MetadataResult metadata = preparedJd.metadata();
+        ClassifiedCriteriaBundle bundle = preparedJd.bundle();
+
+        // Run Step 4
+        log.info("[STEP 4/7] Recording discovered Ad-hoc criteria and loading domain criteria tree for Category: {}, Level: {}...", metadata.category(), metadata.level());
+        recordAdHocCriteriaPreAssessment(metadata, bundle);
+        List<CriteriaWeightProjection> criteriaListProj = criteriaPreparer.loadAndFilterCriteria(
+                metadata.category().name(),
+                metadata.level().name(),
+                sessionId,
+                fullJdMarkdown,
+                shouldIncludeNotApp
+        );
+
+        List<CriteriaWeightDto> criteriaListDto = criteriaListProj.stream()
+                .map(c -> new CriteriaWeightDto(
+                        c.getCriteriaId(),
+                        c.getCriteriaName(),
+                        c.getPromptInstruction(),
+                        c.getLevelPromptInstruction(),
+                        c.getWeightPercentage(),
+                        c.getEmbedding()
+                ))
+                .collect(Collectors.toList());
+
+        JdPhase1And4Bundle bundleToCache = new JdPhase1And4Bundle(preparedJd, criteriaListDto);
+
+        try {
+            String json = objectMapper.writeValueAsString(bundleToCache);
+            stringRedisTemplate.opsForValue().set(cacheKey, json, Duration.ofDays(30));
+        } catch (Exception e) {
+            log.warn("[Phase1+4-Cache] Warning: Failed to save to Redis for cacheKey {}: {}", cacheKey, e.getMessage());
+        }
+
+        return bundleToCache;
     }
 
     private Optional<AssessmentResponse> checkCachedAssessment(String sessionId, boolean forceRefresh, String fromSessionId) {
@@ -192,17 +253,22 @@ public class AssessmentServiceImpl implements AssessmentService {
                 }
             }
 
-            Optional<SessionDocument> cvDocOpt = sessionDocumentRepository.findBySessionIdAndDocumentType(sessionId, DocumentType.CV);
-            Optional<SessionDocument> jdDocOpt = sessionDocumentRepository.findBySessionIdAndDocumentType(sessionId, DocumentType.JD);
-            if (cvDocOpt.isPresent() && jdDocOpt.isPresent()) {
-                String cvContent = cvDocOpt.get().getMarkdownContent();
-                String jdContent = jdDocOpt.get().getMarkdownContent();
-                Optional<String> otherSessionIdOpt = sessionDocumentRepository.findSessionWithSameContentAndAssessment(cvContent, jdContent, sessionId);
-                if (otherSessionIdOpt.isPresent()) {
-                    String otherSessionId = otherSessionIdOpt.get();
-                    log.info("[Assessment] Content-based Cache HIT! Reusing assessment for new sessionId={}", sessionId);
-                    var otherAssessment = resumeAssessmentRepository.findBySessionId(otherSessionId).get();
-                    return Optional.of(cloneAndBuildResponse(sessionId, otherAssessment));
+            Optional<Session> sessionOpt = sessionRepository.findById(sessionId);
+            if (sessionOpt.isPresent()) {
+                Session session = sessionOpt.get();
+                if (session.getResume() != null && session.getResume().getParsedContent() != null &&
+                    session.getJobDescription() != null && session.getJobDescription().getParsedContent() != null) {
+                    
+                    String cvContent = session.getResume().getParsedContent();
+                    String jdContent = session.getJobDescription().getParsedContent();
+                    
+                    Optional<String> otherSessionIdOpt = sessionRepository.findSessionWithSameContentAndAssessment(cvContent, jdContent, sessionId);
+                    if (otherSessionIdOpt.isPresent()) {
+                        String otherSessionId = otherSessionIdOpt.get();
+                        log.info("[Assessment] Content-based Cache HIT! Reusing assessment for new sessionId={}", sessionId);
+                        var otherAssessment = resumeAssessmentRepository.findBySessionId(otherSessionId).get();
+                        return Optional.of(cloneAndBuildResponse(sessionId, otherAssessment));
+                    }
                 }
             }
         } else if (resumeAssessmentRepository.existsBySessionId(sessionId)) {
@@ -217,7 +283,7 @@ public class AssessmentServiceImpl implements AssessmentService {
         try {
             List<AssessmentResponseDto.AdHocEvidenceItem> jdExtrasForRecording = bundle.jdExtras().stream()
                     .map(e -> new AssessmentResponseDto.AdHocEvidenceItem(
-                            null, e.name(), e.importance(), e.promptInstruction(), null, null, null))
+                            null, e.name(), e.importance(), e.promptInstruction(), null, null, null, null))
                     .collect(Collectors.toList());
             criteriaPreparer.recordAdHocCriteria(metadata.category(), jdExtrasForRecording);
         } catch (Exception e) {
@@ -274,8 +340,9 @@ public class AssessmentServiceImpl implements AssessmentService {
         if (weaknesses.isEmpty()) return List.of();
         try {
             String jsonStr = objectMapper.writeValueAsString(weaknesses);
-            String prompt = "Generate top priority resume improvements based on weaknesses:\n" + jsonStr;
-            String llmRes = llmRunner.callLlmBlockingWithSemaphore(null, prompt);
+            String sysPrompt = "You are a career expert. Analyze candidate weaknesses and generate top priority resume improvements in valid JSON matching the ImprovementResponseDto schema.";
+            String userPrompt = "Generate top priority resume improvements based on weaknesses:\n" + jsonStr;
+            String llmRes = llmRunner.callLlmBlockingWithSemaphore(sysPrompt, userPrompt);
             String clean = fit.iuh.modules.assessment.util.TextSanitizationUtil.extractCleanJson(llmRes);
             var res = objectMapper.readValue(clean, ImprovementResponseDto.class);
             return res != null && res.topPriorityImprovements() != null ? res.topPriorityImprovements() : List.of();
@@ -288,18 +355,103 @@ public class AssessmentServiceImpl implements AssessmentService {
     private ResumeAssessment buildAndPersistEntity(
             String sessionId, MetadataResult metadata, ScoringResult scoringResult,
             List<AssessmentResponseDto.AdHocEvidenceItem> preferToHaveItems,
-            List<ImprovementResponseDto.ImprovementItem> improvements, Eligibility eligibility) {
+            List<AssessmentResponseDto.EvidenceItem> gateItems,
+            List<ImprovementResponseDto.ImprovementItem> improvements, EligibilityStatus eligibility) {
 
         ResumeAssessment entity = ResumeAssessment.builder()
                 .sessionId(sessionId)
                 .jobCategory(metadata.category())
                 .seniorityLevel(metadata.level())
                 .overallMatchScore(scoringResult.overallScore())
-                .mustHaveEvidenceItems(scoringResult.updatedItems())
-                .preferToHaveEvidenceItems(preferToHaveItems)
-                .topPriorityImprovements(improvements)
                 .eligibility(eligibility)
                 .build();
+
+        List<fit.iuh.modules.assessment.entity.EvidenceItem> evidenceEntities = new ArrayList<>();
+        if (scoringResult.updatedItems() != null) {
+            for (var item : scoringResult.updatedItems()) {
+                evidenceEntities.add(fit.iuh.modules.assessment.entity.EvidenceItem.builder()
+                        .assessment(entity)
+                        .criteriaId(item.criteriaId() != null ? item.criteriaId().intValue() : null)
+                        .criteriaName(item.criteriaName())
+                        .importance(item.importance())
+                        .jdRequirement(item.jdRequirement())
+                        .cvEvidence(item.cvEvidence())
+                        .status(item.status())
+                        .reasoning(item.reasoning())
+                        .build());
+            }
+        }
+        if (preferToHaveItems != null) {
+            for (var item : preferToHaveItems) {
+                evidenceEntities.add(fit.iuh.modules.assessment.entity.EvidenceItem.builder()
+                        .assessment(entity)
+                        .criteriaId(item.criteriaId() != null ? item.criteriaId().intValue() : null)
+                        .criteriaName(item.criteriaName())
+                        .importance(item.importance())
+                        .jdRequirement(item.jdRequirement())
+                        .cvEvidence(item.cvEvidence())
+                        .status(item.status())
+                        .reasoning(item.reasoning())
+                        .build());
+            }
+        }
+        if (gateItems != null) {
+            for (var item : gateItems) {
+                evidenceEntities.add(fit.iuh.modules.assessment.entity.EvidenceItem.builder()
+                        .assessment(entity)
+                        .criteriaId(item.criteriaId() != null ? item.criteriaId().intValue() : null)
+                        .criteriaName(item.criteriaName())
+                        .importance(item.importance())
+                        .jdRequirement(item.jdRequirement())
+                        .cvEvidence(item.cvEvidence())
+                        .status(item.status())
+                        .reasoning(item.reasoning())
+                        .build());
+            }
+        }
+        entity.setEvidenceItems(evidenceEntities);
+
+        List<fit.iuh.modules.assessment.entity.ScoreBreakdown> breakdownEntities = new ArrayList<>();
+        if (scoringResult.breakdown() != null) {
+            // AssessmentResponse.ScoreBreakdown contains rawMustHaveScore, etc.
+            // Let's store MustHave and PreferToHave as categories
+            breakdownEntities.add(fit.iuh.modules.assessment.entity.ScoreBreakdown.builder()
+                    .assessment(entity)
+                    .category("Must-Have")
+                    .score(scoringResult.breakdown().rawMustHaveScore())
+                    .maxScore(100)
+                    .feedback("Weight: " + scoringResult.breakdown().mustHaveWeightRatio())
+                    .build());
+            breakdownEntities.add(fit.iuh.modules.assessment.entity.ScoreBreakdown.builder()
+                    .assessment(entity)
+                    .category("Prefer-To-Have")
+                    .score(scoringResult.breakdown().rawPreferToHaveScore())
+                    .maxScore(100)
+                    .feedback("Weight: " + scoringResult.breakdown().preferToHaveWeightRatio())
+                    .build());
+            breakdownEntities.add(fit.iuh.modules.assessment.entity.ScoreBreakdown.builder()
+                    .assessment(entity)
+                    .category("Overall")
+                    .score(scoringResult.breakdown().finalScore())
+                    .maxScore(100)
+                    .feedback("Final Score")
+                    .build());
+        }
+        entity.setScoreBreakdowns(breakdownEntities);
+
+        List<fit.iuh.modules.assessment.entity.Improvement> improvementEntities = new ArrayList<>();
+        if (improvements != null) {
+            for (int i = 0; i < improvements.size(); i++) {
+                var imp = improvements.get(i);
+                improvementEntities.add(fit.iuh.modules.assessment.entity.Improvement.builder()
+                        .assessment(entity)
+                        .priorityRank(i + 1)
+                        .topic(imp.criteriaName())
+                        .suggestionDetails(imp.actionableAdvice())
+                        .build());
+            }
+        }
+        entity.setImprovements(improvementEntities);
 
         return resumeAssessmentRepository.save(entity);
     }
@@ -312,9 +464,12 @@ public class AssessmentServiceImpl implements AssessmentService {
                 "",
                 true
         );
+        List<AssessmentResponseDto.EvidenceItem> mustHave = mapToMustHaveDto(entity.getEvidenceItems());
+        List<AssessmentResponseDto.AdHocEvidenceItem> prefer = mapToPreferDto(entity.getEvidenceItems());
+
         ScoringResult scoringResult = scoringEngine.calculateWithBreakdown(
-                entity.getMustHaveEvidenceItems(),
-                entity.getPreferToHaveEvidenceItems(),
+                mustHave,
+                prefer,
                 criteriaList,
                 entity.getSeniorityLevel()
         );
@@ -328,11 +483,52 @@ public class AssessmentServiceImpl implements AssessmentService {
                 .jobCategory(otherAssessment.getJobCategory())
                 .seniorityLevel(otherAssessment.getSeniorityLevel())
                 .overallMatchScore(otherAssessment.getOverallMatchScore())
-                .mustHaveEvidenceItems(otherAssessment.getMustHaveEvidenceItems())
-                .preferToHaveEvidenceItems(otherAssessment.getPreferToHaveEvidenceItems())
-                .topPriorityImprovements(otherAssessment.getTopPriorityImprovements())
                 .eligibility(otherAssessment.getEligibility())
                 .build();
+                
+        List<fit.iuh.modules.assessment.entity.EvidenceItem> clonedEvidences = new ArrayList<>();
+        if (otherAssessment.getEvidenceItems() != null) {
+            for (var ev : otherAssessment.getEvidenceItems()) {
+                clonedEvidences.add(fit.iuh.modules.assessment.entity.EvidenceItem.builder()
+                        .assessment(clonedAssessment)
+                        .criteriaId(ev.getCriteriaId())
+                        .criteriaName(ev.getCriteriaName())
+                        .importance(ev.getImportance())
+                        .jdRequirement(ev.getJdRequirement())
+                        .cvEvidence(ev.getCvEvidence())
+                        .status(ev.getStatus())
+                        .reasoning(ev.getReasoning())
+                        .build());
+            }
+        }
+        clonedAssessment.setEvidenceItems(clonedEvidences);
+        
+        List<fit.iuh.modules.assessment.entity.ScoreBreakdown> clonedBreakdowns = new ArrayList<>();
+        if (otherAssessment.getScoreBreakdowns() != null) {
+            for (var sb : otherAssessment.getScoreBreakdowns()) {
+                clonedBreakdowns.add(fit.iuh.modules.assessment.entity.ScoreBreakdown.builder()
+                        .assessment(clonedAssessment)
+                        .category(sb.getCategory())
+                        .score(sb.getScore())
+                        .maxScore(sb.getMaxScore())
+                        .feedback(sb.getFeedback())
+                        .build());
+            }
+        }
+        clonedAssessment.setScoreBreakdowns(clonedBreakdowns);
+
+        List<fit.iuh.modules.assessment.entity.Improvement> clonedImprovements = new ArrayList<>();
+        if (otherAssessment.getImprovements() != null) {
+            for (var imp : otherAssessment.getImprovements()) {
+                clonedImprovements.add(fit.iuh.modules.assessment.entity.Improvement.builder()
+                        .assessment(clonedAssessment)
+                        .priorityRank(imp.getPriorityRank())
+                        .topic(imp.getTopic())
+                        .suggestionDetails(imp.getSuggestionDetails())
+                        .build());
+            }
+        }
+        clonedAssessment.setImprovements(clonedImprovements);
 
         ResumeAssessment savedCloned = resumeAssessmentRepository.save(clonedAssessment);
         return buildResponseWithScoring(sessionId, clonedAssessment, toResponse(savedCloned, true));
@@ -345,13 +541,55 @@ public class AssessmentServiceImpl implements AssessmentService {
                 .jobCategory(entity.getJobCategory())
                 .seniorityLevel(entity.getSeniorityLevel())
                 .overallMatchScore(entity.getOverallMatchScore())
-                .mustHaveEvidenceItems(entity.getMustHaveEvidenceItems())
-                .preferToHaveEvidenceItems(entity.getPreferToHaveEvidenceItems())
-                .topPriorityImprovements(entity.getTopPriorityImprovements())
+                .mustHaveEvidenceItems(mapToMustHaveDto(entity.getEvidenceItems()))
+                .preferToHaveEvidenceItems(mapToPreferDto(entity.getEvidenceItems()))
+                .gateEvidenceItems(mapToGateDto(entity.getEvidenceItems()))
+                .topPriorityImprovements(mapToImprovementDto(entity.getImprovements()))
                 .eligibility(entity.getEligibility())
                 .cached(cached)
                 .createdAt(entity.getCreatedAt())
                 .build();
+    }
+
+    private List<AssessmentResponseDto.EvidenceItem> mapToMustHaveDto(List<fit.iuh.modules.assessment.entity.EvidenceItem> items) {
+        if (items == null) return List.of();
+        return items.stream()
+                .filter(i -> !"PREFERRED".equalsIgnoreCase(i.getImportance()) && !"GATE".equalsIgnoreCase(i.getImportance()))
+                .map(i -> new AssessmentResponseDto.EvidenceItem(
+                        i.getCriteriaId() != null ? i.getCriteriaId().longValue() : null,
+                        i.getCriteriaName(), i.getImportance(), i.getJdRequirement(), i.getCvEvidence(),
+                        null, i.getStatus(), i.getReasoning(), null, null, null, null, null, null
+                )).collect(Collectors.toList());
+    }
+
+    private List<AssessmentResponseDto.EvidenceItem> mapToGateDto(List<fit.iuh.modules.assessment.entity.EvidenceItem> items) {
+        if (items == null) return List.of();
+        return items.stream()
+                .filter(i -> "GATE".equalsIgnoreCase(i.getImportance()))
+                .map(i -> new AssessmentResponseDto.EvidenceItem(
+                        i.getCriteriaId() != null ? i.getCriteriaId().longValue() : null,
+                        i.getCriteriaName(), i.getImportance(), i.getJdRequirement(), i.getCvEvidence(),
+                        null, i.getStatus(), i.getReasoning(), null, null, null, null, null, null
+                )).collect(Collectors.toList());
+    }
+
+    private List<AssessmentResponseDto.AdHocEvidenceItem> mapToPreferDto(List<fit.iuh.modules.assessment.entity.EvidenceItem> items) {
+        if (items == null) return List.of();
+        return items.stream()
+                .filter(i -> "PREFERRED".equalsIgnoreCase(i.getImportance()))
+                .map(i -> new AssessmentResponseDto.AdHocEvidenceItem(
+                        i.getCriteriaId() != null ? i.getCriteriaId().longValue() : null,
+                        i.getCriteriaName(), i.getImportance(), null, i.getJdRequirement(),
+                        i.getCvEvidence(), i.getStatus(), i.getReasoning()
+                )).collect(Collectors.toList());
+    }
+
+    private List<ImprovementResponseDto.ImprovementItem> mapToImprovementDto(List<fit.iuh.modules.assessment.entity.Improvement> items) {
+        if (items == null) return List.of();
+        return items.stream()
+                .sorted(Comparator.comparing(fit.iuh.modules.assessment.entity.Improvement::getPriorityRank))
+                .map(i -> new ImprovementResponseDto.ImprovementItem(i.getTopic(), i.getSuggestionDetails(), String.valueOf(i.getPriorityRank())))
+                .collect(Collectors.toList());
     }
 
     private List<AssessmentResponseDto.AdHocEvidenceItem> filterDuplicateAdHocItems(

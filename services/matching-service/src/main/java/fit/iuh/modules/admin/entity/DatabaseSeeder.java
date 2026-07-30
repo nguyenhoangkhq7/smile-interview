@@ -134,13 +134,13 @@ public class DatabaseSeeder implements CommandLineRunner {
 
         seedSettingIfAbsent(
                 "CRITERIA_BATCH_SIZE",
-                "5",
+                "10",
                 "Number of criteria sent per LLM batch call during evidence matching"
         );
-        // Force update existing setting to 5 for optimal LLM evaluation accuracy
+        // Force update existing setting to 10 for optimal LLM evaluation speed and latency
         settingRepository.findBySettingKey("CRITERIA_BATCH_SIZE").ifPresent(setting -> {
-            if ("10".equals(setting.getSettingValue())) {
-                setting.setSettingValue("5");
+            if ("5".equals(setting.getSettingValue()) || "1".equals(setting.getSettingValue())) {
+                setting.setSettingValue("10");
                 settingRepository.save(setting);
             }
         });

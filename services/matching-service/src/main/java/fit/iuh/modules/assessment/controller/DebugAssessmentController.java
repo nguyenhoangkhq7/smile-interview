@@ -1,7 +1,7 @@
 package fit.iuh.modules.assessment.controller;
 
 import fit.iuh.modules.assessment.dto.ClassifiedCriteriaBundle;
-import fit.iuh.modules.assessment.entity.Eligibility;
+import fit.iuh.modules.assessment.entity.EligibilityStatus;
 import fit.iuh.modules.assessment.service.AssessmentCriteriaPreparer;
 import fit.iuh.modules.assessment.service.AssessmentCriteriaPreparer.MetadataResult;
 import fit.iuh.modules.rulengine.repository.JobCriteriaRepository.CriteriaWeightProjection;
@@ -38,10 +38,10 @@ public class DebugAssessmentController {
     // STEP 2: Gate Extraction & Eligibility (Hard Requirements)
     // =========================================================================
     @PostMapping("/evaluate-eligibility")
-    public ResponseEntity<Eligibility> debugEvaluateEligibility(
-            @RequestParam(value = "jd_content", defaultValue = "") String jdContent,
-            @RequestParam(value = "cv_content", defaultValue = "") String cvContent) {
-        Eligibility result = criteriaPreparer.evaluateEligibility(jdContent, cvContent);
+    public ResponseEntity<?> debugEvaluateEligibility(
+            @RequestParam("jdContent") String jdContent,
+            @RequestParam("cvContent") String cvContent) {
+        var result = criteriaPreparer.evaluateEligibility(jdContent, cvContent);
         return ResponseEntity.ok(result);
     }
 

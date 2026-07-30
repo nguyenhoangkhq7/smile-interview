@@ -41,6 +41,8 @@ public class IngestionController {
         return ResponseEntity.ok(response);
     }
 
+
+
     @DeleteMapping("/{sessionId}")
     public ResponseEntity<java.util.Map<String, String>> deleteSession(@PathVariable String sessionId) {
         log.info("Received request to delete session: {}", sessionId);

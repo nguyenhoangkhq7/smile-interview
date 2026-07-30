@@ -31,106 +31,150 @@ const pool = globalWithPool.postgresPool;
 let dbInitialized = false;
 
 export async function initDb() {
-  const createResumesTable = `
+  const createTablesSql = `
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+    CREATE TABLE IF NOT EXISTS users (
+      id UUID PRIMARY KEY,
+      username VARCHAR(255) NOT NULL,
+      email VARCHAR(255) NOT NULL UNIQUE,
+      password_hash VARCHAR(255) NOT NULL,
+      role VARCHAR(50) NOT NULL,
+      phone_number VARCHAR(50),
+      avatar_url VARCHAR(255),
+      default_resume_id UUID,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE TABLE IF NOT EXISTS resumes (
-      id SERIAL PRIMARY KEY,
-      user_id VARCHAR(255),
+      id UUID PRIMARY KEY,
+      user_id UUID REFERENCES users(id) ON DELETE SET NULL,
       file_name VARCHAR(255) NOT NULL,
-      extracted_text TEXT,
+      parsed_content TEXT,
       raw_text TEXT,
       file_url VARCHAR(500),
       cloudinary_id VARCHAR(255),
       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );
-  `;
 
-  const createJdsTable = `
     CREATE TABLE IF NOT EXISTS job_descriptions (
-      id SERIAL PRIMARY KEY,
-      user_id VARCHAR(255),
+      id UUID PRIMARY KEY,
+      user_id UUID REFERENCES users(id) ON DELETE SET NULL,
       title VARCHAR(255) NOT NULL,
-      extracted_text TEXT,
+      parsed_content TEXT,
       raw_text TEXT,
       file_url VARCHAR(500),
       cloudinary_id VARCHAR(255),
       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );
-  `;
 
-  const createSessionsTable = `
+    CREATE TABLE IF NOT EXISTS resume_assessments (
+      id UUID PRIMARY KEY,
+      session_id VARCHAR(128) UNIQUE,
+      job_category VARCHAR(50),
+      seniority_level VARCHAR(20),
+      overall_match_score INTEGER,
+      eligibility VARCHAR(50),
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS evidence_items (
+      id UUID PRIMARY KEY,
+      assessment_id UUID NOT NULL REFERENCES resume_assessments(id) ON DELETE CASCADE,
+      criteria_id INTEGER,
+      criteria_name VARCHAR(255),
+      importance VARCHAR(50),
+      jd_requirement TEXT,
+      cv_evidence TEXT,
+      status VARCHAR(50),
+      reasoning TEXT,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS score_breakdowns (
+      id UUID PRIMARY KEY,
+      assessment_id UUID NOT NULL REFERENCES resume_assessments(id) ON DELETE CASCADE,
+      category VARCHAR(100),
+      score INTEGER,
+      max_score INTEGER,
+      feedback TEXT,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS improvements (
+      id UUID PRIMARY KEY,
+      assessment_id UUID NOT NULL REFERENCES resume_assessments(id) ON DELETE CASCADE,
+      priority_rank INTEGER,
+      topic VARCHAR(255),
+      suggestion_details TEXT,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE TABLE IF NOT EXISTS sessions (
-      id VARCHAR(255) PRIMARY KEY,
-      date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      id VARCHAR(128) PRIMARY KEY,
+      user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+      resume_id UUID REFERENCES resumes(id) ON DELETE SET NULL,
+      jd_id UUID REFERENCES job_descriptions(id) ON DELETE SET NULL,
+      assessment_id UUID REFERENCES resume_assessments(id) ON DELETE SET NULL,
+      status VARCHAR(50),
       interview_type VARCHAR(50),
       role_title VARCHAR(255),
-      cv_filename VARCHAR(255),
-      jd_filename VARCHAR(255),
-      overall_score INT,
-      status VARCHAR(50),
+      overall_score INTEGER,
       overall_feedback TEXT,
-      competency_fit_score INT,
-      technical_depth_score INT,
-      match_level VARCHAR(50),
-      candidate_level VARCHAR(50),
-      role_type_detected VARCHAR(100),
-      years_of_experience_estimate VARCHAR(50),
-      strong_areas JSONB,
-      gap_areas JSONB,
-      critical_missing_skills JSONB,
-      section_wise_feedback JSONB,
-      actionable_suggestions JSONB
+      user_rating INTEGER,
+      user_feedback_text TEXT,
+      started_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      ended_at TIMESTAMP WITH TIME ZONE
     );
-  `;
 
-  const createTurnsTable = `
+    CREATE TABLE IF NOT EXISTS session_questions (
+      id UUID PRIMARY KEY,
+      session_id VARCHAR(128) NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+      question_config TEXT,
+      candidate_context TEXT,
+      total_questions INTEGER,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS questions (
+      id UUID PRIMARY KEY,
+      session_question_id UUID NOT NULL REFERENCES session_questions(id) ON DELETE CASCADE,
+      category VARCHAR(100),
+      question_text TEXT,
+      expected_answer TEXT,
+      difficulty_level INTEGER,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS session_metadata (
+      id UUID PRIMARY KEY,
+      session_question_id UUID NOT NULL REFERENCES session_questions(id) ON DELETE CASCADE,
+      metadata_key VARCHAR(100),
+      metadata_value TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS session_turns (
-      id SERIAL PRIMARY KEY,
-      session_id VARCHAR(255) REFERENCES sessions(id) ON DELETE CASCADE,
-      question TEXT,
+      id UUID PRIMARY KEY,
+      session_id VARCHAR(128) NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+      turn_number INTEGER NOT NULL,
+      question_id UUID REFERENCES questions(id) ON DELETE SET NULL,
+      dynamic_question_text TEXT,
       answer TEXT,
-      score INT,
+      score INTEGER,
       strengths TEXT,
       improvements TEXT,
       suggested_answer TEXT,
       topic_tag VARCHAR(100),
-      is_deep_dive BOOLEAN
+      is_deep_dive BOOLEAN DEFAULT FALSE,
+      latency_ms INTEGER,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(session_id, turn_number)
     );
   `;
 
-  await pool.query(createResumesTable);
-  await pool.query(createJdsTable);
-  await pool.query(createSessionsTable);
-  await pool.query(createTurnsTable);
-
-  // Alter sessions to add resume_id, jd_id, and all assessment columns if they do not exist
-  const alterColumns = [
-    'ALTER TABLE users ALTER COLUMN default_resume_id TYPE VARCHAR(255) USING default_resume_id::varchar;',
-    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS resume_id INT REFERENCES resumes(id) ON DELETE SET NULL;',
-    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS jd_id INT REFERENCES job_descriptions(id) ON DELETE SET NULL;',
-    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS competency_fit_score INT;',
-    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS technical_depth_score INT;',
-    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS match_level VARCHAR(50);',
-    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS candidate_level VARCHAR(50);',
-    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS role_type_detected VARCHAR(100);',
-    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS years_of_experience_estimate VARCHAR(50);',
-    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS strong_areas JSONB;',
-    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS gap_areas JSONB;',
-    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS critical_missing_skills JSONB;',
-    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS section_wise_feedback JSONB;',
-    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS actionable_suggestions JSONB;',
-    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS evidence_items JSONB;',
-    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS additional_evidence_items JSONB;',
-    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS score_breakdown JSONB;',
-    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS top_priority_improvements JSONB;',
-    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS hiring_recommendation VARCHAR(50);',
-    'ALTER TABLE sessions ADD COLUMN IF NOT EXISTS eligibility JSONB;',
-    'ALTER TABLE session_turns ADD COLUMN IF NOT EXISTS good_answer_signals JSONB;'
-  ];
-
-  for (const sql of alterColumns) {
-    await pool.query(sql);
-  }
-
+  await pool.query(createTablesSql);
   console.log('[DB] Database tables initialized successfully');
 }
 

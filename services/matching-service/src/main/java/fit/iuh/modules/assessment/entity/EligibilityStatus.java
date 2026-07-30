@@ -1,7 +1,7 @@
 package fit.iuh.modules.assessment.entity;
 
 public enum EligibilityStatus {
-    ELIGIBLE,
-    NOT_ELIGIBLE,
-    UNCERTAIN
+    ELIGIBILITY,
+    PARTIAL,
+    NOT_ELIGIBILITY
 }
