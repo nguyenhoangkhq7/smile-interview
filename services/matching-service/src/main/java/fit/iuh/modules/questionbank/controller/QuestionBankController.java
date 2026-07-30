@@ -11,7 +11,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -29,11 +28,21 @@ public class QuestionBankController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    /**
+     * Retrieves the most recently generated question bank for a given session.
+     *
+     * <p>Returns {@code 200 OK} with the {@link QuestionBankResponseDto} payload if a
+     * question bank exists for the session, or {@code 404 Not Found} if no questions
+     * have been generated yet.
+     *
+     * @param sessionId the interview session identifier
+     * @return the latest question bank record for the session
+     */
     @GetMapping(value = "/session/{sessionId}", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<List<QuestionBankResponseDto>> getBySessionId(@PathVariable String sessionId) {
-        log.info("Received request to fetch question banks for sessionId={}", sessionId);
-        List<QuestionBankResponseDto> list = questionBankService.getBySessionId(sessionId);
-        return ResponseEntity.ok(list);
+    public ResponseEntity<QuestionBankResponseDto> getQuestionBankBySessionId(@PathVariable String sessionId) {
+        log.info("Received request to fetch latest question bank for sessionId={}", sessionId);
+        QuestionBankResponseDto response = questionBankService.getQuestionBankBySessionId(sessionId);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping(value = "/{id}", produces = MediaType.APPLICATION_JSON_VALUE)

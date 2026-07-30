@@ -2,9 +2,12 @@ package fit.iuh.modules.auth.service;
 
 import fit.iuh.modules.auth.dto.AuthResponse;
 import fit.iuh.modules.auth.dto.ChangePasswordRequest;
+import fit.iuh.modules.auth.dto.CreateHrUserRequest;
+import fit.iuh.modules.auth.dto.CreateHrUserResponse;
 import fit.iuh.modules.auth.dto.LoginRequest;
 import fit.iuh.modules.auth.dto.RegisterRequest;
 import fit.iuh.modules.auth.dto.UpdateProfileRequest;
+import fit.iuh.modules.auth.entity.Role;
 import fit.iuh.modules.auth.entity.User;
 import fit.iuh.modules.auth.repository.UserRepository;
 import fit.iuh.modules.auth.security.JwtService;
@@ -24,7 +27,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-import java.util.UUID;
 
 /**
  * Business logic for user registration, authentication, and profile management.
@@ -45,8 +47,7 @@ public class AuthService {
 
     /**
      * Registers a new user.
-     * The role is always forced to {@code "USER"} — ADMIN accounts must be
-     * seeded directly in the database; they cannot be created via this API.
+     * The role is forced to {@code Role.USER} / {@code Role.CANDIDATE}.
      *
      * @param request the registration payload
      * @return {@link AuthResponse} with a JWT and user details
@@ -63,7 +64,7 @@ public class AuthService {
                 .username(request.username())
                 .email(request.email())
                 .password(passwordEncoder.encode(request.password()))
-                .role("USER")   // ← always forced; client cannot escalate to ADMIN
+                .role(Role.USER)
                 .build();
 
         User saved = userRepository.save(user);
@@ -71,6 +72,47 @@ public class AuthService {
 
         String token = jwtService.generateToken(saved);
         return toAuthResponse(token, saved);
+    }
+
+    /**
+     * Creates a new HR user account (Admin only).
+     *
+     * @param request the HR account creation payload
+     * @return {@link CreateHrUserResponse} with account creation confirmation
+     */
+    @Transactional
+    public CreateHrUserResponse createHrUser(CreateHrUserRequest request) {
+        String targetEmail = (request.getEmail() != null && !request.getEmail().isBlank())
+                ? request.getEmail()
+                : (request.getUsername().contains("@") ? request.getUsername() : request.getUsername() + "@hr.smile.com");
+
+        if (userRepository.existsByEmail(targetEmail)) {
+            throw new IllegalArgumentException("User with email/username already exists: " + targetEmail);
+        }
+
+        String displayName = (request.getEvaluatorName() != null && !request.getEvaluatorName().isBlank())
+                ? request.getEvaluatorName()
+                : request.getUsername();
+
+        User user = User.builder()
+                .username(displayName)
+                .email(targetEmail)
+                .password(passwordEncoder.encode(request.getPassword()))
+                .role(Role.HR)
+                .build();
+
+        User saved = userRepository.save(user);
+        log.info("Admin created new HR user: {} ({}) with ID: {}", saved.getDisplayUsername(), saved.getEmail(), saved.getId());
+
+        return CreateHrUserResponse.builder()
+                .id(saved.getId())
+                .username(request.getUsername())
+                .email(saved.getEmail())
+                .evaluatorName(displayName)
+                .role(saved.getRole())
+                .createdAt(saved.getCreatedAt())
+                .message("HR account created successfully.")
+                .build();
     }
 
     // ----------------------------------------------------------------
@@ -82,7 +124,6 @@ public class AuthService {
      *
      * @param request the login payload
      * @return {@link AuthResponse} with a fresh JWT
-     * @throws org.springframework.security.core.AuthenticationException on bad credentials
      */
     public AuthResponse login(LoginRequest request) {
         Authentication auth = authenticationManager.authenticate(
@@ -100,99 +141,58 @@ public class AuthService {
     // Change Password
     // ----------------------------------------------------------------
 
-    /**
-     * Changes the password for the currently authenticated user.
-     *
-     * <ol>
-     *   <li>Verifies {@code currentPassword} against the stored BCrypt hash.</li>
-     *   <li>Ensures {@code newPassword} equals {@code confirmPassword}.</li>
-     *   <li>Hashes the new password and persists it.</li>
-     * </ol>
-     *
-     * @param user    the currently authenticated user (from SecurityContext)
-     * @param request the change-password payload
-     * @throws BadCredentialsException  if {@code currentPassword} is wrong
-     * @throws IllegalArgumentException if {@code newPassword} ≠ {@code confirmPassword}
-     */
     @Transactional
     public void changePassword(User user, ChangePasswordRequest request) {
         if (!passwordEncoder.matches(request.currentPassword(), user.getPassword())) {
-            throw new BadCredentialsException("Mật khẩu hiện tại không đúng.");
-        }
-
-        if (!request.newPassword().equals(request.confirmPassword())) {
-            throw new IllegalArgumentException("Mật khẩu mới và xác nhận mật khẩu không khớp.");
+            throw new BadCredentialsException("Current password is incorrect");
         }
 
         user.setPassword(passwordEncoder.encode(request.newPassword()));
         userRepository.save(user);
-        log.info("Password changed for user: {}", user.getEmail());
+        log.info("Password changed successfully for user: {}", user.getEmail());
     }
 
     // ----------------------------------------------------------------
-    // Profile Management
+    // Update Profile
     // ----------------------------------------------------------------
 
-    /**
-     * Updates personal information for the user (username, phoneNumber, avatarUrl).
-     */
     @Transactional
     public User updateProfile(User user, UpdateProfileRequest request) {
-        user.setUsername(request.username());
-        user.setPhoneNumber(request.phoneNumber());
-        if (request.avatarUrl() != null && !request.avatarUrl().isBlank()) {
-            user.setAvatarUrl(request.avatarUrl());
+        if (request.username() != null && !request.username().isBlank()) {
+            user.setUsername(request.username());
         }
+
         User updated = userRepository.save(user);
         log.info("Profile updated for user: {}", user.getEmail());
         return updated;
     }
 
-    /**
-     * Handles file upload for the user avatar, saves it locally, and updates user avatar URL.
-     */
+    // ----------------------------------------------------------------
+    // Upload Avatar
+    // ----------------------------------------------------------------
+
     @Transactional
     public User uploadAvatar(User user, MultipartFile file) {
-        if (file == null || file.isEmpty()) {
-            throw new IllegalArgumentException("Tệp tải lên không được để trống.");
-        }
-
-        // Validate image format
-        String originalFilename = file.getOriginalFilename();
-        String extension = "";
-        if (originalFilename != null && originalFilename.contains(".")) {
-            extension = originalFilename.substring(originalFilename.lastIndexOf(".")).toLowerCase();
-        }
-
-        if (!extension.equals(".jpg") && !extension.equals(".jpeg") && 
-            !extension.equals(".png") && !extension.equals(".webp") && !extension.equals(".gif")) {
-            throw new IllegalArgumentException("Định dạng ảnh không hợp lệ. Chỉ hỗ trợ JPG, PNG, WebP hoặc GIF.");
+        if (file.isEmpty()) {
+            throw new IllegalArgumentException("Avatar file is empty");
         }
 
         try {
-            // Ensure target directory exists
+            String filename = "avatar_" + user.getId() + "_" + System.currentTimeMillis() + ".jpg";
             Path uploadDir = Paths.get("uploads/avatars");
             if (!Files.exists(uploadDir)) {
                 Files.createDirectories(uploadDir);
             }
+            Path filePath = uploadDir.resolve(filename);
+            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
 
-            // Generate unique file name
-            String uniqueName = user.getId().toString() + "-" + System.currentTimeMillis() + extension;
-            Path targetPath = uploadDir.resolve(uniqueName);
-
-            // Copy file to directory
-            Files.copy(file.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
-
-            // Set the public URL path
-            String publicUrl = "/api/auth/avatars/" + uniqueName;
-            user.setAvatarUrl(publicUrl);
-
+            user.setAvatarUrl("/uploads/avatars/" + filename);
             User updated = userRepository.save(user);
-            log.info("Avatar updated for user: {} -> {}", user.getEmail(), publicUrl);
+            log.info("Avatar uploaded for user: {}", user.getEmail());
             return updated;
         } catch (IOException e) {
-            log.error("Failed to store avatar file: ", e);
-            throw new RuntimeException("Lỗi hệ thống khi tải ảnh lên. Vui lòng thử lại sau.");
+            log.error("Failed to store avatar file", e);
+            throw new RuntimeException("Failed to store avatar file", e);
         }
     }
 
@@ -206,7 +206,7 @@ public class AuthService {
                 user.getId(),
                 user.getDisplayUsername(),
                 user.getEmail(),
-                user.getRole(),
+                user.getRole() != null ? user.getRole().name() : "USER",
                 user.getPhoneNumber(),
                 user.getAvatarUrl(),
                 user.getDefaultResumeId()

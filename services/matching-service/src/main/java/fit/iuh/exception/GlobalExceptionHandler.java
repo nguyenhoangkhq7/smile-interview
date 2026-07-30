@@ -5,9 +5,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+
+import java.util.stream.Collectors;
 
 /**
  * Global exception handler for all REST controllers in the matching-service.
@@ -20,8 +23,10 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
  * <ul>
  *   <li>{@link PdfParsingException}         → 400 Bad Request</li>
  *   <li>{@link IngestionException}           → 400 Bad Request</li>
+ *   <li>{@link MethodArgumentNotValidException} → 400 Bad Request (Bean Validation)</li>
  *   <li>{@link LlmApiException}              → 502 Bad Gateway</li>
  *   <li>{@link MaxUploadSizeExceededException} → 413 Payload Too Large</li>
+ *   <li>{@link ResourceNotFoundException}      → 404 Not Found</li>
  *   <li>{@link QuestionBankException}         → 422 Unprocessable Entity</li>
  *   <li>{@link Exception} (catch-all)        → 500 Internal Server Error</li>
  * </ul>
@@ -48,6 +53,31 @@ public class GlobalExceptionHandler {
                         .errorCode("PDF_PARSING_ERROR")
                         .message("Failed to parse the uploaded PDF file.")
                         .detail(ex.getMessage())
+                        .path(request.getRequestURI())
+                        .build());
+    }
+
+    /**
+     * Handles Bean Validation failures ({@code @Valid} on request body).
+     *
+     * <p>Collects all field-level constraint violation messages into a single
+     * comma-separated {@code detail} string so the frontend can surface them.
+     */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorResponse> handleValidationException(
+            MethodArgumentNotValidException ex, HttpServletRequest request) {
+
+        String fieldErrors = ex.getBindingResult().getFieldErrors().stream()
+                .map(fe -> fe.getField() + ": " + fe.getDefaultMessage())
+                .collect(Collectors.joining(", "));
+
+        log.warn("[VALIDATION_ERROR] path={} | {}", request.getRequestURI(), fieldErrors);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ErrorResponse.builder()
+                        .status(HttpStatus.BAD_REQUEST.value())
+                        .errorCode("VALIDATION_ERROR")
+                        .message("Request validation failed.")
+                        .detail(fieldErrors)
                         .path(request.getRequestURI())
                         .build());
     }
@@ -87,6 +117,28 @@ public class GlobalExceptionHandler {
                         .status(HttpStatus.PAYLOAD_TOO_LARGE.value())
                         .errorCode("FILE_TOO_LARGE")
                         .message("Uploaded file exceeds the maximum allowed size (50 MB).")
+                        .path(request.getRequestURI())
+                        .build());
+    }
+
+    // -------------------------------------------------------------------------
+    // 404 Not Found — requested resource does not exist
+    // -------------------------------------------------------------------------
+
+    /**
+     * Handles lookup failures where a resource (e.g., QuestionBank) cannot be
+     * found for the given identifier (e.g., sessionId).
+     */
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleResourceNotFoundException(
+            ResourceNotFoundException ex, HttpServletRequest request) {
+
+        log.warn("[RESOURCE_NOT_FOUND] path={} | {}", request.getRequestURI(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ErrorResponse.builder()
+                        .status(HttpStatus.NOT_FOUND.value())
+                        .errorCode("RESOURCE_NOT_FOUND")
+                        .message(ex.getMessage())
                         .path(request.getRequestURI())
                         .build());
     }

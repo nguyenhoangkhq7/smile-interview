@@ -43,8 +43,9 @@ public class User implements UserDetails {
     @Column(name = "password_hash", nullable = false)
     private String password;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false)
-    private String role;
+    private Role role;
 
     @Column(name = "phone_number")
     private String phoneNumber;
@@ -79,7 +80,7 @@ public class User implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of(new SimpleGrantedAuthority("ROLE_" + role));
+        return List.of(new SimpleGrantedAuthority("ROLE_" + (role != null ? role.name() : "USER")));
     }
 
     /** Returns the BCrypt-hashed password (stored in {@code password_hash}). */

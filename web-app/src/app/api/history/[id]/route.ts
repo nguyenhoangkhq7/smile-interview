@@ -12,8 +12,21 @@ export async function GET(
       return NextResponse.json({ error: 'id is required' }, { status: 400 });
     }
 
-    // 1. Get session info
-    const sessionRes = await query('SELECT * FROM sessions WHERE id = $1', [id]);
+    // 1. Get session info with joined resumes & job_descriptions for Cloudinary URLs
+    const sql = `
+      SELECT DISTINCT ON (s.id)
+        s.*,
+        r.file_url AS cv_file_url,
+        r.extracted_text AS cv_extracted_text,
+        j.file_url AS jd_file_url,
+        j.extracted_text AS jd_extracted_text
+      FROM sessions s
+      LEFT JOIN resumes r ON (s.resume_id = r.id OR s.cv_filename = r.file_name)
+      LEFT JOIN job_descriptions j ON (s.jd_id = j.id OR s.jd_filename = j.title)
+      WHERE s.id = $1
+      ORDER BY s.id, s.date DESC
+    `;
+    const sessionRes = await query(sql, [id]);
     if (sessionRes.rows.length === 0) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
@@ -41,6 +54,10 @@ export async function GET(
       roleTitle: sess.role_title,
       cvFilename: sess.cv_filename,
       jdFilename: sess.jd_filename,
+      cvFileUrl: sess.cv_file_url || undefined,
+      jdFileUrl: sess.jd_file_url || undefined,
+      cvExtractedText: sess.cv_extracted_text || undefined,
+      jdExtractedText: sess.jd_extracted_text || undefined,
       resumeId: sess.resume_id,
       jdId: sess.jd_id,
       overallScore: sess.overall_score !== null ? sess.overall_score : undefined,

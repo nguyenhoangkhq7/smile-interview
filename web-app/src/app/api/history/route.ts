@@ -3,8 +3,20 @@ import { query } from '@/lib/db';
 
 export async function GET() {
   try {
-    // 1. Get all sessions
-    const sessionsRes = await query('SELECT * FROM sessions ORDER BY date DESC');
+    // 1. Get all sessions with joined resumes & job_descriptions for Cloudinary URLs
+    const sql = `
+      SELECT DISTINCT ON (s.id)
+        s.*,
+        r.file_url AS cv_file_url,
+        r.extracted_text AS cv_extracted_text,
+        j.file_url AS jd_file_url,
+        j.extracted_text AS jd_extracted_text
+      FROM sessions s
+      LEFT JOIN resumes r ON (s.resume_id = r.id OR s.cv_filename = r.file_name)
+      LEFT JOIN job_descriptions j ON (s.jd_id = j.id OR s.jd_filename = j.title)
+      ORDER BY s.id, s.date DESC
+    `;
+    const sessionsRes = await query(sql);
     const sessions = sessionsRes.rows;
 
     if (sessions.length === 0) {
@@ -34,6 +46,10 @@ export async function GET() {
           roleTitle: sess.role_title,
           cvFilename: sess.cv_filename,
           jdFilename: sess.jd_filename,
+          cvFileUrl: sess.cv_file_url || undefined,
+          jdFileUrl: sess.jd_file_url || undefined,
+          cvExtractedText: sess.cv_extracted_text || undefined,
+          jdExtractedText: sess.jd_extracted_text || undefined,
           resumeId: sess.resume_id,
           jdId: sess.jd_id,
           overallScore: sess.overall_score !== null ? sess.overall_score : undefined,

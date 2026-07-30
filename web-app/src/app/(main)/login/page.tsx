@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import styles from './login.module.css';
@@ -9,12 +9,25 @@ import { useAuthStore } from '@/store/authStore';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuthStore();
+  const { login, isAuthenticated, user } = useAuthStore();
 
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      if (user.role === 'ADMIN') {
+        router.replace('/admin/rules');
+      } else if (user.role === 'HR') {
+        router.replace('/hr-dashboard');
+      } else {
+        router.replace('/');
+      }
+    }
+  }, [isAuthenticated, user, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,6 +56,8 @@ export default function LoginPage() {
 
       if (data.role === 'ADMIN') {
         router.push('/admin/rules');
+      } else if (data.role === 'HR') {
+        router.push('/hr-dashboard');
       } else {
         router.push('/');
       }

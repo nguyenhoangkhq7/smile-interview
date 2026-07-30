@@ -46,7 +46,17 @@ export async function POST(request: NextRequest) {
     if (!backendRes.ok) {
       const errText = await backendRes.text();
       console.error(`[API Proxy QuestionBank] Backend error status ${backendRes.status}:`, errText);
-      return NextResponse.json({ error: `Backend error: ${backendRes.statusText}` }, { status: backendRes.status });
+      let detail = errText;
+      try {
+        const parsed = JSON.parse(errText);
+        detail = parsed.message || parsed.error || errText;
+      } catch {
+        // use raw errText
+      }
+      const errorMessage = detail
+        ? `Backend error (${backendRes.status}): ${detail}`
+        : `Backend error: ${backendRes.status} ${backendRes.statusText}`.trim();
+      return NextResponse.json({ error: errorMessage }, { status: backendRes.status });
     }
 
     const data = await backendRes.json();
