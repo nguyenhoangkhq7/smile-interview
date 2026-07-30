@@ -3,8 +3,9 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { FolderOpen, Lightbulb, AlertTriangle, CheckCircle, AlertCircle, MessageSquare, BarChart3, CheckCircle2, XCircle } from 'lucide-react';
+import { FolderOpen, Lightbulb, AlertTriangle, CheckCircle, AlertCircle, MessageSquare, BarChart3, CheckCircle2, XCircle, Download } from 'lucide-react';
 import { historyService, SessionHistoryItem } from '@/services/historyService';
+import { exportQuestionBankToCSV } from '@/lib/exportUtils';
 import styles from './result.module.css';
 
 interface GateCheck {
@@ -401,7 +402,18 @@ export default function InterviewResultPage() {
 
         {/* ── Accordion QA Section ── */}
         <section className={styles.questionsSection}>
-          <h2 className={styles.sectionTitle}>Chi tiết câu hỏi &amp; Trả lời</h2>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <h2 className={styles.sectionTitle} style={{ margin: 0 }}>Chi tiết câu hỏi &amp; Trả lời</h2>
+            {session.questions && session.questions.length > 0 && (
+              <button
+                onClick={() => exportQuestionBankToCSV(session.questions, session.id)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors shadow-sm cursor-pointer"
+              >
+                <Download size={16} />
+                <span>📥 Xuất danh sách câu hỏi (CSV)</span>
+              </button>
+            )}
+          </div>
 
           {session.questions.length === 0 ? (
             <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '0.75rem', padding: '3rem', textAlign: 'center', color: '#94a3b8', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
