@@ -15,6 +15,8 @@ import {
   TrendingUp,
   Lightbulb,
   AlignLeft,
+  Zap,
+  Target,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -214,7 +216,6 @@ function formatEligibility(raw: string): { label: string; color: 'green' | 'red'
 /** Map sectionWiseFeedback keys to display names with icons */
 const SECTION_META: Record<string, { label: string; icon: React.ReactNode }> = {
   tech_stack_alignment: { label: 'Kỹ năng công nghệ (Tech Stack)', icon: <Cpu size={14} /> },
-  project_technical_depth: { label: 'Chiều sâu dự án kỹ thuật', icon: <Layers size={14} /> },
   cs_fundamentals: { label: 'Kiến thức nền tảng (CS Fundamentals)', icon: <BarChart2 size={14} /> },
   overall_match_score: { label: 'Độ phù hợp tổng thể', icon: <Star size={14} /> },
   must_have: { label: 'Tiêu chí bắt buộc (Must-Have)', icon: <ClipboardList size={14} /> },
@@ -566,8 +567,66 @@ export function MatchingResultPanel({
             </div>
           )}
 
-          {/* ─── Actionable Suggestions ─── */}
-          {((assessment.topPriorityImprovements?.length ?? 0) > 0 || (assessment.actionableImprovementSuggestions?.length ?? 0) > 0) && (
+          {/* ─── Actionable Suggestions (Quick Wins & Skill Gaps) ─── */}
+          {((assessment.quickWins?.length ?? 0) > 0 || (assessment.skillGaps?.length ?? 0) > 0) ? (
+            <div className="space-y-6">
+              {/* Quick Wins Card */}
+              {(assessment.quickWins?.length ?? 0) > 0 && (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 overflow-hidden shadow-sm">
+                  <div className="border-b border-emerald-200/60 bg-emerald-100/50 px-5 py-3.5 flex items-center justify-between">
+                    <h3 className="font-bold text-emerald-900 flex items-center gap-2">
+                      <Zap size={16} className="text-emerald-600 fill-emerald-500" />
+                      Gợi ý cải thiện nhanh (Quick Wins)
+                    </h3>
+                    <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-300 text-[11px] font-semibold">
+                      {assessment.quickWins!.length} điểm cộng dễ nâng điểm
+                    </Badge>
+                  </div>
+                  <div className="p-5 divide-y divide-emerald-200/50">
+                    {assessment.quickWins!.map((item, i) => (
+                      <div key={i} className="py-3.5 first:pt-0 last:pb-0 flex items-start gap-3.5 text-sm">
+                        <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-xs font-bold text-white mt-0.5 shadow-sm">
+                          {item.priority || i + 1}
+                        </span>
+                        <div className="space-y-1">
+                          <p className="font-bold text-emerald-950 text-sm">{item.criteria_name || item.criteriaName}</p>
+                          <p className="text-emerald-800/90 leading-relaxed text-xs font-normal">{item.actionable_advice || item.actionableAdvice || item.suggestion}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Skill Gaps Card */}
+              {(assessment.skillGaps?.length ?? 0) > 0 && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50/40 overflow-hidden shadow-sm">
+                  <div className="border-b border-amber-200/60 bg-amber-100/50 px-5 py-3.5 flex items-center justify-between">
+                    <h3 className="font-bold text-amber-900 flex items-center gap-2">
+                      <Target size={16} className="text-amber-600" />
+                      Lỗ hổng kỹ năng cần bổ sung (Skill Gaps)
+                    </h3>
+                    <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-300 text-[11px] font-semibold">
+                      {assessment.skillGaps!.length} kỹ năng thiếu
+                    </Badge>
+                  </div>
+                  <div className="p-5 divide-y divide-amber-200/50">
+                    {assessment.skillGaps!.map((item, i) => (
+                      <div key={i} className="py-3.5 first:pt-0 last:pb-0 flex items-start gap-3.5 text-sm">
+                        <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-amber-600 text-xs font-bold text-white mt-0.5 shadow-sm">
+                          {item.priority || i + 1}
+                        </span>
+                        <div className="space-y-1">
+                          <p className="font-bold text-amber-950 text-sm">{item.criteria_name || item.criteriaName}</p>
+                          <p className="text-amber-800/90 leading-relaxed text-xs font-normal">{item.actionable_advice || item.actionableAdvice || item.suggestion}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (((assessment.topPriorityImprovements?.length ?? 0) > 0 || (assessment.actionableImprovementSuggestions?.length ?? 0) > 0) && (
             <div className="rounded-xl border border-brand-orange/20 bg-brand-orange/5 overflow-hidden shadow-sm">
               <div className="border-b border-brand-orange/15 bg-brand-orange/10 px-5 py-3.5">
                 <h3 className="font-bold text-foreground flex items-center gap-2">
@@ -589,7 +648,7 @@ export function MatchingResultPanel({
                 </div>
               </div>
             </div>
-          )}
+          ))}
         </div>
       )}
 

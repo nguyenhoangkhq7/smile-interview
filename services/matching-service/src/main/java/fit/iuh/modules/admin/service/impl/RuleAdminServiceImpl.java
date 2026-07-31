@@ -19,7 +19,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -115,8 +119,19 @@ public class RuleAdminServiceImpl implements RuleAdminService {
     @Override
     @Transactional(readOnly = true)
     public List<EvaluationCriteriaDto> getAllCriteria() {
+        // 1. Fetch all (criteriaId, level) pairs from the mapping table in one query.
+        List<Object[]> rows = criteriaRepository.findAllCriteriaIdAndLevel();
+        Map<Long, Set<String>> levelsByCriteriaId = new HashMap<>();
+        for (Object[] row : rows) {
+            Long criteriaId = ((Number) row[0]).longValue();
+            String level = (String) row[1];
+            levelsByCriteriaId
+                    .computeIfAbsent(criteriaId, k -> new HashSet<>())
+                    .add(level);
+        }
+        // 2. Map each criteria entity to a DTO with its collected mapped levels.
         return criteriaRepository.findAll().stream()
-                .map(this::toCriteriaDto)
+                .map(e -> toCriteriaDto(e, levelsByCriteriaId.getOrDefault(e.getId(), Set.of())))
                 .collect(Collectors.toList());
     }
 
@@ -138,7 +153,7 @@ public class RuleAdminServiceImpl implements RuleAdminService {
             criteriaEmbeddingInitializer.computeAndPersistEmbedding(saved);
         }
 
-        return toCriteriaDto(saved);
+        return toCriteriaDto(saved, Set.of());
     }
 
     @Override
@@ -163,7 +178,7 @@ public class RuleAdminServiceImpl implements RuleAdminService {
             criteriaEmbeddingInitializer.computeAndPersistEmbedding(updated);
         }
 
-        return toCriteriaDto(updated);
+        return toCriteriaDto(updated, Set.of());
     }
 
     @Override
@@ -294,8 +309,8 @@ public class RuleAdminServiceImpl implements RuleAdminService {
         return new JobCategoryDto(e.getId(), e.getCode(), e.getName(), parentId);
     }
 
-    private EvaluationCriteriaDto toCriteriaDto(EvaluationCriteria e) {
-        return new EvaluationCriteriaDto(e.getId(), e.getName(), e.getCategory(), e.getQuestionType(), e.getPromptInstruction());
+    private EvaluationCriteriaDto toCriteriaDto(EvaluationCriteria e, Set<String> mappedLevels) {
+        return new EvaluationCriteriaDto(e.getId(), e.getName(), e.getCategory(), e.getQuestionType(), e.getPromptInstruction(), mappedLevels);
     }
 
     private CategoryCriteriaMappingDto toMappingDto(CategoryCriteriaMapping e) {

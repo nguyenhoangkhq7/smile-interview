@@ -239,6 +239,8 @@ export function useNewInterview() {
         criticalMissingSkills: session.criticalMissingSkills || [],
         sectionWiseFeedback: session.sectionWiseFeedback || {},
         actionableImprovementSuggestions: session.actionableSuggestions || [],
+        quickWins: session.quickWins || [],
+        skillGaps: session.skillGaps || [],
         cached: true,
         createdAt: session.date || '',
         gateEvidenceItems: session.gateEvidenceItems || [],
@@ -569,9 +571,15 @@ export function useNewInterview() {
       const displayJdName = jdSource === 'upload' && jdFile
         ? jdFile.name : jdSource === 'text' ? 'JD_Pasted_Text.txt'
         : (savedJds.find((j) => j.id === selectedJdId)?.title || 'Saved_JD.pdf');
+      const defaultRoleName = jdSource === 'saved' && selectedJdId
+        ? (savedJds.find((j) => j.id === selectedJdId)?.title || 'Software Engineer')
+        : jdSource === 'upload' && jdFile
+        ? jdFile.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ')
+        : 'Software Engineer';
+
       const finalRole = result.roleTypeDetected
         ? getDisplayRoleTitle(result.roleTypeDetected)
-        : initialRoleTitle({ jdSource, selectedJdId, savedJds, jdFile });
+        : defaultRoleName;
 
       setRoleTitle(finalRole);
       await historyService.saveSession({
@@ -589,6 +597,8 @@ export function useNewInterview() {
         criticalMissingSkills: result.criticalMissingSkills,
         sectionWiseFeedback: result.sectionWiseFeedback,
         actionableSuggestions: result.actionableImprovementSuggestions,
+        quickWins: result.quickWins,
+        skillGaps: result.skillGaps,
         gateEvidenceItems: result.gateEvidenceItems || [],
         mustHaveEvidenceItems: result.mustHaveEvidenceItems || result.evidenceItems,
         preferToHaveEvidenceItems: result.preferToHaveEvidenceItems || result.additionalEvidenceItems,

@@ -1,9 +1,4 @@
-/**
- * Interview Session History Service
- * 
- * Exposes an asynchronous interface to persist and retrieve interview session records.
- * Integrates with PostgreSQL database via server-side Next.js route handlers.
- */
+import type { ImprovementItem } from './cvJdMatching';
 
 export interface QuestionFeedback {
   question: string;
@@ -57,6 +52,8 @@ export interface SessionHistoryItem {
   additionalEvidenceItems?: unknown[];
   scoreBreakdown?: unknown;
   topPriorityImprovements?: unknown[];
+  quickWins?: ImprovementItem[];
+  skillGaps?: ImprovementItem[];
   hiringRecommendation?: string;
   eligibility?: SessionEligibility | string | null;
 }

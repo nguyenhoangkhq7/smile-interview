@@ -51,11 +51,21 @@ spring:
       max-file-size: 50MB
       max-request-size: 100MB
 
+  # ============================================================
+  # Spring MVC Async Timeout
+  # ============================================================
+  mvc:
+    async:
+      request-timeout: 300000
+
 # ============================================================
-# Server Port
+# Server Configuration (Port & Timeouts)
 # ============================================================
 server:
   port: ${SERVER_PORT:8081}
+  tomcat:
+    connection-timeout: 300000
+    keep-alive-timeout: 300000
 
 # ============================================================
 # Smile Interview — Custom Application Properties

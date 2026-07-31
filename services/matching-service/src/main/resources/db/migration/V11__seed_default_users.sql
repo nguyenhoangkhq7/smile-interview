@@ -8,7 +8,7 @@ VALUES
         'a1111111-1111-1111-1111-111111111111', 
         'System Admin', 
         'admin@smile.com', 
-        '$2a$10$vD9CgZ9k2mS2dJ6G2F8z9.hG5J7k8L9m0N1O2P3Q4R5S6T7U8V9W0', 
+        '$2a$10$8.UnVuG9HHgffUDAlk8qfOUVGkqRzgVymGe07xd00DMxs.AQubh4a', 
         'ADMIN', 
         CURRENT_TIMESTAMP
     ),
@@ -16,7 +16,7 @@ VALUES
         'b2222222-2222-2222-2222-222222222222', 
         'HR Manager', 
         'hr@smile.com', 
-        '$2a$10$vD9CgZ9k2mS2dJ6G2F8z9.hG5J7k8L9m0N1O2P3Q4R5S6T7U8V9W0', 
+        '$2a$10$8.UnVuG9HHgffUDAlk8qfOUVGkqRzgVymGe07xd00DMxs.AQubh4a', 
         'HR', 
         CURRENT_TIMESTAMP
     )

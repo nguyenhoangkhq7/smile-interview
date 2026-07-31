@@ -108,7 +108,7 @@ export default function AdminRulesPage() {
               <JobCategoryTable categories={data.categories} onRefresh={fetchAll} />
             </TabsContent>
             <TabsContent value="criteria" className="mt-0">
-              <EvaluationCriteriaTable criteria={data.criteria} onRefresh={fetchAll} />
+              <EvaluationCriteriaTable criteria={data.criteria} categories={data.categories} mappings={data.mappings} onRefresh={fetchAll} />
             </TabsContent>
             <TabsContent value="weights" className="mt-0">
               <WeightMappingTable mappings={data.mappings} categories={data.categories} criteria={data.criteria} onRefresh={fetchAll} />

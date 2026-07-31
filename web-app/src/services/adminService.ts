@@ -15,6 +15,8 @@ export interface EvaluationCriteriaDto {
   category: string | null;
   question_type: string | null;
   prompt_instruction: string | null;
+  /** Distinct seniority levels that have a CategoryCriteriaMapping for this criteria */
+  mapped_levels?: string[];
 }
 
 export interface CategoryCriteriaMappingDto {
