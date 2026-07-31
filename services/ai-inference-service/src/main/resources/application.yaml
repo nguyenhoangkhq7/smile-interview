@@ -8,6 +8,7 @@ spring:
 openrouter:
   api-key: ${LLM_API_KEY:${OPENROUTER_API_KEY:mock-key}}
   base-url: ${LLM_API_URL:${OPENROUTER_BASE_URL:https://openrouter.ai/api/v1}}
+  fallback-models: ${LLM_FALLBACK_MODELS:poolside/laguna-xs-2.1:free,poolside/laguna-xs-2.1}
   model:
     evaluation: ${LLM_MODEL_REALTIME_EVALUATION:${OPENROUTER_EVAL_MODEL:${LLM_MODEL:google/gemini-2.0-flash-001}}}
     final-report: ${LLM_MODEL_FINAL_REPORT:${OPENROUTER_FINAL_REPORT_MODEL:${LLM_MODEL:google/gemini-2.0-flash-001}}}

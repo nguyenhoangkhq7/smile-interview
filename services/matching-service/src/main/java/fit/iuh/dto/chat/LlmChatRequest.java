@@ -21,6 +21,10 @@ public class LlmChatRequest {
     @JsonProperty("model")
     private String model;
 
+    /** Ordered list of models for OpenRouter fallback support. */
+    @JsonProperty("models")
+    private List<String> models;
+
     /** The ordered list of conversation messages. */
     @JsonProperty("messages")
     private List<Message> messages;

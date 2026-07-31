@@ -8,9 +8,13 @@ import fit.iuh.modules.rulengine.entity.JobCategoryEntity;
 import fit.iuh.modules.rulengine.repository.CategoryCriteriaMappingRepository;
 import fit.iuh.modules.rulengine.repository.EvaluationCriteriaRepository;
 import fit.iuh.modules.rulengine.repository.JobCategoryEntityRepository;
+import fit.iuh.modules.auth.entity.Role;
+import fit.iuh.modules.auth.entity.User;
+import fit.iuh.modules.auth.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -25,13 +29,33 @@ public class DatabaseSeeder implements CommandLineRunner {
     private final JobCategoryEntityRepository jobCategoryRepository;
     private final EvaluationCriteriaRepository criteriaRepository;
     private final CategoryCriteriaMappingRepository mappingRepository;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     public void run(String... args) {
+        seedAdminUser();
         seedLevelRules();
         seedSystemSettings();
         seedJobCategories();
         seedEvaluationCriteria();
+    }
+
+    private void seedAdminUser() {
+        String adminEmail = "admin@smile.com";
+        if (userRepository.existsByEmail(adminEmail)) {
+            return;
+        }
+        log.info("[DatabaseSeeder] Seeding default admin user: {}", adminEmail);
+        User admin = User.builder()
+                .username("System Admin")
+                .email(adminEmail)
+                .password(passwordEncoder.encode("admin123"))
+                .role(Role.ADMIN)
+                .phoneNumber("0900000000")
+                .build();
+        userRepository.save(admin);
+        log.info("[DatabaseSeeder] Admin user created successfully.");
     }
 
     private void seedLevelRules() {

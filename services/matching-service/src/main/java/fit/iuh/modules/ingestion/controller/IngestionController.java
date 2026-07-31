@@ -28,15 +28,21 @@ public class IngestionController {
             @RequestPart(value = "jdFile", required = false) MultipartFile jdFile,
             @RequestPart(value = "jdText", required = false) String jdText,
             @RequestPart(value = "resumeMarkdown", required = false) String resumeMarkdown,
-            @RequestPart(value = "jdMarkdown", required = false) String jdMarkdown) {
+            @RequestPart(value = "jdMarkdown", required = false) String jdMarkdown,
+            @RequestParam(value = "jdCategory", required = false) String jdCategory,
+            @RequestParam(value = "jdAcceptedLevels", required = false) String jdAcceptedLevels,
+            @RequestParam(value = "cvCategory", required = false) String cvCategory,
+            @RequestParam(value = "cvSeniorityLevel", required = false) String cvSeniorityLevel) {
 
-        log.info("Received ingestion request: sessionId={}, cvFile={}, jdFile={}",
+        log.info("Received ingestion request: sessionId={}, cvFile={}, jdFile={}, jdCategory={}, jdLevels={}, cvCategory={}, cvLevel={}",
                 sessionId,
                 cvFile != null ? cvFile.getOriginalFilename() : "null",
-                jdFile != null ? jdFile.getOriginalFilename() : "null");
+                jdFile != null ? jdFile.getOriginalFilename() : "null",
+                jdCategory, jdAcceptedLevels, cvCategory, cvSeniorityLevel);
 
         IngestionResponse response = ingestionService.ingest(
-                sessionId, cvFile, jdFile, jdText, resumeMarkdown, jdMarkdown);
+                sessionId, cvFile, jdFile, jdText, resumeMarkdown, jdMarkdown,
+                jdCategory, jdAcceptedLevels, cvCategory, cvSeniorityLevel);
 
         return ResponseEntity.ok(response);
     }

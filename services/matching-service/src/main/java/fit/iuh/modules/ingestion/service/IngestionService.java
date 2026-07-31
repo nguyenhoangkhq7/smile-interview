@@ -11,7 +11,11 @@ public interface IngestionService {
             MultipartFile jdFile,
             String jdText,
             String resumeMarkdown,
-            String jdMarkdown);
+            String jdMarkdown,
+            String jdCategory,
+            String jdAcceptedLevels,
+            String cvCategory,
+            String cvSeniorityLevel);
 
     void deleteSession(String sessionId);
 }

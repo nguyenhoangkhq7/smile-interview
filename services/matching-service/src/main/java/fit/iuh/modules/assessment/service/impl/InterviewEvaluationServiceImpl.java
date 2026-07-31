@@ -52,12 +52,14 @@ public class InterviewEvaluationServiceImpl implements InterviewEvaluationServic
         }
 
         var taskConfig = appProperties.getLlm().getTasks().getInterviewEvaluation();
-        String model = appProperties.getLlm().resolveModel(taskConfig);
+        List<String> models = appProperties.getLlm().resolveModels(taskConfig);
+        String model = models.isEmpty() ? appProperties.getLlm().resolveModel(taskConfig) : models.get(0);
         int maxTokens = appProperties.getLlm().resolveMaxTokens(taskConfig);
         double temperature = appProperties.getLlm().resolveTemperature(taskConfig);
 
         LlmChatRequest llmRequest = LlmChatRequest.builder()
                 .model(model)
+                .models(models)
                 .maxTokens(maxTokens)
                 .temperature(temperature)
                 .stream(false)

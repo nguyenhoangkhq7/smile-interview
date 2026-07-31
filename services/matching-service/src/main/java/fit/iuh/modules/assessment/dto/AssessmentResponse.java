@@ -49,8 +49,11 @@ public class AssessmentResponse {
     @JsonProperty("score_breakdown")
     private ScoreBreakdown scoreBreakdown;
 
-    @JsonProperty("top_priority_improvements")
-    private List<ImprovementResponseDto.ImprovementItem> topPriorityImprovements;
+    @JsonProperty("quick_wins")
+    private List<ImprovementResponseDto.ImprovementItem> quickWins;
+
+    @JsonProperty("skill_gaps")
+    private List<ImprovementResponseDto.ImprovementItem> skillGaps;
 
     @JsonProperty("cached")
     private boolean cached;

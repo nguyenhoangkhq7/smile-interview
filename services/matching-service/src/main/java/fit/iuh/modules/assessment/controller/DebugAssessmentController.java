@@ -30,7 +30,7 @@ public class DebugAssessmentController {
     @PostMapping("/extract-metadata")
     public ResponseEntity<MetadataResult> debugExtractMetadata(
             @RequestParam(value = "jd_content", defaultValue = "") String jdContent) {
-        MetadataResult result = criteriaPreparer.extractMetadata(jdContent);
+        MetadataResult result = criteriaPreparer.extractMetadata(jdContent, "");
         return ResponseEntity.ok(result);
     }
 
