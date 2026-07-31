@@ -39,6 +39,12 @@ public class JobDescription {
     @Column(name = "cloudinary_id")
     private String cloudinaryId;
 
+    @Column(name = "job_category")
+    private String jobCategory;
+
+    @Column(name = "accepted_levels")
+    private String acceptedLevels;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 }

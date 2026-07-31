@@ -99,7 +99,8 @@ public class AssessmentLlmRunner {
     }
 
     public String callLlmBlocking(AppProperties.TaskConfig taskConfig, String systemPrompt, String userPrompt) {
-        String targetModel = appProperties.getLlm().resolveModel(taskConfig);
+        List<String> targetModels = appProperties.getLlm().resolveModels(taskConfig);
+        String targetModel = targetModels.isEmpty() ? appProperties.getLlm().resolveModel(taskConfig) : targetModels.get(0);
         int maxTokens = appProperties.getLlm().resolveMaxTokens(taskConfig);
         double temperature = appProperties.getLlm().resolveTemperature(taskConfig);
         int timeoutSec = Math.max(180, appProperties.getLlm().resolveTimeoutSeconds(taskConfig));
@@ -114,6 +115,7 @@ public class AssessmentLlmRunner {
 
         LlmChatRequest request = LlmChatRequest.builder()
                 .model(targetModel)
+                .models(targetModels)
                 .maxTokens(maxTokens)
                 .temperature(temperature)
                 .stream(false)
@@ -156,6 +158,7 @@ public class AssessmentLlmRunner {
                     log.warn("[LlmRunner] Model '{}' rejected response_format (400 Bad Request). Retrying without response_format...", targetModel);
                     request = LlmChatRequest.builder()
                             .model(targetModel)
+                            .models(targetModels)
                             .maxTokens(maxTokens)
                             .temperature(temperature)
                             .stream(false)
@@ -207,7 +210,8 @@ public class AssessmentLlmRunner {
                             item.groundingScore(),
                             item.confidenceVotes(),
                             item.lowConfidence(),
-                            item.needsManualReview()
+                            item.needsManualReview(),
+                            item.matchMetadata()
                     ))
                     .collect(Collectors.toList())
                     : List.of();
@@ -224,7 +228,8 @@ public class AssessmentLlmRunner {
                             TextSanitizationUtil.sanitizeLanguageText(item.cvEvidence()),
                             TextSanitizationUtil.sanitizeLanguageText(item.cvQuote()),
                             item.status(),
-                            TextSanitizationUtil.sanitizeLanguageText(item.reasoning())
+                            TextSanitizationUtil.sanitizeLanguageText(item.reasoning()),
+                            item.matchMetadata()
                     ))
                     .collect(Collectors.toList());
 
@@ -413,7 +418,7 @@ public class AssessmentLlmRunner {
                                 cid, item.criteriaName(), item.importance(), item.jdRequirement(),
                                 item.cvEvidence(), item.cvQuote(), item.status(), item.reasoning(),
                                 item.weightUsed(), item.scoreContribution(), item.groundingScore(),
-                                item.confidenceVotes(), item.lowConfidence(), item.needsManualReview()
+                                item.confidenceVotes(), item.lowConfidence(), item.needsManualReview(), item.matchMetadata()
                         );
                         groupedById.computeIfAbsent(cid, k -> new ArrayList<>()).add(resolved);
                     }
@@ -435,7 +440,7 @@ public class AssessmentLlmRunner {
                                 item.cvQuote(),
                                 item.status(),
                                 item.reasoning(),
-                                null, null, null, null, null, null
+                                null, null, null, null, null, null, null
                         );
                         groupedById.computeIfAbsent(cid, k -> new ArrayList<>()).add(converted);
                     }
@@ -457,7 +462,7 @@ public class AssessmentLlmRunner {
                         null,
                         "missing",
                         "Criterion evaluated as missing (not directly addressed in CV)",
-                        null, null, null, null, false, false
+                        null, null, null, null, false, false, null
                 );
                 groupedById.put(item.criteriaId(), List.of(fallbackItem));
             }
@@ -505,7 +510,8 @@ public class AssessmentLlmRunner {
                     sample.groundingScore(),
                     confidenceVotesMap,
                     lowConfidence,
-                    needsManualReview
+                    needsManualReview,
+                    null
             );
 
             if (evidenceGroundingValidator != null) {

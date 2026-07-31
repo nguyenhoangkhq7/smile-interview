@@ -39,6 +39,12 @@ public class Resume {
     @Column(name = "cloudinary_id")
     private String cloudinaryId;
 
+    @Column(name = "job_category")
+    private String jobCategory;
+
+    @Column(name = "seniority_level")
+    private String seniorityLevel;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 }

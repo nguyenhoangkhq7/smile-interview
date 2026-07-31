@@ -28,6 +28,8 @@ CREATE TABLE IF NOT EXISTS resumes (
     raw_text       TEXT,
     file_url       VARCHAR(500),
     cloudinary_id  VARCHAR(255),
+    job_category    VARCHAR(100),
+    seniority_level VARCHAR(100),
     created_at     TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -40,6 +42,8 @@ CREATE TABLE IF NOT EXISTS job_descriptions (
     raw_text       TEXT,
     file_url       VARCHAR(500),
     cloudinary_id  VARCHAR(255),
+    job_category    VARCHAR(100),
+    accepted_levels VARCHAR(255),
     created_at     TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -129,7 +133,7 @@ CREATE INDEX IF NOT EXISTS idx_sq_session_id ON session_questions(session_id);
 
 -- Table: questions
 CREATE TABLE IF NOT EXISTS questions (
-    id                  UUID PRIMARY KEY,
+    id                  VARCHAR(50) PRIMARY KEY,
     session_question_id UUID NOT NULL REFERENCES session_questions(id) ON DELETE CASCADE,
     category            VARCHAR(100),
     question_text       TEXT,
@@ -151,7 +155,7 @@ CREATE TABLE IF NOT EXISTS session_turns (
     id UUID PRIMARY KEY,
     session_id VARCHAR(128) NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
     turn_number INTEGER NOT NULL,
-    question_id UUID REFERENCES questions(id) ON DELETE SET NULL,
+    question_id VARCHAR(50) REFERENCES questions(id) ON DELETE SET NULL,
     dynamic_question_text TEXT,
     answer TEXT,
     score INTEGER,

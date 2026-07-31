@@ -5,6 +5,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.validation.annotation.Validated;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Data
 @Validated
 @Configuration
@@ -43,6 +46,9 @@ public class AppProperties {
 
         /** Global default LLM model identifier. */
         private String model;
+
+        /** Comma-separated list of fallback models for OpenRouter. */
+        private String fallbackModels = "poolside/laguna-xs-2.1:free,poolside/laguna-xs-2.1";
 
         /** Global default timeout in seconds for LLM API calls. */
         private int timeoutSeconds = 60;
@@ -83,6 +89,28 @@ public class AppProperties {
                 return taskConfig.getModel();
             }
             return model;
+        }
+
+        public List<String> resolveModels(String taskSpecificModel) {
+            String primary = resolveModel(taskSpecificModel);
+            List<String> result = new ArrayList<>();
+            if (primary != null && !primary.isBlank()) {
+                result.add(primary);
+            }
+            if (fallbackModels != null && !fallbackModels.isBlank()) {
+                for (String fm : fallbackModels.split(",")) {
+                    String trimmed = fm.trim();
+                    if (!trimmed.isEmpty() && !result.contains(trimmed)) {
+                        result.add(trimmed);
+                    }
+                }
+            }
+            return result;
+        }
+
+        public List<String> resolveModels(TaskConfig taskConfig) {
+            String primary = resolveModel(taskConfig);
+            return resolveModels(primary);
         }
 
         public int resolveMaxTokens(Integer taskSpecificMaxTokens) {

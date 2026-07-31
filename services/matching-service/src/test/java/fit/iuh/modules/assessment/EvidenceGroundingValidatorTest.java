@@ -39,7 +39,7 @@ class EvidenceGroundingValidatorTest {
         EvidenceItem item = new EvidenceItem(
                 1L, "Tech Stack Alignment", "REQUIRED", "Java 21 & Spring Boot",
                 span, span, "matched",
-                "Found in CV", null, null, null, null, null, null
+                "Found in CV", null, null, null, null, null, null, null
         );
 
         EvidenceItem result = validator.validateAndApply(item, SAMPLE_CV_MARKDOWN, 0.75);
@@ -57,7 +57,7 @@ class EvidenceGroundingValidatorTest {
         EvidenceItem item = new EvidenceItem(
                 2L, "Quantum Tech Stack", "REQUIRED", "Quantum computing with Qiskit",
                 hallucinatedSpan, hallucinatedSpan, "matched",
-                "Hallucinated evidence", null, null, null, null, null, null
+                "Hallucinated evidence", null, null, null, null, null, null, null
         );
 
         EvidenceItem result = validator.validateAndApply(item, SAMPLE_CV_MARKDOWN, 0.75);
@@ -74,7 +74,7 @@ class EvidenceGroundingValidatorTest {
         EvidenceItem item = new EvidenceItem(
                 3L, "Scrum Coaching", "REQUIRED", "Scrum Master Certification",
                 hallucinatedSpan, hallucinatedSpan, "weak",
-                "Hallucinated evidence", null, null, null, null, null, null
+                "Hallucinated evidence", null, null, null, null, null, null, null
         );
 
         EvidenceItem result = validator.validateAndApply(item, SAMPLE_CV_MARKDOWN, 0.75);
@@ -89,7 +89,7 @@ class EvidenceGroundingValidatorTest {
         EvidenceItem item = new EvidenceItem(
                 4L, "Golang Experience", "REQUIRED", "Golang 1.22 requirement",
                 null, null, "missing",
-                "Requirement completely absent", null, null, null, null, null, null
+                "Requirement completely absent", null, null, null, null, null, null, null
         );
 
         EvidenceItem result = validator.validateAndApply(item, SAMPLE_CV_MARKDOWN, 0.75);

@@ -42,7 +42,7 @@ public class EvidenceGroundingValidator {
             return new AssessmentResponseDto.EvidenceItem(
                     item.criteriaId(), item.criteriaName(), item.importance(), item.jdRequirement(),
                     item.cvEvidence(), item.cvQuote(), item.status(), item.reasoning(), item.weightUsed(),
-                    item.scoreContribution(), score, item.confidenceVotes(), item.lowConfidence(), item.needsManualReview()
+                    item.scoreContribution(), score, item.confidenceVotes(), item.lowConfidence(), item.needsManualReview(), item.matchMetadata()
             );
         }
 
@@ -62,14 +62,14 @@ public class EvidenceGroundingValidator {
                     item.cvEvidence(), item.cvQuote(), downgradedStatus,
                     item.reasoning() + " [Canh bao: Bang chung tu CV co do tin cay thap (" + String.format("%.2f", sim) + ").]",
                     item.weightUsed(), item.scoreContribution(), sim,
-                    item.confidenceVotes(), item.lowConfidence(), true
+                    item.confidenceVotes(), item.lowConfidence(), true, item.matchMetadata()
             );
         }
 
         return new AssessmentResponseDto.EvidenceItem(
                 item.criteriaId(), item.criteriaName(), item.importance(), item.jdRequirement(),
                 item.cvEvidence(), item.cvQuote(), item.status(), item.reasoning(), item.weightUsed(),
-                item.scoreContribution(), sim, item.confidenceVotes(), item.lowConfidence(), item.needsManualReview()
+                item.scoreContribution(), sim, item.confidenceVotes(), item.lowConfidence(), item.needsManualReview(), item.matchMetadata()
         );
     }
 

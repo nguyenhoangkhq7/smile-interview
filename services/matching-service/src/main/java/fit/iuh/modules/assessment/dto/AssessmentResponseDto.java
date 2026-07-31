@@ -22,6 +22,14 @@ public record AssessmentResponseDto(
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record MatchMetadata(
+            @JsonProperty("source_type") String sourceType,
+            @JsonProperty("badge_label") String badgeLabel,
+            @JsonProperty("badge_color") String badgeColor
+    ) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public record EvidenceItem(
             @JsonProperty("criteria_id")
             Long criteriaId,
@@ -63,8 +71,15 @@ public record AssessmentResponseDto(
             Boolean lowConfidence,
 
             @JsonProperty(value = "needs_manual_review", access = JsonProperty.Access.WRITE_ONLY)
-            Boolean needsManualReview
-    ) {}
+            Boolean needsManualReview,
+            
+            @JsonProperty("match_metadata")
+            MatchMetadata matchMetadata
+    ) {
+        public EvidenceItem withMatchMetadata(MatchMetadata metadata) {
+            return new EvidenceItem(criteriaId, criteriaName, importance, jdRequirement, cvEvidence, cvQuote, status, reasoning, weightUsed, scoreContribution, groundingScore, confidenceVotes, lowConfidence, needsManualReview, metadata);
+        }
+    }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -91,6 +106,13 @@ public record AssessmentResponseDto(
             String status,
 
             @JsonProperty("reasoning")
-            String reasoning
-    ) {}
+            String reasoning,
+
+            @JsonProperty("match_metadata")
+            MatchMetadata matchMetadata
+    ) {
+        public AdHocEvidenceItem withMatchMetadata(MatchMetadata metadata) {
+            return new AdHocEvidenceItem(criteriaId, criteriaName, importance, jdRequirement, cvEvidence, cvQuote, status, reasoning, metadata);
+        }
+    }
 }

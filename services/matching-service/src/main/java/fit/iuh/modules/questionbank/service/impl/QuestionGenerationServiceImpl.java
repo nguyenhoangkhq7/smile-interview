@@ -94,7 +94,8 @@ public class QuestionGenerationServiceImpl implements QuestionGenerationService 
         int maxAttempts = props.getQuestionBank().getMaxRetries() + 1;
 
         var taskConfig = props.getLlm().getTasks().getQuestionGeneration();
-        String model = props.getLlm().resolveModel(taskConfig);
+        List<String> models = props.getLlm().resolveModels(taskConfig);
+        String model = models.isEmpty() ? props.getLlm().resolveModel(taskConfig) : models.get(0);
         int maxTokens = taskConfig != null && taskConfig.getMaxTokens() != null && taskConfig.getMaxTokens() > 0
                 ? taskConfig.getMaxTokens() : props.getQuestionBank().getMaxTokens();
         double temperature = taskConfig != null && taskConfig.getTemperature() != null && taskConfig.getTemperature() >= 0.0
@@ -106,6 +107,7 @@ public class QuestionGenerationServiceImpl implements QuestionGenerationService 
             try {
                 LlmChatRequest request = LlmChatRequest.builder()
                         .model(model)
+                        .models(models)
                         .maxTokens(maxTokens)
                         .temperature(temperature)
                         .stream(false)
@@ -234,7 +236,8 @@ public class QuestionGenerationServiceImpl implements QuestionGenerationService 
                 """.formatted(evidenceItemsText, existingTopics, type, difficulty);
 
         var taskConfig = props.getLlm().getTasks().getQuestionGeneration();
-        String model = props.getLlm().resolveModel(taskConfig);
+        List<String> models = props.getLlm().resolveModels(taskConfig);
+        String model = models.isEmpty() ? props.getLlm().resolveModel(taskConfig) : models.get(0);
         int maxTokens = taskConfig != null && taskConfig.getMaxTokens() != null && taskConfig.getMaxTokens() > 0
                 ? taskConfig.getMaxTokens() : props.getQuestionBank().getMaxTokens();
         double temperature = (taskConfig != null && taskConfig.getTemperature() != null && taskConfig.getTemperature() >= 0.0
@@ -243,6 +246,7 @@ public class QuestionGenerationServiceImpl implements QuestionGenerationService 
 
         LlmChatRequest request = LlmChatRequest.builder()
                 .model(model)
+                .models(models)
                 .maxTokens(maxTokens)
                 .temperature(temperature)
                 .stream(false)

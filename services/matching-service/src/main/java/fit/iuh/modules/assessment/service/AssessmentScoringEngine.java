@@ -145,7 +145,8 @@ public class AssessmentScoringEngine {
                         item.groundingScore(),
                         item.confidenceVotes(),
                         item.lowConfidence(),
-                        item.needsManualReview()
+                        item.needsManualReview(),
+                        item.matchMetadata()
                 );
                 updatedItems.add(updated);
             }

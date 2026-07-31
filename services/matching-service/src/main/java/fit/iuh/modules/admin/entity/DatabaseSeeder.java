@@ -11,6 +11,9 @@ import fit.iuh.modules.rulengine.entity.JobCategoryEntity;
 import fit.iuh.modules.rulengine.repository.CategoryCriteriaMappingRepository;
 import fit.iuh.modules.rulengine.repository.EvaluationCriteriaRepository;
 import fit.iuh.modules.rulengine.repository.JobCategoryEntityRepository;
+import fit.iuh.modules.auth.entity.Role;
+import fit.iuh.modules.auth.entity.User;
+import fit.iuh.modules.auth.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -34,35 +37,28 @@ public class DatabaseSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        seedDefaultUsers();
+        seedAdminUser();
         seedLevelRules();
         seedSystemSettings();
         seedJobCategories();
         seedEvaluationCriteria();
     }
 
-    private void seedDefaultUsers() {
-        if (!userRepository.existsByEmail("admin@smile.com")) {
-            User admin = User.builder()
-                    .username("System Admin")
-                    .email("admin@smile.com")
-                    .password(passwordEncoder.encode("admin123"))
-                    .role(Role.ADMIN)
-                    .build();
-            userRepository.save(admin);
-            log.info("[DatabaseSeeder] Seeded default ADMIN user: admin@smile.com / admin123");
+    private void seedAdminUser() {
+        String adminEmail = "admin@smile.com";
+        if (userRepository.existsByEmail(adminEmail)) {
+            return;
         }
-
-        if (!userRepository.existsByEmail("hr@smile.com")) {
-            User hr = User.builder()
-                    .username("HR Manager")
-                    .email("hr@smile.com")
-                    .password(passwordEncoder.encode("hr123"))
-                    .role(Role.HR)
-                    .build();
-            userRepository.save(hr);
-            log.info("[DatabaseSeeder] Seeded default HR user: hr@smile.com / hr123");
-        }
+        log.info("[DatabaseSeeder] Seeding default admin user: {}", adminEmail);
+        User admin = User.builder()
+                .username("System Admin")
+                .email(adminEmail)
+                .password(passwordEncoder.encode("admin123"))
+                .role(Role.ADMIN)
+                .phoneNumber("0900000000")
+                .build();
+        userRepository.save(admin);
+        log.info("[DatabaseSeeder] Admin user created successfully.");
     }
 
     private void seedLevelRules() {

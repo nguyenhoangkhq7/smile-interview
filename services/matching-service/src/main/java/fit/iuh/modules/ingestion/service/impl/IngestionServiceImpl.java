@@ -38,6 +38,9 @@ public class IngestionServiceImpl implements IngestionService {
     private final ChunkerService chunkerService;
     private final EmbeddingService embeddingService;
     private final DocumentChunkRepository documentChunkRepository;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private fit.iuh.modules.assessment.service.AssessmentCriteriaPreparer criteriaPreparer;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
 
 
@@ -49,7 +52,11 @@ public class IngestionServiceImpl implements IngestionService {
             MultipartFile jdFile,
             String jdText,
             String resumeMarkdown,
-            String jdMarkdown) {
+            String jdMarkdown,
+            String jdCategory,
+            String jdAcceptedLevels,
+            String cvCategory,
+            String cvSeniorityLevel) {
 
         validateInputs(sessionId, cvFile, jdFile, jdText, resumeMarkdown, jdMarkdown);
 
@@ -130,6 +137,20 @@ public class IngestionServiceImpl implements IngestionService {
         }
         resume.setParsedContent(markdownCv);
         resume.setRawText(rawCvText);
+
+        if (cvCategory != null && !cvCategory.isBlank()) resume.setJobCategory(cvCategory);
+        if (cvSeniorityLevel != null && !cvSeniorityLevel.isBlank()) {
+            resume.setSeniorityLevel(cvSeniorityLevel);
+        } else if (resume.getSeniorityLevel() == null && criteriaPreparer != null) {
+            try {
+                fit.iuh.modules.assessment.entity.SeniorityLevel extractedLvl = criteriaPreparer.extractCvSeniorityLevel(markdownCv);
+                resume.setSeniorityLevel(extractedLvl.name());
+                log.info("[INGESTION] Auto-extracted CV Seniority Level: {}", extractedLvl);
+            } catch (Exception e) {
+                log.warn("[INGESTION] Warning auto-extracting CV level: {}", e.getMessage());
+            }
+        }
+
         resume = resumeRepository.save(resume);
         session.setResume(resume);
 
@@ -144,6 +165,25 @@ public class IngestionServiceImpl implements IngestionService {
         }
         jd.setParsedContent(markdownJd);
         jd.setRawText(rawJdText);
+
+        if (jdCategory != null && !jdCategory.isBlank()) jd.setJobCategory(jdCategory);
+        if (jdAcceptedLevels != null && !jdAcceptedLevels.isBlank()) jd.setAcceptedLevels(jdAcceptedLevels);
+        else if ((jd.getAcceptedLevels() == null || jd.getJobCategory() == null) && criteriaPreparer != null) {
+            try {
+                var rawMeta = criteriaPreparer.extractJdRawMetadata(markdownJd);
+                if (jd.getJobCategory() == null && rawMeta.category() != null) {
+                    jd.setJobCategory(rawMeta.category().name());
+                }
+                if (jd.getAcceptedLevels() == null && rawMeta.acceptedLevels() != null) {
+                    List<String> lvlStrings = rawMeta.acceptedLevels().stream().map(Enum::name).toList();
+                    jd.setAcceptedLevels(objectMapper != null ? objectMapper.writeValueAsString(lvlStrings) : lvlStrings.toString());
+                }
+                log.info("[INGESTION] Auto-extracted JD Category: {}, Accepted Levels: {}", jd.getJobCategory(), jd.getAcceptedLevels());
+            } catch (Exception e) {
+                log.warn("[INGESTION] Warning auto-extracting JD metadata: {}", e.getMessage());
+            }
+        }
+
         jd = jobDescriptionRepository.save(jd);
         session.setJobDescription(jd);
 

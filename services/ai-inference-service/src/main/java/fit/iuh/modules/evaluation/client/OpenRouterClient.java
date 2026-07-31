@@ -32,12 +32,14 @@ public class OpenRouterClient {
     private final ObjectMapper objectMapper;
     private final String evalModel;
     private final String finalReportModel;
+    private final List<String> fallbackModels;
     private final Duration evalTimeout;
     private final Duration finalReportTimeout;
 
     public OpenRouterClient(
             @Value("${openrouter.api-key}") String apiKey,
             @Value("${openrouter.base-url:https://openrouter.ai/api/v1}") String baseUrl,
+            @Value("${openrouter.fallback-models:poolside/laguna-xs-2.1:free,poolside/laguna-xs-2.1}") String fallbackModelsStr,
             @Value("${openrouter.model.evaluation:google/gemini-2.5-flash}") String evalModel,
             @Value("${openrouter.model.final-report:google/gemini-2.5-flash}") String finalReportModel,
             @Value("${llm.timeout-seconds:20}") int timeoutSeconds,
@@ -53,8 +55,19 @@ public class OpenRouterClient {
         this.objectMapper = objectMapper;
         this.evalModel = evalModel;
         this.finalReportModel = finalReportModel;
+        this.fallbackModels = parseModelsStr(fallbackModelsStr);
         this.evalTimeout = Duration.ofSeconds(timeoutSeconds);
         this.finalReportTimeout = Duration.ofSeconds(finalReportTimeoutSeconds);
+    }
+
+    private static List<String> parseModelsStr(String modelsStr) {
+        if (modelsStr == null || modelsStr.isBlank()) {
+            return List.of();
+        }
+        return java.util.Arrays.stream(modelsStr.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(java.util.stream.Collectors.toList());
     }
 
     /**
@@ -83,8 +96,18 @@ public class OpenRouterClient {
 
     private Mono<String> chatCompletion(String model, String systemPrompt, String userPrompt,
                                         double temperature, Duration timeout) {
+        List<String> modelsList = new java.util.ArrayList<>();
+        if (model != null && !model.isBlank()) {
+            modelsList.add(model);
+        }
+        for (String fm : fallbackModels) {
+            if (!modelsList.contains(fm)) {
+                modelsList.add(fm);
+            }
+        }
+
         Map<String, Object> body = Map.of(
-                "model", model,
+                "models", modelsList,
                 "messages", List.of(
                         Map.of("role", "system", "content", systemPrompt),
                         Map.of("role", "user", "content", userPrompt)

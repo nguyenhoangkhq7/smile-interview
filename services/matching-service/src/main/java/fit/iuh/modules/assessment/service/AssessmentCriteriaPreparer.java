@@ -83,6 +83,7 @@ public class AssessmentCriteriaPreparer {
     private Importance defaultGpaImportance = Importance.PREFERRED;
 
     public record MetadataResult(JobCategory category, SeniorityLevel level) {}
+    public record JdRawMetadata(JobCategory category, List<SeniorityLevel> acceptedLevels) {}
     public record PreparedJdBundle(
             MetadataResult metadata,
             ClassifiedCriteriaBundle bundle,
@@ -115,22 +116,26 @@ public class AssessmentCriteriaPreparer {
     // 1. SMART 2-STEP PHASE 1 JD PREPARATION
     // =========================================================================
 
-    public PreparedJdBundle prepareJdConsolidatedSinglePass(String jdId, String fullJdMarkdown) {
+    public PreparedJdBundle prepareJdConsolidatedSinglePass(String jdId, String fullJdMarkdown, String fullCvMarkdown) {
         if (fullJdMarkdown == null) fullJdMarkdown = "";
+        if (fullCvMarkdown == null) fullCvMarkdown = "";
+        
+        final String jdContent = fullJdMarkdown;
 
-        // Step 1: Extract exact Job Category & Seniority Level from JD
-        log.info("[Phase1-3Pass] Step 1/3: Extracting Category & Level from JD...");
-        MetadataResult metadata = extractMetadata(fullJdMarkdown);
+        log.info("[Phase1-3Pass] Step 1 & 2: Extracting Category, Level, and Gate Requirements concurrently from JD...");
+        
+        final String finalCvMarkdown = fullCvMarkdown;
+        java.util.concurrent.CompletableFuture<MetadataResult> metaFuture = java.util.concurrent.CompletableFuture.supplyAsync(() -> extractMetadata(jdContent, finalCvMarkdown));
+        java.util.concurrent.CompletableFuture<List<GateCheckDto>> gatesFuture = java.util.concurrent.CompletableFuture.supplyAsync(() -> extractGateFromJd(jdContent));
 
-        // Step 2: Extract strict Gate Requirements (YOE, Education, GPA, Certifications) from JD
-        log.info("[Phase1-3Pass] Step 2/3: Extracting Gate Requirements from JD...");
-        List<GateCheckDto> gates = extractGateFromJd(fullJdMarkdown, "");
+        MetadataResult metadata = metaFuture.join();
 
-        // Step 3: Load DB criteria tree and classify criteria (Must-have, Prefer-to-have, Ad-hoc)
-        log.info("[Phase1-3Pass] Step 3/3: Loading DB criteria tree and classifying criteria for Category={} Level={}...",
+        log.info("[Phase1-3Pass] Step 3: Loading DB criteria tree and classifying criteria for Category={} Level={}...",
                 metadata.category(), metadata.level());
         ClassifiedCriteriaBundle bundle = loadAndClassifyCriteria(
-                metadata.category().name(), metadata.level().name(), fullJdMarkdown);
+                metadata.category().name(), metadata.level().name(), jdContent);
+
+        List<GateCheckDto> gates = gatesFuture.join();
 
         log.info("[Phase1-3Pass] SUCCESS (3-Pass Pipeline): Category={}, Level={}, Gates={}, Classified Criteria={}",
                 metadata.category(), metadata.level(), gates.size(), bundle.dbCriteria().size());
@@ -138,12 +143,37 @@ public class AssessmentCriteriaPreparer {
         return new PreparedJdBundle(metadata, bundle, gates);
     }
 
+    public PreparedJdBundle prepareJdConsolidatedSinglePassWithKnownMetadata(String jdId, String fullJdMarkdown, String fullCvMarkdown, MetadataResult knownMetadata) {
+        if (fullJdMarkdown == null) fullJdMarkdown = "";
+        if (fullCvMarkdown == null) fullCvMarkdown = "";
+        
+        final String jdContent = fullJdMarkdown;
+        final String finalCvMarkdown = fullCvMarkdown;
+
+        log.info("[Phase1-DirectMatch] Reusing pre-resolved Category={} and Level={}. Bypassing LLM Metadata Extraction!",
+                knownMetadata.category(), knownMetadata.level());
+
+        java.util.concurrent.CompletableFuture<List<GateCheckDto>> gatesFuture = java.util.concurrent.CompletableFuture.supplyAsync(() -> extractGateFromJd(jdContent));
+
+        log.info("[Phase1-DirectMatch] Loading DB criteria tree and classifying criteria for Category={} Level={}...",
+                knownMetadata.category(), knownMetadata.level());
+        ClassifiedCriteriaBundle bundle = loadAndClassifyCriteria(
+                knownMetadata.category().name(), knownMetadata.level().name(), jdContent);
+
+        List<GateCheckDto> gates = gatesFuture.join();
+
+        log.info("[Phase1-DirectMatch] SUCCESS: Category={}, Level={}, Gates={}, Classified Criteria={}",
+                knownMetadata.category(), knownMetadata.level(), gates.size(), bundle.dbCriteria().size());
+
+        return new PreparedJdBundle(knownMetadata, bundle, gates);
+    }
+
     // =========================================================================
     // 2. METADATA EXTRACTION
     // =========================================================================
 
-    public MetadataResult extractMetadata(String jdMarkdown) {
-        log.info("[CriteriaPreparer] Extracting job category and seniority level from JD...");
+    public MetadataResult extractMetadata(String jdMarkdown, String cvMarkdown) {
+        log.info("[CriteriaPreparer] Extracting job category and seniority levels from JD...");
 
         int truncateLength = (appProperties != null && appProperties.getAssessment() != null && appProperties.getAssessment().getMetadataJdTruncateLength() > 0)
                 ? appProperties.getAssessment().getMetadataJdTruncateLength() : 600;
@@ -153,12 +183,14 @@ public class AssessmentCriteriaPreparer {
         }
 
         var taskConfig = appProperties.getLlm().getTasks().getMetadataExtraction();
-        String model = appProperties.getLlm().resolveModel(taskConfig);
+        List<String> models = appProperties.getLlm().resolveModels(taskConfig);
+        String model = models.isEmpty() ? appProperties.getLlm().resolveModel(taskConfig) : models.get(0);
         int maxTokens = appProperties.getLlm().resolveMaxTokens(taskConfig);
         Duration timeout = Duration.ofSeconds(appProperties.getLlm().resolveTimeoutSeconds(taskConfig));
 
         LlmChatRequest request = LlmChatRequest.builder()
                 .model(model)
+                .models(models)
                 .maxTokens(maxTokens)
                 .temperature(0.1)
                 .stream(false)
@@ -186,7 +218,7 @@ public class AssessmentCriteriaPreparer {
                 LlmChatResponse response = objectMapper.readValue(responseBody, LlmChatResponse.class);
                 if (response != null && response.getFirstChoiceContent() != null) {
                     String rawJson = response.getFirstChoiceContent().strip();
-                    return parseAndMapToEnums(rawJson);
+                    return parseAndMapToEnums(rawJson, cvMarkdown);
                 }
 
             } catch (WebClientResponseException e) {
@@ -195,6 +227,7 @@ public class AssessmentCriteriaPreparer {
                     log.warn("[CriteriaPreparer] Model '{}' rejected response_format. Retrying without response_format...", model);
                     request = LlmChatRequest.builder()
                             .model(model)
+                            .models(models)
                             .maxTokens(METADATA_MAX_TOKENS)
                             .temperature(0.1)
                             .stream(false)
@@ -210,20 +243,132 @@ public class AssessmentCriteriaPreparer {
         return fallbackMetadataResult();
     }
 
-    private MetadataResult parseAndMapToEnums(String rawJson) {
+    private MetadataResult parseAndMapToEnums(String rawJson, String cvMarkdown) {
         String json = rawJson.replaceAll("(?s)^```json\\s*", "").replaceAll("(?s)\\s*```$", "").strip();
         try {
             RawMetadataDto raw = objectMapper.readValue(json, RawMetadataDto.class);
             JobCategory category = parseJobCategory(raw.category());
-            SeniorityLevel level = parseSeniorityLevel(raw.level());
-            log.info("[CriteriaPreparer] Extracted metadata: category={}, level={}", category, level);
-            return new MetadataResult(category, level);
+            
+            List<SeniorityLevel> jdLevels = new ArrayList<>();
+            if (raw.acceptedLevels() != null && !raw.acceptedLevels().isEmpty()) {
+                for (String lvlStr : raw.acceptedLevels()) {
+                    jdLevels.add(parseSeniorityLevel(lvlStr));
+                }
+            } else if (raw.level() != null) { // Fallback for old prompt structure
+                jdLevels.add(parseSeniorityLevel(raw.level()));
+            }
+
+            if (jdLevels.isEmpty()) {
+                jdLevels.add(SeniorityLevel.MID);
+            }
+
+            // Remove duplicates and sort based on natural enum order (INTERN < FRESHER < JUNIOR < MID < SENIOR < LEAD)
+            List<SeniorityLevel> distinctSortedLevels = jdLevels.stream()
+                    .distinct()
+                    .sorted()
+                    .toList();
+
+            SeniorityLevel targetLevel;
+            if (distinctSortedLevels.size() == 1) {
+                // Optimization: If JD is strict about 1 level, skip CV extraction.
+                targetLevel = distinctSortedLevels.get(0);
+                log.info("[CriteriaPreparer] JD has single accepted level: {}. Skipping CV level extraction.", targetLevel);
+            } else {
+                log.info("[CriteriaPreparer] JD accepts multiple levels: {}. Extracting level from CV...", distinctSortedLevels);
+                SeniorityLevel cvLevel = extractCvSeniorityLevel(cvMarkdown);
+                targetLevel = resolveTargetSeniorityLevel(distinctSortedLevels, cvLevel);
+            }
+
+            log.info("[CriteriaPreparer] Final extracted metadata: category={}, targetLevel={}", category, targetLevel);
+            return new MetadataResult(category, targetLevel);
         } catch (Exception e) {
+            log.error("[CriteriaPreparer] Failed to parse Metadata JSON: {}", e.getMessage(), e);
             return fallbackMetadataResult();
         }
     }
 
-    private JobCategory parseJobCategory(String value) {
+    public JdRawMetadata extractJdRawMetadata(String jdMarkdown) {
+        if (jdMarkdown == null || jdMarkdown.isBlank()) {
+            return new JdRawMetadata(JobCategory.OTHER, List.of(SeniorityLevel.MID));
+        }
+        try {
+            MetadataResult res = extractMetadata(jdMarkdown, null);
+            // Re-parse raw metadata json if needed, or extract metadata
+            return new JdRawMetadata(res.category(), List.of(res.level()));
+        } catch (Exception e) {
+            return new JdRawMetadata(JobCategory.OTHER, List.of(SeniorityLevel.MID));
+        }
+    }
+
+    public SeniorityLevel extractCvSeniorityLevel(String cvMarkdown) {
+        if (cvMarkdown == null || cvMarkdown.isBlank()) return SeniorityLevel.JUNIOR;
+        log.info("[CriteriaPreparer] Extracting Candidate Seniority Level from CV...");
+        
+        int truncateLength = 2000;
+        String truncatedCv = cvMarkdown;
+        if (cvMarkdown.length() > truncateLength) {
+            truncatedCv = cvMarkdown.substring(0, truncateLength) + "\n...[TRUNCATED]";
+        }
+
+        var taskConfig = appProperties.getLlm().getTasks().getMetadataExtraction();
+        List<String> models = appProperties.getLlm().resolveModels(taskConfig);
+        String model = models.isEmpty() ? appProperties.getLlm().resolveModel(taskConfig) : models.get(0);
+        Duration timeout = Duration.ofSeconds(appProperties.getLlm().resolveTimeoutSeconds(taskConfig));
+
+        LlmChatRequest request = LlmChatRequest.builder()
+                .model(model)
+                .models(models)
+                .maxTokens(150)
+                .temperature(0.1)
+                .stream(false)
+                .responseFormat(JSON_RESPONSE_FORMAT)
+                .messages(List.of(
+                        LlmChatRequest.Message.system(AssessmentPrompts.SYSTEM_PROMPT_CV_LEVEL_EXTRACTION),
+                        LlmChatRequest.Message.user(truncatedCv)
+                ))
+                .build();
+
+        try {
+            String responseBody = llmWebClient.post()
+                    .uri(appProperties.getLlm().getChatPath())
+                    .bodyValue(request)
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .timeout(timeout)
+                    .block();
+
+            LlmChatResponse response = objectMapper.readValue(responseBody, LlmChatResponse.class);
+            if (response != null && response.getFirstChoiceContent() != null) {
+                String rawJson = response.getFirstChoiceContent().strip();
+                String json = rawJson.replaceAll("(?s)^```json\\s*", "").replaceAll("(?s)\\s*```$", "").strip();
+                java.util.Map<String, String> result = objectMapper.readValue(json, new com.fasterxml.jackson.core.type.TypeReference<>() {});
+                return parseSeniorityLevel(result.get("level"));
+            }
+        } catch (Exception e) {
+            log.warn("[CriteriaPreparer] Failed to extract CV level: {}", e.getMessage());
+        }
+        return SeniorityLevel.JUNIOR; // Safe fallback for Tech
+    }
+
+    public SeniorityLevel resolveTargetSeniorityLevel(List<SeniorityLevel> jdLevels, SeniorityLevel cvLevel) {
+        if (jdLevels.contains(cvLevel)) {
+            log.info("[CriteriaPreparer] CV level {} is accepted by JD. Using it as target level.", cvLevel);
+            return cvLevel;
+        }
+        
+        SeniorityLevel minLevel = jdLevels.get(0);
+        SeniorityLevel maxLevel = jdLevels.get(jdLevels.size() - 1);
+        
+        if (cvLevel.compareTo(minLevel) < 0) {
+            log.info("[CriteriaPreparer] CV level {} is LOWER than JD min level {}. Evaluating at min level.", cvLevel, minLevel);
+            return minLevel;
+        } else {
+            log.info("[CriteriaPreparer] CV level {} is HIGHER than JD max level {}. Evaluating at max level.", cvLevel, maxLevel);
+            return maxLevel;
+        }
+    }
+
+    public JobCategory parseJobCategory(String value) {
         if (value == null) return JobCategory.OTHER;
         String normalized = value.toUpperCase().strip().replace(" ", "_").replace("-", "_");
 
@@ -263,18 +408,24 @@ public class AssessmentCriteriaPreparer {
         }
     }
 
-    private SeniorityLevel parseSeniorityLevel(String value) {
-        if (value == null) return SeniorityLevel.MID;
-        try {
-            return SeniorityLevel.valueOf(value.toUpperCase().strip());
-        } catch (IllegalArgumentException e) {
-            return SeniorityLevel.MID;
+    public SeniorityLevel parseSeniorityLevel(String value) {
+        if (value == null) return SeniorityLevel.JUNIOR; // Safe fallback
+        
+        String normalized = value.toUpperCase().strip().replace(" ", "_").replace("-", "_");
+        switch (normalized) {
+            case "INTERN": case "INTERNSHIP": return SeniorityLevel.INTERN;
+            case "FRESHER": case "FRESHER_JUNIOR": case "FRESH": return SeniorityLevel.FRESHER;
+            case "JUNIOR": case "JR": return SeniorityLevel.JUNIOR;
+            case "MID": case "MIDDLE": case "MID_LEVEL": return SeniorityLevel.MID;
+            case "SENIOR": case "SR": return SeniorityLevel.SENIOR;
+            case "LEAD": case "TECH_LEAD": case "ARCHITECT": return SeniorityLevel.LEAD;
+            default: return SeniorityLevel.JUNIOR; // Fallback an toàn về JUNIOR
         }
     }
 
     private MetadataResult fallbackMetadataResult() {
-        log.warn("[CriteriaPreparer] Using fallback defaults: category=OTHER, level=MID");
-        return new MetadataResult(JobCategory.OTHER, SeniorityLevel.MID);
+        log.warn("[CriteriaPreparer] Using fallback defaults: category=OTHER, level=JUNIOR");
+        return new MetadataResult(JobCategory.OTHER, SeniorityLevel.JUNIOR);
     }
 
     // =========================================================================
@@ -283,8 +434,20 @@ public class AssessmentCriteriaPreparer {
 
     public ClassifiedCriteriaBundle loadAndClassifyCriteria(String categoryName, String seniorityLevelName, String fullJdMarkdown) {
         List<CriteriaWeightProjection> dbCriteria = loadCriteriaWithFallback(categoryName, seniorityLevelName);
-        List<CriteriaWeightProjection> preFiltered = preFilterCriteriaForJd("pre-classify", fullJdMarkdown, dbCriteria);
-        return classifyCriteria(fullJdMarkdown, preFiltered, seniorityLevelName);
+        log.info("[CriteriaPreparer] Loading DB criteria tree: Fetched {} base criteria for Category={}, Level={}",
+                dbCriteria.size(), categoryName, seniorityLevelName);
+
+        ClassifiedCriteriaBundle bundle = classifyCriteria(fullJdMarkdown, dbCriteria, seniorityLevelName);
+
+        long requiredCount = bundle.dbCriteria() != null ? bundle.dbCriteria().stream().filter(c -> "required".equalsIgnoreCase(c.importance())).count() : 0;
+        long preferredCount = bundle.dbCriteria() != null ? bundle.dbCriteria().stream().filter(c -> "preferred".equalsIgnoreCase(c.importance())).count() : 0;
+        long notInJdCount = bundle.dbCriteria() != null ? bundle.dbCriteria().stream().filter(c -> "not_in_jd".equalsIgnoreCase(c.importance())).count() : 0;
+        long adHocCount = bundle.jdExtras() != null ? bundle.jdExtras().size() : 0;
+
+        log.info("[CriteriaPreparer] LLM Classification & Single-Pass Filtering Report: DB Loaded={} -> [Required={}, Preferred={}, NotInJD={}] | Discovered Ad-hoc={}",
+                dbCriteria.size(), requiredCount, preferredCount, notInJdCount, adHocCount);
+
+        return bundle;
     }
 
     public List<CriteriaWeightProjection> loadAndFilterCriteria(
@@ -387,12 +550,14 @@ public class AssessmentCriteriaPreparer {
         );
 
         var taskConfig = appProperties.getLlm().getTasks().getCriteriaClassification();
-        String model = appProperties.getLlm().resolveModel(taskConfig);
+        List<String> models = appProperties.getLlm().resolveModels(taskConfig);
+        String model = models.isEmpty() ? appProperties.getLlm().resolveModel(taskConfig) : models.get(0);
         int maxTokens = appProperties.getLlm().resolveMaxTokens(taskConfig);
         Duration timeout = Duration.ofSeconds(Math.max(120, appProperties.getLlm().resolveTimeoutSeconds(taskConfig)));
 
         LlmChatRequest request = LlmChatRequest.builder()
                 .model(model)
+                .models(models)
                 .maxTokens(maxTokens)
                 .temperature(0.1)
                 .stream(false)
@@ -425,6 +590,7 @@ public class AssessmentCriteriaPreparer {
                     log.warn("[CriteriaPreparer] Model '{}' rejected response_format. Retrying without response_format...", model);
                     request = LlmChatRequest.builder()
                             .model(model)
+                            .models(models)
                             .maxTokens(maxTokens)
                             .temperature(0.1)
                             .stream(false)
@@ -546,11 +712,14 @@ public class AssessmentCriteriaPreparer {
                 "Candidate Seniority Level: %s\n\nDatabase Criteria List:\n%s\n\nJob Description:\n%s",
                 seniorityLevel, listBuilder, jdMarkdown);
         var taskConfig = appProperties.getLlm().getTasks().getCriteriaClassification();
+        List<String> models = appProperties.getLlm().resolveModels(taskConfig);
+        String model = models.isEmpty() ? appProperties.getLlm().resolveModel(taskConfig) : models.get(0);
         long timeoutSec = Math.max(180, appProperties.getLlm().resolveTimeoutSeconds(taskConfig));
         Duration timeout = Duration.ofSeconds(timeoutSec);
 
         LlmChatRequest request = LlmChatRequest.builder()
-                .model(appProperties.getLlm().resolveModel(taskConfig))
+                .model(model)
+                .models(models)
                 .maxTokens(appProperties.getLlm().resolveMaxTokens(taskConfig))
                 .temperature(0.1)
                 .stream(false)
@@ -584,6 +753,7 @@ public class AssessmentCriteriaPreparer {
                     log.warn("[CriteriaPreparer] Model '{}' rejected response_format. Retrying classify batch without response_format...", request.getModel());
                     request = LlmChatRequest.builder()
                             .model(request.getModel())
+                            .models(request.getModels())
                             .maxTokens(request.getMaxTokens())
                             .temperature(0.1)
                             .stream(false)
@@ -679,7 +849,7 @@ public class AssessmentCriteriaPreparer {
 
         if (rawGates == null) {
             try {
-                rawGates = extractGateFromJd(jdContent, cvContent);
+                rawGates = extractGateFromJd(jdContent);
             } catch (Exception e) {
                 log.error("[CriteriaPreparer] Gate extraction exception: {}", e.getMessage());
             }
@@ -705,7 +875,7 @@ public class AssessmentCriteriaPreparer {
             if (name != null && (name.toLowerCase().contains("experience") || name.toLowerCase().contains("yoe"))) {
                 double reqYoe = parseRequiredYoe(reqVal);
                 pass = candidateYoe >= reqYoe;
-                cvEvidence = candidateYoe > 0 ? candidateYoe + " years of experience" : "No explicitly quantifiable experience found";
+                cvEvidence = candidateYoe > 0 ? candidateYoe + " years of experience" : (pass ? "0 YOE (Fresher/Entry-level requirement met)" : "No quantifiable experience found");
                 evaluated = true;
             } else if (name != null && (name.toLowerCase().contains("degree") || name.toLowerCase().contains("education") || name.toLowerCase().contains("academic") || name.toLowerCase().contains("university") || name.toLowerCase().contains("bachelor"))) {
                 boolean hasDegree = checkDegreeInCv(cvContent);
@@ -725,7 +895,7 @@ public class AssessmentCriteriaPreparer {
 
             gateItems.add(new fit.iuh.modules.assessment.dto.AssessmentResponseDto.EvidenceItem(
                     null,
-                    name,
+                    (name != null && !"Certification".equalsIgnoreCase(name)) ? name : (reqVal != null && reqVal.length() <= 30 ? reqVal : name),
                     "GATE",
                     reqVal,
                     cvEvidence,
@@ -733,7 +903,7 @@ public class AssessmentCriteriaPreparer {
                     evaluated ? (pass ? "Pass" : "Not Pass") : "Not Evaluated",
                     evaluated ? (pass ? "Candidate meets the gate requirement." : "Candidate does not meet the gate requirement.") 
                               : "System heuristics currently only auto-evaluate YOE and Degree gates. Please manually verify this requirement.",
-                    null, null, null, null, null, null
+                    null, null, null, null, null, null, null
             ));
         }
 
@@ -741,21 +911,28 @@ public class AssessmentCriteriaPreparer {
         return new EligibilityEvaluationResult(finalStatus, gateItems);
     }
 
-    private List<GateCheckDto> extractGateFromJd(String jdContent, String cvContent) {
+    private List<GateCheckDto> extractGateFromJd(String jdContent) {
+        if (jdContent == null || jdContent.isBlank()) return List.of();
+
+        // Use full JD text (or safe 8000 char limit for extremely long JDs) so requirements at the end are never missed
+        String targetJd = jdContent.length() > 8000 ? jdContent.substring(0, 8000) + "\n...[TRUNCATED]" : jdContent;
+
         var taskConfig = appProperties.getLlm().getTasks().getGateExtraction();
-        String model = appProperties.getLlm().resolveModel(taskConfig);
-        int maxTokens = appProperties.getLlm().resolveMaxTokens(taskConfig);
-        Duration timeout = Duration.ofSeconds(appProperties.getLlm().resolveTimeoutSeconds(taskConfig));
+        List<String> models = appProperties.getLlm().resolveModels(taskConfig);
+        String model = models.isEmpty() ? appProperties.getLlm().resolveModel(taskConfig) : models.get(0);
+        int maxTokens = 500;
+        Duration timeout = Duration.ofSeconds(30);
 
         LlmChatRequest request = LlmChatRequest.builder()
                 .model(model)
+                .models(models)
                 .maxTokens(maxTokens)
                 .temperature(0.1)
                 .stream(false)
                 .responseFormat(JSON_RESPONSE_FORMAT)
                 .messages(List.of(
                         LlmChatRequest.Message.system(AssessmentPrompts.SYSTEM_PROMPT_GATE_EXTRACTION),
-                        LlmChatRequest.Message.user("JD:\n" + jdContent + "\n\nCV:\n" + cvContent)
+                        LlmChatRequest.Message.user("Job Description:\n" + targetJd)
                 ))
                 .build();
 
@@ -782,6 +959,7 @@ public class AssessmentCriteriaPreparer {
                     log.warn("[CriteriaPreparer] Retrying gate extraction without response_format...");
                     request = LlmChatRequest.builder()
                             .model(model)
+                            .models(models)
                             .maxTokens(maxTokens)
                             .temperature(0.1)
                             .stream(false)
@@ -791,6 +969,10 @@ public class AssessmentCriteriaPreparer {
                 }
                 break;
             } catch (Exception e) {
+                if (e instanceof java.util.concurrent.TimeoutException || (e.getCause() != null && e.getCause() instanceof java.util.concurrent.TimeoutException) || (e.getMessage() != null && e.getMessage().contains("TimeoutException"))) {
+                    log.warn("[CriteriaPreparer] Gate extraction LLM request timed out after {}s: {}", timeout.getSeconds(), e.getMessage());
+                    break;
+                }
                 log.warn("[CriteriaPreparer] Failed to parse gate extraction output: {}", e.getMessage());
             }
         }
@@ -952,6 +1134,7 @@ public class AssessmentCriteriaPreparer {
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record RawMetadataDto(
             @JsonProperty("category") String category,
-            @JsonProperty("level") String level
+            @JsonProperty("accepted_levels") List<String> acceptedLevels,
+            @JsonProperty("level") String level // For backwards compatibility
     ) {}
 }

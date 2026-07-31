@@ -21,18 +21,17 @@ public final class AssessmentPrompts {
             """
             Role: Job Description Parser & Criteria Classifier.
             Task: Analyze JD and numbered DB criteria list in a SINGLE pass.
-            STRICT JSON OUTPUT:
             {
               "category": "<BACKEND|FRONTEND|FULLSTACK|DEVOPS|DATA_ENGINEERING|AI_ML|MOBILE|SECURITY|QA_TESTING|OTHER>",
-              "level": "<INTERN|FRESHER|JUNIOR|MID|SENIOR|LEAD>",
+              "accepted_levels": ["<INTERN|FRESHER|JUNIOR|MID|SENIOR|LEAD>"],
               "gate_requirements": [{"criteria_name": "<YOE|Education|GPA|Certification>", "importance": "<REQUIRED|PREFERRED>", "required_value": "<English text>"}],
               "classified": [{"criteria_id": <long>, "importance": "<required|preferred|not_in_jd>"}],
               "jd_extras": [{"name": "<skill>", "importance": "<required|preferred>", "prompt_instruction": "<English sentence>"}]
             }
             RULES:
             1. CATEGORY: BACKEND (APIs/Java/Go/Node), FRONTEND (React/Vue/CSS), FULLSTACK (both), DEVOPS (CI/CD/Docker/K8s), DATA_ENGINEERING (ETL/Spark/Pipelines), AI_ML (ML/LLM/Models), MOBILE (iOS/Android/Flutter), SECURITY (SAST/DAST), QA_TESTING (Automation/QA), OTHER.
-            2. LEVEL: Check title/first 10 lines. INTERN (0 exp/student), FRESHER (0-1 yr/fresh grad), JUNIOR (1-2 yrs), MID (2-5 yrs), SENIOR (5-8 yrs), LEAD (8+ yrs/Lead/Architect).
-            3. GATES: Extract YOE, Education, GPA, Certifications explicitly in JD. Return [] if none.
+            2. LEVEL: Check title/first 10 lines. Return an array of accepted levels. INTERN (0 exp/student), FRESHER (0-1 yr/fresh grad), JUNIOR (1-2 yrs), MID (2-5 yrs), SENIOR (5-8 yrs), LEAD (8+ yrs/Lead/Architect).
+            3. GATES: Extract YOE, Education, GPA, Certifications explicitly in JD. Return [] if none. DO NOT extract technical skills, tools, frameworks, system design concepts (e.g. C4 Model), or programming languages as GATES — those MUST be classified as criteria.
             4. CLASSIFIED: 'required' (mandatory), 'preferred' (nice-to-have), 'not_in_jd' (absent). For INTERN/FRESHER, heavy DevOps/Cloud = 'preferred'.
             5. EXTRA SKILLS: List unique JD skills NOT in DB criteria list.
             """;
@@ -60,7 +59,7 @@ public final class AssessmentPrompts {
               ]
             }
             RULES:
-            1. Only YOE, Education, GPA, Certifications. Do NOT invent missing thresholds.
+            1. Only YOE, Education, GPA, Official Certifications. Do NOT extract technical skills, system design (e.g. C4 Model), tools, languages, or general requirements as GATES.
             2. Differentiate REQUIRED vs PREFERRED.
             3. All text fields in English. Output STRICT JSON ONLY.
             """;
@@ -68,12 +67,26 @@ public final class AssessmentPrompts {
     public static final String SYSTEM_PROMPT_METADATA_EXTRACTION =
             """
             Role: IT Job Classifier.
-            Task: Extract category and level from Job Description (first 10 lines priority).
+            Task: Extract category and levels from Job Description (first 10 lines priority).
             STRICT JSON OUTPUT:
             {
               "category": "<BACKEND|FRONTEND|FULLSTACK|DEVOPS|DATA_ENGINEERING|AI_ML|MOBILE|SECURITY|QA_TESTING|OTHER>",
-              "level": "<INTERN|FRESHER|JUNIOR|MID|SENIOR|LEAD>"
+              "accepted_levels": ["<INTERN|FRESHER|JUNIOR|MID|SENIOR|LEAD>"]
             }
+            """;
+
+    public static final String SYSTEM_PROMPT_CV_LEVEL_EXTRACTION =
+            """
+            Role: Candidate Seniority Assessor.
+            Task: Extract the candidate's actual seniority level based strictly on their total Years of Experience (YOE) and Job Titles in their CV.
+            STRICT JSON OUTPUT: {"level": "<INTERN|FRESHER|JUNIOR|MID|SENIOR|LEAD>"}
+            RULES:
+            - INTERN: 0 exp/student/internships
+            - FRESHER: < 1 yr total exp
+            - JUNIOR: 1-2 yrs total exp
+            - MID: 2-5 yrs total exp
+            - SENIOR: 5-8 yrs total exp
+            - LEAD: 8+ yrs or explicit Lead/Architect titles
             """;
 
     public static final String SYSTEM_PROMPT_CRITERIA_CLASSIFICATION =
@@ -156,13 +169,19 @@ public final class AssessmentPrompts {
             Task: Provide actionable CV editing advice and concrete sample bullet points for candidate weaknesses based on their CV.
             STRICT JSON OUTPUT:
             {
-              "top_priority_improvements": [
+              "quick_wins": [
+                {"criteria_name": "<string>", "actionable_advice": "<Exact recommended CV bullet point>", "priority": "<HIGH|MEDIUM|LOW>"}
+              ],
+              "skill_gaps": [
                 {"criteria_name": "<string>", "actionable_advice": "<Exact recommended CV bullet point>", "priority": "<HIGH|MEDIUM|LOW>"}
               ]
             }
-            RULES:
-            1. DO NOT recommend taking online courses/LeetCode. Focus on rewording existing CV experience.
-            2. Provide exact professional CV bullet points in English. Zero hallucination.
+            STRICT CONSTRAINTS FOR ACTIONABLE ADVICE:
+            1. ZERO FAKE METRICS: Only use numerical metrics (e.g., 500+ users, 30% latency reduction) if they explicitly appear in the candidate's CV for THAT specific project/technology. NEVER transfer metrics from Project A to Project B.
+            2. REWORDING vs LAB PRACTICE:
+               - Quick Wins (Technology X exists in CV but weak): Reframe the bullet point using STAR framework (Action Verb + Context + Measured Impact from that project).
+               - Skill Gaps (Technology X is missing from CV): Frame as a practice recommendation: "If you have practiced X in a lab/personal project, write: 'Built a lab prototype using X to...'". DO NOT recommend taking online courses/LeetCode.
+            3. Provide exact professional CV bullet points in English. Zero hallucination.
             """;
 
     public static String buildImprovementUserPrompt(String missingAndWeakItemsJson) {

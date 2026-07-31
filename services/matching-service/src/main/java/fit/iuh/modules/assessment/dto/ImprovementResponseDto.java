@@ -8,8 +8,11 @@ import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record ImprovementResponseDto(
-        @JsonProperty("top_priority_improvements")
-        List<ImprovementItem> topPriorityImprovements
+        @JsonProperty("quick_wins")
+        List<ImprovementItem> quickWins,
+        
+        @JsonProperty("skill_gaps")
+        List<ImprovementItem> skillGaps
 ) {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
