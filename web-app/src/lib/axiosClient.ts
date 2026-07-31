@@ -9,7 +9,7 @@ const axiosClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 15_000, // 15 s
+  timeout: 300_000, // 300 s (5 minutes)
 });
 
 // ----------------------------------------------------------------

@@ -949,9 +949,8 @@ public class AssessmentCriteriaPreparer {
                 if (responseBody != null) {
                     LlmChatResponse res = objectMapper.readValue(responseBody, LlmChatResponse.class);
                     if (res != null && res.getFirstChoiceContent() != null) {
-                        String cleanJson = TextSanitizationUtil.extractCleanJson(res.getFirstChoiceContent());
-                        GateExtractionDto dto = objectMapper.readValue(cleanJson, GateExtractionDto.class);
-                        return dto != null && dto.getGateRequirements() != null ? dto.getGateRequirements() : List.of();
+                        GateExtractionDto dto = objectMapper.readValue(res.getFirstChoiceContent(), GateExtractionDto.class);
+                        return (dto != null && dto.getGateRequirements() != null) ? dto.getGateRequirements() : List.of();
                     }
                 }
             } catch (WebClientResponseException e) {

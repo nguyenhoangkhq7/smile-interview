@@ -158,7 +158,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'id is required' }, { status: 400 });
     }
 
-    await query('DELETE FROM resumes WHERE id = $1', [parseInt(id, 10)]);
+    await query('DELETE FROM resumes WHERE id = $1', [id]);
     return NextResponse.json({ success: true });
   } catch (errorVal) { const error = errorVal as Error;
     console.error('[API Resumes] Error deleting resume:', error);

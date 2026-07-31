@@ -50,6 +50,7 @@ export interface SessionHistoryItem {
   actionableSuggestions?: string[];
   resumeId?: number;
   jdId?: number;
+  gateEvidenceItems?: unknown[];
   mustHaveEvidenceItems?: unknown[];
   preferToHaveEvidenceItems?: unknown[];
   evidenceItems?: unknown[];
@@ -57,8 +58,9 @@ export interface SessionHistoryItem {
   scoreBreakdown?: unknown;
   topPriorityImprovements?: unknown[];
   hiringRecommendation?: string;
-  eligibility?: SessionEligibility;
+  eligibility?: SessionEligibility | string | null;
 }
+
 
 export interface SessionEligibility {
   status?: string;

@@ -172,7 +172,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'id is required' }, { status: 400 });
     }
 
-    await query('DELETE FROM job_descriptions WHERE id = $1', [parseInt(id, 10)]);
+    await query('DELETE FROM job_descriptions WHERE id = $1', [id]);
     return NextResponse.json({ success: true });
   } catch (error) {
     const err = error as Error;

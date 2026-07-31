@@ -66,6 +66,7 @@ export async function GET() {
           criticalMissingSkills: parseJsonField(sess.critical_missing_skills) || [],
           sectionWiseFeedback: parseJsonField(sess.section_wise_feedback) || {},
           actionableSuggestions: parseJsonField(sess.actionable_suggestions) || [],
+          gateEvidenceItems: parseJsonField(sess.gate_evidence_items) || [],
           mustHaveEvidenceItems: parseJsonField(sess.must_have_evidence_items) || parseJsonField(sess.evidence_items) || [],
           preferToHaveEvidenceItems: parseJsonField(sess.prefer_to_have_evidence_items) || parseJsonField(sess.additional_evidence_items) || [],
           evidenceItems: parseJsonField(sess.must_have_evidence_items) || parseJsonField(sess.evidence_items) || [],
@@ -114,8 +115,8 @@ export async function POST(request: NextRequest) {
         years_of_experience_estimate, strong_areas, gap_areas, critical_missing_skills,
         section_wise_feedback, actionable_suggestions, resume_id, jd_id,
         evidence_items, additional_evidence_items, score_breakdown, top_priority_improvements,
-        hiring_recommendation, eligibility
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
+        hiring_recommendation, eligibility, gate_evidence_items, must_have_evidence_items, prefer_to_have_evidence_items
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31)
       ON CONFLICT (id) DO UPDATE SET
         date = EXCLUDED.date,
         interview_type = EXCLUDED.interview_type,
@@ -143,7 +144,10 @@ export async function POST(request: NextRequest) {
         score_breakdown = EXCLUDED.score_breakdown,
         top_priority_improvements = EXCLUDED.top_priority_improvements,
         hiring_recommendation = EXCLUDED.hiring_recommendation,
-        eligibility = EXCLUDED.eligibility
+        eligibility = EXCLUDED.eligibility,
+        gate_evidence_items = EXCLUDED.gate_evidence_items,
+        must_have_evidence_items = EXCLUDED.must_have_evidence_items,
+        prefer_to_have_evidence_items = EXCLUDED.prefer_to_have_evidence_items
     `;
 
     await query(upsertSessionSql, [
@@ -174,8 +178,12 @@ export async function POST(request: NextRequest) {
       session.scoreBreakdown ? JSON.stringify(session.scoreBreakdown) : null,
       session.topPriorityImprovements ? JSON.stringify(session.topPriorityImprovements) : null,
       session.hiringRecommendation ? session.hiringRecommendation : null,
-      session.eligibility ? JSON.stringify(session.eligibility) : null,
+      session.eligibility ? (typeof session.eligibility === 'string' ? session.eligibility : JSON.stringify(session.eligibility)) : null,
+      session.gateEvidenceItems ? JSON.stringify(session.gateEvidenceItems) : null,
+      session.mustHaveEvidenceItems ? JSON.stringify(session.mustHaveEvidenceItems) : null,
+      session.preferToHaveEvidenceItems ? JSON.stringify(session.preferToHaveEvidenceItems) : null,
     ]);
+
 
     // 2. Replace turns only when explicitly requested.
     if (session.replaceQuestions === true) {

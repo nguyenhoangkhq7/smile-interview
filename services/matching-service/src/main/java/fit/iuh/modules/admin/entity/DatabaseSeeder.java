@@ -1,5 +1,8 @@
 package fit.iuh.modules.admin.entity;
 
+import fit.iuh.modules.auth.entity.Role;
+import fit.iuh.modules.auth.entity.User;
+import fit.iuh.modules.auth.repository.UserRepository;
 import fit.iuh.modules.admin.repository.LevelDistributionRuleRepository;
 import fit.iuh.modules.admin.repository.SystemSettingRepository;
 import fit.iuh.modules.rulengine.entity.CategoryCriteriaMapping;

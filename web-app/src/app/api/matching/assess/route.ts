@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { customFetch } from '@/lib/customFetch';
 
 interface EvidenceItem {
   status: string;
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
          WHERE resume_id = $1 AND jd_id = $2 
            AND competency_fit_score IS NOT NULL 
          ORDER BY date DESC LIMIT 1`,
-        [parseInt(resumeId, 10), parseInt(jdId, 10)]
+        [resumeId, jdId]
       );
 
       if (cachedSessionRes.rows.length > 0) {
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
           if (authHeader) {
             headers['Authorization'] = authHeader;
           }
-          await fetch(targetUrl, { headers });
+          await customFetch(targetUrl, { headers });
           console.log(`[API Proxy Assess] Java backend cloned successfully for sessionId=${sessionId}`);
         } catch (e) {
           console.error(`[API Proxy Assess] Failed to trigger Java backend clone:`, e);
@@ -87,8 +88,11 @@ export async function GET(request: NextRequest) {
           actionableImprovementSuggestions: parseJsonField(cachedSession.actionable_suggestions) || [],
           cached: true,
           createdAt: cachedSession.date || '',
-          evidenceItems: parseJsonField(cachedSession.evidence_items) || [],
-          additionalEvidenceItems: parseJsonField(cachedSession.additional_evidence_items) || [],
+          gateEvidenceItems: parseJsonField(cachedSession.gate_evidence_items) || [],
+          mustHaveEvidenceItems: parseJsonField(cachedSession.must_have_evidence_items) || parseJsonField(cachedSession.evidence_items) || [],
+          preferToHaveEvidenceItems: parseJsonField(cachedSession.prefer_to_have_evidence_items) || parseJsonField(cachedSession.additional_evidence_items) || [],
+          evidenceItems: parseJsonField(cachedSession.must_have_evidence_items) || parseJsonField(cachedSession.evidence_items) || [],
+          additionalEvidenceItems: parseJsonField(cachedSession.prefer_to_have_evidence_items) || parseJsonField(cachedSession.additional_evidence_items) || [],
           scoreBreakdown: parseJsonField(cachedSession.score_breakdown) || null,
           topPriorityImprovements: parseJsonField(cachedSession.top_priority_improvements) || [],
           eligibility: parseJsonField(cachedSession.eligibility) || null
@@ -105,7 +109,7 @@ export async function GET(request: NextRequest) {
     if (authHeader) {
       headers['Authorization'] = authHeader;
     }
-    const backendRes = await fetch(targetUrl, {
+    const backendRes = await customFetch(targetUrl, {
       headers: headers
     });
 
@@ -128,7 +132,7 @@ export async function GET(request: NextRequest) {
     const data = await backendRes.json();
     
     // Map Java response structure to frontend AssessmentResponse interface
-    const overallScore = data.overall_match_score || 0;
+    const overallScore = data.overall_match_score ?? data.score_breakdown?.final_score ?? 0;
     
     // Compute match level
     let matchLevel = 'Low (Cần cải thiện)';
@@ -160,36 +164,47 @@ export async function GET(request: NextRequest) {
     };
     const yearsOfExperienceEstimate = expMap[data.seniority_level] || data.seniority_level || 'N/A';
 
-    // Map evidence items to strong / gap / missing categories, combining both core and ad-hoc evidence items
+    // Map evidence items to strong / gap / missing categories
+    const gateItems = data.gate_evidence_items || [];
     const mustHave = data.must_have_evidence_items || data.evidence_items || [];
     const preferToHave = data.prefer_to_have_evidence_items || data.additional_evidence_items || [];
-    const allEvidence = [...mustHave, ...preferToHave];
+    const allEvidence = [...gateItems, ...mustHave, ...preferToHave];
+
+    const isMatched = (s?: string) => {
+      const st = (s || '').toLowerCase();
+      return st === 'matched' || st === 'pass' || st === 'passed';
+    };
+    const isWeak = (s?: string) => (s || '').toLowerCase() === 'weak';
+    const isMissing = (s?: string) => {
+      const st = (s || '').toLowerCase();
+      return st === 'missing' || st === 'fail' || st === 'failed';
+    };
 
     const strongAreas = (allEvidence as EvidenceItem[])
-      .filter((item) => item.status === 'matched')
+      .filter((item) => isMatched(item.status))
       .map((item) => item.criteria_name);
 
     const gapAreas = (allEvidence as EvidenceItem[])
-      .filter((item) => item.status === 'weak')
+      .filter((item) => isWeak(item.status))
       .map((item) => item.criteria_name);
 
     const criticalMissingSkills = (allEvidence as EvidenceItem[])
-      .filter((item) => item.status === 'missing')
+      .filter((item) => isMissing(item.status))
       .map((item) => item.criteria_name);
 
     // Group section-wise feedback
     const sectionWiseFeedback: Record<string, string> = {};
     if (allEvidence.length > 0) {
       const matchedText = (allEvidence as EvidenceItem[])
-        .filter((item) => item.status === 'matched')
-        .map((item) => `${item.criteria_name} (${item.cv_evidence || ''})`)
+        .filter((item) => isMatched(item.status))
+        .map((item) => `${item.criteria_name}${item.cv_evidence ? ` (${item.cv_evidence})` : ''}`)
         .join('; ');
       const weakText = (allEvidence as EvidenceItem[])
-        .filter((item) => item.status === 'weak')
+        .filter((item) => isWeak(item.status))
         .map((item) => `${item.criteria_name}: Yêu cầu JD: ${item.jd_requirement || ''}. Minh chứng CV: ${item.cv_evidence || 'chưa rõ ràng'}.`)
         .join(' | ');
       const missingText = (allEvidence as EvidenceItem[])
-        .filter((item) => item.status === 'missing')
+        .filter((item) => isMissing(item.status))
         .map((item) => item.criteria_name)
         .join(', ');
 
@@ -205,8 +220,20 @@ export async function GET(request: NextRequest) {
     }
 
     // Actionable improvement suggestions mapping
-    const actionableImprovementSuggestions = (data.top_priority_improvements as ImprovementItem[] || [])
-      .map((item) => `[${item.criteria_name}] ${item.actionable_advice || item.suggestion || ''}`);
+    const topImprovements = (data.top_priority_improvements as ImprovementItem[]) || [];
+    let actionableImprovementSuggestions: string[] = [];
+    if (topImprovements.length > 0) {
+      actionableImprovementSuggestions = topImprovements.map(
+        (item) => `[${item.criteria_name}] ${item.actionable_advice || item.suggestion || ''}`
+      );
+    } else {
+      const nonMatchedItems = (allEvidence as EvidenceItem[]).filter((item) => !isMatched(item.status));
+      actionableImprovementSuggestions = nonMatchedItems.map((item) => {
+        const req = item.jd_requirement ? `Yêu cầu: ${item.jd_requirement}. ` : '';
+        const reas = (item as unknown as { reasoning?: string }).reasoning || 'Cần bổ sung minh chứng cho kỹ năng này trong CV.';
+        return `[${item.criteria_name}] ${req}${reas}`;
+      });
+    }
 
     return NextResponse.json({
       id: data.id,
@@ -224,14 +251,16 @@ export async function GET(request: NextRequest) {
       actionableImprovementSuggestions,
       cached: data.cached || false,
       createdAt: data.created_at || '',
+      gateEvidenceItems: gateItems,
       mustHaveEvidenceItems: mustHave,
       preferToHaveEvidenceItems: preferToHave,
       evidenceItems: mustHave,
       additionalEvidenceItems: preferToHave,
       scoreBreakdown: data.score_breakdown || null,
-      topPriorityImprovements: data.top_priority_improvements || [],
+      topPriorityImprovements: topImprovements,
       eligibility: data.eligibility || null
     });
+
   } catch (error) {
     const err = error as Error;
     console.error('[API Proxy Assess] Error in proxy assessment:', err);

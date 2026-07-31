@@ -74,6 +74,7 @@ export async function GET(
       criticalMissingSkills: parseJsonField(sess.critical_missing_skills) || [],
       sectionWiseFeedback: parseJsonField(sess.section_wise_feedback) || {},
       actionableSuggestions: parseJsonField(sess.actionable_suggestions) || [],
+      gateEvidenceItems: parseJsonField(sess.gate_evidence_items) || [],
       mustHaveEvidenceItems: parseJsonField(sess.must_have_evidence_items) || parseJsonField(sess.evidence_items) || [],
       preferToHaveEvidenceItems: parseJsonField(sess.prefer_to_have_evidence_items) || parseJsonField(sess.additional_evidence_items) || [],
       evidenceItems: parseJsonField(sess.must_have_evidence_items) || parseJsonField(sess.evidence_items) || [],

@@ -36,6 +36,7 @@ export interface ScoreBreakdown {
   overall_match_score?: number;
   raw_must_have_score?: number;
   raw_prefer_to_have_score?: number;
+  final_score?: number;
   mustHaveScore?: number;
   mustHaveWeightRatio?: number;
   preferToHaveScore?: number;
@@ -59,14 +60,16 @@ export interface AssessmentResponse {
   actionableImprovementSuggestions: string[];
   cached: boolean;
   createdAt: string;
+  gateEvidenceItems?: unknown[];
   mustHaveEvidenceItems?: unknown[];
   preferToHaveEvidenceItems?: unknown[];
   evidenceItems?: unknown[];
   additionalEvidenceItems?: unknown[];
   scoreBreakdown?: ScoreBreakdown | null;
   topPriorityImprovements?: unknown[];
-  eligibility?: SessionEligibility;
+  eligibility?: SessionEligibility | string | null;
 }
+
 
 const getBaseUrl = () => {
   // Client-side call to Next.js API route
