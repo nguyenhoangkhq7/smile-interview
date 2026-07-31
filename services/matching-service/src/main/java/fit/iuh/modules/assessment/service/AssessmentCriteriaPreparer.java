@@ -685,7 +685,94 @@ public class AssessmentCriteriaPreparer {
         }
 
         enforceSeniorityDevOpsRules(classifiedResults, seniorityLevel);
-        return new ClassifiedCriteriaBundle(classifiedResults, extraResults);
+        List<JdExtraCriteria> filteredExtras = filterAndDeduplicateJdExtras(classifiedResults, extraResults);
+        return new ClassifiedCriteriaBundle(classifiedResults, filteredExtras);
+    }
+
+    private List<JdExtraCriteria> filterAndDeduplicateJdExtras(
+            List<ClassifiedCriteria> classifiedResults, List<JdExtraCriteria> extraResults) {
+        if (extraResults == null || extraResults.isEmpty()) {
+            return List.of();
+        }
+
+        Set<String> activeDbCriteriaNamesLower = classifiedResults.stream()
+                .filter(c -> !"not_in_jd".equalsIgnoreCase(c.importance()))
+                .map(c -> c.criteriaName() != null ? c.criteriaName().toLowerCase(Locale.ROOT) : "")
+                .collect(Collectors.toSet());
+
+        List<JdExtraCriteria> filteredExtras = new ArrayList<>();
+        Set<String> addedNamesLower = new HashSet<>();
+
+        for (JdExtraCriteria extra : extraResults) {
+            if (extra == null || extra.name() == null || extra.name().isBlank()) continue;
+
+            String extraNameLower = extra.name().trim().toLowerCase(Locale.ROOT);
+            if (addedNamesLower.contains(extraNameLower)) continue;
+
+            boolean overlaps = isOverlappingWithDbCriteria(extraNameLower, activeDbCriteriaNamesLower);
+            if (overlaps) {
+                log.info("[CriteriaPreparer] Filtered out redundant ad-hoc criteria '{}' (overlaps with DB criteria tree).", extra.name());
+                continue;
+            }
+
+            filteredExtras.add(extra);
+            addedNamesLower.add(extraNameLower);
+
+            if (filteredExtras.size() >= 5) {
+                log.info("[CriteriaPreparer] Capped ad-hoc criteria at maximum 5 items.");
+                break;
+            }
+        }
+
+        return filteredExtras;
+    }
+
+    private boolean isOverlappingWithDbCriteria(String extraNameLower, Set<String> activeDbNamesLower) {
+        for (String dbName : activeDbNamesLower) {
+            if (dbName.isBlank()) continue;
+            if (dbName.contains(extraNameLower) || extraNameLower.contains(dbName)) return true;
+
+            String cleanExtra = extraNameLower.replaceAll("[^a-z0-9]", "");
+            String cleanDb = dbName.replaceAll("[^a-z0-9]", "");
+            if (!cleanExtra.isEmpty() && !cleanDb.isEmpty() && (cleanDb.contains(cleanExtra) || cleanExtra.contains(cleanDb))) {
+                return true;
+            }
+        }
+
+        if (containsAnyKeyword(extraNameLower, "mysql", "postgresql", "postgres", "mongodb", "sql", "nosql")
+                && activeDbNamesLower.stream().anyMatch(d -> containsAnyKeyword(d, "database", "sql", "nosql"))) {
+            return true;
+        }
+
+        if (containsAnyKeyword(extraNameLower, "agile", "scrum", "jira", "sprint")
+                && activeDbNamesLower.stream().anyMatch(d -> containsAnyKeyword(d, "agile", "sdlc", "scrum"))) {
+            return true;
+        }
+
+        if (containsAnyKeyword(extraNameLower, "docker", "container", "containerization")
+                && activeDbNamesLower.stream().anyMatch(d -> containsAnyKeyword(d, "docker", "container"))) {
+            return true;
+        }
+
+        if (containsAnyKeyword(extraNameLower, "git", "github", "gitlab", "pr workflow")
+                && activeDbNamesLower.stream().anyMatch(d -> containsAnyKeyword(d, "git", "version control", "vcs"))) {
+            return true;
+        }
+
+        if (containsAnyKeyword(extraNameLower, "rest", "restful", "graphql", "api design")
+                && activeDbNamesLower.stream().anyMatch(d -> containsAnyKeyword(d, "api", "rest", "graphql"))) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private boolean containsAnyKeyword(String text, String... keywords) {
+        if (text == null) return false;
+        for (String kw : keywords) {
+            if (text.contains(kw)) return true;
+        }
+        return false;
     }
 
     private String resolveEffectivePromptInstruction(CriteriaWeightProjection c) {
@@ -743,8 +830,10 @@ public class AssessmentCriteriaPreparer {
                 if (responseBody != null) {
                     LlmChatResponse res = objectMapper.readValue(responseBody, LlmChatResponse.class);
                     if (res != null && res.getFirstChoiceContent() != null) {
-                        parseClassifierJson(res.getFirstChoiceContent(), batchMap, classifiedResults, includeExtras ? extraResults : null);
-                        return;
+                        boolean parsedSuccessfully = parseClassifierJson(res.getFirstChoiceContent(), batchMap, classifiedResults, includeExtras ? extraResults : null);
+                        if (parsedSuccessfully) {
+                            return;
+                        }
                     }
                 }
             } catch (WebClientResponseException e) {
@@ -763,16 +852,17 @@ public class AssessmentCriteriaPreparer {
                 }
                 break;
             } catch (Exception e) {
-                log.warn("[CriteriaPreparer] Batch classification failed: {}", e.getMessage());
+                log.warn("[CriteriaPreparer] Batch classification failed (attempt {}/2): {}", attempt, e.getMessage());
             }
         }
 
+        log.warn("[CriteriaPreparer] Batch classification failed after retries. Applying fallback 'preferred' to {} criteria in batch.", batch.size());
         for (CriteriaWeightProjection c : batch) {
             classifiedResults.add(new ClassifiedCriteria(c.getCriteriaId(), c.getCriteriaName(), resolveEffectivePromptInstruction(c), c.getWeightPercentage(), "preferred"));
         }
     }
 
-    private void parseClassifierJson(String rawJson, Map<Long, CriteriaWeightProjection> batchMap, List<ClassifiedCriteria> classifiedResults, List<JdExtraCriteria> extraResults) {
+    private boolean parseClassifierJson(String rawJson, Map<Long, CriteriaWeightProjection> batchMap, List<ClassifiedCriteria> classifiedResults, List<JdExtraCriteria> extraResults) {
         String cleanJson = TextSanitizationUtil.extractCleanJson(rawJson);
         try {
             var node = objectMapper.readTree(cleanJson);
@@ -792,6 +882,9 @@ public class AssessmentCriteriaPreparer {
                         classifiedResults.add(new ClassifiedCriteria(c.getCriteriaId(), c.getCriteriaName(), resolveEffectivePromptInstruction(c), c.getWeightPercentage(), "preferred"));
                     }
                 }
+            } else {
+                log.warn("[CriteriaPreparer] Classifier JSON missing 'classified' array: {}", cleanJson);
+                return false;
             }
             if (extraResults != null && node.has("jd_extras") && node.get("jd_extras").isArray()) {
                 for (var extra : node.get("jd_extras")) {
@@ -803,8 +896,10 @@ public class AssessmentCriteriaPreparer {
                     }
                 }
             }
+            return true;
         } catch (Exception e) {
             log.warn("[CriteriaPreparer] Classifier JSON parse error: {}", e.getMessage());
+            return false;
         }
     }
 

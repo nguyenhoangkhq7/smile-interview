@@ -91,8 +91,8 @@ app:
         temperature: ${LLM_TEMPERATURE_METADATA_EXTRACTION:0.1}
       criteria-classification:
         model: ${LLM_MODEL_CRITERIA_CLASSIFICATION:${app.llm.model}}
-        max-tokens: ${LLM_MAX_TOKENS_CRITERIA_CLASSIFICATION:1536}
-        timeout-seconds: ${LLM_TIMEOUT_CRITERIA_CLASSIFICATION:25}
+        max-tokens: ${LLM_MAX_TOKENS_CRITERIA_CLASSIFICATION:6144}
+        timeout-seconds: ${LLM_TIMEOUT_CRITERIA_CLASSIFICATION:100}
         temperature: ${LLM_TEMPERATURE_CRITERIA_CLASSIFICATION:0.1}
       gate-extraction:
         model: ${LLM_MODEL_GATE_EXTRACTION:${app.llm.model}}

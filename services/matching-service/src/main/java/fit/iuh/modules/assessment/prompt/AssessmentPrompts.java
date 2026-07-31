@@ -97,10 +97,12 @@ public final class AssessmentPrompts {
               "classified": [{"criteria_id": <long>, "importance": "<required|preferred|not_in_jd>"}],
               "jd_extras": [{"name": "<skill>", "importance": "<required|preferred>", "prompt_instruction": "<English sentence>"}]
             }
-            RULES:
-            1. 'required' (mandatory in JD), 'preferred' (nice-to-have), 'not_in_jd' (absent).
-            2. Map specific tools (e.g. Spring Boot -> Backend Frameworks).
-            3. For INTERN/FRESHER, DevOps/Cloud = 'preferred'.
+            CRITICAL RULES FOR CLASSIFICATION:
+            1. 'required': Core requirements explicitly requested or essential in the Job Description.
+            2. 'preferred': Optional, nice-to-have, or secondary skills mentioned in JD.
+            3. 'not_in_jd': STRICTLY mark any Database Criterion as 'not_in_jd' if it is NOT mentioned, NOT implied, or NOT required in the Job Description! Do NOT assign 'preferred' or 'required' to criteria that are completely absent from the JD.
+            4. EXTRA SKILLS (jd_extras): Extract ONLY unique, highly specific technologies explicitly in JD that are NOT ALREADY COVERED by any item in the Database Criteria List above. DO NOT extract duplicate skills (e.g. do NOT extract 'Docker', 'MySQL', 'Agile', 'Git' if Docker/Databases/Agile/Git are in the DB criteria list). Limit to maximum 3-5 distinct extra skills. Default importance to 'preferred'.
+            5. SENIORITY: For INTERN/FRESHER candidates, mark heavy DevOps/Cloud criteria as 'preferred'.
             """;
 
     public static String buildAssessmentSystemPrompt() {
