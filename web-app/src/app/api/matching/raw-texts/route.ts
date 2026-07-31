@@ -31,16 +31,13 @@ export async function GET(request: NextRequest) {
     let cvFilename: string | null = null;
 
     if (resumeIdStr) {
-      const resumeId = parseInt(resumeIdStr, 10);
-      if (!isNaN(resumeId)) {
-        const res = await query(
-          'SELECT file_name, raw_text FROM resumes WHERE id = $1',
-          [resumeId]
-        );
-        if (res.rows.length > 0) {
-          rawCvText = res.rows[0].raw_text || null;
-          cvFilename = res.rows[0].file_name || null;
-        }
+      const res = await query(
+        'SELECT file_name, raw_text FROM resumes WHERE id = $1',
+        [resumeIdStr]
+      );
+      if (res.rows.length > 0) {
+        rawCvText = res.rows[0].raw_text || null;
+        cvFilename = res.rows[0].file_name || null;
       }
     }
 
@@ -48,16 +45,13 @@ export async function GET(request: NextRequest) {
     let jdFilename: string | null = null;
 
     if (jdIdStr) {
-      const jdId = parseInt(jdIdStr, 10);
-      if (!isNaN(jdId)) {
-        const res = await query(
-          'SELECT title, raw_text FROM job_descriptions WHERE id = $1',
-          [jdId]
-        );
-        if (res.rows.length > 0) {
-          rawJdText = res.rows[0].raw_text || null;
-          jdFilename = res.rows[0].title || null;
-        }
+      const res = await query(
+        'SELECT title, raw_text FROM job_descriptions WHERE id = $1',
+        [jdIdStr]
+      );
+      if (res.rows.length > 0) {
+        rawJdText = res.rows[0].raw_text || null;
+        jdFilename = res.rows[0].title || null;
       }
     }
 

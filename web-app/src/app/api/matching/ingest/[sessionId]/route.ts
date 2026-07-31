@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import cloudinary from '@/lib/cloudinary';
 import { matchKeywords, KeywordMatchResult } from '@/lib/matchKeywords';
+import { customFetch } from '@/lib/customFetch';
 
 // ─── JWT helper ───────────────────────────────────────────────────────────────
 function extractUserId(request: NextRequest): string | null {
@@ -45,8 +46,8 @@ export async function POST(
       }, { status: 400 });
     }
 
-    let finalResumeId: number | null = resumeIdStr ? parseInt(resumeIdStr, 10) : null;
-    let finalJdId: number | null = jdIdStr ? parseInt(jdIdStr, 10) : null;
+    let finalResumeId: string | null = resumeIdStr || null;
+    let finalJdId: string | null = jdIdStr || null;
 
     // ── 1. Upload new CV to Cloudinary + DB if no resumeId provided ──────────
     if (!finalResumeId && cvFile) {
@@ -239,7 +240,7 @@ export async function POST(
       if (authHeader) headers['Authorization'] = authHeader;
 
       console.log(`[API Proxy Ingest] Forwarding cached markdown to backend (no LLM): ${backendUrl}/api/v1/ingest/${sessionId}`);
-      const backendRes = await fetch(`${backendUrl}/api/v1/ingest/${sessionId}`, {
+      const backendRes = await customFetch(`${backendUrl}/api/v1/ingest/${sessionId}`, {
         method: 'POST',
         body: backendFormData,
         headers,
@@ -284,7 +285,7 @@ export async function POST(
       if (authHeader) headers['Authorization'] = authHeader;
 
       console.log(`[API Proxy Ingest] Forwarding to backend: ${backendUrl}/api/v1/ingest/${sessionId}`);
-      const backendRes = await fetch(`${backendUrl}/api/v1/ingest/${sessionId}`, {
+      const backendRes = await customFetch(`${backendUrl}/api/v1/ingest/${sessionId}`, {
         method: 'POST',
         body: backendFormData,
         headers,

@@ -90,15 +90,19 @@ interface QuestionBankItem {
   goodAnswerSignals?: string[];
 }
 
-export function extractKeywordsFromEvaluation(evidenceItems: unknown[], additionalEvidenceItems: unknown[]) {
+export function extractKeywordsFromEvaluation(gateEvidenceItems: unknown[], mustHaveEvidenceItems: unknown[], preferToHaveEvidenceItems: unknown[]) {
   const matching: string[] = [], variation: string[] = [], missing: string[] = [];
-  const items = [...(evidenceItems || []), ...(additionalEvidenceItems || [])] as KeywordEvidenceItem[];
+  const items = [
+    ...(gateEvidenceItems || []),
+    ...(mustHaveEvidenceItems || []),
+    ...(preferToHaveEvidenceItems || [])
+  ] as KeywordEvidenceItem[];
   for (const item of items) {
     const tokens = splitCriteriaName(item.criteria_name || '');
     const s = (item.status || '').toLowerCase();
-    if (s === 'matched') matching.push(...tokens);
-    else if (s === 'weak')    variation.push(...tokens);
-    else if (s === 'missing') missing.push(...tokens);
+    if (s === 'matched' || s === 'pass' || s === 'passed') matching.push(...tokens);
+    else if (s === 'weak') variation.push(...tokens);
+    else if (s === 'missing' || s === 'fail' || s === 'failed') missing.push(...tokens);
   }
   const dedupe = (a: string[]) => [...new Set(a)];
   return { matchingSkills: dedupe(matching), variationSkills: dedupe(variation), missingSkills: dedupe(missing) };
@@ -237,12 +241,14 @@ export function useNewInterview() {
         actionableImprovementSuggestions: session.actionableSuggestions || [],
         cached: true,
         createdAt: session.date || '',
+        gateEvidenceItems: session.gateEvidenceItems || [],
         mustHaveEvidenceItems: session.mustHaveEvidenceItems || session.evidenceItems || [],
         preferToHaveEvidenceItems: session.preferToHaveEvidenceItems || session.additionalEvidenceItems || [],
         evidenceItems: session.mustHaveEvidenceItems || session.evidenceItems || [],
         additionalEvidenceItems: session.preferToHaveEvidenceItems || session.additionalEvidenceItems || [],
         scoreBreakdown: session.scoreBreakdown || null,
         topPriorityImprovements: session.topPriorityImprovements || [],
+        eligibility: session.eligibility || null,
       });
       setSessionId(session.id);
       setRoleTitle(session.roleTitle);
@@ -441,6 +447,7 @@ export function useNewInterview() {
         criticalMissingSkills: assessment.criticalMissingSkills,
         sectionWiseFeedback: assessment.sectionWiseFeedback,
         actionableSuggestions: assessment.actionableImprovementSuggestions || [],
+        gateEvidenceItems: assessment.gateEvidenceItems || [],
         mustHaveEvidenceItems: assessment.mustHaveEvidenceItems || assessment.evidenceItems,
         preferToHaveEvidenceItems: assessment.preferToHaveEvidenceItems || assessment.additionalEvidenceItems,
         evidenceItems: assessment.mustHaveEvidenceItems || assessment.evidenceItems,
@@ -582,6 +589,7 @@ export function useNewInterview() {
         criticalMissingSkills: result.criticalMissingSkills,
         sectionWiseFeedback: result.sectionWiseFeedback,
         actionableSuggestions: result.actionableImprovementSuggestions,
+        gateEvidenceItems: result.gateEvidenceItems || [],
         mustHaveEvidenceItems: result.mustHaveEvidenceItems || result.evidenceItems,
         preferToHaveEvidenceItems: result.preferToHaveEvidenceItems || result.additionalEvidenceItems,
         evidenceItems: result.mustHaveEvidenceItems || result.evidenceItems,

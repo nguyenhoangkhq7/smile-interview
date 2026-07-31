@@ -280,44 +280,62 @@ export default function InterviewResultPage() {
             }}>
               <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.1rem' }}>Kết quả sàng lọc hồ sơ</span>
               
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', marginBottom: '0.1rem' }}>
-                <span style={{ fontSize: '0.82rem', color: '#64748b' }}>Trạng thái:</span>
-                <span style={{
-                  fontSize: '0.75rem',
-                  fontWeight: 700,
-                  padding: '0.2rem 0.5rem',
-                  borderRadius: '0.25rem',
-                  backgroundColor: session.eligibility.status === 'ELIGIBLE' ? '#ecfdf5' : '#fef2f2',
-                  color: session.eligibility.status === 'ELIGIBLE' ? '#047857' : '#b91c1c',
-                  border: '1px solid currentColor'
-                }}>
-                  {session.eligibility.status === 'ELIGIBLE' ? 'ĐỦ ĐIỀU KIỆN (ELIGIBLE)' : 'CHƯA ĐỦ ĐIỀU KIỆN'}
-                </span>
-              </div>
+              {(() => {
+                const eligibilityObj = typeof session.eligibility === 'object' && session.eligibility !== null ? session.eligibility : null;
+                const eligibilityStatus = typeof session.eligibility === 'string' ? session.eligibility : eligibilityObj?.status;
+                const gateChecks = eligibilityObj?.gate_checks || [];
+                const isPass = eligibilityStatus === 'ELIGIBLE' || eligibilityStatus === 'PASS' || eligibilityStatus === 'ELIGIBILITY';
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
-                {(session.eligibility.gate_checks as GateCheck[] || []).map((check, idx) => {
-                  const isMet = check.status === 'met' || check.status === 'MET';
-                  return (
-                    <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', padding: '0.4rem 0.65rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '0.35rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <strong style={{ fontSize: '0.78rem', color: '#0f172a' }}>{check.criteria_name}</strong>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 700, color: isMet ? '#047857' : '#b91c1c', display: 'flex', alignItems: 'center', gap: '0.15rem' }}>
-                          {isMet ? '✓ Đạt' : '✗ Chưa đạt'}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
-                        Yêu cầu: <span style={{ color: '#475569', fontWeight: 500 }}>{check.required_value}</span>
-                      </div>
-                      <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
-                        Thực tế: <span style={{ color: isMet ? '#047857' : '#b91c1c', fontWeight: 600 }}>{check.actual_value}</span>
-                      </div>
+                return (
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: gateChecks.length > 0 ? '1px solid #e2e8f0' : 'none', paddingBottom: gateChecks.length > 0 ? '0.5rem' : '0', marginBottom: '0.1rem' }}>
+                      <span style={{ fontSize: '0.82rem', color: '#64748b' }}>Trạng thái:</span>
+                      <span style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        padding: '0.2rem 0.5rem',
+                        borderRadius: '0.25rem',
+                        backgroundColor: isPass ? '#ecfdf5' : '#fef2f2',
+                        color: isPass ? '#047857' : '#b91c1c',
+                        border: '1px solid currentColor'
+                      }}>
+                        {eligibilityStatus || 'N/A'}
+                      </span>
                     </div>
-                  );
-                })}
-              </div>
+
+                    {gateChecks.length > 0 && (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
+                        {gateChecks.map((check, idx) => {
+                          const isMet = check.status === 'met' || check.status === 'MET' || check.passed;
+                          return (
+                            <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', padding: '0.4rem 0.65rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '0.35rem' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <strong style={{ fontSize: '0.78rem', color: '#0f172a' }}>{check.criteria_name || check.criterion}</strong>
+                                <span style={{ fontSize: '0.68rem', fontWeight: 700, color: isMet ? '#047857' : '#b91c1c', display: 'flex', alignItems: 'center', gap: '0.15rem' }}>
+                                  {isMet ? '✓ Đạt' : '✗ Chưa đạt'}
+                                </span>
+                              </div>
+                              {check.required_value && (
+                                <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                                  Yêu cầu: <span style={{ color: '#475569', fontWeight: 500 }}>{check.required_value}</span>
+                                </div>
+                              )}
+                              {check.actual_value && (
+                                <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                                  Thực tế: <span style={{ color: isMet ? '#047857' : '#b91c1c', fontWeight: 600 }}>{check.actual_value}</span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           )}
+
 
           {/* Strengths & Weaknesses Panel */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginTop: '1.5rem' }}>

@@ -773,7 +773,7 @@ public class AssessmentCriteriaPreparer {
                     LlmChatResponse res = objectMapper.readValue(responseBody, LlmChatResponse.class);
                     if (res != null && res.getFirstChoiceContent() != null) {
                         GateExtractionDto dto = objectMapper.readValue(res.getFirstChoiceContent(), GateExtractionDto.class);
-                        return dto != null ? dto.getGateRequirements() : List.of();
+                        return (dto != null && dto.getGateRequirements() != null) ? dto.getGateRequirements() : List.of();
                     }
                 }
             } catch (WebClientResponseException e) {
