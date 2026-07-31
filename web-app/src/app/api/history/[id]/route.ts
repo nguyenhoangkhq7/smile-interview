@@ -81,6 +81,8 @@ export async function GET(
       additionalEvidenceItems: parseJsonField(sess.prefer_to_have_evidence_items) || parseJsonField(sess.additional_evidence_items) || [],
       scoreBreakdown: parseJsonField(sess.score_breakdown) || null,
       topPriorityImprovements: parseJsonField(sess.top_priority_improvements) || [],
+      quickWins: parseJsonField(sess.quick_wins) || [],
+      skillGaps: parseJsonField(sess.skill_gaps) || [],
       hiringRecommendation: sess.hiring_recommendation ? sess.hiring_recommendation : undefined,
       eligibility: parseJsonField(sess.eligibility) || null,
       questions: turns.map((t) => ({

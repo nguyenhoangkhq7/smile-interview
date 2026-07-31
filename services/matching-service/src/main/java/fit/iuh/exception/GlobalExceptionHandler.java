@@ -7,7 +7,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.util.stream.Collectors;
@@ -189,6 +191,32 @@ public class GlobalExceptionHandler {
                         .detail(ex.getMessage())
                         .path(request.getRequestURI())
                         .build());
+    }
+
+    /**
+     * Handles bad credentials on login.
+     */
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<ErrorResponse> handleBadCredentials(
+            BadCredentialsException ex, HttpServletRequest request) {
+
+        log.warn("[BAD_CREDENTIALS] path={} | Invalid email or password", request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ErrorResponse.builder()
+                        .status(HttpStatus.UNAUTHORIZED.value())
+                        .errorCode("INVALID_CREDENTIALS")
+                        .message("Email hoặc mật khẩu không chính xác.")
+                        .path(request.getRequestURI())
+                        .build());
+    }
+
+    /**
+     * Handles client disconnects (e.g. Broken pipe / AsyncRequestNotUsableException) gracefully
+     * without polluting system error logs.
+     */
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void handleClientDisconnect(AsyncRequestNotUsableException ex, HttpServletRequest request) {
+        log.warn("[CLIENT_DISCONNECT] Client closed connection before response was completed. path={}", request.getRequestURI());
     }
 
     // -------------------------------------------------------------------------

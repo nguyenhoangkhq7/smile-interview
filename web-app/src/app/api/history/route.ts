@@ -73,6 +73,8 @@ export async function GET() {
           additionalEvidenceItems: parseJsonField(sess.prefer_to_have_evidence_items) || parseJsonField(sess.additional_evidence_items) || [],
           scoreBreakdown: parseJsonField(sess.score_breakdown) || null,
           topPriorityImprovements: parseJsonField(sess.top_priority_improvements) || [],
+          quickWins: parseJsonField(sess.quick_wins) || [],
+          skillGaps: parseJsonField(sess.skill_gaps) || [],
           hiringRecommendation: sess.hiring_recommendation ? sess.hiring_recommendation : undefined,
           eligibility: parseJsonField(sess.eligibility) || null,
           questions: turnsRes.rows.map((t) => ({
@@ -115,8 +117,9 @@ export async function POST(request: NextRequest) {
         years_of_experience_estimate, strong_areas, gap_areas, critical_missing_skills,
         section_wise_feedback, actionable_suggestions, resume_id, jd_id,
         evidence_items, additional_evidence_items, score_breakdown, top_priority_improvements,
-        hiring_recommendation, eligibility, gate_evidence_items, must_have_evidence_items, prefer_to_have_evidence_items
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31)
+        hiring_recommendation, eligibility, gate_evidence_items, must_have_evidence_items, prefer_to_have_evidence_items,
+        quick_wins, skill_gaps
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33)
       ON CONFLICT (id) DO UPDATE SET
         date = EXCLUDED.date,
         interview_type = EXCLUDED.interview_type,
@@ -147,7 +150,9 @@ export async function POST(request: NextRequest) {
         eligibility = EXCLUDED.eligibility,
         gate_evidence_items = EXCLUDED.gate_evidence_items,
         must_have_evidence_items = EXCLUDED.must_have_evidence_items,
-        prefer_to_have_evidence_items = EXCLUDED.prefer_to_have_evidence_items
+        prefer_to_have_evidence_items = EXCLUDED.prefer_to_have_evidence_items,
+        quick_wins = EXCLUDED.quick_wins,
+        skill_gaps = EXCLUDED.skill_gaps
     `;
 
     await query(upsertSessionSql, [
@@ -182,6 +187,8 @@ export async function POST(request: NextRequest) {
       session.gateEvidenceItems ? JSON.stringify(session.gateEvidenceItems) : null,
       session.mustHaveEvidenceItems ? JSON.stringify(session.mustHaveEvidenceItems) : null,
       session.preferToHaveEvidenceItems ? JSON.stringify(session.preferToHaveEvidenceItems) : null,
+      session.quickWins ? JSON.stringify(session.quickWins) : null,
+      session.skillGaps ? JSON.stringify(session.skillGaps) : null,
     ]);
 
 

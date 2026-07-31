@@ -4,6 +4,9 @@ import cloudinary from '@/lib/cloudinary';
 import { matchKeywords, KeywordMatchResult } from '@/lib/matchKeywords';
 import { customFetch } from '@/lib/customFetch';
 
+// Allow route handler to run up to 5 minutes (300 seconds) for heavy LLM ingestion pipeline
+export const maxDuration = 300;
+
 // ─── JWT helper ───────────────────────────────────────────────────────────────
 function extractUserId(request: NextRequest): string | null {
   const authHeader = request.headers.get('Authorization');

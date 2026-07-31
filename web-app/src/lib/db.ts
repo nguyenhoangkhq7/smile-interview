@@ -182,6 +182,8 @@ export async function initDb() {
     ALTER TABLE sessions ADD COLUMN IF NOT EXISTS gate_evidence_items TEXT;
     ALTER TABLE sessions ADD COLUMN IF NOT EXISTS must_have_evidence_items TEXT;
     ALTER TABLE sessions ADD COLUMN IF NOT EXISTS prefer_to_have_evidence_items TEXT;
+    ALTER TABLE sessions ADD COLUMN IF NOT EXISTS quick_wins TEXT;
+    ALTER TABLE sessions ADD COLUMN IF NOT EXISTS skill_gaps TEXT;
 
     CREATE TABLE IF NOT EXISTS session_questions (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

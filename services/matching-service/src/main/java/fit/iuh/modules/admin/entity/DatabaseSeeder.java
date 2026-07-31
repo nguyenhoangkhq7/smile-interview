@@ -38,6 +38,7 @@ public class DatabaseSeeder implements CommandLineRunner {
     @Override
     public void run(String... args) {
         seedAdminUser();
+        seedHrUser();
         seedLevelRules();
         seedSystemSettings();
         seedJobCategories();
@@ -46,19 +47,46 @@ public class DatabaseSeeder implements CommandLineRunner {
 
     private void seedAdminUser() {
         String adminEmail = "admin@smile.com";
-        if (userRepository.existsByEmail(adminEmail)) {
-            return;
+        String rawPassword = "admin123";
+        User admin = userRepository.findByEmail(adminEmail).orElse(null);
+        if (admin == null) {
+            log.info("[DatabaseSeeder] Seeding default admin user: {}", adminEmail);
+            admin = User.builder()
+                    .username("System Admin")
+                    .email(adminEmail)
+                    .password(passwordEncoder.encode(rawPassword))
+                    .role(Role.ADMIN)
+                    .phoneNumber("0900000000")
+                    .build();
+            userRepository.save(admin);
+            log.info("[DatabaseSeeder] Admin user created successfully.");
+        } else if (!passwordEncoder.matches(rawPassword, admin.getPassword())) {
+            log.info("[DatabaseSeeder] Updating default admin user password to match 'admin123'");
+            admin.setPassword(passwordEncoder.encode(rawPassword));
+            userRepository.save(admin);
         }
-        log.info("[DatabaseSeeder] Seeding default admin user: {}", adminEmail);
-        User admin = User.builder()
-                .username("System Admin")
-                .email(adminEmail)
-                .password(passwordEncoder.encode("admin123"))
-                .role(Role.ADMIN)
-                .phoneNumber("0900000000")
-                .build();
-        userRepository.save(admin);
-        log.info("[DatabaseSeeder] Admin user created successfully.");
+    }
+
+    private void seedHrUser() {
+        String hrEmail = "hr@smile.com";
+        String rawPassword = "admin123";
+        User hr = userRepository.findByEmail(hrEmail).orElse(null);
+        if (hr == null) {
+            log.info("[DatabaseSeeder] Seeding default HR user: {}", hrEmail);
+            hr = User.builder()
+                    .username("HR Manager")
+                    .email(hrEmail)
+                    .password(passwordEncoder.encode(rawPassword))
+                    .role(Role.HR)
+                    .phoneNumber("0911111111")
+                    .build();
+            userRepository.save(hr);
+            log.info("[DatabaseSeeder] HR user created successfully.");
+        } else if (!passwordEncoder.matches(rawPassword, hr.getPassword())) {
+            log.info("[DatabaseSeeder] Updating default HR user password to match 'admin123'");
+            hr.setPassword(passwordEncoder.encode(rawPassword));
+            userRepository.save(hr);
+        }
     }
 
     private void seedLevelRules() {

@@ -44,6 +44,16 @@ export interface ScoreBreakdown {
   overallMatchScore?: number;
 }
 
+export interface ImprovementItem {
+  criteria_name?: string;
+  criteriaName?: string;
+  actionable_advice?: string;
+  actionableAdvice?: string;
+  suggestion?: string;
+  description?: string;
+  priority?: string | number;
+}
+
 export interface AssessmentResponse {
   id: string;
   sessionId: string;
@@ -58,6 +68,8 @@ export interface AssessmentResponse {
   criticalMissingSkills: string[];
   sectionWiseFeedback: Record<string, string>;
   actionableImprovementSuggestions: string[];
+  quickWins?: ImprovementItem[];
+  skillGaps?: ImprovementItem[];
   cached: boolean;
   createdAt: string;
   gateEvidenceItems?: unknown[];

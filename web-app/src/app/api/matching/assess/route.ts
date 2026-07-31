@@ -86,6 +86,8 @@ export async function GET(request: NextRequest) {
           criticalMissingSkills: parseJsonField(cachedSession.critical_missing_skills) || [],
           sectionWiseFeedback: parseJsonField(cachedSession.section_wise_feedback) || {},
           actionableImprovementSuggestions: parseJsonField(cachedSession.actionable_suggestions) || [],
+          quickWins: parseJsonField(cachedSession.quick_wins) || [],
+          skillGaps: parseJsonField(cachedSession.skill_gaps) || [],
           cached: true,
           createdAt: cachedSession.date || '',
           gateEvidenceItems: parseJsonField(cachedSession.gate_evidence_items) || [],
@@ -194,7 +196,9 @@ export async function GET(request: NextRequest) {
 
     // Group section-wise feedback
     const sectionWiseFeedback: Record<string, string> = {};
-    if (allEvidence.length > 0) {
+    if (data.section_wise_feedback && Object.keys(data.section_wise_feedback).length > 0) {
+      Object.assign(sectionWiseFeedback, data.section_wise_feedback);
+    } else if (allEvidence.length > 0) {
       const matchedText = (allEvidence as EvidenceItem[])
         .filter((item) => isMatched(item.status))
         .map((item) => `${item.criteria_name}${item.cv_evidence ? ` (${item.cv_evidence})` : ''}`)
@@ -211,18 +215,25 @@ export async function GET(request: NextRequest) {
       if (matchedText) {
         sectionWiseFeedback['tech_stack_alignment'] = `Các điểm tương thích tốt: ${matchedText}.`;
       }
-      if (weakText) {
-        sectionWiseFeedback['project_technical_depth'] = `Các kỹ năng còn yếu hoặc thiếu chiều sâu: ${weakText}.`;
-      }
       if (missingText) {
         sectionWiseFeedback['cs_fundamentals'] = `Yêu cầu quan trọng trong JD nhưng thiếu trong CV: ${missingText}.`;
       }
     }
 
-    // Actionable improvement suggestions mapping
-    const topImprovements = (data.top_priority_improvements as ImprovementItem[]) || [];
+    // Quick wins & Skill gaps
+    const quickWins = data.quick_wins || [];
+    const skillGaps = data.skill_gaps || [];
+    const topImprovements = (data.top_priority_improvements as ImprovementItem[]) || [...quickWins, ...skillGaps];
+
     let actionableImprovementSuggestions: string[] = [];
-    if (topImprovements.length > 0) {
+    const allImprovements = [...quickWins, ...skillGaps];
+    if (allImprovements.length > 0) {
+      actionableImprovementSuggestions = allImprovements.map(
+        (item: ImprovementItem) => item.criteria_name 
+          ? `[${item.criteria_name}] ${item.actionable_advice || item.suggestion || ''}` 
+          : (item.actionable_advice || item.suggestion || String(item))
+      );
+    } else if (topImprovements.length > 0) {
       actionableImprovementSuggestions = topImprovements.map(
         (item) => `[${item.criteria_name}] ${item.actionable_advice || item.suggestion || ''}`
       );
@@ -249,6 +260,8 @@ export async function GET(request: NextRequest) {
       criticalMissingSkills,
       sectionWiseFeedback,
       actionableImprovementSuggestions,
+      quickWins,
+      skillGaps,
       cached: data.cached || false,
       createdAt: data.created_at || '',
       gateEvidenceItems: gateItems,
