@@ -1,6 +1,7 @@
 import type { ImprovementItem } from './cvJdMatching';
 
 export interface QuestionFeedback {
+  id?: string;
   question: string;
   answer: string;
   score: number;
@@ -9,6 +10,8 @@ export interface QuestionFeedback {
   suggestedAnswer: string;
   topicTag: string;
   isDeepDive: boolean;
+  hrRating?: number;
+  hrFeedback?: string;
 }
 
 export interface SessionHistoryItem {
@@ -56,6 +59,7 @@ export interface SessionHistoryItem {
   skillGaps?: ImprovementItem[];
   hiringRecommendation?: string;
   eligibility?: SessionEligibility | string | null;
+  currentStage?: 'CV_JD_MATCHED' | 'QUESTION_BANK_READY' | 'INTERVIEW_IN_PROGRESS' | 'COMPLETED' | string;
 }
 
 
@@ -76,13 +80,22 @@ export interface SessionSavePayload extends SessionHistoryItem {
   replaceQuestions?: boolean;
 }
 
+function getFetchUrl(path: string): string {
+  if (typeof window !== 'undefined') {
+    return path;
+  }
+  const port = process.env.PORT || 3000;
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `http://localhost:${port}`;
+  return `${baseUrl}${path}`;
+}
+
 export const historyService = {
   /**
    * Fetch all past practice sessions
    */
   async getHistory(): Promise<SessionHistoryItem[]> {
     try {
-      const res = await fetch('/api/history');
+      const res = await fetch(getFetchUrl('/api/history'), { cache: 'no-store' });
       if (!res.ok) {
         throw new Error(`Failed to fetch history: ${res.statusText}`);
       }
@@ -98,7 +111,7 @@ export const historyService = {
    */
   async getSessionById(id: string): Promise<SessionHistoryItem | null> {
     try {
-      const res = await fetch(`/api/history/${id}`);
+      const res = await fetch(getFetchUrl(`/api/history/${id}`), { cache: 'no-store' });
       if (!res.ok) {
         if (res.status === 404) return null;
         throw new Error(`Failed to fetch session: ${res.statusText}`);

@@ -72,7 +72,10 @@ export async function POST(
     const evalResult = await backendRes.json();
     console.log('[Evaluate] Raw backend response:', evalResult);
 
-    const overallScore = evalResult.overall_score !== undefined ? evalResult.overall_score : (evalResult.overallScore !== undefined ? evalResult.overallScore : 60);
+    let overallScore = evalResult.overall_score !== undefined ? evalResult.overall_score : (evalResult.overallScore !== undefined ? evalResult.overallScore : 60);
+    if (typeof overallScore === 'number' && overallScore > 0 && overallScore <= 10) {
+      overallScore = Math.round(overallScore * 10);
+    }
     const overallFeedback = JSON.stringify(evalResult);
     const strengthsList = evalResult.strengths || evalResult.strongAreas || [];
     const weaknessesList = evalResult.weaknesses || evalResult.gapAreas || [];
@@ -109,6 +112,10 @@ export async function POST(
         const eq = evaluatedQuestions[i];
         if (i < turns.length) {
           const turnId = turns[i].id;
+          let turnScore = typeof eq.score === 'number' ? eq.score : (parseInt(eq.score) || 0);
+          if (turnScore > 0 && turnScore <= 10) {
+            turnScore = Math.round(turnScore * 10);
+          }
           await query(
             `UPDATE session_turns SET 
               score = $1,
@@ -117,7 +124,7 @@ export async function POST(
               suggested_answer = $4
              WHERE id = $5`,
             [
-              eq.score || 0,
+              turnScore,
               eq.evaluation || eq.strengths || '',
               eq.improvements || '',
               eq.suggested_answer || eq.suggestedAnswer || '',

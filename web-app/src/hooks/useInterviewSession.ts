@@ -179,8 +179,11 @@ export function useInterviewSession() {
         currentSession.status = 'Completed';
 
         if (currentSession.questions.length > 0) {
-          const totalScores = currentSession.questions.reduce((sum, q) => sum + q.score, 0);
-          currentSession.overallScore = Math.round(totalScores / currentSession.questions.length);
+          const scoredQuestions = currentSession.questions.filter((q) => (q.score || 0) > 0);
+          if (scoredQuestions.length > 0) {
+            const totalScores = scoredQuestions.reduce((sum, q) => sum + (q.score || 0), 0);
+            currentSession.overallScore = Math.round(totalScores / scoredQuestions.length);
+          }
         } else {
           currentSession.overallScore = 60;
         }
@@ -201,6 +204,11 @@ export function useInterviewSession() {
         }).catch((evalErr) => {
           console.error('[Session Finish] Background evaluation trigger failed:', evalErr);
         });
+        fetch('/api/hr-realtime', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: id, stage: 'COMPLETED' }),
+        }).catch(() => {});
       }
     } catch (err) {
       console.error('Error completing session:', err);
@@ -273,10 +281,24 @@ export function useInterviewSession() {
       if (id) {
         historyService.getSessionById(id).then(session => {
           if (session) {
-            const updatedQuestions = session.questions ? [...session.questions] : [];
-            if (updatedQuestions.length === 0) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const updatedQuestions: any[] = session.questions ? [...session.questions] : [];
+            const activeQText = currentQuestionRef.current;
+
+            let targetIdx = updatedQuestions.findIndex((q: any) => {
+              const qStr = typeof q.question === 'object' && q.question !== null ? q.question.question : q.question;
+              return qStr && activeQText && qStr.trim() === activeQText.trim();
+            });
+
+            if (targetIdx === -1) {
+              targetIdx = updatedQuestions.findIndex((q: any) => !q.answer);
+            }
+
+            if (targetIdx !== -1) {
+              updatedQuestions[targetIdx] = { ...updatedQuestions[targetIdx], answer: answer };
+            } else {
               updatedQuestions.push({
-                question: currentQuestionRef.current || 'Câu hỏi',
+                question: activeQText || 'Câu hỏi',
                 answer: answer,
                 score: 0,
                 strengths: '',
@@ -285,13 +307,8 @@ export function useInterviewSession() {
                 topicTag: topicTag || '',
                 isDeepDive
               });
-            } else {
-              const lastIndex = updatedQuestions.length - 1;
-              updatedQuestions[lastIndex] = {
-                ...updatedQuestions[lastIndex],
-                answer
-              };
             }
+
             historyService.saveSession({
               ...session,
               questions: updatedQuestions,
@@ -663,7 +680,7 @@ export function useInterviewSession() {
 
   // Socket logic
   useEffect(() => {
-    const streamingUrl = process.env.NEXT_PUBLIC_STREAMING_SERVICE_URL || 'http://localhost:3001';
+    const streamingUrl = process.env.NEXT_PUBLIC_STREAMING_SERVICE_URL || 'http://localhost:8001';
     const socket = io(streamingUrl, {
       transports: ['websocket'],
       reconnectionAttempts: 2,
@@ -690,32 +707,56 @@ export function useInterviewSession() {
         if (evaluation && score !== undefined) {
           historyService.getSessionById(id).then(session => {
              if (session && session.questions) {
-                const updatedQuestions = [...session.questions];
-                if (updatedQuestions.length > 0) {
-                    const lastIndex = updatedQuestions.length - 1;
-                    updatedQuestions[lastIndex] = {
-                       ...updatedQuestions[lastIndex],
-                       score,
-                       strengths: evaluation,
-                       improvements: actionType === 'FOLLOW_UP' ? 'Needs more detail' : '',
-                    };
-                    updatedQuestions.push({
-                       question: text,
-                       answer: '',
-                       score: 0,
-                       strengths: '',
-                       improvements: '',
-                       suggestedAnswer: '',
-                       topicTag: '',
-                       isDeepDive: actionType === 'FOLLOW_UP'
-                    });
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const updatedQuestions: any[] = [...session.questions];
+                const answeredQText = currentQuestionRef.current;
 
-                    historyService.saveSession({
-                       ...session,
-                       questions: updatedQuestions,
-                       replaceQuestions: true
-                    });
-                 }
+                let answeredIdx = updatedQuestions.findIndex((q: any) => {
+                  const qStr = typeof q.question === 'object' && q.question !== null ? q.question.question : q.question;
+                  return qStr && answeredQText && qStr.trim() === answeredQText.trim();
+                });
+
+                if (answeredIdx === -1) {
+                  for (let i = updatedQuestions.length - 1; i >= 0; i--) {
+                    if (updatedQuestions[i].answer && !updatedQuestions[i].score) {
+                      answeredIdx = i;
+                      break;
+                    }
+                  }
+                }
+
+                if (answeredIdx !== -1) {
+                  updatedQuestions[answeredIdx] = {
+                    ...updatedQuestions[answeredIdx],
+                    score: score ?? 0,
+                    strengths: evaluation,
+                    improvements: actionType === 'FOLLOW_UP' ? 'Cần bổ sung chi tiết' : '',
+                  };
+                }
+
+                const newQExists = updatedQuestions.some((q: any) => {
+                  const qStr = typeof q.question === 'object' && q.question !== null ? q.question.question : q.question;
+                  return qStr && text && qStr.trim() === text.trim();
+                });
+
+                if (!newQExists && text) {
+                  updatedQuestions.push({
+                    question: text,
+                    answer: '',
+                    score: 0,
+                    strengths: '',
+                    improvements: '',
+                    suggestedAnswer: '',
+                    topicTag: '',
+                    isDeepDive: actionType === 'FOLLOW_UP'
+                  });
+                }
+
+                historyService.saveSession({
+                   ...session,
+                   questions: updatedQuestions,
+                   replaceQuestions: true
+                });
               }
           });
         }

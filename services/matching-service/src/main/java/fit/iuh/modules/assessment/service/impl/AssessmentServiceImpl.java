@@ -63,6 +63,8 @@ public class AssessmentServiceImpl implements AssessmentService {
         @Override public String getLevelPromptInstruction() { return levelPromptInstruction; }
         @Override public Double getWeightPercentage() { return weightPercentage; }
         @Override public String getEmbedding() { return embedding; }
+        /** Depth is not applicable for manually constructed DTOs — treated as specific (depth=0). */
+        @Override public Integer getSourceDepth() { return null; }
     }
 
     public record JdPhase1And4Bundle(

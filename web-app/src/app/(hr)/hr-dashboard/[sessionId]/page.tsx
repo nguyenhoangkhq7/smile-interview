@@ -2,37 +2,23 @@ import React from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { query } from '@/lib/db';
-import { SessionHistoryItem } from '@/services/historyService';
-import {
-  AiContextBanner,
-  QuestionCardList,
-  HrEvaluationForm,
-  QuestionBankData,
-  CvJdMatchingView,
-} from '@/components/features/hr';
+import { SessionHistoryItem, QuestionFeedback } from '@/services/historyService';
+import { HrSessionDetailClient, QuestionBankData } from '@/components/features/hr';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { ArrowLeft, FileCheck, ShieldAlert, FileText, HelpCircle } from 'lucide-react';
+import { ArrowLeft, FileCheck } from 'lucide-react';
 
-export const revalidate = 0; // Always fetch fresh data for evaluation
+export const revalidate = 0;
 
 async function getQuestionBankData(sessionId: string): Promise<QuestionBankData | null> {
   try {
     const backendUrl = process.env.MATCHING_SERVICE_URL || 'http://localhost:8081';
     const targetUrl = `${backendUrl}/api/v1/question-bank/session/${sessionId}`;
-
     console.log(`[HR Detail Page] Fetching question bank from: ${targetUrl}`);
-    const res = await fetch(targetUrl, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-      cache: 'no-store',
-    });
-
+    const res = await fetch(targetUrl, { method: 'GET', headers: { 'Content-Type': 'application/json' }, cache: 'no-store' });
     if (!res.ok) {
       console.warn(`[HR Detail Page] Failed to fetch question bank (${res.status}): ${res.statusText}`);
       return null;
     }
-
     return await res.json();
   } catch (error) {
     console.error('[HR Detail Page] Error fetching question bank:', error);
@@ -42,20 +28,89 @@ async function getQuestionBankData(sessionId: string): Promise<QuestionBankData 
 
 async function getSessionData(sessionId: string): Promise<SessionHistoryItem | null> {
   try {
-    const res = await query('SELECT * FROM sessions WHERE id = $1', [sessionId]);
-    if (res.rows.length === 0) return null;
+    const sql = `
+      SELECT DISTINCT ON (s.id)
+        s.*,
+        r.file_url AS cv_file_url,
+        COALESCE(r.raw_text, r.parsed_content, r.extracted_text) AS cv_extracted_text,
+        j.file_url AS jd_file_url,
+        COALESCE(j.raw_text, j.parsed_content, j.extracted_text) AS jd_extracted_text
+      FROM sessions s
+      LEFT JOIN resumes r ON (s.resume_id = r.id OR (s.resume_id IS NULL AND s.cv_filename = r.file_name))
+      LEFT JOIN job_descriptions j ON (s.jd_id = j.id OR (s.jd_id IS NULL AND s.jd_filename = j.title))
+      WHERE s.id = $1
+      ORDER BY s.id, s.date DESC
+    `;
+    const res = await query(sql, [sessionId]);
     const sess = res.rows[0];
+
+    if (!sess) {
+      try {
+        const backendUrl = process.env.MATCHING_SERVICE_URL || 'http://localhost:8081';
+        const assessUrl = `${backendUrl}/api/v2/assess-resume?sessionId=${sessionId}&forceRefresh=false`;
+        const assessRes = await fetch(assessUrl, { cache: 'no-store' });
+        if (assessRes.ok) {
+          const data = await assessRes.json();
+          const overallScore = data.overall_match_score ?? data.score_breakdown?.final_score ?? undefined;
+          return {
+            id: sessionId,
+            date: data.created_at || new Date().toISOString(),
+            interviewType: 'Technical',
+            roleTitle: data.job_category || 'Software Engineer',
+            cvFilename: 'Uploaded_CV.pdf',
+            jdFilename: 'Uploaded_JD.pdf',
+            overallScore,
+            status: 'In progress',
+            questions: [],
+            competencyFitScore: overallScore,
+            matchLevel: overallScore >= 80 ? 'High (Rất tốt)' : (overallScore >= 60 ? 'Moderate (Khớp)' : 'Low (Cần cải thiện)'),
+            candidateLevel: data.seniority_level || 'N/A',
+            roleTypeDetected: data.job_category || 'N/A',
+            strongAreas: [],
+            gapAreas: [],
+            criticalMissingSkills: [],
+            mustHaveEvidenceItems: data.must_have_evidence_items || [],
+            preferToHaveEvidenceItems: data.prefer_to_have_evidence_items || [],
+            gateEvidenceItems: data.gate_evidence_items || [],
+            scoreBreakdown: data.score_breakdown || null,
+            eligibility: data.eligibility || null,
+          };
+        }
+      } catch (fErr) {
+        console.warn('[HR Detail Page] Fallback assessment fetch failed:', fErr);
+      }
+      return null;
+    }
 
     const parseJsonField = (val: unknown) => {
       if (typeof val === 'string') {
-        try {
-          return JSON.parse(val);
-        } catch {
-          return val;
-        }
+        try { return JSON.parse(val); } catch { return val; }
       }
       return val;
     };
+
+    let questionsList: QuestionFeedback[] = [];
+    try {
+      const turnsRes = await query(
+        'SELECT * FROM session_turns WHERE session_id = $1 ORDER BY turn_number ASC, created_at ASC',
+        [sessionId]
+      );
+      questionsList = turnsRes.rows.map((t) => ({
+        id: t.id,
+        question: t.dynamic_question_text || t.question || '',
+        answer: t.answer || '',
+        score: t.score !== null && t.score !== undefined ? Number(t.score) : 0,
+        strengths: t.strengths || '',
+        improvements: t.improvements || '',
+        suggestedAnswer: t.suggested_answer || '',
+        topicTag: t.topic_tag || '',
+        isDeepDive: Boolean(t.is_deep_dive),
+        hrRating: t.hr_rating !== null && t.hr_rating !== undefined ? Number(t.hr_rating) : undefined,
+        hrFeedback: t.hr_feedback || undefined,
+      }));
+    } catch (turnsErr) {
+      console.warn('[HR Detail Page] Could not fetch session_turns:', turnsErr);
+    }
 
     return {
       id: sess.id,
@@ -64,9 +119,13 @@ async function getSessionData(sessionId: string): Promise<SessionHistoryItem | n
       roleTitle: sess.role_title,
       cvFilename: sess.cv_filename,
       jdFilename: sess.jd_filename,
+      cvFileUrl: sess.cv_file_url || undefined,
+      jdFileUrl: sess.jd_file_url || undefined,
+      cvExtractedText: sess.cv_extracted_text || undefined,
+      jdExtractedText: sess.jd_extracted_text || undefined,
       overallScore: sess.overall_score !== null ? sess.overall_score : undefined,
       status: sess.status,
-      questions: [],
+      questions: questionsList,
       competencyFitScore: sess.competency_fit_score !== null ? sess.competency_fit_score : undefined,
       technicalDepthScore: sess.technical_depth_score !== null ? sess.technical_depth_score : undefined,
       matchLevel: sess.match_level || undefined,
@@ -106,77 +165,27 @@ export default async function HrSessionDetailPage({
       {/* Header Navigation */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <div className="flex items-center space-x-3">
-          <Button variant="outline" size="sm" className="gap-1 text-slate-700">
-            <Link href="/hr-dashboard" className="inline-flex items-center gap-1">
+          <Link href="/hr-dashboard">
+            <Button variant="outline" size="sm" className="gap-1 text-slate-700 inline-flex items-center gap-1">
               <ArrowLeft className="size-4" /> Quay lại danh sách
-            </Link>
-          </Button>
+            </Button>
+          </Link>
           <div>
             <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
               <FileCheck className="size-5 text-brand-orange" />
-              Chi Tiết Đánh Giá Phỏng Vấn & So Khớp CV-JD
+              Chi Tiết Phỏng Vấn & So Khớp CV-JD
             </h1>
-            <p className="text-xs text-slate-500 font-mono">
-              Session ID: {sessionId}
-            </p>
+            <p className="text-xs text-slate-500 font-mono">Session ID: {sessionId}</p>
           </div>
         </div>
       </div>
 
-      {/* If question bank data not found */}
-      {!qbData ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-8 text-center space-y-3">
-          <ShieldAlert className="mx-auto size-10 text-amber-600" />
-          <h3 className="text-lg font-bold text-amber-900">
-            Chưa Tìm Thấy Ngân Hàng Câu Hỏi AI Đã Sinh
-          </h3>
-          <p className="max-w-md mx-auto text-sm text-amber-800">
-            Phiên phỏng vấn <strong>{sessionId}</strong> chưa được tạo ngân hàng câu hỏi AI thành công hoặc dữ liệu chưa sẵn sàng trên hệ thống backend.
-          </p>
-          <Button size="sm" variant="outline" className="mt-2 border-amber-300 text-amber-900">
-            <Link href="/hr-dashboard">Quay Lại Dashboard HR</Link>
-          </Button>
-        </div>
-      ) : (
-        /* Assembled Tabbed Layout */
-        <div className="space-y-8">
-          {/* Tabs for Review: Matching vs Questions */}
-          <Tabs defaultValue="matching" className="w-full space-y-6">
-            <TabsList className="grid w-full grid-cols-2 bg-slate-200/80 p-1.5 rounded-xl border border-slate-300/60 shadow-inner">
-              <TabsTrigger
-                value="matching"
-                className="font-bold gap-2 text-sm py-2.5 data-active:bg-white data-active:text-blue-700 data-active:shadow-sm transition-all cursor-pointer"
-              >
-                <FileText className="size-4 text-blue-600" />
-                1. Đánh giá So khớp (Matching)
-              </TabsTrigger>
-              <TabsTrigger
-                value="questions"
-                className="font-bold gap-2 text-sm py-2.5 data-active:bg-white data-active:text-brand-orange data-active:shadow-sm transition-all cursor-pointer"
-              >
-                <HelpCircle className="size-4 text-brand-orange" />
-                2. Đánh giá Câu hỏi (Questions)
-              </TabsTrigger>
-            </TabsList>
-
-            {/* Tab 1: Matching Review */}
-            <TabsContent value="matching" className="space-y-6 focus:outline-none">
-              <CvJdMatchingView session={sessionData} />
-            </TabsContent>
-
-            {/* Tab 2: Question Bank Review */}
-            <TabsContent value="questions" className="space-y-6 focus:outline-none">
-              <AiContextBanner metadata={qbData.metadata} />
-              <QuestionCardList questions={qbData.question_bank} />
-            </TabsContent>
-          </Tabs>
-
-          {/* 3. HR Evaluation Form (Always visible below tabs) */}
-          <div className="pt-6 border-t border-slate-200">
-            <HrEvaluationForm sessionId={sessionId} />
-          </div>
-        </div>
-      )}
+      {/* Client wrapper handles tabs + form */}
+      <HrSessionDetailClient
+        sessionId={sessionId}
+        sessionData={sessionData}
+        qbData={qbData}
+      />
     </div>
   );
 }

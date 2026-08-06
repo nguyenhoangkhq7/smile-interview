@@ -15,6 +15,7 @@ import fit.iuh.modules.questionbank.repository.QuestionBankRepository;
 import fit.iuh.modules.questionbank.service.*;
 import fit.iuh.modules.rulengine.entity.EvaluationCriteria;
 import fit.iuh.modules.rulengine.repository.EvaluationCriteriaRepository;
+import fit.iuh.modules.chunking.repository.DocumentChunkRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -36,6 +37,7 @@ public class QuestionBankServiceImpl implements QuestionBankService {
     private final DifficultyDistributor difficultyDistributor;
     private final ResumeAssessmentRepository assessmentRepo;
     private final SessionRepository sessionRepository;
+    private final DocumentChunkRepository documentChunkRepository;
     private final QuestionBankRepository questionBankRepo;
     private final ObjectMapper objectMapper;
     private final SemanticCacheKeyGenerator cacheKeyGenerator;
@@ -94,20 +96,26 @@ public class QuestionBankServiceImpl implements QuestionBankService {
                 .collect(Collectors.toList());
         List<String> techStackRequired = extractTechKeywords(rawTechRequired);
 
-        Session session = sessionRepository.findById(sessionId)
-                .orElseThrow(() -> new QuestionBankException("Session not found: " + sessionId));
+        Session session = sessionRepository.findById(sessionId).orElse(null);
 
-        if (session.getResume() == null || session.getResume().getParsedContent() == null) {
-            throw new QuestionBankException("CV document not found for session: " + sessionId);
+        String cvContent = (session != null && session.getResume() != null) ? session.getResume().getParsedContent() : null;
+        String jdContent = (session != null && session.getJobDescription() != null) ? session.getJobDescription().getParsedContent() : null;
+
+        // Fallback to DocumentChunks if parsedContent on Resume/JD entity is null
+        if ((cvContent == null || cvContent.isBlank()) && documentChunkRepository != null) {
+            var chunks = documentChunkRepository.findBySessionIdAndDocType(sessionId, "cv");
+            if (chunks != null && !chunks.isEmpty()) {
+                cvContent = chunks.stream().map(c -> c.getContent()).collect(Collectors.joining("\n"));
+            }
         }
-        if (session.getJobDescription() == null || session.getJobDescription().getParsedContent() == null) {
-            throw new QuestionBankException("JD document not found for session: " + sessionId);
+        if ((jdContent == null || jdContent.isBlank()) && documentChunkRepository != null) {
+            var chunks = documentChunkRepository.findBySessionIdAndDocType(sessionId, "jd");
+            if (chunks != null && !chunks.isEmpty()) {
+                jdContent = chunks.stream().map(c -> c.getContent()).collect(Collectors.joining("\n"));
+            }
         }
 
-        String targetDomain = detectTargetDomain(
-                session.getResume().getParsedContent(), 
-                session.getJobDescription().getParsedContent()
-        );
+        String targetDomain = detectTargetDomain(cvContent, jdContent);
 
         CandidateContextDto context = CandidateContextDto.builder()
                 .candidateLevel(assessment.getSeniorityLevel())
@@ -257,6 +265,17 @@ public class QuestionBankServiceImpl implements QuestionBankService {
                 .generationRationale(generationRationale)
                 .build();
 
+        // Delete any previous question bank for this session to keep clean state
+        try {
+            List<QuestionBank> existingBanks = questionBankRepo.findBySessionIdOrderByCreatedAtDesc(sessionId);
+            if (existingBanks != null && !existingBanks.isEmpty()) {
+                questionBankRepo.deleteAll(existingBanks);
+                questionBankRepo.flush();
+            }
+        } catch (Exception e) {
+            log.warn("[QuestionBank] Failed to clear previous question bank for session {}: {}", sessionId, e.getMessage());
+        }
+
         QuestionBank entity = QuestionBank.builder()
                 .sessionId(sessionId)
                 .questionConfig(config)
@@ -285,9 +304,13 @@ public class QuestionBankServiceImpl implements QuestionBankService {
 
         List<fit.iuh.modules.questionbank.entity.Question> questionEntities = new ArrayList<>();
         for (QuestionDto dto : allQuestions) {
+            String uniqueQId = (dto.getId() != null && dto.getId().contains("_")) 
+                    ? dto.getId() 
+                    : (sessionId + "_" + (dto.getId() != null ? dto.getId() : UUID.randomUUID().toString()));
+            
             questionEntities.add(fit.iuh.modules.questionbank.entity.Question.builder()
                     .questionBank(entity)
-                    .id(dto.getId())
+                    .id(uniqueQId)
                     .category(dto.getType())
                     .questionType(dto.getType())
                     .expectedCompetency(dto.getExpectedCompetency())
@@ -533,7 +556,11 @@ public class QuestionBankServiceImpl implements QuestionBankService {
         if (entity.getQuestions() != null) {
             for (var q : entity.getQuestions()) {
                 QuestionDto dto = new QuestionDto();
-                dto.setId(q.getId());
+                String cleanId = q.getId();
+                if (cleanId != null && cleanId.contains("_")) {
+                    cleanId = cleanId.substring(cleanId.indexOf("_") + 1);
+                }
+                dto.setId(cleanId);
                 dto.setQuestion(q.getQuestionText());
                 dto.setEvaluationCriteria(q.getExpectedAnswer());
                 dto.setDifficulty(q.getDifficulty());

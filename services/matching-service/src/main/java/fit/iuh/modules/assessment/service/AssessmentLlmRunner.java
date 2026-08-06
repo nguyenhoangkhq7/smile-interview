@@ -245,7 +245,22 @@ public class AssessmentLlmRunner {
     // 3. BATCHED ASSESSMENT EXECUTION & SELF-CONSISTENCY VOTING
     // =========================================================================
 
-    public record CriteriaInstructionItem(Long criteriaId, String name, String label, String promptInstruction) {}
+    /**
+     * A single criterion item assembled for LLM prompt injection.
+     *
+     * @param sourceDepth  0 = leaf / most-specific category → [SPECIFIC_SKILLS] tag;
+     *                     ≥1 = ancestor category → [CORE_SKILLS] tag.
+     *                     Null means depth is unknown (treated as specific).
+     */
+    public record CriteriaInstructionItem(Long criteriaId, String name, String label, String promptInstruction, Integer sourceDepth) implements java.io.Serializable {
+        @java.io.Serial
+        private static final long serialVersionUID = 1L;
+    }
+
+    /** Convenience factory preserving backward-compatibility for callers that don't have depth info. */
+    public static CriteriaInstructionItem criteriaItem(Long criteriaId, String name, String label, String promptInstruction) {
+        return new CriteriaInstructionItem(criteriaId, name, label, promptInstruction, null);
+    }
     public record BatchResult(
             List<AssessmentResponseDto.EvidenceItem> evidenceItems,
             List<AssessmentResponseDto.AdHocEvidenceItem> preferToHaveEvidenceItems
@@ -269,11 +284,12 @@ public class AssessmentLlmRunner {
                 case "not_in_jd" -> "[NOT_IN_JD]";
                 default -> "[REQUIRED]";
             };
-            allItems.add(new CriteriaInstructionItem(c.criteriaId(), c.criteriaName(), label, c.promptInstruction()));
+            // JD-classified criteria: depth not applicable (null → treated as [SPECIFIC_SKILLS] by convention)
+            allItems.add(new CriteriaInstructionItem(c.criteriaId(), c.criteriaName(), label, c.promptInstruction(), null));
         }
         for (var extra : jdExtras) {
             String label = "preferred".equalsIgnoreCase(extra.importance()) ? "[PREFERRED]" : "[REQUIRED]";
-            allItems.add(new CriteriaInstructionItem(null, extra.name(), label, extra.promptInstruction()));
+            allItems.add(new CriteriaInstructionItem(null, extra.name(), label, extra.promptInstruction(), null));
         }
 
         return executeBatchedSelfConsistency(sessionId, fullCvMarkdown, allItems);
@@ -290,7 +306,9 @@ public class AssessmentLlmRunner {
             for (CriteriaWeightProjection c : criteriaList) {
                 String promptInst = (c.getLevelPromptInstruction() != null && !c.getLevelPromptInstruction().isBlank())
                         ? c.getLevelPromptInstruction() : c.getPromptInstruction();
-                allItems.add(new CriteriaInstructionItem(c.getCriteriaId(), c.getCriteriaName(), "[REQUIRED]", promptInst));
+                // sourceDepth: 0 = leaf/specific category, ≥1 = ancestor/inherited
+                Integer depth = c.getSourceDepth();
+                allItems.add(new CriteriaInstructionItem(c.getCriteriaId(), c.getCriteriaName(), "[REQUIRED]", promptInst, depth));
             }
         }
         return executeBatchedSelfConsistency(sessionId, fullCvMarkdown, allItems);
@@ -362,6 +380,9 @@ public class AssessmentLlmRunner {
             if (item.criteriaId() != null) {
                 sb.append(" [ID: ").append(item.criteriaId()).append("]");
             }
+            // Inheritance tag: depth=0 (or unknown) → specific skill; depth≥1 → inherited core skill
+            boolean isInherited = item.sourceDepth() != null && item.sourceDepth() > 0;
+            sb.append(isInherited ? " [CORE_SKILLS]" : " [SPECIFIC_SKILLS]");
             sb.append(" ").append(item.name()).append(": ")
                     .append(item.promptInstruction() != null ? item.promptInstruction() : "")
                     .append("\n");

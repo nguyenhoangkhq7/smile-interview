@@ -84,5 +84,17 @@ public class LlmChatResponse {
 
         @JsonProperty("total_tokens")
         private int totalTokens;
+
+        @JsonProperty("completion_tokens_details")
+        private CompletionTokensDetails completionTokensDetails;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class CompletionTokensDetails {
+
+        @JsonProperty("reasoning_tokens")
+        private int reasoningTokens;
     }
 }

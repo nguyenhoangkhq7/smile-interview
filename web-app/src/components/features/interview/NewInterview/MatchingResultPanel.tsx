@@ -202,13 +202,13 @@ function CriterionItem({ item }: { item: Criterion }) {
 function formatEligibility(raw: string): { label: string; color: 'green' | 'red' | 'amber' } {
   const upper = raw.toUpperCase();
   if (upper === 'ELIGIBLE' || upper === 'ELIGIBILITY' || upper === 'PASS') {
-    return { label: '✅ Đủ điều kiện', color: 'green' };
+    return { label: 'Đủ điều kiện', color: 'green' };
   }
   if (upper === 'NOT_ELIGIBLE' || upper === 'NOT_ELIGIBILITY' || upper === 'FAIL' || upper === 'FAILED') {
-    return { label: '❌ Chưa đủ điều kiện', color: 'red' };
+    return { label: 'Chưa đủ điều kiện', color: 'red' };
   }
   if (upper === 'CONDITIONAL' || upper === 'PARTIAL') {
-    return { label: '⚠️ Đủ điều kiện có điều kiện', color: 'amber' };
+    return { label: 'Đủ điều kiện có điều kiện', color: 'amber' };
   }
   return { label: raw, color: 'amber' };
 }
@@ -317,7 +317,7 @@ export function MatchingResultPanel({
   const matchLevelBadgeClass = (() => {
     const ml = (assessment.matchLevel || '').toLowerCase();
     if (ml.includes('high') || ml.includes('cao') || ml.includes('tốt')) return 'bg-emerald-100 text-emerald-800 border-emerald-200';
-    if (ml.includes('medium') || ml.includes('trung') || ml.includes('vừa')) return 'bg-amber-100 text-amber-800 border-amber-200';
+    if (ml.includes('medium') || ml.includes('moderate') || ml.includes('trung') || ml.includes('vừa') || ml.includes('khớp')) return 'bg-sky-100 text-sky-800 border-sky-200';
     return 'bg-red-100 text-red-800 border-red-200';
   })();
 
@@ -413,13 +413,12 @@ export function MatchingResultPanel({
                   </div>
                 )}
                 {eligibilityFormatted && (
-                  <div className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                    eligibilityFormatted.color === 'green'
+                  <div className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${eligibilityFormatted.color === 'green'
                       ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
                       : eligibilityFormatted.color === 'red'
-                      ? 'bg-red-50 border-red-200 text-red-800'
-                      : 'bg-amber-50 border-amber-200 text-amber-800'
-                  }`}>
+                        ? 'bg-red-50 border-red-200 text-red-800'
+                        : 'bg-amber-50 border-amber-200 text-amber-800'
+                    }`}>
                     <ShieldCheck size={11} />
                     <span>{eligibilityFormatted.label}</span>
                   </div>
@@ -437,13 +436,12 @@ export function MatchingResultPanel({
                   Tiêu chí điều kiện tối thiểu (Eligibility Gate)
                 </h3>
                 {eligibilityFormatted && (
-                  <span className={`rounded-full px-3 py-1 text-xs font-bold border ${
-                    eligibilityFormatted.color === 'green'
+                  <span className={`rounded-full px-3 py-1 text-xs font-bold border ${eligibilityFormatted.color === 'green'
                       ? 'bg-emerald-100 border-emerald-300 text-emerald-800'
                       : eligibilityFormatted.color === 'red'
-                      ? 'bg-red-100 border-red-300 text-red-800'
-                      : 'bg-amber-100 border-amber-300 text-amber-800'
-                  }`}>
+                        ? 'bg-red-100 border-red-300 text-red-800'
+                        : 'bg-amber-100 border-amber-300 text-amber-800'
+                    }`}>
                     {eligibilityFormatted.label}
                   </span>
                 )}
@@ -690,7 +688,7 @@ export function MatchingResultPanel({
         </div>
       )}
 
-      {}
+      { }
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
         <Button variant="outline" onClick={onReset}>Tải lại tài liệu khác</Button>
         <Button

@@ -77,6 +77,7 @@ export async function GET() {
           skillGaps: parseJsonField(sess.skill_gaps) || [],
           hiringRecommendation: sess.hiring_recommendation ? sess.hiring_recommendation : undefined,
           eligibility: parseJsonField(sess.eligibility) || null,
+          currentStage: sess.current_stage || 'COMPLETED',
           questions: turnsRes.rows.map((t) => ({
             question: t.question,
             answer: t.answer,
@@ -107,6 +108,9 @@ export async function POST(request: NextRequest) {
     if (!session || !session.id) {
       return NextResponse.json({ error: 'Session details with id are required' }, { status: 400 });
     }
+
+    const isValidUuid = (val?: string | null) => 
+      !!val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(val));
 
     // 1. Upsert session info
     const upsertSessionSql = `
@@ -176,8 +180,8 @@ export async function POST(request: NextRequest) {
       session.criticalMissingSkills ? JSON.stringify(session.criticalMissingSkills) : null,
       session.sectionWiseFeedback ? JSON.stringify(session.sectionWiseFeedback) : null,
       session.actionableSuggestions ? JSON.stringify(session.actionableSuggestions) : null,
-      session.resumeId !== undefined ? session.resumeId : null,
-      session.jdId !== undefined ? session.jdId : null,
+      isValidUuid(session.resumeId) ? session.resumeId : null,
+      isValidUuid(session.jdId) ? session.jdId : null,
       (session.mustHaveEvidenceItems || session.evidenceItems) ? JSON.stringify(session.mustHaveEvidenceItems || session.evidenceItems) : null,
       (session.preferToHaveEvidenceItems || session.additionalEvidenceItems) ? JSON.stringify(session.preferToHaveEvidenceItems || session.additionalEvidenceItems) : null,
       session.scoreBreakdown ? JSON.stringify(session.scoreBreakdown) : null,

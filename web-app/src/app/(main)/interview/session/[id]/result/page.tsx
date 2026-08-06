@@ -184,12 +184,12 @@ export default function InterviewResultPage() {
       strengths = report.strengths || report.strongAreas || strengths;
       weaknesses = report.weaknesses || report.gapAreas || weaknesses;
       recommendations = report.recommendations || report.actionableSuggestions || recommendations;
-      
+
       const rawScore = report.overall_score !== undefined ? report.overall_score : report.overallScore;
       if (rawScore !== undefined) {
         score = rawScore <= 10 ? rawScore * 10 : rawScore;
       }
-      
+
       overallFeedbackText = report.overall_summary || report.overallFeedback || overallFeedbackText;
       hiringRecommendation = report.hiring_recommendation || report.hiringRecommendation || hiringRecommendation;
     }
@@ -210,13 +210,13 @@ export default function InterviewResultPage() {
   } else {
     // 2. CV Evaluation report loaded
     score = session.competencyFitScore || 0;
-    
+
     // Construct a beautiful CV match overall feedback summary
     overallFeedbackText = `Báo cáo đánh giá mức độ tương thích của hồ sơ ứng viên (CV) đối với mô tả công việc (JD).\n` +
       `• Mức độ phù hợp năng lực: ${session.matchLevel || 'N/A'}\n` +
       `• Cấp độ ứng viên phù hợp: ${session.candidateLevel || 'N/A'}\n` +
       `• Ước tính số năm kinh nghiệm: ${session.yearsOfExperienceEstimate || 'N/A'}`;
-      
+
     hiringRecommendation = 'Đánh giá CV';
   }
 
@@ -279,7 +279,7 @@ export default function InterviewResultPage() {
               marginBottom: '0.5rem'
             }}>
               <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.1rem' }}>Kết quả sàng lọc hồ sơ</span>
-              
+
               {(() => {
                 const eligibilityObj = typeof session.eligibility === 'object' && session.eligibility !== null ? session.eligibility : null;
                 const eligibilityStatus = typeof session.eligibility === 'string' ? session.eligibility : eligibilityObj?.status;
@@ -339,7 +339,7 @@ export default function InterviewResultPage() {
 
           {/* Strengths & Weaknesses Panel */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginTop: '1.5rem' }}>
-            
+
             {/* Strengths */}
             <div style={{ padding: '1.25rem', border: '1px solid #a7f3d0', backgroundColor: '#f0fdf4', borderRadius: '0.5rem' }}>
               <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#15803d', fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.75rem', marginTop: 0 }}>
@@ -428,7 +428,7 @@ export default function InterviewResultPage() {
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors shadow-sm cursor-pointer"
               >
                 <Download size={16} />
-                <span>📥 Xuất danh sách câu hỏi (CSV)</span>
+                <span>Xuất chi tiết câu hỏi &amp; trả lời (CSV)</span>
               </button>
             )}
           </div>
@@ -437,7 +437,7 @@ export default function InterviewResultPage() {
             <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '0.75rem', padding: '3rem', textAlign: 'center', color: '#94a3b8', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
               <AlertTriangle size={32} style={{ color: '#eab308' }} />
               <p style={{ marginTop: '0.5rem', fontSize: '0.9rem', color: '#64748b' }}>
-                {isPostInterviewEvaluated 
+                {isPostInterviewEvaluated
                   ? 'Không có câu hỏi nào được trả lời trong phiên phỏng vấn này.'
                   : 'Buổi phỏng vấn chưa được thực hiện.'}
               </p>

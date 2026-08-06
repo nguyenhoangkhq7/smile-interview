@@ -60,6 +60,24 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handles client-side validation and business logic constraint failures (e.g., category cycle detection).
+     */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalArgumentException(
+            IllegalArgumentException ex, HttpServletRequest request) {
+
+        log.warn("[BAD_REQUEST] path={} | {}", request.getRequestURI(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ErrorResponse.builder()
+                        .status(HttpStatus.BAD_REQUEST.value())
+                        .errorCode("BAD_REQUEST")
+                        .message(ex.getMessage())
+                        .detail(ex.getMessage())
+                        .path(request.getRequestURI())
+                        .build());
+    }
+
+    /**
      * Handles Bean Validation failures ({@code @Valid} on request body).
      *
      * <p>Collects all field-level constraint violation messages into a single

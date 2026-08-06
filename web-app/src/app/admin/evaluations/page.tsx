@@ -1,39 +1,39 @@
-import React from 'react';
+'use client';
+
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   EvaluationStatsCards,
   AdminEvaluationTable,
   HrEvaluationAdminItem,
 } from '@/components/features/admin/evaluations';
-import { BarChart3, ShieldCheck } from 'lucide-react';
+import { adminService } from '@/services/adminService';
+import { ShieldCheck, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 
-export const revalidate = 0; // Always fetch fresh evaluation results
+export default function AdminEvaluationsPage() {
+  const [evaluations, setEvaluations] = useState<HrEvaluationAdminItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-async function fetchAdminEvaluations(): Promise<HrEvaluationAdminItem[]> {
-  try {
-    const backendUrl = process.env.MATCHING_SERVICE_URL || 'http://localhost:8081';
-    const targetUrl = `${backendUrl}/api/v1/hr-evaluations/all`;
-
-    console.log(`[Admin Evaluation Page] Fetching all HR evaluations from: ${targetUrl}`);
-    const res = await fetch(targetUrl, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-      cache: 'no-store',
-    });
-
-    if (!res.ok) {
-      console.warn(`[Admin Evaluation Page] Failed to fetch evaluations (${res.status}): ${res.statusText}`);
-      return [];
+  const fetchEvaluations = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await adminService.getHrEvaluations();
+      setEvaluations(data || []);
+    } catch (err) {
+      console.error('[Admin Evaluation Page] Error fetching evaluations:', err);
+      const message = err instanceof Error ? err.message : 'Không thể tải danh sách đánh giá từ HR';
+      setError(message);
+    } finally {
+      setLoading(false);
     }
+  }, []);
 
-    return await res.json();
-  } catch (error) {
-    console.error('[Admin Evaluation Page] Error fetching evaluations:', error);
-    return [];
-  }
-}
-
-export default async function AdminEvaluationsPage() {
-  const evaluations = await fetchAdminEvaluations();
+  useEffect(() => {
+    fetchEvaluations();
+  }, [fetchEvaluations]);
 
   return (
     <div className="space-y-6 p-6">
@@ -50,17 +50,50 @@ export default async function AdminEvaluationsPage() {
           </p>
         </div>
 
-        <div className="flex items-center space-x-2 rounded-xl border border-white/10 bg-slate-900/80 px-3.5 py-2 text-xs text-slate-300">
-          <ShieldCheck className="size-4 text-orange-400" />
-          <span>Quyền Quản Trị Viên (Admin)</span>
+        <div className="flex items-center space-x-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchEvaluations}
+            disabled={loading}
+            className="border-slate-700 bg-slate-900/60 text-slate-300 hover:border-slate-500 hover:text-white disabled:opacity-40 gap-1.5 text-xs font-semibold"
+          >
+            <RefreshCw className={`size-3.5 ${loading ? 'animate-spin' : ''}`} />
+            Làm mới
+          </Button>
+
+          <div className="flex items-center space-x-2 rounded-xl border border-white/10 bg-slate-900/80 px-3.5 py-2 text-xs text-slate-300">
+            <ShieldCheck className="size-4 text-orange-400" />
+            <span>Quyền Quản Trị Viên (Admin)</span>
+          </div>
         </div>
       </div>
 
-      {/* 1. Evaluation Metric Cards */}
-      <EvaluationStatsCards evaluations={evaluations} />
+      {error && (
+        <div className="flex items-center gap-2 rounded-xl border border-rose-800/60 bg-rose-950/40 p-4 text-xs text-rose-300">
+          <AlertTriangle className="size-4 shrink-0 text-rose-400" />
+          <span>{error}</span>
+        </div>
+      )}
 
-      {/* 2. Admin Evaluation Data Table */}
-      <AdminEvaluationTable evaluations={evaluations} />
+      {loading ? (
+        <div className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-4">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-24 rounded-2xl bg-slate-900/60 border border-white/5" />
+            ))}
+          </div>
+          <Skeleton className="h-64 rounded-2xl bg-slate-900/60 border border-white/5" />
+        </div>
+      ) : (
+        <>
+          {/* 1. Evaluation Metric Cards */}
+          <EvaluationStatsCards evaluations={evaluations} />
+
+          {/* 2. Admin Evaluation Data Table */}
+          <AdminEvaluationTable evaluations={evaluations} />
+        </>
+      )}
     </div>
   );
 }

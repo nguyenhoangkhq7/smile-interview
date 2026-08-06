@@ -21,11 +21,14 @@ import fit.iuh.modules.chunking.service.EmbeddingService;
 import fit.iuh.modules.ingestion.entity.DocumentType;
 import fit.iuh.modules.rulengine.repository.JobCriteriaRepository;
 import fit.iuh.modules.rulengine.repository.JobCriteriaRepository.CriteriaWeightProjection;
+import fit.iuh.modules.rulengine.repository.JobCriteriaRepository.ConcreteCriteriaWeightDto;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -75,6 +78,10 @@ public class AssessmentCriteriaPreparer {
     private final SuggestedCriteriaRepository suggestedCriteriaRepository;
     private final CriteriaEmbeddingInitializer criteriaEmbeddingInitializer;
     private final StringRedisTemplate stringRedisTemplate;
+
+    @Autowired
+    @Lazy
+    private AssessmentCriteriaPreparer self;
 
     @Value("${app.llm.chat-path:/v1/chat/completions}")
     private String llmChatPath;
@@ -433,7 +440,7 @@ public class AssessmentCriteriaPreparer {
     // =========================================================================
 
     public ClassifiedCriteriaBundle loadAndClassifyCriteria(String categoryName, String seniorityLevelName, String fullJdMarkdown) {
-        List<CriteriaWeightProjection> dbCriteria = loadCriteriaWithFallback(categoryName, seniorityLevelName);
+        List<CriteriaWeightProjection> dbCriteria = (self != null ? self : this).loadCriteriaWithFallback(categoryName, seniorityLevelName);
         log.info("[CriteriaPreparer] Loading DB criteria tree: Fetched {} base criteria for Category={}, Level={}",
                 dbCriteria.size(), categoryName, seniorityLevelName);
 
@@ -452,7 +459,7 @@ public class AssessmentCriteriaPreparer {
 
     public List<CriteriaWeightProjection> loadAndFilterCriteria(
             String categoryName, String seniorityLevelName, String sessionId, String fullJdMarkdown, boolean shouldIncludeNotApp) {
-        List<CriteriaWeightProjection> criteriaList = loadCriteriaWithFallback(categoryName, seniorityLevelName);
+        List<CriteriaWeightProjection> criteriaList = (self != null ? self : this).loadCriteriaWithFallback(categoryName, seniorityLevelName);
 
         if (!shouldIncludeNotApp) {
             List<CriteriaWeightProjection> preFiltered = preFilterCriteriaForJd(sessionId, fullJdMarkdown, criteriaList);
@@ -463,7 +470,8 @@ public class AssessmentCriteriaPreparer {
         return criteriaList;
     }
 
-    private List<CriteriaWeightProjection> loadCriteriaWithFallback(String categoryName, String seniorityLevelName) {
+    @Cacheable(value = "criteria_prompts", key = "#categoryName + '_' + #seniorityLevelName")
+    public List<CriteriaWeightProjection> loadCriteriaWithFallback(String categoryName, String seniorityLevelName) {
         List<CriteriaWeightProjection> criteriaList = jobCriteriaRepository.findCriteriaTreeByCategory(categoryName, seniorityLevelName);
         if (criteriaList.isEmpty()) {
             criteriaList = jobCriteriaRepository.findCriteriaTreeByCategory(categoryName, "ALL");
@@ -471,7 +479,12 @@ public class AssessmentCriteriaPreparer {
         if (criteriaList.isEmpty()) {
             criteriaList = jobCriteriaRepository.findCriteriaTreeByCategory("SOFTWARE_ENGINEERING", "ALL");
         }
-        return deduplicateCriteria(criteriaList);
+        List<CriteriaWeightProjection> deduplicated = deduplicateCriteria(criteriaList);
+        List<CriteriaWeightProjection> result = new ArrayList<>(deduplicated.size());
+        for (CriteriaWeightProjection p : deduplicated) {
+            result.add(ConcreteCriteriaWeightDto.from(p));
+        }
+        return result;
     }
 
     private List<CriteriaWeightProjection> deduplicateCriteria(List<CriteriaWeightProjection> list) {
@@ -517,7 +530,7 @@ public class AssessmentCriteriaPreparer {
     public List<CriteriaFilterDebugDetail> debugFilterCriteriaDetails(
             String categoryName, String seniorityLevelName, String jdText, double threshold) {
 
-        List<CriteriaWeightProjection> allCriteria = loadCriteriaWithFallback(categoryName, seniorityLevelName);
+        List<CriteriaWeightProjection> allCriteria = (self != null ? self : this).loadCriteriaWithFallback(categoryName, seniorityLevelName);
         return executeLlmCriteriaPreFiltering(jdText, allCriteria);
     }
 

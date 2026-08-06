@@ -52,17 +52,17 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({ question, index }) =
   };
 
   return (
-    <Card className="overflow-hidden border-slate-200 shadow-sm transition-all hover:shadow-md">
-      <CardHeader className="bg-slate-50/60 border-b border-slate-100 py-3.5 px-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center space-x-2.5">
-            <span className="flex size-7 items-center justify-center rounded-lg bg-slate-900 text-xs font-bold text-white font-mono">
+    <Card className="overflow-hidden border-slate-200 shadow-sm transition-all hover:shadow-md min-w-0 w-full">
+      <CardHeader className="bg-slate-50/60 border-b border-slate-100 py-3.5 px-5 min-w-0">
+        <div className="flex flex-wrap items-center justify-between gap-3 min-w-0">
+          <div className="flex items-center space-x-2.5 min-w-0">
+            <span className="flex size-7 items-center justify-center rounded-lg bg-slate-900 text-xs font-bold text-white font-mono shrink-0">
               {question.id || `Q${String(index + 1).padStart(3, '0')}`}
             </span>
             {question.topic && (
-              <span className="text-xs font-semibold text-slate-600 flex items-center gap-1">
-                <Tag className="size-3 text-slate-400" />
-                {question.topic}
+              <span className="text-xs font-semibold text-slate-600 flex items-center gap-1 min-w-0 break-words">
+                <Tag className="size-3 text-slate-400 shrink-0" />
+                <span className="truncate">{question.topic}</span>
               </span>
             )}
           </div>
@@ -73,33 +73,33 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({ question, index }) =
         </div>
       </CardHeader>
 
-      <CardContent className="p-5 space-y-4">
+      <CardContent className="p-5 space-y-4 min-w-0">
         {/* Main Question Text */}
-        <div>
-          <p className="text-base font-semibold leading-relaxed text-slate-900 whitespace-pre-line">
+        <div className="min-w-0">
+          <p className="text-base font-semibold leading-relaxed text-slate-900 whitespace-pre-wrap break-words">
             {question.question}
           </p>
         </div>
 
         {/* Behavioural STAR Prompt */}
         {question.star_prompt && (
-          <div className="rounded-lg border border-purple-200 bg-purple-50/60 p-3.5 text-xs text-purple-900 space-y-1">
+          <div className="rounded-lg border border-purple-200 bg-purple-50/60 p-3.5 text-xs text-purple-900 space-y-1 min-w-0">
             <p className="font-bold flex items-center gap-1 text-purple-800">
-              <MessageSquare className="size-3.5 text-purple-600" /> Khung Đánh Giá S.T.A.R:
+              <MessageSquare className="size-3.5 text-purple-600 shrink-0" /> Khung Đánh Giá S.T.A.R:
             </p>
-            <p className="leading-relaxed">{question.star_prompt}</p>
+            <p className="leading-relaxed break-words">{question.star_prompt}</p>
           </div>
         )}
 
         {/* Coding / Technical Hints */}
         {question.hints && question.hints.length > 0 && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3.5 text-xs text-amber-900 space-y-1.5">
+          <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3.5 text-xs text-amber-900 space-y-1.5 min-w-0">
             <p className="font-bold flex items-center gap-1 text-amber-800">
-              <Lightbulb className="size-3.5 text-amber-600" /> Gợi Ý / Thuật Toán Đánh Giá (Hints):
+              <Lightbulb className="size-3.5 text-amber-600 shrink-0" /> Gợi Ý / Thuật Toán Đánh Giá (Hints):
             </p>
             <ul className="list-disc list-inside space-y-1 text-amber-950">
               {question.hints.map((hint, hIdx) => (
-                <li key={hIdx}>{hint}</li>
+                <li key={hIdx} className="break-words">{hint}</li>
               ))}
             </ul>
           </div>
@@ -107,13 +107,13 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({ question, index }) =
 
         {/* System Design Components to Cover */}
         {question.components_to_cover && question.components_to_cover.length > 0 && (
-          <div className="rounded-lg border border-indigo-200 bg-indigo-50/60 p-3.5 text-xs text-indigo-900 space-y-2">
+          <div className="rounded-lg border border-indigo-200 bg-indigo-50/60 p-3.5 text-xs text-indigo-900 space-y-2 min-w-0">
             <p className="font-bold flex items-center gap-1 text-indigo-800">
-              <CheckSquare className="size-3.5 text-indigo-600" /> Thành Phần Cần Yêu Cầu Trả Lời (Components):
+              <CheckSquare className="size-3.5 text-indigo-600 shrink-0" /> Thành Phần Cần Yêu Cầu Trả Lời (Components):
             </p>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-1.5 min-w-0">
               {question.components_to_cover.map((comp, cIdx) => (
-                <Badge key={cIdx} variant="outline" className="bg-white border-indigo-300 text-indigo-700 text-xs">
+                <Badge key={cIdx} variant="outline" className="bg-white border-indigo-300 text-indigo-700 text-xs whitespace-normal break-words max-w-full">
                   {comp}
                 </Badge>
               ))}

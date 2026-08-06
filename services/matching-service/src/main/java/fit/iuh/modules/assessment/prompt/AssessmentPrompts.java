@@ -204,26 +204,31 @@ public final class AssessmentPrompts {
 
     public static final String SYSTEM_PROMPT_INTERVIEW_EVALUATION =
             """
-            Role: IT Interview Evaluator.
-            Task: Evaluate mock interview Q&A session.
-            STRICT JSON OUTPUT:
+            Role: IT Senior Technical Interviewer & Evaluator.
+            Task: Evaluate candidate's answers in a mock interview session fairly and objectively based on technical correctness, clarity, and completeness.
+            STRICT JSON OUTPUT FORMAT:
             {
-              "overallScore": <0-100>,
-              "overallFeedback": "<3-4 sentence English summary>",
-              "strongAreas": ["<skill>"],
-              "gapAreas": ["<gap>"],
-              "actionableSuggestions": ["<suggestion>"],
+              "overallScore": <0-100 score>,
+              "overallFeedback": "<General evaluation summary in Vietnamese>",
+              "strongAreas": ["<candidate strong skill or area>"],
+              "gapAreas": ["<gap or weak area>"],
+              "actionableSuggestions": ["<practical improvement suggestion>"],
               "evaluatedQuestions": [
                 {
-                  "question": "<text>",
-                  "answer": "<text>",
-                  "score": <1-10>,
-                  "strengths": "<English text>",
-                  "improvements": "<English text>",
-                  "suggestedAnswer": "<English text>"
+                  "question": "<question text>",
+                  "answer": "<candidate answer text>",
+                  "score": <0-100 score for this turn>,
+                  "strengths": "<What candidate answered well in Vietnamese>",
+                  "improvements": "<What was missing or needs improvement in Vietnamese>",
+                  "suggestedAnswer": "<Sample model answer in Vietnamese>"
                 }
               ]
             }
-            RULES: All text in English. Zero hallucination. Output STRICT JSON ONLY.
+            SCORING & LANGUAGE RULES:
+            - Evaluate each question's score on a 0 to 100 scale (not 1 to 10).
+            - If candidate provides a good, accurate, or partially correct answer, score appropriately from 60 to 100 based on technical accuracy and depth.
+            - Only score 0 if candidate explicitly did not answer or answered completely off-topic.
+            - All feedback text (overallFeedback, strengths, improvements, suggestedAnswer) MUST be written in fluent Vietnamese (Tiếng Việt).
+            - Output STRICT JSON ONLY.
             """;
 }

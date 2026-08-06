@@ -91,6 +91,31 @@ function formatCategoryLabel(text: string | null | undefined): string {
     .join(' ');
 }
 
+// ─── YouTube Comment Thread Style Curved Connector Line ──────────────────────
+function CurvedTreeConnector({ isLast }: { isLast: boolean }) {
+  return (
+    <div className="absolute -left-6 top-0 bottom-0 w-6 pointer-events-none select-none">
+      {/* Continuous vertical line if NOT the last item */}
+      {!isLast && (
+        <div className="absolute left-[3px] top-0 bottom-0 w-[1.5px] bg-slate-700/60 transition-colors" />
+      )}
+      {/* Curved YouTube comment elbow connector */}
+      <svg
+        className="absolute left-[3px] top-0 w-6 h-7 text-slate-700/70 transition-colors"
+        fill="none"
+        viewBox="0 0 24 28"
+      >
+        <path
+          d="M 0 0 V 14 C 0 21, 6 27, 24 27"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+      </svg>
+    </div>
+  );
+}
+
 function buildCategoryTree(
   categories: JobCategoryDto[],
   criteria: EvaluationCriteriaDto[],
@@ -401,39 +426,16 @@ function CategoryTreeNode({
       </div>
 
       {isExpanded && hasChildren && (
-        <div className="mt-2 space-y-1 relative" style={{ marginLeft: '24px', paddingLeft: 0 }}>
+        <div className="mt-2 space-y-1 relative ml-6">
           {childrenItems.map((item, index) => {
             const isLast = index === childrenItems.length - 1;
-            const itemMidHeight = item.type === 'category' ? (isTopLevel ? 28 : 20) : 22; // adjusted vertical branch segment anchor
 
             return (
               <div key={item.id} className="relative">
-                {/* Vertical connecting line segment */}
-                <div
-                  className="absolute bg-slate-700/50"
-                  style={{
-                    position: 'absolute',
-                    left: '-20px',
-                    width: '1px',
-                    backgroundColor: 'rgba(51, 65, 85, 0.5)',
-                    top: '-8px',
-                    bottom: isLast ? `calc(100% - ${itemMidHeight}px)` : '-8px',
-                  }}
-                />
-                {/* Horizontal branch line pointing to child icon */}
-                <div 
-                  className="absolute bg-slate-700/50"
-                  style={{
-                    position: 'absolute',
-                    left: '-20px',
-                    height: '1px',
-                    backgroundColor: 'rgba(51, 65, 85, 0.5)',
-                    top: `${itemMidHeight}px`,
-                    width: '20px',
-                  }}
-                />
+                {/* YouTube Comment Thread Curve */}
+                <CurvedTreeConnector isLast={isLast} />
 
-                <div style={{ paddingLeft: '24px' }}>
+                <div>
                   {item.type === 'category' ? (
                     <CategoryTreeNode
                       node={item.data as CategoryTreeNodeData}

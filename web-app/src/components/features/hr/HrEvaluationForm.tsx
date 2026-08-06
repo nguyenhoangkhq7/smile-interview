@@ -9,11 +9,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { Star, Send, CheckCircle2, Lock, MessageSquare, Award } from 'lucide-react';
 
+import { useAuthStore } from '@/store/authStore';
+
 interface HrEvaluationFormProps {
   sessionId: string;
+  activeTab?: 'matching' | 'questions' | 'transcript';
 }
 
-export const HrEvaluationForm: React.FC<HrEvaluationFormProps> = ({ sessionId }) => {
+export const HrEvaluationForm: React.FC<HrEvaluationFormProps> = ({ sessionId, activeTab = 'matching' }) => {
   const [evaluatorName, setEvaluatorName] = useState('');
   const [ratingMatchingAccuracy, setRatingMatchingAccuracy] = useState<number>(5);
   const [ratingAiRationale, setRatingAiRationale] = useState<number>(5);
@@ -33,15 +36,17 @@ export const HrEvaluationForm: React.FC<HrEvaluationFormProps> = ({ sessionId })
     setIsSubmitting(true);
 
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+      const authState = useAuthStore.getState();
+      const token = authState.token;
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
+      const defaultEvaluator = evaluatorName.trim() || authState.user?.username || 'HR Specialist';
       const payload = {
         session_id: sessionId,
-        evaluator_name: evaluatorName.trim() || undefined,
+        evaluator_name: defaultEvaluator,
         rating_matching_accuracy: ratingMatchingAccuracy,
         rating_ai_rationale: ratingAiRationale,
         rating_question_quality: ratingQuestionQuality,
@@ -163,24 +168,22 @@ export const HrEvaluationForm: React.FC<HrEvaluationFormProps> = ({ sessionId })
             />
           </div>
 
-          {/* Rating 1: CV-JD Matching Accuracy */}
-          {renderStarRating(
+          {/* Rating 1: CV-JD Matching Accuracy — shown on matching tab */}
+          {(activeTab === 'matching') && renderStarRating(
             '1. Đánh giá độ chính xác So khớp CV & JD (CV-JD Matching Accuracy)',
             'Độ chính xác của AI khi phân tích điểm mạnh, khoảng trống kỹ năng và mức độ phù hợp CV-JD (1: Rất kém -> 5: Rất chính xác)',
             ratingMatchingAccuracy,
             setRatingMatchingAccuracy
           )}
 
-          {/* Rating 2: AI Rationale */}
-          {renderStarRating(
+          {/* Ratings 2+3: AI Rationale + Question Quality — shown on questions tab */}
+          {(activeTab === 'questions') && renderStarRating(
             '2. Đánh giá chất lượng lập luận AI (AI Rationale Rating)',
             'Mức độ hợp lý của lý do AI chọn câu hỏi dựa trên hồ sơ ứng viên (1: Rất kém -> 5: Rất tốt)',
             ratingAiRationale,
             setRatingAiRationale
           )}
-
-          {/* Rating 3: Question Quality */}
-          {renderStarRating(
+          {(activeTab === 'questions') && renderStarRating(
             '3. Đánh giá chất lượng câu hỏi (Question Quality Rating)',
             'Độ chính xác, độ phân loại và tính thực tế của câu hỏi (1: Không phù hợp -> 5: Rất thực tế)',
             ratingQuestionQuality,
