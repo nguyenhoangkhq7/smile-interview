@@ -15,7 +15,7 @@ import java.util.UUID;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/v1/question-bank")
+@RequestMapping({"/api/v1/question-bank", "/api/v1/question-banks"})
 @RequiredArgsConstructor
 public class QuestionBankController {
 

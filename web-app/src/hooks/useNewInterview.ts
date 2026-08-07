@@ -588,6 +588,7 @@ export function useNewInterview() {
         cvFilename: displayCvName, jdFilename: displayJdName,
         resumeId: selectedResumeId || undefined, jdId: selectedJdId || undefined,
         status: 'In progress', questions: [], replaceQuestions: false,
+        overallScore: result.competencyFitScore,
         competencyFitScore: result.competencyFitScore,
         technicalDepthScore: result.technicalDepthScore,
         matchLevel: result.matchLevel, candidateLevel: result.candidateLevel,

@@ -32,6 +32,8 @@ export const createSession = async (
     // Resume and JD full text for Final Synthesis
     resumeText: options.resumeText || '',
     jdText: options.jdText || '',
+    // Text-only chat mode flag — disables avatar generation and server-side TTS
+    chatMode: options.chatMode === true || options.chatMode === 'true' ? 'true' : 'false',
     questions: JSON.stringify(questionsList),
     questionState: JSON.stringify({
       baseQuestionIndex,

@@ -28,12 +28,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'sessionId is required' }, { status: 400 });
     }
 
+    const isValidUuid = (val?: string | null) => 
+      !!val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+
     // Cache lookup: Check if we have an existing completed assessment for this resumeId & jdId
-    if (forceRefresh !== 'true' && resumeId && jdId) {
+    if (forceRefresh !== 'true' && isValidUuid(resumeId) && isValidUuid(jdId)) {
       console.log(`[API Proxy Assess] Checking local DB cache for resumeId=${resumeId}, jdId=${jdId}`);
       const cachedSessionRes = await query(
         `SELECT * FROM sessions 
-         WHERE resume_id = $1 AND jd_id = $2 
+         WHERE resume_id = $1::uuid AND jd_id = $2::uuid 
            AND competency_fit_score IS NOT NULL 
          ORDER BY date DESC LIMIT 1`,
         [resumeId, jdId]
@@ -244,6 +247,87 @@ export async function GET(request: NextRequest) {
         const reas = (item as unknown as { reasoning?: string }).reasoning || 'Cần bổ sung minh chứng cho kỹ năng này trong CV.';
         return `[${item.criteria_name}] ${req}${reas}`;
       });
+    }
+
+    // Persist assessment result into Postgres sessions table so HR dashboard can load it immediately
+    try {
+      const upsertSessionSql = `
+        INSERT INTO sessions (
+          id, date, interview_type, role_title, cv_filename, jd_filename,
+          overall_score, status, competency_fit_score, technical_depth_score,
+          match_level, candidate_level, role_type_detected, years_of_experience_estimate,
+          strong_areas, gap_areas, critical_missing_skills, section_wise_feedback,
+          actionable_suggestions, resume_id, jd_id, evidence_items, additional_evidence_items,
+          score_breakdown, top_priority_improvements, eligibility, gate_evidence_items,
+          must_have_evidence_items, prefer_to_have_evidence_items, quick_wins, skill_gaps
+        ) VALUES (
+          $1, NOW(), 'Technical', $2, 'Uploaded_CV.pdf', 'Uploaded_JD.pdf',
+          $3, 'In progress', $3, $3,
+          $4, $5, $6, $7,
+          $8, $9, $10, $11,
+          $12, $13, $14, $15, $16,
+          $17, $18, $19, $20,
+          $21, $22, $23, $24
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          overall_score = EXCLUDED.overall_score,
+          competency_fit_score = EXCLUDED.competency_fit_score,
+          technical_depth_score = EXCLUDED.technical_depth_score,
+          match_level = EXCLUDED.match_level,
+          candidate_level = EXCLUDED.candidate_level,
+          role_type_detected = EXCLUDED.role_type_detected,
+          years_of_experience_estimate = EXCLUDED.years_of_experience_estimate,
+          strong_areas = EXCLUDED.strong_areas,
+          gap_areas = EXCLUDED.gap_areas,
+          critical_missing_skills = EXCLUDED.critical_missing_skills,
+          section_wise_feedback = EXCLUDED.section_wise_feedback,
+          actionable_suggestions = EXCLUDED.actionable_suggestions,
+          resume_id = COALESCE(EXCLUDED.resume_id, sessions.resume_id),
+          jd_id = COALESCE(EXCLUDED.jd_id, sessions.jd_id),
+          evidence_items = EXCLUDED.evidence_items,
+          additional_evidence_items = EXCLUDED.additional_evidence_items,
+          score_breakdown = EXCLUDED.score_breakdown,
+          top_priority_improvements = EXCLUDED.top_priority_improvements,
+          eligibility = EXCLUDED.eligibility,
+          gate_evidence_items = EXCLUDED.gate_evidence_items,
+          must_have_evidence_items = EXCLUDED.must_have_evidence_items,
+          prefer_to_have_evidence_items = EXCLUDED.prefer_to_have_evidence_items,
+          quick_wins = EXCLUDED.quick_wins,
+          skill_gaps = EXCLUDED.skill_gaps;
+      `;
+
+      const validResumeUuid = isValidUuid(resumeId) ? resumeId : null;
+      const validJdUuid = isValidUuid(jdId) ? jdId : null;
+
+      await query(upsertSessionSql, [
+        data.session_id || sessionId,
+        roleTypeDetected || 'Software Engineer',
+        overallScore,
+        matchLevel,
+        candidateLevel,
+        roleTypeDetected,
+        yearsOfExperienceEstimate,
+        JSON.stringify(strongAreas),
+        JSON.stringify(gapAreas),
+        JSON.stringify(criticalMissingSkills),
+        JSON.stringify(sectionWiseFeedback),
+        JSON.stringify(actionableImprovementSuggestions),
+        validResumeUuid,
+        validJdUuid,
+        JSON.stringify(mustHave),
+        JSON.stringify(preferToHave),
+        JSON.stringify(data.score_breakdown || null),
+        JSON.stringify(topImprovements),
+        data.eligibility ? (typeof data.eligibility === 'string' ? data.eligibility : JSON.stringify(data.eligibility)) : null,
+        JSON.stringify(gateItems),
+        JSON.stringify(mustHave),
+        JSON.stringify(preferToHave),
+        JSON.stringify(quickWins),
+        JSON.stringify(skillGaps)
+      ]);
+      console.log(`[API Proxy Assess] Successfully persisted session assessment to Postgres DB for sessionId=${sessionId}`);
+    } catch (dbErr) {
+      console.error(`[API Proxy Assess] Warning: Failed to persist session assessment to DB:`, dbErr);
     }
 
     return NextResponse.json({

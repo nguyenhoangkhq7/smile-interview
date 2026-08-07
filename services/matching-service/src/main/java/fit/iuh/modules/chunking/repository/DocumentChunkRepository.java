@@ -13,7 +13,13 @@ import java.util.UUID;
 @Repository
 public interface DocumentChunkRepository extends JpaRepository<DocumentChunk, UUID> {
 
-    List<DocumentChunk> findBySessionIdAndDocType(String sessionId, String docType);
+    @Query(value = """
+            SELECT id, session_id, doc_type, parent_id, chunk_type, domain, content, enriched_content, created_at, NULL as embedding
+            FROM document_chunks
+            WHERE session_id = :sessionId
+              AND doc_type = :docType
+            """, nativeQuery = true)
+    List<DocumentChunk> findBySessionIdAndDocType(@Param("sessionId") String sessionId, @Param("docType") String docType);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("DELETE FROM DocumentChunk c WHERE c.sessionId = :sessionId")

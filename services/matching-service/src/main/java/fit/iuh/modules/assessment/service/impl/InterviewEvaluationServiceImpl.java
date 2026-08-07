@@ -48,7 +48,11 @@ public class InterviewEvaluationServiceImpl implements InterviewEvaluationServic
             userPrompt.append("Trả lời: ")
                     .append(t.answer() != null && !t.answer().trim().isEmpty() ? t.answer() : "[Không trả lời]")
                     .append("\n");
-            userPrompt.append("Điểm sơ bộ: ").append(t.score() != null ? t.score() : 0).append("/10\n\n");
+            if (t.score() != null && t.score() > 0) {
+                userPrompt.append("Điểm sơ bộ: ").append(t.score()).append("/100\n\n");
+            } else {
+                userPrompt.append("\n");
+            }
         }
 
         var taskConfig = appProperties.getLlm().getTasks().getInterviewEvaluation();

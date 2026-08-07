@@ -16,6 +16,7 @@ import fit.iuh.modules.rulengine.repository.JobCategoryEntityRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -63,7 +64,10 @@ public class RuleAdminServiceImpl implements RuleAdminService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "criteria_prompts", allEntries = true)
     public JobCategoryDto createCategory(JobCategoryDto dto) {
+        validateNoCycle(null, dto.parentId());
+
         JobCategoryEntity parent = null;
         if (dto.parentId() != null) {
             parent = jobCategoryRepository.findById(dto.parentId())
@@ -83,15 +87,15 @@ public class RuleAdminServiceImpl implements RuleAdminService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "criteria_prompts", allEntries = true)
     public JobCategoryDto updateCategory(Long id, JobCategoryDto dto) {
         JobCategoryEntity entity = jobCategoryRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Category not found with id: " + id));
 
+        validateNoCycle(id, dto.parentId());
+
         JobCategoryEntity parent = null;
         if (dto.parentId() != null) {
-            if (dto.parentId().equals(id)) {
-                throw new IllegalArgumentException("A category cannot be its own parent.");
-            }
             parent = jobCategoryRepository.findById(dto.parentId())
                     .orElseThrow(() -> new IllegalArgumentException("Parent category not found with id: " + dto.parentId()));
         }
@@ -105,8 +109,45 @@ public class RuleAdminServiceImpl implements RuleAdminService {
         return toCategoryDto(updated);
     }
 
+    /**
+     * Prevents cyclic reference in the Job Category tree hierarchy.
+     *
+     * @param targetCategoryId the ID of the category being updated (null if creating new)
+     * @param newParentId      the proposed new parent ID
+     */
+    private void validateNoCycle(Long targetCategoryId, Long newParentId) {
+        if (newParentId == null) {
+            return;
+        }
+
+        if (targetCategoryId != null && targetCategoryId.equals(newParentId)) {
+            throw new IllegalArgumentException("Không thể tự gán danh mục làm cha của chính nó.");
+        }
+
+        Long currentParentId = newParentId;
+        Set<Long> visited = new HashSet<>();
+        if (targetCategoryId != null) {
+            visited.add(targetCategoryId);
+        }
+
+        while (currentParentId != null) {
+            if (!visited.add(currentParentId)) {
+                if (targetCategoryId != null && targetCategoryId.equals(currentParentId)) {
+                    throw new IllegalArgumentException("Lỗi tham chiếu vòng: Không thể gán danh mục này làm con của một danh mục thuộc nhánh con của chính nó.");
+                }
+                break;
+            }
+
+            JobCategoryEntity parentEntity = jobCategoryRepository.findById(currentParentId)
+                    .orElseThrow(() -> new IllegalArgumentException("Parent category not found with id: " + newParentId));
+
+            currentParentId = (parentEntity.getParent() != null) ? parentEntity.getParent().getId() : null;
+        }
+    }
+
     @Override
     @Transactional
+    @CacheEvict(value = "criteria_prompts", allEntries = true)
     public boolean deleteCategory(Long id) {
         if (!jobCategoryRepository.existsById(id)) {
             return false;
@@ -137,6 +178,7 @@ public class RuleAdminServiceImpl implements RuleAdminService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "criteria_prompts", allEntries = true)
     public EvaluationCriteriaDto createCriteria(EvaluationCriteriaDto dto) {
         EvaluationCriteria entity = EvaluationCriteria.builder()
                 .name(dto.name().strip())
@@ -158,6 +200,7 @@ public class RuleAdminServiceImpl implements RuleAdminService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "criteria_prompts", allEntries = true)
     public EvaluationCriteriaDto updateCriteria(Long id, EvaluationCriteriaDto dto) {
         EvaluationCriteria entity = criteriaRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Criteria not found with id: " + id));
@@ -183,6 +226,7 @@ public class RuleAdminServiceImpl implements RuleAdminService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "criteria_prompts", allEntries = true)
     public boolean deleteCriteria(Long id) {
         if (!criteriaRepository.existsById(id)) {
             return false;
@@ -202,6 +246,7 @@ public class RuleAdminServiceImpl implements RuleAdminService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "criteria_prompts", allEntries = true)
     public CategoryCriteriaMappingDto createMapping(CategoryCriteriaMappingDto dto) {
         JobCategoryEntity category = jobCategoryRepository.findById(dto.categoryId())
                 .orElseThrow(() -> new IllegalArgumentException("Category not found with id: " + dto.categoryId()));
@@ -227,6 +272,7 @@ public class RuleAdminServiceImpl implements RuleAdminService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "criteria_prompts", allEntries = true)
     public CategoryCriteriaMappingDto updateMapping(Long categoryId, Long criteriaId, String level, CategoryCriteriaMappingDto dto) {
         CategoryCriteriaMapping entity = mappingRepository
                 .findByJobCategoryIdAndEvaluationCriteriaIdAndLevel(categoryId, criteriaId, level.toUpperCase().strip())
@@ -245,6 +291,7 @@ public class RuleAdminServiceImpl implements RuleAdminService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "criteria_prompts", allEntries = true)
     public boolean deleteMapping(Long categoryId, Long criteriaId, String level) {
         var opt = mappingRepository.findByJobCategoryIdAndEvaluationCriteriaIdAndLevel(
                 categoryId, criteriaId, level.toUpperCase().strip());

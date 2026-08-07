@@ -70,6 +70,13 @@ public class StandardizationServiceImpl implements StandardizationService {
                     .timeout(Duration.ofSeconds(timeoutSeconds))
                     .block();
 
+            log.info("[RAW_LLM_RESPONSE_DIAGNOSTIC] Doc={} | ReqMaxTokens={} | ResponseObj={} | ChoicesCount={} | FirstFinishReason={} | Usage={}",
+                    documentLabel, request.getMaxTokens(),
+                    response,
+                    (response != null && response.getChoices() != null) ? response.getChoices().size() : null,
+                    (response != null && response.getChoices() != null && !response.getChoices().isEmpty()) ? response.getChoices().get(0).getFinishReason() : null,
+                    (response != null) ? response.getUsage() : null);
+
             if (response == null || response.getFirstChoiceContent() == null) {
                 throw new LlmApiException(
                         "LLM API returned an empty choice list for " + documentLabel + " standardization.");

@@ -121,6 +121,7 @@ public class SecurityConfig {
             // Authorization rules
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers("/api/auth/**").permitAll()
+                    .requestMatchers("/api/v1/question-bank/**").permitAll()
                     .anyRequest().authenticated()
             )
 

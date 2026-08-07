@@ -95,6 +95,9 @@ export async function POST(request: NextRequest) {
         jd_id = EXCLUDED.jd_id
     `;
 
+    const isValidUuid = (val?: string | null) => 
+      !!val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(val));
+
     await query(upsertSessionSql, [
       session.id,
       session.date || new Date().toISOString(),
@@ -116,8 +119,8 @@ export async function POST(request: NextRequest) {
       session.criticalMissingSkills ? JSON.stringify(session.criticalMissingSkills) : null,
       session.sectionWiseFeedback ? JSON.stringify(session.sectionWiseFeedback) : null,
       session.actionableSuggestions ? JSON.stringify(session.actionableSuggestions) : null,
-      session.resumeId !== undefined ? session.resumeId : null,
-      session.jdId !== undefined ? session.jdId : null,
+      isValidUuid(session.resumeId) ? session.resumeId : null,
+      isValidUuid(session.jdId) ? session.jdId : null,
     ]);
 
     if (session.replaceQuestions === true) {

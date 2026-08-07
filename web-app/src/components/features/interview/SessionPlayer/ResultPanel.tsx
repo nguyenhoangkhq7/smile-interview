@@ -26,7 +26,7 @@ export function ResultPanel({
 }: ResultPanelProps) {
   return (
     <div className="min-h-screen w-screen bg-background text-foreground flex flex-col font-sans animate-fade-up">
-      {}
+      { }
       <header className="border-b border-border bg-card px-8 py-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
           <Image src="/logo.png" alt="Smile Interview Logo" width={150} height={36} className="h-9 w-auto" unoptimized />
@@ -35,7 +35,7 @@ export function ResultPanel({
         </div>
       </header>
 
-      {}
+      { }
       <main className="flex-grow flex flex-col items-center justify-center p-6 md:p-12 bg-muted/20">
         <div className="max-w-xl w-full bg-card border border-border rounded-2xl p-8 shadow-xl flex flex-col items-center text-center gap-6 animate-fade-up">
           <span className="flex size-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 shadow-inner">
@@ -78,7 +78,7 @@ export function ResultPanel({
                 className="w-full border-emerald-600/30 text-emerald-700 hover:bg-emerald-50 font-bold h-11 rounded-xl shadow-sm flex items-center justify-center gap-2"
               >
                 <FileSpreadsheet size={16} />
-                <span>📥 Xuất danh sách câu hỏi (CSV)</span>
+                <span>Xuất chi tiết câu hỏi &amp; trả lời (CSV)</span>
               </Button>
             )}
 

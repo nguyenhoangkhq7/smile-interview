@@ -1,5 +1,11 @@
 'use client';
 
+// ─── FEATURE FLAG ────────────────────────────────────────────────────────────
+// Set to `true` to use text-only chat mode (bypasses STT / TTS / 3D Avatar).
+// Set to `false` to restore the full audio-visual interview experience.
+const CHAT_MODE = true;
+// ─────────────────────────────────────────────────────────────────────────────
+
 import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -9,11 +15,22 @@ import { InterviewerAvatar } from '@/components/interview/InterviewerAvatar/Inte
 import { ChatPanel } from '@/components/features/interview/SessionPlayer/ChatPanel';
 import { ControlsBar } from '@/components/features/interview/SessionPlayer/ControlsBar';
 import { ResultPanel } from '@/components/features/interview/SessionPlayer/ResultPanel';
+import { InterviewChatMode } from '@/components/features/interview/InterviewChatMode';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { CameraOff, Info, Timer, Radio, Volume2, Circle } from 'lucide-react';
 
 export default function InterviewSessionPage() {
+  // ── Chat mode: render lightweight text UI, no media permissions needed ──
+  if (CHAT_MODE) {
+    return (
+      <ProtectedRoute>
+        <InterviewChatMode />
+      </ProtectedRoute>
+    );
+  }
+
+
   const {
     id,
     session,

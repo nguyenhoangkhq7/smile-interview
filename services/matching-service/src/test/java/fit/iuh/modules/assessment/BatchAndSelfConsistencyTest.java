@@ -38,6 +38,8 @@ class BatchAndSelfConsistencyTest {
         public String getEmbedding() { return null; }
         @Override
         public String getLevelPromptInstruction() { return null; }
+        @Override
+        public Integer getSourceDepth() { return null; }
     }
 
     @BeforeEach

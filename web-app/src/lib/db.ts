@@ -184,6 +184,8 @@ export async function initDb() {
     ALTER TABLE sessions ADD COLUMN IF NOT EXISTS prefer_to_have_evidence_items TEXT;
     ALTER TABLE sessions ADD COLUMN IF NOT EXISTS quick_wins TEXT;
     ALTER TABLE sessions ADD COLUMN IF NOT EXISTS skill_gaps TEXT;
+    ALTER TABLE sessions ADD COLUMN IF NOT EXISTS current_stage VARCHAR(50) DEFAULT 'CV_JD_MATCHED';
+    CREATE INDEX IF NOT EXISTS idx_sessions_current_stage ON sessions(current_stage);
 
     CREATE TABLE IF NOT EXISTS session_questions (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -235,6 +237,8 @@ export async function initDb() {
     ALTER TABLE session_turns ALTER COLUMN turn_number DROP NOT NULL;
     ALTER TABLE session_turns ADD COLUMN IF NOT EXISTS question TEXT;
     ALTER TABLE session_turns ADD COLUMN IF NOT EXISTS good_answer_signals TEXT;
+    ALTER TABLE session_turns ADD COLUMN IF NOT EXISTS hr_rating INTEGER;
+    ALTER TABLE session_turns ADD COLUMN IF NOT EXISTS hr_feedback TEXT;
 
     ALTER TABLE session_turns DROP CONSTRAINT IF EXISTS session_turns_question_id_fkey;
     ALTER TABLE session_turns ALTER COLUMN question_id TYPE VARCHAR(50) USING question_id::varchar;

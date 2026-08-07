@@ -1,4 +1,5 @@
 import axiosClient from '@/lib/axiosClient';
+import { HrEvaluationAdminItem } from '@/components/features/admin/evaluations/types';
 
 // ─── TypeScript Interfaces matching Backend DTOs ──────────────────────────────
 
@@ -156,6 +157,13 @@ export const adminService = {
 
   async updateSystemSetting(key: string, payload: UpdateSystemSettingPayload): Promise<SystemSettingDto> {
     const { data } = await axiosClient.put<SystemSettingDto>(`/api/admin/system-settings/${key}`, payload);
+    return data;
+  },
+
+  // ── HR Evaluations ────────────────────────────────────────────────────────────
+
+  async getHrEvaluations(): Promise<HrEvaluationAdminItem[]> {
+    const { data } = await axiosClient.get<HrEvaluationAdminItem[]>('/api/v1/hr-evaluations/all');
     return data;
   },
 };

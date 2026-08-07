@@ -12,24 +12,39 @@ interface Props {
   onRefresh: () => void;
 }
 
+function generateCategoryCode(name: string): string {
+  return name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toUpperCase()
+    .replace(/[^A-Z0-9\s_]/g, '')
+    .trim()
+    .replace(/\s+/g, '_');
+}
+
 const emptyForm: CreateJobCategoryPayload = { code: '', name: '', parent_id: null };
 
 export default function JobCategoryTable({ categories, onRefresh }: Props) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<JobCategoryDto | null>(null);
   const [form, setForm] = useState<CreateJobCategoryPayload>(emptyForm);
+  const [isCodeManual, setIsCodeManual] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const openCreate = () => {
     setEditTarget(null);
     setForm(emptyForm);
+    setIsCodeManual(false);
     setModalOpen(true);
   };
 
   const openEdit = (cat: JobCategoryDto) => {
     setEditTarget(cat);
     setForm({ code: cat.code, name: cat.name, parent_id: cat.parent_id });
+    setIsCodeManual(true);
     setModalOpen(true);
   };
 
@@ -180,24 +195,50 @@ export default function JobCategoryTable({ categories, onRefresh }: Props) {
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editTarget ? 'Sửa danh mục' : 'Thêm danh mục'}>
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm text-slate-400 mb-1.5">Mã danh mục (code) <span className="text-red-400">*</span></label>
-            <input
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30 transition-colors font-mono"
-              value={form.code}
-              onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
-              placeholder="VD: BACKEND, AI_ML, QA_TESTING"
-            />
-          </div>
+          {/* Category Name FIRST */}
           <div>
             <label className="block text-sm text-slate-400 mb-1.5">Tên danh mục <span className="text-red-400">*</span></label>
             <input
               className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30 transition-colors"
               value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              onChange={(e) => {
+                const newName = e.target.value;
+                setForm((prev) => ({
+                  ...prev,
+                  name: newName,
+                  code: isCodeManual ? prev.code : generateCategoryCode(newName),
+                }));
+              }}
               placeholder="VD: Backend Development"
             />
           </div>
+
+          {/* Category Code SECOND with Auto-slug Hint */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-sm text-slate-400">
+                Mã danh mục (code) <span className="text-red-400">*</span>
+              </label>
+              {!isCodeManual && form.code && (
+                <span className="text-[10px] font-semibold text-amber-400/90 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded">
+                  ✨ Tự động tạo
+                </span>
+              )}
+            </div>
+            <input
+              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30 transition-colors font-mono uppercase"
+              value={form.code}
+              onChange={(e) => {
+                setIsCodeManual(true);
+                setForm({ ...form, code: e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, '') });
+              }}
+              placeholder="VD: BACKEND_DEVELOPMENT"
+            />
+            <p className="mt-1 text-[11px] text-slate-500 leading-normal">
+              Mã dùng cho hệ thống Rule Engine. Tự động sinh từ Tên danh mục (chỉ gồm chữ in hoa, số và gạch dưới <code className="text-slate-400">_</code>).
+            </p>
+          </div>
+
           <div>
             <label className="block text-sm text-slate-400 mb-1.5">Danh mục cha</label>
             <select
