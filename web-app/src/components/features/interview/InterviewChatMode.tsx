@@ -108,6 +108,19 @@ export function InterviewChatMode() {
               0
             );
             currentSession.overallScore = Math.round(totalScores / scoredQuestions.length);
+          } else {
+            let turnSum = 0;
+            let answeredCount = 0;
+            currentSession.questions.forEach((q: { answer?: string; score?: number }) => {
+              const ans = (q.answer || '').trim();
+              if (ans.length > 0 && ans !== '[Không trả lời]') {
+                const est = ans.length >= 120 ? 80 : (ans.length >= 40 ? 70 : 60);
+                turnSum += est;
+                answeredCount++;
+                q.score = est;
+              }
+            });
+            currentSession.overallScore = answeredCount > 0 ? Math.round(turnSum / answeredCount) : 60;
           }
         } else {
           currentSession.overallScore = 60;

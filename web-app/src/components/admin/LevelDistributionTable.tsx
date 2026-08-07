@@ -20,6 +20,17 @@ const LEVEL_LABELS: Record<string, string> = {
   LEAD: 'Tech Lead',
 };
 
+const LEVEL_ORDER: Record<string, number> = {
+  INTERN: 1,
+  FRESHER: 2,
+  JUNIOR: 3,
+  MID: 4,
+  SENIOR: 5,
+  LEAD: 6,
+};
+
+type SortOption = 'level_asc' | 'level_desc' | 'questions_asc' | 'questions_desc';
+
 interface EditState {
   level: string;
   form: UpdateLevelRulePayload;
@@ -28,6 +39,27 @@ interface EditState {
 export default function LevelDistributionTable({ rules, onRefresh }: Props) {
   const [editing, setEditing] = useState<EditState | null>(null);
   const [saving, setSaving] = useState(false);
+  const [sortBy, setSortBy] = useState<SortOption>('level_asc');
+
+  const sortedRules = [...rules].sort((a, b) => {
+    const levelOrderA = LEVEL_ORDER[a.level.toUpperCase()] || 99;
+    const levelOrderB = LEVEL_ORDER[b.level.toUpperCase()] || 99;
+    const qA = a.total_questions || 5;
+    const qB = b.total_questions || 5;
+
+    if (sortBy === 'level_asc') {
+      return levelOrderA - levelOrderB;
+    } else if (sortBy === 'level_desc') {
+      return levelOrderB - levelOrderA;
+    } else if (sortBy === 'questions_asc') {
+      if (qA !== qB) return qA - qB;
+      return levelOrderA - levelOrderB;
+    } else if (sortBy === 'questions_desc') {
+      if (qA !== qB) return qB - qA;
+      return levelOrderA - levelOrderB;
+    }
+    return 0;
+  });
 
   const startEdit = (rule: LevelDistributionRuleDto) => {
     setEditing({
@@ -37,6 +69,7 @@ export default function LevelDistributionTable({ rules, onRefresh }: Props) {
         technical_pct: rule.technical_pct,
         coding_pct: rule.coding_pct,
         system_design_pct: rule.system_design_pct,
+        total_questions: rule.total_questions || 5,
       },
     });
   };
@@ -75,18 +108,34 @@ export default function LevelDistributionTable({ rules, onRefresh }: Props) {
       title="Phân phối câu hỏi theo cấp bậc"
       count={rules.length}
       countLabel="mức"
-      description="Điều chỉnh tỷ lệ behavioral, technical, coding và system design cho từng seniority."
+      description="Điều chỉnh tỷ lệ behavioral, technical, coding, system design và tổng số câu hỏi cho từng seniority."
+      action={(
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-slate-400 hidden sm:inline">Sắp xếp:</span>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortOption)}
+            className="rounded-xl border border-slate-700 bg-slate-900/90 px-3 py-1.5 text-xs font-semibold text-slate-200 transition-colors focus:border-amber-400/50 focus:outline-none cursor-pointer"
+          >
+            <option value="level_asc">Trình độ: Thấp đến Cao (Mặc định)</option>
+            <option value="level_desc">Trình độ: Cao đến Thấp</option>
+            <option value="questions_asc">Số câu hỏi: Ít đến Nhiều</option>
+            <option value="questions_desc">Số câu hỏi: Nhiều đến Ít</option>
+          </select>
+        </div>
+      )}
     >
       {rules.length === 0 && (
         <div className="px-6 py-10 text-center text-slate-400">Chưa có dữ liệu. Hãy chạy DatabaseSeeder.</div>
       )}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 border-t border-white/6 bg-slate-950/35 p-6 sm:p-8 lg:p-10">
-        {rules.map((rule) => {
+        {sortedRules.map((rule) => {
         const isEditing = editing?.level === rule.level;
         const f = isEditing ? editing!.form : null;
         const total = isEditing
           ? (f!.behavioral_pct ?? 0) + (f!.technical_pct ?? 0) + (f!.coding_pct ?? 0) + (f!.system_design_pct ?? 0)
           : rule.behavioral_pct + rule.technical_pct + rule.coding_pct + rule.system_design_pct;
+        const currentTotalQuestions = isEditing ? (f!.total_questions ?? 5) : (rule.total_questions ?? 5);
 
         return (
           <div
@@ -115,6 +164,26 @@ export default function LevelDistributionTable({ rules, onRefresh }: Props) {
                       {saving ? '...' : 'Lưu'}
                     </button>
                   </div>
+                )}
+              </div>
+
+              {/* Total Questions Setting Field */}
+              <div className="mb-5 flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/50 px-3.5 py-2.5">
+                <span className="text-xs font-medium text-slate-300 flex items-center gap-2">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-amber-400"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                  Số câu hỏi quy định:
+                </span>
+                {isEditing ? (
+                  <input
+                    type="number" min={1} max={30} step={1}
+                    className="w-14 rounded border border-amber-400/50 bg-slate-900 px-2 py-1 text-center text-xs font-bold font-mono text-amber-300 focus:outline-none"
+                    value={f!.total_questions ?? 5}
+                    onChange={(e) => setEditing({ ...editing!, form: { ...f!, total_questions: Math.max(1, Number(e.target.value)) } })}
+                  />
+                ) : (
+                  <span className="rounded-md bg-amber-400/10 px-2.5 py-0.5 text-xs font-bold text-amber-300 border border-amber-400/20">
+                    {currentTotalQuestions} câu
+                  </span>
                 )}
               </div>
 

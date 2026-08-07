@@ -194,9 +194,32 @@ export default function InterviewResultPage() {
       hiringRecommendation = report.hiring_recommendation || report.hiringRecommendation || hiringRecommendation;
     }
 
-    // Auto-calculate hiringRecommendation if it's 'N/A' or empty
-    if (!hiringRecommendation || hiringRecommendation === 'N/A') {
-      const numericScore = typeof score === 'number' ? score : parseInt(score) || 0;
+    // Safety fallback: If overall score is 0 or missing, attempt to calculate from questions
+    if ((score === 0 || !score) && session.questions && session.questions.length > 0) {
+      let turnSum = 0;
+      let answeredCount = 0;
+      session.questions.forEach((q) => {
+        const qAns = (q.answer || '').trim();
+        let qScore = typeof q.score === 'number' ? q.score : 0;
+        if (qScore > 0 && qScore <= 10) qScore *= 10;
+        if (qScore > 0) {
+          turnSum += qScore;
+          answeredCount++;
+        } else if (qAns.length > 0 && qAns !== '[Không trả lời]') {
+          const estimated = qAns.length >= 120 ? 80 : (qAns.length >= 40 ? 70 : 60);
+          turnSum += estimated;
+          answeredCount++;
+          q.score = estimated;
+        }
+      });
+      if (answeredCount > 0) {
+        score = Math.round(turnSum / answeredCount);
+      }
+    }
+
+    // Auto-calculate hiringRecommendation if missing or invalid
+    const numericScore = typeof score === 'number' ? score : (parseInt(score) || 0);
+    if (!hiringRecommendation || hiringRecommendation === 'N/A' || (numericScore >= 70 && hiringRecommendation.toLowerCase().includes('no'))) {
       if (numericScore >= 90) {
         hiringRecommendation = 'Strong Hire';
       } else if (numericScore >= 70) {

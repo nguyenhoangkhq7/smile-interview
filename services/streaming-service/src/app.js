@@ -24,6 +24,20 @@ app.get('/health', (_req, res) => {
 app.use('/api/v1/audio', audioRoutes);
 app.use('/api/v1/audio', ttsRoutes);
 
+// Session endpoint
+app.get('/api/v1/sessions/:sessionId', async (req, res) => {
+  try {
+    const { getSession } = await import('./modules/interview/session.service.js');
+    const session = await getSession(req.params.sessionId);
+    if (!session) {
+      return res.status(404).json({ status: 'error', message: 'Session not found in Redis' });
+    }
+    return res.status(200).json({ status: 'success', session });
+  } catch (err) {
+    return res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
 // Error Handlers
 app.use(handleMulterError);
 

@@ -8,5 +8,6 @@ public record LevelDistributionRuleDto(
         @JsonProperty("behavioral_pct") Double behavioralPct,
         @JsonProperty("technical_pct") Double technicalPct,
         @JsonProperty("coding_pct") Double codingPct,
-        @JsonProperty("system_design_pct") Double systemDesignPct
+        @JsonProperty("system_design_pct") Double systemDesignPct,
+        @JsonProperty("total_questions") Integer totalQuestions
 ) {}
