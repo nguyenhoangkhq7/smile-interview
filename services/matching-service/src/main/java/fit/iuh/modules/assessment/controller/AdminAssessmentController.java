@@ -1,6 +1,5 @@
 package fit.iuh.modules.assessment.controller;
 
-import fit.iuh.modules.assessment.entity.JobCategory;
 import fit.iuh.modules.assessment.entity.SuggestedCriteria;
 import fit.iuh.modules.assessment.repository.SuggestedCriteriaRepository;
 import fit.iuh.modules.rulengine.entity.CategoryCriteriaMapping;
@@ -40,6 +39,8 @@ public class AdminAssessmentController {
     private final EvaluationCriteriaRepository evaluationCriteriaRepository;
     private final CategoryCriteriaMappingRepository categoryCriteriaMappingRepository;
     private final JobCategoryEntityRepository jobCategoryEntityRepository;
+    private final fit.iuh.modules.assessment.service.CriteriaEmbeddingInitializer criteriaEmbeddingInitializer;
+    private final org.springframework.cache.CacheManager cacheManager;
 
     /**
      * Lấy danh sách tất cả suggested criteria, sắp xếp theo occurrenceCount giảm dần.
@@ -113,6 +114,11 @@ public class AdminAssessmentController {
                 .build();
         newCriteria = evaluationCriteriaRepository.save(newCriteria);
 
+        // Compute vector embedding immediately for similarity searches
+        if (criteriaEmbeddingInitializer != null) {
+            criteriaEmbeddingInitializer.computeAndPersistEmbedding(newCriteria);
+        }
+
         // 4. Insert vào category_criteria_mapping
         CategoryCriteriaMapping mapping = CategoryCriteriaMapping.builder()
                 .jobCategory(jobCategory)
@@ -125,6 +131,15 @@ public class AdminAssessmentController {
         // 5. Đánh dấu đã promote
         suggested.setPromoted(true);
         suggestedCriteriaRepository.save(suggested);
+
+        // 6. Evict cached criteria prompts
+        if (cacheManager != null) {
+            org.springframework.cache.Cache cache = cacheManager.getCache("criteria_prompts");
+            if (cache != null) {
+                cache.clear();
+                log.info("[AdminAssessment] Evicted 'criteria_prompts' Spring cache on promote.");
+            }
+        }
 
         log.info("[AdminAssessment] Promoted suggested criteria '{}' → evaluation_criteria id={}, category={}, level={}, weight={}%",
                 suggested.getCriteriaName(), newCriteria.getId(), categoryCode, level, weight);

@@ -75,11 +75,7 @@ public record AssessmentResponseDto(
             
             @JsonProperty("match_metadata")
             MatchMetadata matchMetadata
-    ) {
-        public EvidenceItem withMatchMetadata(MatchMetadata metadata) {
-            return new EvidenceItem(criteriaId, criteriaName, importance, jdRequirement, cvEvidence, cvQuote, status, reasoning, weightUsed, scoreContribution, groundingScore, confidenceVotes, lowConfidence, needsManualReview, metadata);
-        }
-    }
+    ) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -110,9 +106,5 @@ public record AssessmentResponseDto(
 
             @JsonProperty("match_metadata")
             MatchMetadata matchMetadata
-    ) {
-        public AdHocEvidenceItem withMatchMetadata(MatchMetadata metadata) {
-            return new AdHocEvidenceItem(criteriaId, criteriaName, importance, jdRequirement, cvEvidence, cvQuote, status, reasoning, metadata);
-        }
-    }
+    ) {}
 }

@@ -4,8 +4,6 @@ import fit.iuh.modules.admin.repository.SystemSettingRepository;
 import fit.iuh.modules.assessment.dto.AssessmentResponse;
 import fit.iuh.modules.assessment.dto.AssessmentResponseDto;
 import fit.iuh.modules.assessment.entity.SeniorityLevel;
-import fit.iuh.modules.ontology.dto.GraphMatchResult;
-import fit.iuh.modules.ontology.service.SkillKnowledgeGraphService;
 import fit.iuh.modules.rulengine.repository.JobCriteriaRepository.CriteriaWeightProjection;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,18 +16,18 @@ import java.util.stream.Collectors;
 
 /**
  * High-cohesion service responsible for score calculation, weight breakdowns,
- * seniority-level adjustments, and Ontology graph matching score boosts.
+ * and seniority-level adjustments.
  */
 @Slf4j
 @Service
 public class AssessmentScoringEngine {
 
-    private static final double DEFAULT_WEAK_COEFF = 0.3;
+    private static final double DEFAULT_PARTIAL_COEFF = 0.65;
+    private static final double DEFAULT_WEAK_COEFF = 0.30;
     private static final double POINTS_MATCHED = 1.0;
     private static final double POINTS_MISSING = 0.0;
 
     private final SystemSettingRepository systemSettingRepository;
-    private final SkillKnowledgeGraphService skillKnowledgeGraphService;
 
     public record ScoringResult(
             int overallScore,
@@ -38,11 +36,8 @@ public class AssessmentScoringEngine {
     ) {}
 
     @Autowired
-    public AssessmentScoringEngine(
-            SystemSettingRepository systemSettingRepository,
-            @Autowired(required = false) SkillKnowledgeGraphService skillKnowledgeGraphService) {
+    public AssessmentScoringEngine(SystemSettingRepository systemSettingRepository) {
         this.systemSettingRepository = systemSettingRepository;
-        this.skillKnowledgeGraphService = skillKnowledgeGraphService;
     }
 
     public ScoringResult calculateWithBreakdown(
@@ -51,16 +46,23 @@ public class AssessmentScoringEngine {
             List<CriteriaWeightProjection> criteriaWeights,
             SeniorityLevel seniorityLevel) {
 
+        double pointsMatched = getSettingDouble("STATUS_MATCHED_COEFF", POINTS_MATCHED);
+        double pointsPartial;
         double pointsWeak;
+        double pointsMissing = getSettingDouble("STATUS_MISSING_COEFF", POINTS_MISSING);
+
         if (seniorityLevel == SeniorityLevel.INTERN || seniorityLevel == SeniorityLevel.FRESHER) {
-            pointsWeak = getSettingDouble("WEAK_COEFF_INTERN_FRESHER", 0.5);
-            log.info("[AssessmentScoringEngine] Intern/Fresher seniority level. pointsWeak={}", pointsWeak);
+            pointsPartial = getSettingDouble("PARTIAL_COEFF_INTERN_FRESHER", 0.75);
+            pointsWeak = getSettingDouble("WEAK_COEFF_INTERN_FRESHER", 0.50);
+            log.info("[AssessmentScoringEngine] Intern/Fresher seniority level. pointsPartial={}, pointsWeak={}", pointsPartial, pointsWeak);
         } else if (seniorityLevel == SeniorityLevel.SENIOR || seniorityLevel == SeniorityLevel.LEAD) {
-            pointsWeak = getSettingDouble("WEAK_COEFF_SENIOR_LEAD", 0.1);
-            log.info("[AssessmentScoringEngine] Senior/Lead seniority level. pointsWeak={}", pointsWeak);
+            pointsPartial = getSettingDouble("PARTIAL_COEFF_SENIOR_LEAD", 0.50);
+            pointsWeak = getSettingDouble("WEAK_COEFF_SENIOR_LEAD", 0.10);
+            log.info("[AssessmentScoringEngine] Senior/Lead seniority level. pointsPartial={}, pointsWeak={}", pointsPartial, pointsWeak);
         } else {
+            pointsPartial = getSettingDouble("STATUS_PARTIAL_COEFF", DEFAULT_PARTIAL_COEFF);
             pointsWeak = getSettingDouble("STATUS_WEAK_COEFF", DEFAULT_WEAK_COEFF);
-            log.info("[AssessmentScoringEngine] Standard seniority level. pointsWeak={}", pointsWeak);
+            log.info("[AssessmentScoringEngine] Standard seniority level. pointsPartial={}, pointsWeak={}", pointsPartial, pointsWeak);
         }
 
         double mustHaveWeightedSum = 0.0;
@@ -73,18 +75,18 @@ public class AssessmentScoringEngine {
 
         List<AssessmentResponseDto.EvidenceItem> updatedItems = new ArrayList<>();
 
-        if (evidenceItems != null && criteriaWeights != null && !criteriaWeights.isEmpty()) {
-            Map<Long, Double> weightMap = criteriaWeights.stream()
-                    .collect(Collectors.toMap(
+        if (evidenceItems != null) {
+            Map<Long, Double> weightMap = (criteriaWeights != null && !criteriaWeights.isEmpty())
+                    ? criteriaWeights.stream().collect(Collectors.toMap(
                             CriteriaWeightProjection::getCriteriaId,
                             CriteriaWeightProjection::getWeightPercentage,
                             (existing, replacement) -> existing
-                    ));
+                    ))
+                    : Map.of();
 
-            double avgDbWeight = weightMap.values().stream()
-                    .mapToDouble(Double::doubleValue)
-                    .average()
-                    .orElse(10.0);
+            double avgDbWeight = (!weightMap.isEmpty())
+                    ? weightMap.values().stream().mapToDouble(Double::doubleValue).average().orElse(10.0)
+                    : 10.0;
 
             for (AssessmentResponseDto.EvidenceItem item : evidenceItems) {
                 Long id = item.criteriaId();
@@ -99,25 +101,8 @@ public class AssessmentScoringEngine {
                     weight = avgDbWeight;
                 }
 
-                double points = isNotApp ? 0.0 : statusToPoints(item.status(), pointsWeak);
-
-                // Ontology Graph Matching Enhancement
-                GraphMatchResult graphResult = null;
-                if (!isNotApp && skillKnowledgeGraphService != null) {
-                    graphResult = skillKnowledgeGraphService.matchSkills(item.criteriaName(), item.cvEvidence());
-                    if (graphResult != null && graphResult.similarityScore() > points) {
-                        log.info("[OntologyBoost] criteria='{}' score boosted from {} to {} via graph: {}",
-                                item.criteriaName(), String.format("%.2f", points),
-                                String.format("%.2f", graphResult.similarityScore()), graphResult.relationPath());
-                        points = graphResult.similarityScore();
-                    }
-                }
-
+                double points = isNotApp ? 0.0 : statusToPoints(item.status(), pointsMatched, pointsPartial, pointsWeak, pointsMissing);
                 double scoreContribution = isNotApp ? 0.0 : weight * points;
-                String finalReasoning = item.reasoning();
-                if (graphResult != null && graphResult.similarityScore() > 0.0 && graphResult.relationPath() != null) {
-                    finalReasoning = (finalReasoning != null ? finalReasoning + " | " : "") + "[Ontology: " + graphResult.relationPath() + "]";
-                }
 
                 if (isNotApp) {
                     log.debug("[ScoringEngine] NOT_APPLICABLE criteria='{}'", item.criteriaName());
@@ -139,7 +124,7 @@ public class AssessmentScoringEngine {
                         item.cvEvidence(),
                         item.cvQuote(),
                         item.status(),
-                        finalReasoning,
+                        item.reasoning(),
                         weight,
                         scoreContribution,
                         item.groundingScore(),
@@ -153,26 +138,27 @@ public class AssessmentScoringEngine {
         }
 
         if (adHocItems != null && !adHocItems.isEmpty()) {
+            double fixedAvgPreferWeight = (preferToHaveWeightSum > 0 && preferToHaveCount > 0)
+                    ? (preferToHaveWeightSum / preferToHaveCount) : 10.0;
+            double fixedAvgMustHaveWeight = (mustHaveWeightSum > 0 && mustHaveCount > 0)
+                    ? (mustHaveWeightSum / mustHaveCount) : 10.0;
+
             for (AssessmentResponseDto.AdHocEvidenceItem adHoc : adHocItems) {
                 if ("not_applicable".equalsIgnoreCase(adHoc.status()) || "NOT_APPLICABLE".equalsIgnoreCase(adHoc.importance())) {
                     continue;
                 }
 
-                double points = statusToPoints(adHoc.status(), pointsWeak);
+                double points = statusToPoints(adHoc.status(), pointsMatched, pointsPartial, pointsWeak, pointsMissing);
 
                 if ("PREFERRED".equalsIgnoreCase(adHoc.importance())) {
-                    double avgWeight = (preferToHaveWeightSum > 0 && preferToHaveCount > 0)
-                            ? (preferToHaveWeightSum / preferToHaveCount) : 10.0;
-                    double contribution = avgWeight * points;
+                    double contribution = fixedAvgPreferWeight * points;
                     preferToHaveWeightedSum += contribution;
-                    preferToHaveWeightSum += avgWeight;
+                    preferToHaveWeightSum += fixedAvgPreferWeight;
                     preferToHaveCount++;
                 } else {
-                    double avgWeight = (mustHaveWeightSum > 0 && mustHaveCount > 0)
-                            ? (mustHaveWeightSum / mustHaveCount) : 10.0;
-                    double contribution = avgWeight * points;
+                    double contribution = fixedAvgMustHaveWeight * points;
                     mustHaveWeightedSum += contribution;
-                    mustHaveWeightSum += avgWeight;
+                    mustHaveWeightSum += fixedAvgMustHaveWeight;
                     mustHaveCount++;
                 }
             }
@@ -181,8 +167,13 @@ public class AssessmentScoringEngine {
         double mustHaveWeightRatio = getSettingDouble("MUST_HAVE_WEIGHT_RATIO", 0.8);
         double preferToHaveWeightRatio = getSettingDouble("PREFER_TO_HAVE_WEIGHT_RATIO", 0.2);
 
-        double rawMustHaveScore = mustHaveWeightSum > 0.0 ? (mustHaveWeightedSum / mustHaveWeightSum) * 100.0 : 0.0;
-        double rawPreferToHaveScore = preferToHaveWeightSum > 0.0 ? (preferToHaveWeightedSum / preferToHaveWeightSum) * 100.0 : rawMustHaveScore;
+        double rawPreferToHaveScore = preferToHaveWeightSum > 0.0 ? (preferToHaveWeightedSum / preferToHaveWeightSum) * 100.0 : 0.0;
+        double rawMustHaveScore = mustHaveWeightSum > 0.0 
+                ? (mustHaveWeightedSum / mustHaveWeightSum) * 100.0 
+                : (preferToHaveWeightSum > 0.0 ? rawPreferToHaveScore : 0.0);
+        if (preferToHaveWeightSum == 0.0) {
+            rawPreferToHaveScore = rawMustHaveScore;
+        }
 
         double finalScoreDouble = (rawMustHaveScore * mustHaveWeightRatio) + (rawPreferToHaveScore * preferToHaveWeightRatio);
         int finalScore = (int) Math.round(finalScoreDouble);
@@ -201,14 +192,14 @@ public class AssessmentScoringEngine {
         return new ScoringResult(finalScore, breakdown, updatedItems);
     }
 
-    private double statusToPoints(String status, double pointsWeak) {
-        if (status == null) return POINTS_MISSING;
-        return switch (status.toLowerCase()) {
-            case "matched" -> POINTS_MATCHED;
-            case "weak" -> pointsWeak;
-            case "missing" -> POINTS_MISSING;
-            case "not_applicable" -> 0.0;
-            default -> POINTS_MISSING;
+    private double statusToPoints(String status, double pointsMatched, double pointsPartial, double pointsWeak, double pointsMissing) {
+        fit.iuh.modules.assessment.entity.EvaluationStatus evalStatus = fit.iuh.modules.assessment.entity.EvaluationStatus.fromCode(status);
+        return switch (evalStatus) {
+            case MATCHED -> pointsMatched;
+            case PARTIAL -> pointsPartial;
+            case WEAK -> pointsWeak;
+            case MISSING -> pointsMissing;
+            case NOT_APPLICABLE -> 0.0;
         };
     }
 

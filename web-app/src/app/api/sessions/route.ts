@@ -1,10 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 
+// ─── JWT helper ───────────────────────────────────────────────────────────────
+function extractUserId(request: NextRequest): string | null {
+  const authHeader = request.headers.get('Authorization');
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    try {
+      const token = authHeader.substring(7);
+      const parts = token.split('.');
+      if (parts.length === 3) {
+        const payload = Buffer.from(parts[1], 'base64').toString('utf-8');
+        const claims = JSON.parse(payload);
+        return claims.id || null;
+      }
+    } catch (e) {
+      console.error('[API Sessions] Error decoding JWT:', e);
+    }
+  }
+  return null;
+}
+
 // GET: List all sessions
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const sessionsRes = await query('SELECT * FROM sessions ORDER BY date DESC');
+    const authUserId = extractUserId(request);
+    let sessionsRes;
+    if (authUserId) {
+      sessionsRes = await query('SELECT * FROM sessions WHERE user_id = $1 OR user_id IS NULL ORDER BY date DESC', [authUserId]);
+    } else {
+      sessionsRes = await query('SELECT * FROM sessions ORDER BY date DESC');
+    }
     const sessions = sessionsRes.rows;
 
     const fullSessions = await Promise.all(
@@ -12,6 +37,7 @@ export async function GET() {
         const turnsRes = await query('SELECT * FROM session_turns WHERE session_id = $1 ORDER BY id ASC', [sess.id]);
         return {
           id: sess.id,
+          userId: sess.user_id,
           date: sess.date,
           interviewType: sess.interview_type,
           roleTitle: sess.role_title,
@@ -63,15 +89,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Session details with id are required' }, { status: 400 });
     }
 
+    const authUserId = extractUserId(request);
+    const userIdToSave = authUserId || session.userId || null;
+
     const upsertSessionSql = `
       INSERT INTO sessions (
-        id, date, interview_type, role_title, cv_filename, jd_filename,
+        id, user_id, date, interview_type, role_title, cv_filename, jd_filename,
         overall_score, status, overall_feedback, competency_fit_score,
         technical_depth_score, match_level, candidate_level, role_type_detected,
         years_of_experience_estimate, strong_areas, gap_areas, critical_missing_skills,
         section_wise_feedback, actionable_suggestions, resume_id, jd_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
       ON CONFLICT (id) DO UPDATE SET
+        user_id = COALESCE(EXCLUDED.user_id, sessions.user_id),
         date = EXCLUDED.date,
         interview_type = EXCLUDED.interview_type,
         role_title = EXCLUDED.role_title,
@@ -100,6 +130,7 @@ export async function POST(request: NextRequest) {
 
     await query(upsertSessionSql, [
       session.id,
+      isValidUuid(userIdToSave) ? userIdToSave : null,
       session.date || new Date().toISOString(),
       session.interviewType || 'Technical',
       session.roleTitle || '',

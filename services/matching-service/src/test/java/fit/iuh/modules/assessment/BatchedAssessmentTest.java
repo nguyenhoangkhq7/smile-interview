@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-class BatchAndSelfConsistencyTest {
+class BatchedAssessmentTest {
 
     private AssessmentService assessmentService;
 
@@ -45,13 +45,13 @@ class BatchAndSelfConsistencyTest {
     @BeforeEach
     void setUp() {
         assessmentService = new AssessmentServiceImpl(
-                null, null, null, null, null, null, null, new fit.iuh.config.AppProperties(), null
+                null, null, null, null, null, null, null
         );
     }
 
     @Test
-    @DisplayName("Grounding check integration in assessment pipeline")
-    void testGroundingCheckIntegration() {
+    @DisplayName("Assessment service initialization and wiring")
+    void testAssessmentServiceInitialization() {
         assertNotNull(assessmentService);
     }
 }

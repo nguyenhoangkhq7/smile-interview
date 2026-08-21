@@ -14,14 +14,14 @@ public class EvidenceGroundingValidator {
 
     /**
      * Regex that captures contiguous sequences of ASCII letters, digits, dots, plus-signs,
-     * and hash-signs with length ≥ 2 — i.e. English technical terms and technology names
+     * hash-signs, and slashes — i.e. English technical terms and technology names
      * that appear in both Vietnamese evidence sentences and English CV text.
      *
      * Examples matched: "PostgreSQL", "Docker", "JWT", "Spring Boot", "EC2", "RDS",
-     *   "Next.js", "Redis", "C++", "C#", "AWS", "2026", "3.19"
+     *   "Next.js", "Redis", "C++", "C#", "CI/CD", "AWS", "2026", "3.19"
      */
     private static final Pattern TECH_TOKEN_PATTERN =
-            Pattern.compile("[A-Za-z0-9][A-Za-z0-9.+#]*[A-Za-z0-9]");
+            Pattern.compile("[A-Za-z0-9][A-Za-z0-9.+#/]*");
 
     /**
      * Validates cv_evidence against the full CV markdown using fuzzy similarity.
@@ -37,7 +37,21 @@ public class EvidenceGroundingValidator {
         String cvEvidence = item.cvEvidence();
         String cvQuote = item.cvQuote();
 
+        // Handle case where evidence/quote is empty
         if ((cvEvidence == null || cvEvidence.isBlank()) && (cvQuote == null || cvQuote.isBlank())) {
+            String currentStatus = item.status() != null ? item.status().toLowerCase(Locale.ROOT) : "missing";
+            if ("matched".equals(currentStatus) || "partial".equals(currentStatus) || "weak".equals(currentStatus)) {
+                // LLM claimed match/partial without providing any evidence -> downgrade to missing
+                log.warn("[GroundingCheck] criteria_id={} | status={} -> missing | Reason: No cv_evidence or cv_quote provided.",
+                        item.criteriaId(), item.status());
+                return new AssessmentResponseDto.EvidenceItem(
+                        item.criteriaId(), item.criteriaName(), item.importance(), item.jdRequirement(),
+                        null, null, "missing",
+                        item.reasoning() + " [Warning: Missing evidence context from CV.]",
+                        item.weightUsed(), item.scoreContribution(), 0.0,
+                        item.confidenceVotes(), item.lowConfidence(), true, item.matchMetadata()
+                );
+            }
             Double score = item.groundingScore() != null ? item.groundingScore() : 1.0;
             return new AssessmentResponseDto.EvidenceItem(
                     item.criteriaId(), item.criteriaName(), item.importance(), item.jdRequirement(),
@@ -50,17 +64,29 @@ public class EvidenceGroundingValidator {
         double simQuote = calculateFuzzySimilarity(cvQuote, cvMarkdown);
         double sim = Math.max(simEvidence, simQuote);
 
-        boolean quoteHallucinated = cvQuote != null && !cvQuote.isBlank() && simQuote < 0.35;
+        boolean hasTechTokens = !extractTechTokens(cvEvidence).isEmpty() || !extractTechTokens(cvQuote).isEmpty();
+        
+        // Soft skills / non-technical criteria check vs Technical criteria check
+        double effectiveThreshold;
+        if (hasTechTokens) {
+            effectiveThreshold = Math.min(groundingThreshold, 0.50);
+        } else if (cvQuote != null && !cvQuote.isBlank()) {
+            effectiveThreshold = Math.min(groundingThreshold, 0.40);
+        } else {
+            effectiveThreshold = Math.min(groundingThreshold, 0.25);
+        }
 
-        if (sim < groundingThreshold || quoteHallucinated) {
+        boolean quoteHallucinated = cvQuote != null && !cvQuote.isBlank() && simQuote < 0.20;
+
+        if (sim < effectiveThreshold || quoteHallucinated) {
             String originalStatus = item.status();
             String downgradedStatus = downgradeStatus(originalStatus);
-            log.warn("[GroundingCheck] criteria_id={} | status={} -> {} | score={} < threshold={} (quoteHallucinated={})",
-                    item.criteriaId(), originalStatus, downgradedStatus, sim, groundingThreshold, quoteHallucinated);
+            log.warn("[GroundingCheck] criteria_id={} | status={} -> {} | score={} < effectiveThreshold={} (quoteHallucinated={})",
+                    item.criteriaId(), originalStatus, downgradedStatus, sim, effectiveThreshold, quoteHallucinated);
             return new AssessmentResponseDto.EvidenceItem(
                     item.criteriaId(), item.criteriaName(), item.importance(), item.jdRequirement(),
                     item.cvEvidence(), item.cvQuote(), downgradedStatus,
-                    item.reasoning() + " [Canh bao: Bang chung tu CV co do tin cay thap (" + String.format("%.2f", sim) + ").]",
+                    item.reasoning() + " [Warning: Low evidence grounding confidence (" + String.format("%.2f", sim) + ").]",
                     item.weightUsed(), item.scoreContribution(), sim,
                     item.confidenceVotes(), item.lowConfidence(), true, item.matchMetadata()
             );
@@ -81,8 +107,9 @@ public class EvidenceGroundingValidator {
         // Extract English/ASCII technical tokens from the evidence and check whether
         // they actually appear in the full CV markdown. This sidesteps Jaccard failing
         // because Vietnamese words share no tokens with English words.
+        Set<String> techTokens = extractTechTokens(needle);
         double techKeywordScore = calculateTechKeywordMatchScore(needle, haystack);
-        if (techKeywordScore >= 0.5) {
+        if (!techTokens.isEmpty() && techKeywordScore >= 0.5) {
             log.debug("[GroundingCheck] Tech-keyword match score={} (≥0.5) — grounding accepted", String.format("%.2f", techKeywordScore));
             return techKeywordScore;
         }
@@ -117,9 +144,8 @@ public class EvidenceGroundingValidator {
         if (techTokens.isEmpty()) {
             return 0.0;
         }
-        String cvLower = cvMarkdown.toLowerCase(Locale.ROOT);
         long matched = techTokens.stream()
-                .filter(token -> cvLower.contains(token.toLowerCase(Locale.ROOT)))
+                .filter(token -> fit.iuh.modules.assessment.util.TechLexiconDictionary.containsTechOrSynonym(cvMarkdown, token))
                 .count();
         double score = (double) matched / techTokens.size();
         log.debug("[GroundingCheck] Tech-keyword match: {}/{} tokens found → score={}",
@@ -131,7 +157,8 @@ public class EvidenceGroundingValidator {
             "AWS", "EC2", "RDS", "JPA", "JVM", "JWT", "SQL", "API", "CSS", "DOM",
             "ORM", "OOP", "GIT", "TDD", "CI", "CD", "DDD", "SPA", "SSR", "SSG",
             "UI", "UX", "DB", "ML", "AI", "IOT", "SDK", "VPC", "IAM",
-            "SLO", "SLA", "APM", "ECS", "EKS", "S3", "SNS", "SQS", "RPC"
+            "SLO", "SLA", "APM", "ECS", "EKS", "S3", "SNS", "SQS", "RPC",
+            "GO", "C", "R", "PHP", "K8S", "JS", "TS", "OS", "IP", "TCP", "UDP", "SSH", "SSL", "TLS"
     );
 
     /**
@@ -165,34 +192,109 @@ public class EvidenceGroundingValidator {
                 .trim();
     }
 
+    private static final Set<String> STOPWORDS = Set.of(
+            "the", "a", "an", "in", "on", "at", "to", "for", "of", "with", "is", "are", "was", "were",
+            "and", "or", "as", "by", "from", "that", "this", "it", "has", "have", "had", "can", "will",
+            "be", "been", "being", "candidate", "experience", "skills", "skill", "projects", "project",
+            "working", "work", "responsible", "using", "used", "knowledge", "strong", "proficient",
+            "có", "và", "trong", "với", "cho", "được", "các", "những", "của", "tại", "là", "đã",
+            "đang", "khi", "về", "như", "ứng", "viên", "kinh", "nghiệm", "dự", "án", "kỹ", "năng"
+    );
+
     private double calculateTokenJaccardOverlap(String needle, String haystack) {
-        Set<String> needleTokens = new HashSet<>(Arrays.asList(needle.split(" ")));
+        Set<String> allNeedleTokens = new HashSet<>(Arrays.asList(needle.split(" ")));
+        allNeedleTokens.removeIf(String::isBlank);
+        if (allNeedleTokens.isEmpty()) return 0.0;
+
+        Set<String> contentNeedleTokens = new HashSet<>(allNeedleTokens);
+        contentNeedleTokens.removeIf(token -> STOPWORDS.contains(token) || token.length() <= 1);
+        Set<String> targetNeedleTokens = contentNeedleTokens.isEmpty() ? allNeedleTokens : contentNeedleTokens;
+
         Set<String> haystackTokens = new HashSet<>(Arrays.asList(haystack.split(" ")));
-        needleTokens.removeIf(String::isBlank);
         haystackTokens.removeIf(String::isBlank);
-        if (needleTokens.isEmpty()) return 0.0;
+
         int intersection = 0;
-        for (String token : needleTokens) {
+        for (String token : targetNeedleTokens) {
             if (haystackTokens.contains(token)) intersection++;
         }
-        return (double) intersection / needleTokens.size();
+        return (double) intersection / targetNeedleTokens.size();
     }
 
+    /**
+     * Optimized segment-based Levenshtein distance calculation.
+     * Evaluates paragraphs / sentences that share content tokens with the needle rather
+     * than brute-force sliding over the entire 30,000-character document.
+     */
     private double calculateSlidingLevenshtein(String needle, String haystack) {
         int nLen = needle.length();
-        int hLen = haystack.length();
-        if (nLen == 0 || hLen == 0) return 0.0;
-        int windowSize = Math.min(hLen, Math.max(nLen + 10, (int) (nLen * 1.3)));
-        int step = Math.max(1, nLen / 4);
+        if (nLen == 0 || haystack == null || haystack.isBlank()) return 0.0;
+
+        Set<String> needleWords = new HashSet<>(Arrays.asList(needle.split(" ")));
+        needleWords.removeIf(w -> STOPWORDS.contains(w) || w.length() <= 2);
+
+        String[] rawLines = haystack.split("\\r?\\n");
+        List<String> segments = new ArrayList<>();
+        StringBuilder currentSeg = new StringBuilder();
+
+        for (String line : rawLines) {
+            String trimmed = line.trim();
+            if (trimmed.isEmpty()) {
+                if (currentSeg.length() > 0) {
+                    segments.add(currentSeg.toString());
+                    currentSeg.setLength(0);
+                }
+            } else {
+                if (currentSeg.length() > 0) currentSeg.append(" ");
+                currentSeg.append(trimmed);
+                if (currentSeg.length() >= nLen * 2) {
+                    segments.add(currentSeg.toString());
+                    currentSeg.setLength(0);
+                }
+            }
+        }
+        if (currentSeg.length() > 0) segments.add(currentSeg.toString());
+
         double maxSim = 0.0;
-        for (int i = 0; i <= hLen - Math.min(windowSize, nLen); i += step) {
-            int end = Math.min(hLen, i + windowSize);
-            String window = haystack.substring(i, end);
-            int dist = computeLevenshteinDistance(needle, window);
-            int maxLen = Math.max(needle.length(), window.length());
-            double sim = 1.0 - ((double) dist / maxLen);
-            if (sim > maxSim) maxSim = sim;
-            if (maxSim >= 0.95) break;
+
+        for (String segment : segments) {
+            if (segment.isBlank()) continue;
+            String normSeg = normalizeText(segment);
+            if (normSeg.contains(needle)) return 1.0;
+
+            // Pre-filter: only compute DP Levenshtein if segment shares at least 1 keyword
+            boolean hasTokenOverlap = needleWords.isEmpty();
+            if (!hasTokenOverlap) {
+                for (String nw : needleWords) {
+                    if (normSeg.contains(nw)) {
+                        hasTokenOverlap = true;
+                        break;
+                    }
+                }
+            }
+
+            if (hasTokenOverlap) {
+                int sLen = normSeg.length();
+                if (sLen <= nLen * 2.5) {
+                    int dist = computeLevenshteinDistance(needle, normSeg);
+                    int maxLen = Math.max(nLen, sLen);
+                    double sim = 1.0 - ((double) dist / maxLen);
+                    if (sim > maxSim) maxSim = sim;
+                    if (maxSim >= 0.90) return maxSim;
+                } else {
+                    // Small local sliding window inside the candidate segment
+                    int windowSize = Math.min(sLen, Math.max(nLen + 10, (int) (nLen * 1.3)));
+                    int step = Math.max(1, nLen / 3);
+                    for (int i = 0; i <= sLen - Math.min(windowSize, nLen); i += step) {
+                        int end = Math.min(sLen, i + windowSize);
+                        String window = normSeg.substring(i, end);
+                        int dist = computeLevenshteinDistance(needle, window);
+                        int maxLen = Math.max(nLen, window.length());
+                        double sim = 1.0 - ((double) dist / maxLen);
+                        if (sim > maxSim) maxSim = sim;
+                        if (maxSim >= 0.90) return maxSim;
+                    }
+                }
+            }
         }
         return maxSim;
     }
@@ -214,11 +316,12 @@ public class EvidenceGroundingValidator {
     }
 
     private String downgradeStatus(String status) {
-        if (status == null) return "missing";
-        return switch (status.toLowerCase(Locale.ROOT)) {
-            case "matched" -> "weak";
-            case "weak" -> "missing";
-            default -> "missing";
+        fit.iuh.modules.assessment.entity.EvaluationStatus eval = fit.iuh.modules.assessment.entity.EvaluationStatus.fromCode(status);
+        return switch (eval) {
+            case MATCHED -> fit.iuh.modules.assessment.entity.EvaluationStatus.PARTIAL.getCode();
+            case PARTIAL -> fit.iuh.modules.assessment.entity.EvaluationStatus.WEAK.getCode();
+            case WEAK -> fit.iuh.modules.assessment.entity.EvaluationStatus.MISSING.getCode();
+            default -> fit.iuh.modules.assessment.entity.EvaluationStatus.MISSING.getCode();
         };
     }
 }

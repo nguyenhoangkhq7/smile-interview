@@ -1,5 +1,6 @@
 package fit.iuh.modules.ingestion.service.impl;
 
+import fit.iuh.modules.auth.entity.User;
 import fit.iuh.modules.chunking.entity.DocumentChunk;
 import fit.iuh.modules.chunking.repository.DocumentChunkRepository;
 import fit.iuh.modules.chunking.service.ChunkerService;
@@ -42,8 +43,6 @@ public class IngestionServiceImpl implements IngestionService {
     private fit.iuh.modules.assessment.service.AssessmentCriteriaPreparer criteriaPreparer;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
-
-
     @Override
     @Transactional
     public IngestionResponse ingest(
@@ -56,28 +55,46 @@ public class IngestionServiceImpl implements IngestionService {
             String jdCategory,
             String jdAcceptedLevels,
             String cvCategory,
-            String cvSeniorityLevel) {
+            String cvSeniorityLevel,
+            String roleTitle,
+            String interviewType,
+            User currentUser) {
 
         validateInputs(sessionId, cvFile, jdFile, jdText, resumeMarkdown, jdMarkdown);
 
         long totalStartTime = System.currentTimeMillis();
+        UUID userId = (currentUser != null) ? currentUser.getId() : null;
+
         log.info("""
                 
                 ================================================================================
-                >>> [PIPELINE START] INGESTION | Session: {}
+                >>> [PIPELINE START] INGESTION | Session: {} | User: {}
                 ================================================================================
-                """, sessionId);
+                """, sessionId, currentUser != null ? currentUser.getUsername() : "anonymous");
 
         Session session = sessionRepository.findById(sessionId)
                 .orElseGet(() -> {
-                    log.info("[INGESTION] Session '{}' not found in database. Auto-creating a new session.", sessionId);
+                    log.info("[INGESTION] Session '{}' not found in database. Auto-creating a new session with userId: {}", sessionId, userId);
                     Session newSession = Session.builder()
                             .id(sessionId)
+                            .userId(userId)
                             .status("In progress")
+                            .roleTitle(roleTitle)
+                            .interviewType(interviewType != null ? interviewType : "Technical")
                             .startedAt(java.time.LocalDateTime.now())
                             .build();
                     return sessionRepository.save(newSession);
                 });
+
+        if (userId != null && session.getUserId() == null) {
+            session.setUserId(userId);
+        }
+        if (roleTitle != null && !roleTitle.isBlank()) {
+            session.setRoleTitle(roleTitle);
+        }
+        if (interviewType != null && !interviewType.isBlank()) {
+            session.setInterviewType(interviewType);
+        }
 
         long step1Start = System.currentTimeMillis();
 
@@ -130,10 +147,14 @@ public class IngestionServiceImpl implements IngestionService {
         if (resume == null) {
             resume = Resume.builder()
                     .id(UUID.randomUUID())
+                    .userId(userId)
                     .fileName(cvFile != null ? cvFile.getOriginalFilename() : "Direct_Input_CV")
                     .createdAt(java.time.LocalDateTime.now())
                     .build();
-            log.info("[INGESTION] Auto-created new Resume record with ID: {}", resume.getId());
+            log.info("[INGESTION] Auto-created new Resume record with ID: {}, userId: {}", resume.getId(), userId);
+        }
+        if (userId != null && resume.getUserId() == null) {
+            resume.setUserId(userId);
         }
         resume.setParsedContent(markdownCv);
         resume.setRawText(rawCvText);
@@ -158,10 +179,14 @@ public class IngestionServiceImpl implements IngestionService {
         if (jd == null) {
             jd = JobDescription.builder()
                     .id(UUID.randomUUID())
+                    .userId(userId)
                     .title(jdFile != null ? jdFile.getOriginalFilename() : "Direct_Input_JD")
                     .createdAt(java.time.LocalDateTime.now())
                     .build();
-            log.info("[INGESTION] Auto-created new JobDescription record with ID: {}", jd.getId());
+            log.info("[INGESTION] Auto-created new JobDescription record with ID: {}, userId: {}", jd.getId(), userId);
+        }
+        if (userId != null && jd.getUserId() == null) {
+            jd.setUserId(userId);
         }
         jd.setParsedContent(markdownJd);
         jd.setRawText(rawJdText);

@@ -51,8 +51,8 @@ class EvidenceGroundingValidatorTest {
     }
 
     @Test
-    @DisplayName("Hallucinated Evidence — Grounding score below threshold should downgrade 'matched' to 'weak'")
-    void testHallucinatedMatchedDowngradedToWeak() {
+    @DisplayName("Hallucinated Evidence — Grounding score below threshold should downgrade 'matched' to 'partial'")
+    void testHallucinatedMatchedDowngradedToPartial() {
         String hallucinatedSpan = "Developed quantum computing algorithms with IBM Qiskit and Rust in production";
         EvidenceItem item = new EvidenceItem(
                 2L, "Quantum Tech Stack", "REQUIRED", "Quantum computing with Qiskit",
@@ -63,8 +63,24 @@ class EvidenceGroundingValidatorTest {
         EvidenceItem result = validator.validateAndApply(item, SAMPLE_CV_MARKDOWN, 0.75);
 
         assertNotNull(result);
-        assertEquals("weak", result.status(), "Status 'matched' should be downgraded to 'weak' when hallucinated");
+        assertEquals("partial", result.status(), "Status 'matched' should be downgraded to 'partial' when hallucinated");
         assertTrue(result.groundingScore() < 0.75, "Grounding score should be < 0.75 for hallucinated span");
+    }
+
+    @Test
+    @DisplayName("Hallucinated Evidence — Grounding score below threshold should downgrade 'partial' to 'weak'")
+    void testHallucinatedPartialDowngradedToWeak() {
+        String hallucinatedSpan = "Developed quantum computing algorithms with IBM Qiskit and Rust in production";
+        EvidenceItem item = new EvidenceItem(
+                2L, "Quantum Tech Stack", "REQUIRED", "Quantum computing with Qiskit",
+                hallucinatedSpan, hallucinatedSpan, "partial",
+                "Hallucinated evidence", null, null, null, null, null, null, null
+        );
+
+        EvidenceItem result = validator.validateAndApply(item, SAMPLE_CV_MARKDOWN, 0.75);
+
+        assertNotNull(result);
+        assertEquals("weak", result.status(), "Status 'partial' should be downgraded to 'weak' when hallucinated");
     }
 
     @Test
@@ -97,5 +113,70 @@ class EvidenceGroundingValidatorTest {
         assertNotNull(result);
         assertEquals("missing", result.status());
         assertEquals(1.0, result.groundingScore(), "Missing status should have score 1.0");
+    }
+
+    @Test
+    @DisplayName("Short & Special Tech Terms — Go, C++, C# in CV should be accurately grounded without false downgrade")
+    void testShortAndSpecialTechTermsGrounding() {
+        String cvWithSpecialTech = """
+                # Developer Profile
+                * Core Languages: Go, C++, C#, Java
+                * Built high-concurrency microservices using Go and C++ backend.
+                """;
+
+        String spanGo = "Built high-concurrency microservices using Go";
+        EvidenceItem itemGo = new EvidenceItem(
+                5L, "Go Programming", "REQUIRED", "Go microservices",
+                spanGo, spanGo, "matched",
+                "Found in CV", null, null, null, null, null, null, null
+        );
+        EvidenceItem resultGo = validator.validateAndApply(itemGo, cvWithSpecialTech, 0.75);
+        assertEquals("matched", resultGo.status(), "Go skill should be grounded and remain matched");
+
+        String spanCpp = "C++ backend";
+        EvidenceItem itemCpp = new EvidenceItem(
+                6L, "C++ Systems", "REQUIRED", "C++ programming",
+                spanCpp, spanCpp, "matched",
+                "Found in CV", null, null, null, null, null, null, null
+        );
+        EvidenceItem resultCpp = validator.validateAndApply(itemCpp, cvWithSpecialTech, 0.75);
+        assertEquals("matched", resultCpp.status(), "C++ skill should be grounded and remain matched");
+    }
+
+    @Test
+    @DisplayName("Empty Evidence on Matched Status — Should be downgraded to missing due to lack of proof")
+    void testEmptyEvidenceOnMatchedDowngradedToMissing() {
+        EvidenceItem item = new EvidenceItem(
+                7L, "Microservices Architecture", "REQUIRED", "Microservices design",
+                null, null, "matched",
+                "Claimed match but no proof", null, null, null, null, null, null, null
+        );
+
+        EvidenceItem result = validator.validateAndApply(item, SAMPLE_CV_MARKDOWN, 0.75);
+
+        assertNotNull(result);
+        assertEquals("missing", result.status(), "Claimed matched with null evidence must be downgraded to missing");
+        assertTrue(result.needsManualReview());
+    }
+
+    @Test
+    @DisplayName("Vietnamese Evidence with English Quote — Soft skills with quotes should not be falsely downgraded")
+    void testVietnameseEvidenceWithQuote() {
+        String cvText = """
+                # Developer Profile
+                * Strong problem solving and team collaboration skills across cross-functional engineering teams.
+                """;
+
+        EvidenceItem item = new EvidenceItem(
+                8L, "Problem Solving & Teamwork", "REQUIRED", "Team collaboration",
+                "Ứng viên có kỹ năng giải quyết vấn đề và làm việc nhóm hiệu quả",
+                "team collaboration skills across cross-functional engineering teams",
+                "matched",
+                "Demonstrated in profile", null, null, null, null, null, null, null
+        );
+
+        EvidenceItem result = validator.validateAndApply(item, cvText, 0.75);
+        assertNotNull(result);
+        assertEquals("matched", result.status(), "Soft skill with English quote from CV should remain matched");
     }
 }

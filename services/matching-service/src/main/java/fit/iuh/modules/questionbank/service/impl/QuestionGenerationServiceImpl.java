@@ -338,6 +338,9 @@ public class QuestionGenerationServiceImpl implements QuestionGenerationService 
                     item != null && item.status() != null ? item.status() : "unknown",
                     qa.difficulty()
             ));
+            if (qa.promptStrategy() != null && !qa.promptStrategy().isBlank()) {
+                sb.append(String.format("- Prompt Strategy: %s%n", qa.promptStrategy()));
+            }
             if (item != null) {
                 sb.append(String.format("- Criteria: %s%n", item.criteriaName() != null ? item.criteriaName() : "Ad-hoc"));
                 sb.append(String.format("- JD Requirement: %s%n", item.jdRequirement() != null ? item.jdRequirement() : "N/A"));

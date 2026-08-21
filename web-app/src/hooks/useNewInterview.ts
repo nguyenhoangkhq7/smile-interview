@@ -9,7 +9,7 @@ import { useAuthStore } from '@/store/authStore';
 
 export type CvSource  = 'upload' | 'saved' | 'default';
 export type JdSource  = 'upload' | 'text' | 'saved';
-export type CriteriaFilter = 'all' | 'matched' | 'weak' | 'missing';
+export type CriteriaFilter = 'all' | 'matched' | 'partial' | 'weak' | 'missing';
 export type ActiveView = 'ai-cards' | 'visual-match';
 
 

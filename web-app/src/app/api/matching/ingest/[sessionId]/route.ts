@@ -42,6 +42,8 @@ export async function POST(
     const jdText = formData.get('jdText') as string | null;
     const resumeIdStr = formData.get('resumeId') as string | null;
     const jdIdStr = formData.get('jdId') as string | null;
+    const roleTitle = formData.get('roleTitle') as string | null;
+    const interviewType = formData.get('interviewType') as string | null;
 
     if (jdText && jdText.trim().startsWith('%PDF-')) {
       return NextResponse.json({ 
@@ -282,6 +284,12 @@ export async function POST(
         backendFormData.append('jdMarkdown', jdMarkdownToSend);
       } else if (jdTextToSend) {
         backendFormData.append('jdText', jdTextToSend);
+      }
+      if (roleTitle) {
+        backendFormData.append('roleTitle', roleTitle);
+      }
+      if (interviewType) {
+        backendFormData.append('interviewType', interviewType);
       }
 
       const headers: Record<string, string> = {};

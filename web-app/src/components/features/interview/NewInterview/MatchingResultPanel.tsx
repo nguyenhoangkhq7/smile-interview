@@ -105,9 +105,11 @@ function ScoreRing({ score, label, color }: { score: number; label: string; colo
 function CriterionItem({ item }: { item: Criterion }) {
   const normalizedStatus = (item.status || '').toLowerCase();
 
-  let configKey: 'matched' | 'weak' | 'missing' = 'matched';
+  let configKey: 'matched' | 'partial' | 'weak' | 'missing' = 'matched';
   if (normalizedStatus === 'matched' || normalizedStatus === 'pass' || normalizedStatus === 'passed') {
     configKey = 'matched';
+  } else if (normalizedStatus === 'partial') {
+    configKey = 'partial';
   } else if (normalizedStatus === 'weak') {
     configKey = 'weak';
   } else if (normalizedStatus === 'missing' || normalizedStatus === 'fail' || normalizedStatus === 'failed') {
@@ -122,6 +124,12 @@ function CriterionItem({ item }: { item: Criterion }) {
       text: 'text-emerald-700',
       label: isPassFailLabel ? 'Đạt (Pass)' : 'Khớp (Matched)',
       icon: <CheckCircle size={14} />,
+    },
+    partial: {
+      bg: 'bg-sky-50 border-sky-200',
+      text: 'text-sky-700',
+      label: 'Khớp 1 phần (Partial)',
+      icon: <AlertCircle size={14} className="text-sky-600" />,
     },
     weak: {
       bg: 'bg-amber-50 border-amber-200',
@@ -278,6 +286,7 @@ export function MatchingResultPanel({
     if (criteriaFilter === 'all') return true;
     const s = (item.status || '').toLowerCase();
     if (criteriaFilter === 'matched') return s === 'matched' || s === 'pass' || s === 'passed';
+    if (criteriaFilter === 'partial') return s === 'partial';
     if (criteriaFilter === 'weak') return s === 'weak';
     if (criteriaFilter === 'missing') return s === 'missing' || s === 'fail' || s === 'failed';
     return s === criteriaFilter;
@@ -473,11 +482,11 @@ export function MatchingResultPanel({
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <h3 className="font-bold text-foreground">Ma trận kỹ năng (Criteria Alignment)</h3>
               <div className="flex gap-1 flex-wrap">
-                {(['all', 'matched', 'weak', 'missing'] as CriteriaFilter[]).map((f) => (
+                {(['all', 'matched', 'partial', 'weak', 'missing'] as CriteriaFilter[]).map((f) => (
                   <button key={f} type="button" onClick={() => onCriteriaFilter(f)}
                     className={`rounded-lg px-2.5 py-1 text-xs font-semibold capitalize transition-colors ${criteriaFilter === f ? 'bg-brand-orange text-white' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}
                   >
-                    {f === 'all' ? 'Tất cả' : f === 'matched' ? 'Đạt / Khớp' : f === 'weak' ? 'Còn yếu' : 'Thiếu / Chưa đạt'}
+                    {f === 'all' ? 'Tất cả' : f === 'matched' ? 'Đạt / Khớp' : f === 'partial' ? 'Khớp 1 phần' : f === 'weak' ? 'Còn yếu' : 'Thiếu / Chưa đạt'}
                   </button>
                 ))}
               </div>

@@ -1,7 +1,6 @@
 package fit.iuh.modules.assessment.controller;
 
 import fit.iuh.modules.assessment.dto.ClassifiedCriteriaBundle;
-import fit.iuh.modules.assessment.entity.EligibilityStatus;
 import fit.iuh.modules.assessment.service.AssessmentCriteriaPreparer;
 import fit.iuh.modules.assessment.service.AssessmentCriteriaPreparer.MetadataResult;
 import fit.iuh.modules.rulengine.repository.JobCriteriaRepository.CriteriaWeightProjection;
