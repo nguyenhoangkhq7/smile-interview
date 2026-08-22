@@ -1,7 +1,7 @@
 import React from 'react';
 import { QuestionItem } from './types';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { HelpCircle, Lightbulb, Code2, Server, MessageSquare, Tag, CheckSquare } from 'lucide-react';
 
 interface QuestionCardProps {

@@ -646,14 +646,3 @@ export function useNewInterview() {
     handleResumeSession, handleRestart, handleViewAssessment, handleReset, handleContinueToSelection,
   };
 }
-
-
-function initialRoleTitle({ jdSource, selectedJdId, savedJds, jdFile }: {
-  jdSource: JdSource; selectedJdId: number | null; savedJds: DatabaseJd[]; jdFile: File | null;
-}): string {
-  if (jdSource === 'saved' && selectedJdId)
-    return savedJds.find((j) => j.id === selectedJdId)?.title || 'Software Engineer';
-  if (jdSource === 'upload' && jdFile)
-    return jdFile.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
-  return 'Software Engineer';
-}

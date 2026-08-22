@@ -3,7 +3,7 @@
 import { CheckCircle, Download, Info, X, ArrowRight, FileSpreadsheet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
-import { exportQuestionBankToCSV } from '@/lib/exportUtils';
+import { exportQuestionBankToCSV, ExportableQuestionItem } from '@/lib/exportUtils';
 
 interface ResultPanelProps {
   recordedBlob: Blob | null;
@@ -11,7 +11,7 @@ interface ResultPanelProps {
   setShowInfoBanner: (v: boolean) => void;
   handleDownloadVideo: () => void;
   handleGoToResults: () => void;
-  questions?: any[];
+  questions?: ExportableQuestionItem[];
   sessionId?: string;
 }
 

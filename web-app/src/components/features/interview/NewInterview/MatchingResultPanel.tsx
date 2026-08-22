@@ -24,7 +24,6 @@ import HighlightedText from '@/components/HighlightedText';
 import type { AssessmentResponse } from '@/services/cvJdMatching';
 import type { CriteriaFilter, ActiveView } from '@/hooks/useNewInterview';
 import { extractKeywordsFromEvaluation, getDisplayRoleTitle } from '@/hooks/useNewInterview';
-import { useCallback } from 'react';
 
 interface KeywordMetadata {
   matching_skills?: string[];
@@ -270,9 +269,6 @@ export function MatchingResultPanel({
   );
   const keywords = keywordMetadata ?? { matching_skills: derivedKeywords.matchingSkills, variation_skills: derivedKeywords.variationSkills, missing_skills: derivedKeywords.missingSkills };
 
-  const getSectionName = useCallback((key: string) => {
-    return getSectionMeta(key).label;
-  }, []);
 
   const sb = assessment.scoreBreakdown || {};
   const overallScore = sb.final_score ?? sb.overall_match_score ?? sb.overallMatchScore ?? assessment.competencyFitScore ?? 0;

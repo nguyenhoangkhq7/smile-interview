@@ -1,7 +1,3 @@
-/**
- * Utility functions for exporting data to various formats (CSV, etc.)
- */
-
 export interface QuestionBankItem {
   id?: string;
   code?: string;
@@ -9,15 +5,28 @@ export interface QuestionBankItem {
   question_type?: string;
   questionType?: string;
   difficulty?: string;
+  level?: string;
   topic?: string;
   topicTag?: string;
   topic_tag?: string;
   question?: string | { question?: string; topic?: string };
   content?: string;
+  answer?: string;
+  score?: number | string;
   hints?: string[] | string;
   goodAnswerSignals?: string[];
-  [key: string]: unknown;
+  good_answer_signals?: string[];
+  isDeepDive?: boolean;
+  evaluation?: string;
+  strengths?: string;
+  improvements?: string;
+  suggestedAnswer?: string;
+  suggested_answer?: string;
+  hrRating?: number;
+  hrFeedback?: string;
 }
+
+export type ExportableQuestionItem = QuestionBankItem;
 
 /**
  * Escapes a single cell value for CSV compliant format.
@@ -45,7 +54,7 @@ function escapeCSVField(value: unknown): string {
  * - Column E: Nội dung câu hỏi (question)
  * - Column F: Gợi ý / Hints (joined by "; ")
  */
-export function exportQuestionBankToCSV(questionBank: any[], sessionId: string): void {
+export function exportQuestionBankToCSV(questionBank: ExportableQuestionItem[], sessionId: string): void {
   if (!questionBank || questionBank.length === 0) {
     console.warn('[exportUtils] Question bank is empty. Export cancelled.');
     return;

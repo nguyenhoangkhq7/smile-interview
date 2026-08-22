@@ -23,7 +23,6 @@ export const AiContextBanner: React.FC<AiContextBannerProps> = ({ metadata }) =>
     overall_match = 'medium',
     strong_areas = [],
     gap_areas = [],
-    total_questions = 0,
     generation_rationale = '',
   } = metadata;
 

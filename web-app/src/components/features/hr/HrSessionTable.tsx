@@ -73,7 +73,7 @@ export const HrSessionTable: React.FC<HrSessionTableProps> = ({ sessions: initia
           };
           toast.info(`🔔 ${sessionId.substring(0, 8)}... → ${labels[stage] || stage}`, { duration: 4000 });
         }
-      } catch (_) { /* ignore */ }
+      } catch { /* ignore */ }
     });
     es.onerror = () => { /* auto-reconnect */ };
     return () => { es.close(); };

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { io, Socket } from 'socket.io-client';
-import { historyService, SessionHistoryItem } from '@/services/historyService';
+import { historyService, SessionHistoryItem, QuestionFeedback } from '@/services/historyService';
 import { useSessionRecorder } from '@/hooks/useSessionRecorder';
 import { useAuthStore } from '@/store/authStore';
 
@@ -281,17 +281,16 @@ export function useInterviewSession() {
       if (id) {
         historyService.getSessionById(id).then(session => {
           if (session) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const updatedQuestions: any[] = session.questions ? [...session.questions] : [];
+            const updatedQuestions: QuestionFeedback[] = session.questions ? [...session.questions] : [];
             const activeQText = currentQuestionRef.current;
 
-            let targetIdx = updatedQuestions.findIndex((q: any) => {
-              const qStr = typeof q.question === 'object' && q.question !== null ? q.question.question : q.question;
+            let targetIdx = updatedQuestions.findIndex((q) => {
+              const qStr = typeof q.question === 'object' && q.question !== null ? (q.question as { question?: string }).question : q.question;
               return qStr && activeQText && qStr.trim() === activeQText.trim();
             });
 
             if (targetIdx === -1) {
-              targetIdx = updatedQuestions.findIndex((q: any) => !q.answer);
+              targetIdx = updatedQuestions.findIndex((q) => !q.answer);
             }
 
             if (targetIdx !== -1) {
@@ -305,7 +304,7 @@ export function useInterviewSession() {
                 improvements: '',
                 suggestedAnswer: '',
                 topicTag: topicTag || '',
-                isDeepDive
+                isDeepDive: Boolean(isDeepDive)
               });
             }
 
@@ -707,12 +706,11 @@ export function useInterviewSession() {
         if (evaluation && score !== undefined) {
           historyService.getSessionById(id).then(session => {
              if (session && session.questions) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const updatedQuestions: any[] = [...session.questions];
+                const updatedQuestions: QuestionFeedback[] = [...session.questions];
                 const answeredQText = currentQuestionRef.current;
 
-                let answeredIdx = updatedQuestions.findIndex((q: any) => {
-                  const qStr = typeof q.question === 'object' && q.question !== null ? q.question.question : q.question;
+                let answeredIdx = updatedQuestions.findIndex((q) => {
+                  const qStr = typeof q.question === 'object' && q.question !== null ? (q.question as { question?: string }).question : q.question;
                   return qStr && answeredQText && qStr.trim() === answeredQText.trim();
                 });
 
@@ -734,8 +732,8 @@ export function useInterviewSession() {
                   };
                 }
 
-                const newQExists = updatedQuestions.some((q: any) => {
-                  const qStr = typeof q.question === 'object' && q.question !== null ? q.question.question : q.question;
+                const newQExists = updatedQuestions.some((q) => {
+                  const qStr = typeof q.question === 'object' && q.question !== null ? (q.question as { question?: string }).question : q.question;
                   return qStr && text && qStr.trim() === text.trim();
                 });
 
