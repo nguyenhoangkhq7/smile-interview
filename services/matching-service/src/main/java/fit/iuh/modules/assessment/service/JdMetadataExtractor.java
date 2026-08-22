@@ -69,6 +69,7 @@ public class JdMetadataExtractor {
                 .build();
 
         for (int attempt = 1; attempt <= 2; attempt++) {
+            long startTime = System.currentTimeMillis();
             try {
                 String responseBody = llmWebClient.post()
                         .uri(appProperties.getLlm().getChatPath())
@@ -78,9 +79,26 @@ public class JdMetadataExtractor {
                         .timeout(timeout)
                         .block();
 
+                long durationMs = System.currentTimeMillis() - startTime;
+
                 if (responseBody != null) {
                     LlmChatResponse res = objectMapper.readValue(responseBody, LlmChatResponse.class);
                     if (res != null && res.getFirstChoiceContent() != null) {
+                        var usage = res.getUsage();
+                        if (usage != null) {
+                            log.info("[LLM METRICS] Task: MetadataExtraction | Model: {} | Duration: {} ms ({} s) | Prompt Tokens: {} | Completion Tokens: {} | Total Tokens: {}",
+                                    res.getModel() != null ? res.getModel() : model,
+                                    durationMs,
+                                    String.format("%.2f", durationMs / 1000.0),
+                                    usage.getPromptTokens(),
+                                    usage.getCompletionTokens(),
+                                    usage.getTotalTokens());
+                        } else {
+                            log.info("[LLM METRICS] Task: MetadataExtraction | Model: {} | Duration: {} ms ({} s) | Usage: N/A",
+                                    res.getModel() != null ? res.getModel() : model,
+                                    durationMs,
+                                    String.format("%.2f", durationMs / 1000.0));
+                        }
                         return parseAndMapToEnums(res.getFirstChoiceContent(), cvMarkdown);
                     }
                 }

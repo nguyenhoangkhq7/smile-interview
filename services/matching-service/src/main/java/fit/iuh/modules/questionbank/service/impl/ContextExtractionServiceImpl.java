@@ -67,7 +67,7 @@ public class ContextExtractionServiceImpl implements ContextExtractionService {
         int maxAttempts = 3;
 
         while (attempts < maxAttempts) {
-            attempts++;
+            long startTime = System.currentTimeMillis();
             try {
                 LlmChatResponse response = llmWebClient.post()
                         .uri(props.getLlm().getChatPath())
@@ -81,8 +81,26 @@ public class ContextExtractionServiceImpl implements ContextExtractionService {
                         )
                         .block();
 
+                long durationMs = System.currentTimeMillis() - startTime;
+
                 if (response == null || response.getFirstChoiceContent() == null) {
                     throw new QuestionBankException("LLM returned an empty context extraction response.");
+                }
+
+                var usage = response.getUsage();
+                if (usage != null) {
+                    log.info("[LLM METRICS] Task: ContextExtraction | Model: {} | Duration: {} ms ({} s) | Prompt Tokens: {} | Completion Tokens: {} | Total Tokens: {}",
+                            response.getModel() != null ? response.getModel() : model,
+                            durationMs,
+                            String.format("%.2f", durationMs / 1000.0),
+                            usage.getPromptTokens(),
+                            usage.getCompletionTokens(),
+                            usage.getTotalTokens());
+                } else {
+                    log.info("[LLM METRICS] Task: ContextExtraction | Model: {} | Duration: {} ms ({} s) | Usage: N/A",
+                            response.getModel() != null ? response.getModel() : model,
+                            durationMs,
+                            String.format("%.2f", durationMs / 1000.0));
                 }
 
                 String rawJson = response.getFirstChoiceContent().strip();

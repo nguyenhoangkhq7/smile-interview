@@ -131,6 +131,7 @@ public class AssessmentLlmRunner {
                 ? appProperties.getLlm().getRateLimitSleepMs() : 35000;
 
         for (int i = 0; i <= maxRetries; i++) {
+            long startTime = System.currentTimeMillis();
             try {
                 String responseBody = llmWebClient.post()
                         .uri(appProperties.getLlm().getChatPath())
@@ -139,6 +140,8 @@ public class AssessmentLlmRunner {
                         .bodyToMono(String.class)
                         .timeout(Duration.ofSeconds(timeoutSec))
                         .block();
+
+                long durationMs = System.currentTimeMillis() - startTime;
 
                 if (responseBody == null || responseBody.isBlank()) {
                     throw new LlmApiException("LLM API returned empty HTTP body during assessment.");
@@ -152,6 +155,23 @@ public class AssessmentLlmRunner {
                 if (response.getFirstChoiceContent() == null) {
                     throw new LlmApiException("LLM API returned empty assessment response.");
                 }
+
+                var usage = response.getUsage();
+                if (usage != null) {
+                    log.info("[LLM METRICS] Model: {} | Duration: {} ms ({} s) | Prompt Tokens: {} | Completion Tokens: {} | Total Tokens: {}",
+                            response.getModel() != null ? response.getModel() : targetModel,
+                            durationMs,
+                            String.format("%.2f", durationMs / 1000.0),
+                            usage.getPromptTokens(),
+                            usage.getCompletionTokens(),
+                            usage.getTotalTokens());
+                } else {
+                    log.info("[LLM METRICS] Model: {} | Duration: {} ms ({} s) | Usage: N/A",
+                            response.getModel() != null ? response.getModel() : targetModel,
+                            durationMs,
+                            String.format("%.2f", durationMs / 1000.0));
+                }
+
                 return response.getFirstChoiceContent().strip();
 
             } catch (WebClientResponseException e) {

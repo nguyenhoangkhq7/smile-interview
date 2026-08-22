@@ -49,6 +49,7 @@ public class AssessmentServiceImpl implements AssessmentService {
             boolean forceRefresh,
             String fromSessionId) {
 
+        long pipelineStartTime = System.currentTimeMillis();
         log.info("[PIPELINE START] 2-PHASE ASSESSMENT PIPELINE | SessionId: {}, ForceRefresh: {}, FromSessionId: {}",
                 sessionId, forceRefresh, fromSessionId);
 
@@ -56,7 +57,8 @@ public class AssessmentServiceImpl implements AssessmentService {
         log.info("[STEP 1/7] Checking cache and session cloning status for sessionId: {}...", sessionId);
         Optional<AssessmentResponse> cachedResponse = checkCachedAssessment(sessionId, forceRefresh, fromSessionId);
         if (cachedResponse.isPresent()) {
-            log.info("[STEP 1/7] Cache or cloning HIT. Returning saved assessment for sessionId: {}", sessionId);
+            long durationMs = System.currentTimeMillis() - pipelineStartTime;
+            log.info("[STEP 1/7] Cache or cloning HIT in {} ms. Returning saved assessment for sessionId: {}", durationMs, sessionId);
             return cachedResponse.get();
         }
 
@@ -75,6 +77,7 @@ public class AssessmentServiceImpl implements AssessmentService {
                 fullCvMarkdown.length(), fullJdMarkdown.length());
 
         // Step 3 & 4: Get or prepare JD context per target seniority level (2-tier Redis cached)
+        // Note: Session forceRefresh re-evaluates the candidate CV against the JD criteria, but retains the JD BaseProfile & Criteria cache.
         PreparedJdContext jdContext = criteriaPreparer.getOrPrepareJdContext(
                 session.getJobDescription().getId().toString(),
                 fullJdMarkdown,
@@ -82,7 +85,7 @@ public class AssessmentServiceImpl implements AssessmentService {
                 session.getJobDescription().getAcceptedLevels(),
                 session.getResume().getSeniorityLevel(),
                 fullCvMarkdown,
-                forceRefresh
+                false
         );
 
         // Step 5: Phase 2 — Batched LLM assessment pipeline
@@ -134,8 +137,13 @@ public class AssessmentServiceImpl implements AssessmentService {
 
         AssessmentResponse response = toResponse(entity, false);
         response.setScoreBreakdown(scoringResult.breakdown());
-        log.info("[PIPELINE COMPLETE] Assessment successfully saved and returned for sessionId: {} | Final Score: {}% | Eligibility: {}",
-                sessionId, scoringResult.overallScore(), eligibility);
+        long totalPipelineDurationMs = System.currentTimeMillis() - pipelineStartTime;
+        log.info("[PIPELINE COMPLETE] Assessment finished in {} ms ({} s) for sessionId: {} | Final Score: {}% | Eligibility: {}",
+                totalPipelineDurationMs,
+                String.format("%.2f", totalPipelineDurationMs / 1000.0),
+                sessionId,
+                scoringResult.overallScore(),
+                eligibility);
         return response;
     }
 

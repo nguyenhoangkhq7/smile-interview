@@ -156,6 +156,7 @@ public class CriteriaClassifier {
                 .build();
 
         for (int attempt = 1; attempt <= 2; attempt++) {
+            long startTime = System.currentTimeMillis();
             try {
                 String responseBody = llmWebClient.post()
                         .uri(appProperties.getLlm().getChatPath())
@@ -165,9 +166,26 @@ public class CriteriaClassifier {
                         .timeout(timeout)
                         .block();
 
+                long durationMs = System.currentTimeMillis() - startTime;
+
                 if (responseBody != null) {
                     LlmChatResponse res = objectMapper.readValue(responseBody, LlmChatResponse.class);
                     if (res != null && res.getFirstChoiceContent() != null) {
+                        var usage = res.getUsage();
+                        if (usage != null) {
+                            log.info("[LLM METRICS] Task: PreFilterCriteria | Model: {} | Duration: {} ms ({} s) | Prompt Tokens: {} | Completion Tokens: {} | Total Tokens: {}",
+                                    res.getModel() != null ? res.getModel() : model,
+                                    durationMs,
+                                    String.format("%.2f", durationMs / 1000.0),
+                                    usage.getPromptTokens(),
+                                    usage.getCompletionTokens(),
+                                    usage.getTotalTokens());
+                        } else {
+                            log.info("[LLM METRICS] Task: PreFilterCriteria | Model: {} | Duration: {} ms ({} s) | Usage: N/A",
+                                    res.getModel() != null ? res.getModel() : model,
+                                    durationMs,
+                                    String.format("%.2f", durationMs / 1000.0));
+                        }
                         return parseLlmFilterJson(res.getFirstChoiceContent(), allCriteria);
                     }
                 }
@@ -352,6 +370,7 @@ public class CriteriaClassifier {
                 .build();
 
         for (int attempt = 1; attempt <= 2; attempt++) {
+            long startTime = System.currentTimeMillis();
             try {
                 String responseBody = llmWebClient.post()
                         .uri(appProperties.getLlm().getChatPath())
@@ -361,9 +380,28 @@ public class CriteriaClassifier {
                         .timeout(timeout)
                         .block();
 
+                long durationMs = System.currentTimeMillis() - startTime;
+
                 if (responseBody != null) {
                     LlmChatResponse res = objectMapper.readValue(responseBody, LlmChatResponse.class);
                     if (res != null && res.getFirstChoiceContent() != null) {
+                        var usage = res.getUsage();
+                        if (usage != null) {
+                            log.info("[LLM METRICS] Task: ClassifyBatch ({}/{}) | Model: {} | Duration: {} ms ({} s) | Prompt Tokens: {} | Completion Tokens: {} | Total Tokens: {}",
+                                    batchIndex, totalBatches,
+                                    res.getModel() != null ? res.getModel() : model,
+                                    durationMs,
+                                    String.format("%.2f", durationMs / 1000.0),
+                                    usage.getPromptTokens(),
+                                    usage.getCompletionTokens(),
+                                    usage.getTotalTokens());
+                        } else {
+                            log.info("[LLM METRICS] Task: ClassifyBatch ({}/{}) | Model: {} | Duration: {} ms ({} s) | Usage: N/A",
+                                    batchIndex, totalBatches,
+                                    res.getModel() != null ? res.getModel() : model,
+                                    durationMs,
+                                    String.format("%.2f", durationMs / 1000.0));
+                        }
                         boolean parsed = parseClassifierJson(res.getFirstChoiceContent(), batchMap, classifiedResults, extraResults);
                         if (parsed) return;
                     }
@@ -483,6 +521,7 @@ public class CriteriaClassifier {
                 .build();
 
         for (int attempt = 1; attempt <= 2; attempt++) {
+            long startTime = System.currentTimeMillis();
             try {
                 String responseBody = llmWebClient.post()
                         .uri(appProperties.getLlm().getChatPath())
@@ -492,9 +531,26 @@ public class CriteriaClassifier {
                         .timeout(timeout)
                         .block();
 
+                long durationMs = System.currentTimeMillis() - startTime;
+
                 if (responseBody != null) {
                     LlmChatResponse res = objectMapper.readValue(responseBody, LlmChatResponse.class);
                     if (res != null && res.getFirstChoiceContent() != null) {
+                        var usage = res.getUsage();
+                        if (usage != null) {
+                            log.info("[LLM METRICS] Task: ConsolidatedPhase1Preparation | Model: {} | Duration: {} ms ({} s) | Prompt Tokens: {} | Completion Tokens: {} | Total Tokens: {}",
+                                    res.getModel() != null ? res.getModel() : model,
+                                    durationMs,
+                                    String.format("%.2f", durationMs / 1000.0),
+                                    usage.getPromptTokens(),
+                                    usage.getCompletionTokens(),
+                                    usage.getTotalTokens());
+                        } else {
+                            log.info("[LLM METRICS] Task: ConsolidatedPhase1Preparation | Model: {} | Duration: {} ms ({} s) | Usage: N/A",
+                                    res.getModel() != null ? res.getModel() : model,
+                                    durationMs,
+                                    String.format("%.2f", durationMs / 1000.0));
+                        }
                         ConsolidatedPhase1Output parsed = parseConsolidatedJson(res.getFirstChoiceContent(), criteriaMap);
                         if (parsed != null) {
                             return parsed;

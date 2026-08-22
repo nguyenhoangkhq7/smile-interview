@@ -156,9 +156,12 @@ public class EvidenceGroundingValidator {
     private static final Set<String> SHORT_TECH_TERMS = Set.of(
             "AWS", "EC2", "RDS", "JPA", "JVM", "JWT", "SQL", "API", "CSS", "DOM",
             "ORM", "OOP", "GIT", "TDD", "CI", "CD", "DDD", "SPA", "SSR", "SSG",
-            "UI", "UX", "DB", "ML", "AI", "IOT", "SDK", "VPC", "IAM",
-            "SLO", "SLA", "APM", "ECS", "EKS", "S3", "SNS", "SQS", "RPC",
-            "GO", "C", "R", "PHP", "K8S", "JS", "TS", "OS", "IP", "TCP", "UDP", "SSH", "SSL", "TLS"
+            "UI", "UX", "DB", "ML", "AI", "DL", "CV", "QA", "QC", "IOT", "SDK", "VPC", "IAM",
+            "SLO", "SLA", "APM", "ECS", "EKS", "GKE", "AKS", "S3", "SNS", "SQS", "RPC",
+            "GO", "C", "R", "PHP", "CPP", "K8S", "K3S", "K9S", "JS", "TS", "OS", "IP",
+            "TCP", "UDP", "SSH", "SSL", "TLS", "FTP", "DNS", "CDN", "WAF", "VPN",
+            "BQ", "VM", "ES", "TF", "MQ", "EF", "SH", "DRF", "RTK", "SSO", "MFA",
+            "2FA", "ETL", "ELT", "EVM", "DAO", "NFT", "LLM", "RAG", "NLP", "SRE", "SVN", "KMP", "LTS"
     );
 
     /**
@@ -172,8 +175,9 @@ public class EvidenceGroundingValidator {
         Matcher m = TECH_TOKEN_PATTERN.matcher(text);
         while (m.find()) {
             String token = m.group();
-            // Skip very short tokens unless they are known tech acronyms
-            if (token.length() <= 2 && !SHORT_TECH_TERMS.contains(token.toUpperCase(Locale.ROOT))) {
+            String upper = token.toUpperCase(Locale.ROOT);
+            // Skip very short tokens unless they are known tech acronyms or registered in TechLexiconDictionary
+            if (token.length() <= 2 && !SHORT_TECH_TERMS.contains(upper) && !fit.iuh.modules.assessment.util.TechLexiconDictionary.isKnownShortTerm(token)) {
                 continue;
             }
             // Skip pure numeric tokens (page numbers, scores) unless they look like version strings
