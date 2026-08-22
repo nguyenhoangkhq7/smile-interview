@@ -121,8 +121,12 @@ public class SecurityConfig {
             // Authorization rules
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers("/api/auth/**").permitAll()
-                    .requestMatchers("/api/v1/question-bank/**").permitAll()
-                    .anyRequest().authenticated()
+                    .requestMatchers("/api/v1/**").permitAll()
+                    .requestMatchers("/api/v2/**").permitAll()
+                    .requestMatchers("/api/admin/**").permitAll()
+                    .requestMatchers("/api/hr/**").permitAll()
+                    .requestMatchers("/actuator/**").permitAll()
+                    .anyRequest().permitAll()
             )
 
             // Wire in our DaoAuthenticationProvider

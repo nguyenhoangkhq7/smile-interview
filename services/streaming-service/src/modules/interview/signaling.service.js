@@ -533,6 +533,71 @@ const transitionToNextTopic = async (sessionId, session, qState) => {
 };
 
 /**
+ * Helper to sanitize text for word-overlap similarity check.
+ */
+const sanitizeText = (text) => {
+  if (!text) return '';
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+/**
+ * Checks if two questions have high word overlap (similarity >= 0.55).
+ */
+const isSimilarQuestion = (q1, q2) => {
+  if (!q1 || !q2) return false;
+  const s1 = sanitizeText(q1);
+  const s2 = sanitizeText(q2);
+  if (!s1 || !s2) return false;
+  if (s1 === s2) return true;
+
+  const words1 = new Set(s1.split(' ').filter((w) => w.length > 2));
+  const words2 = new Set(s2.split(' ').filter((w) => w.length > 2));
+  if (words1.size === 0 || words2.size === 0) return false;
+
+  let intersectionCount = 0;
+  for (const w of words1) {
+    if (words2.has(w)) intersectionCount++;
+  }
+
+  const similarity = intersectionCount / Math.min(words1.size, words2.size);
+  return similarity >= 0.55;
+};
+
+/**
+ * Checks if a proposed follow-up question is repetitive against past questions.
+ */
+const isRepetitiveFollowUp = (newQuestion, session, qState) => {
+  if (!newQuestion || !newQuestion.trim()) return false;
+  if (qState.currentFollowUpQuestion && isSimilarQuestion(newQuestion, qState.currentFollowUpQuestion)) {
+    return true;
+  }
+  const currentBaseQ = session.questions?.[qState.baseQuestionIndex];
+  const baseText = typeof currentBaseQ === 'object' && currentBaseQ !== null ? currentBaseQ.question : currentBaseQ;
+  if (baseText && isSimilarQuestion(newQuestion, baseText)) {
+    return true;
+  }
+  if (Array.isArray(session.conversationThread)) {
+    for (const entry of session.conversationThread) {
+      if (entry.question && isSimilarQuestion(newQuestion, entry.question)) {
+        return true;
+      }
+    }
+  }
+  if (Array.isArray(session.turns)) {
+    for (const turn of session.turns) {
+      if (turn.question && isSimilarQuestion(newQuestion, turn.question)) {
+        return true;
+      }
+    }
+  }
+  return false;
+};
+
+/**
  * Decides whether to follow up or transition to the next topic.
  */
 const determineNextQuestion = async (sessionId, session, qState, engineResponse) => {
@@ -542,16 +607,15 @@ const determineNextQuestion = async (sessionId, session, qState, engineResponse)
 
   if (actionType === 'FOLLOW_UP' && !engineResponse.isFallback) {
     nextQuestionText = engineResponse.followUpQuestion || '';
+    if (!nextQuestionText.trim() || isRepetitiveFollowUp(nextQuestionText, session, qState)) {
+      console.warn(`[Signaling] AI follow-up was empty or repetitive: "${nextQuestionText}". Forcing transition to next topic.`);
+      return await transitionToNextTopic(sessionId, session, nextQState);
+    }
     nextQState.currentFollowUpDepth += 1;
     // Track the follow-up question text so handleCandidateTextSubmit can use it
     // when the candidate responds (instead of incorrectly using the base question).
     nextQState.currentFollowUpQuestion = nextQuestionText;
     console.log(`[Signaling] AI follow-up: "${nextQuestionText}" (depth: ${nextQState.currentFollowUpDepth})`);
-
-    if (!nextQuestionText.trim()) {
-      console.warn('[Signaling] AI returned FOLLOW_UP but followUpQuestion is empty. Transitioning.');
-      return await transitionToNextTopic(sessionId, session, nextQState);
-    }
   } else {
     return await transitionToNextTopic(sessionId, session, nextQState);
   }

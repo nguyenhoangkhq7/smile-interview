@@ -132,6 +132,7 @@ public class PromptBuilder {
                 ## Sinh câu hỏi phụ (follow_up_question) — Song ngữ, Đối thoại tự nhiên & Xưng hô phù hợp:
                 - Nếu NEXT_TOPIC: để chuỗi rỗng "".
                 - Nếu FOLLOW_UP:
+                  * TUYỆT ĐỐI KHÔNG LẶP LẠI: Tuyệt đối KHÔNG được hỏi lại câu hỏi, không hỏi lại cùng một chủ đề/từ khóa hoặc lặp lại ý đã có trong <current_question> hay <conversation_history>. Nếu ứng viên đã giải thích ý đó rồi, bạn BẮT BUỘC chọn NEXT_TOPIC hoặc hỏi một khía cạnh kỹ thuật hoàn toàn mới.
                   * Ngôn ngữ: Phản hồi theo đúng ngôn ngữ của câu hỏi / câu trả lời của ứng viên (Tiếng Việt hoặc Tiếng Anh).
                   * Xưng hô: Dựa trên <candidate_profile> để xưng hô lịch sự và tự nhiên (em/bạn/anh/chị [Tên]).
                   * Cấu trúc: Có 1 vế ghi nhận/phản hồi ngắn (5-10 từ) có xưng hô trước khi hỏi tiếp.

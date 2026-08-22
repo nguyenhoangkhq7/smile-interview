@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation';
 import { FolderOpen, Lightbulb, AlertTriangle, CheckCircle, AlertCircle, MessageSquare, BarChart3, CheckCircle2, XCircle, Download, CornerDownRight } from 'lucide-react';
 import { historyService, SessionHistoryItem } from '@/services/historyService';
 import { exportQuestionBankToCSV } from '@/lib/exportUtils';
+import { useAuthStore } from '@/store/authStore';
 import styles from './result.module.css';
 
 interface StrengthObject {
@@ -39,8 +40,30 @@ export default function InterviewResultPage() {
   useEffect(() => {
     let active = true;
     let pollCount = 0;
-    const maxPolls = 25; // 50 seconds max
+    const maxPolls = 30; // 60 seconds max
     let timerId: NodeJS.Timeout;
+    let evalTriggered = false;
+
+    async function triggerEvaluationIfNeeded(sessionData: SessionHistoryItem) {
+      if (evalTriggered) return;
+      const hasFeedback = !!(sessionData.overallFeedback && sessionData.overallFeedback.trim() !== '');
+      const hasScore = sessionData.overallScore !== undefined && sessionData.overallScore !== null && sessionData.overallScore > 0;
+      const answeredQs = (sessionData.questions || []).filter(q => q.answer && q.answer.trim().length > 0);
+      const hasTurnEvaluation = answeredQs.length === 0 ||
+        answeredQs.some(q => q.score > 0 && q.strengths && q.strengths.trim().length > 0);
+      if (!hasFeedback || !hasScore || !hasTurnEvaluation) {
+        evalTriggered = true;
+        try {
+          const token = useAuthStore.getState().token;
+          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+          if (token) headers['Authorization'] = `Bearer ${token}`;
+          console.log(`[ResultPage] Triggering evaluation for session ${id}...`);
+          await fetch(`/api/sessions/${id}/evaluate`, { method: 'POST', headers });
+        } catch (e) {
+          console.error('[ResultPage] Error triggering evaluate:', e);
+        }
+      }
+    }
 
     async function loadSession() {
       if (!id) return;
@@ -51,8 +74,18 @@ export default function InterviewResultPage() {
         if (data) {
           const hasFeedback = data.overallFeedback !== undefined && data.overallFeedback !== null && data.overallFeedback.trim() !== '';
           const hasScore = data.overallScore !== undefined && data.overallScore !== null && data.overallScore > 0;
-          const isEvaluated = data.status !== 'Completed' || hasFeedback || hasScore;
 
+          // Check if turn-level evaluation is also done:
+          // At least one answered question must have a score > 0 AND strengths text
+          const answeredQuestions = (data.questions || []).filter(q => q.answer && q.answer.trim().length > 0);
+          const hasTurnEvaluation = answeredQuestions.length === 0 ||
+            answeredQuestions.some(q => q.score > 0 && q.strengths && q.strengths.trim().length > 0);
+
+          const isEvaluated = hasFeedback && hasScore && hasTurnEvaluation;
+
+          if (!isEvaluated && !evalTriggered) {
+            triggerEvaluationIfNeeded(data);
+          }
 
           if (isEvaluated || pollCount >= maxPolls) {
             setSession(data);
@@ -178,17 +211,17 @@ export default function InterviewResultPage() {
     hiringRecommendation = session.hiringRecommendation || '';
 
     if (report) {
-      strengths = report.strengths || report.strongAreas || strengths;
-      weaknesses = report.weaknesses || report.gapAreas || weaknesses;
-      recommendations = report.recommendations || report.actionableSuggestions || recommendations;
+      strengths = report.strongAreas || report.strengths || (Array.isArray(session.strongAreas) ? session.strongAreas : []);
+      weaknesses = report.gapAreas || report.weaknesses || (Array.isArray(session.gapAreas) ? session.gapAreas : []);
+      recommendations = report.actionableSuggestions || report.recommendations || (Array.isArray(session.actionableSuggestions) ? session.actionableSuggestions : []);
 
-      const rawScore = report.overall_score !== undefined ? report.overall_score : report.overallScore;
+      const rawScore = report.overallScore !== undefined ? report.overallScore : report.overall_score;
       if (rawScore !== undefined && rawScore !== null) {
         score = rawScore <= 10 ? Math.round(rawScore * 10) : rawScore;
       }
 
-      overallFeedbackText = report.overall_summary || report.overallFeedback || overallFeedbackText;
-      hiringRecommendation = report.hiring_recommendation || report.hiringRecommendation || hiringRecommendation;
+      overallFeedbackText = report.overallFeedback || report.overall_summary || (typeof session.overallFeedback === 'string' && !session.overallFeedback.startsWith('{') ? session.overallFeedback : '');
+      hiringRecommendation = report.hiringRecommendation || report.hiring_recommendation || session.hiringRecommendation || '';
     }
 
     // Auto-calculate hiringRecommendation if it's 'N/A' or empty
@@ -266,78 +299,6 @@ export default function InterviewResultPage() {
               </div>
             </div>
           </div>
-
-          {/* Eligibility Card */}
-          {session.eligibility && (
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '0.75rem',
-              padding: '1.25rem',
-              backgroundColor: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              borderRadius: '0.5rem',
-              marginTop: '1.5rem',
-              marginBottom: '0.5rem'
-            }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.1rem' }}>Kết quả sàng lọc hồ sơ</span>
-
-              {(() => {
-                const eligibilityObj = typeof session.eligibility === 'object' && session.eligibility !== null ? session.eligibility : null;
-                const eligibilityStatus = typeof session.eligibility === 'string' ? session.eligibility : eligibilityObj?.status;
-                const gateChecks = eligibilityObj?.gate_checks || [];
-                const isPass = eligibilityStatus === 'ELIGIBLE' || eligibilityStatus === 'PASS' || eligibilityStatus === 'ELIGIBILITY';
-
-                return (
-                  <>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: gateChecks.length > 0 ? '1px solid #e2e8f0' : 'none', paddingBottom: gateChecks.length > 0 ? '0.5rem' : '0', marginBottom: '0.1rem' }}>
-                      <span style={{ fontSize: '0.82rem', color: '#64748b' }}>Trạng thái:</span>
-                      <span style={{
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        padding: '0.2rem 0.5rem',
-                        borderRadius: '0.25rem',
-                        backgroundColor: isPass ? '#ecfdf5' : '#fef2f2',
-                        color: isPass ? '#047857' : '#b91c1c',
-                        border: '1px solid currentColor'
-                      }}>
-                        {eligibilityStatus || 'N/A'}
-                      </span>
-                    </div>
-
-                    {gateChecks.length > 0 && (
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
-                        {gateChecks.map((check, idx) => {
-                          const isMet = check.status === 'met' || check.status === 'MET' || check.passed;
-                          return (
-                            <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', padding: '0.4rem 0.65rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '0.35rem' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <strong style={{ fontSize: '0.78rem', color: '#0f172a' }}>{check.criteria_name || check.criterion}</strong>
-                                <span style={{ fontSize: '0.68rem', fontWeight: 700, color: isMet ? '#047857' : '#b91c1c', display: 'flex', alignItems: 'center', gap: '0.15rem' }}>
-                                  {isMet ? '✓ Đạt' : '✗ Chưa đạt'}
-                                </span>
-                              </div>
-                              {check.required_value && (
-                                <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
-                                  Yêu cầu: <span style={{ color: '#475569', fontWeight: 500 }}>{check.required_value}</span>
-                                </div>
-                              )}
-                              {check.actual_value && (
-                                <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
-                                  Thực tế: <span style={{ color: isMet ? '#047857' : '#b91c1c', fontWeight: 600 }}>{check.actual_value}</span>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
-            </div>
-          )}
-
 
           {/* Strengths & Weaknesses Panel */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginTop: '1.5rem' }}>
@@ -543,7 +504,9 @@ export default function InterviewResultPage() {
                           <MessageSquare size={16} style={{ color: '#4f46e5' }} />
                           <span>Câu trả lời của bạn</span>
                         </h4>
-                        <p className={styles.userAnswerText}>{q.answer}</p>
+                        <p className={styles.userAnswerText} style={!q.answer ? { fontStyle: 'italic', color: '#94a3b8' } : undefined}>
+                          {q.answer || 'Ứng viên chưa trả lời câu hỏi này trong phiên phỏng vấn.'}
+                        </p>
                       </div>
 
                       {/* AI Strengths & Improvements */}
@@ -558,14 +521,14 @@ export default function InterviewResultPage() {
                               <CheckCircle2 size={14} style={{ color: '#10b981' }} />
                               <span>Điểm mạnh:</span>
                             </strong>
-                            <div>{q.strengths}</div>
+                            <div>{q.strengths || (q.answer ? 'Câu trả lời đã được ghi nhận.' : 'Chưa có phân tích do câu hỏi chưa được trả lời.')}</div>
                           </div>
                           <div className={`${styles.feedbackBox} ${styles.feedbackImprovement}`}>
                             <strong style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', marginBottom: '0.25rem' }}>
                               <XCircle size={14} style={{ color: '#f59e0b' }} />
                               <span>Cần cải thiện:</span>
                             </strong>
-                            <div>{q.improvements}</div>
+                            <div>{q.improvements || (q.answer ? 'Tiếp tục phát huy và bổ sung ví dụ thực tế.' : 'Cần chuẩn bị và luyện tập trả lời câu hỏi này.')}</div>
                           </div>
                         </div>
                       </div>
@@ -576,8 +539,8 @@ export default function InterviewResultPage() {
                           <Lightbulb size={16} style={{ color: '#4f46e5' }} />
                           <span>Gợi ý câu trả lời tốt hơn từ AI</span>
                         </h4>
-                        <div className={styles.suggestedAnswerBox}>
-                          {q.suggestedAnswer}
+                        <div className={styles.suggestedAnswerBox} style={!q.suggestedAnswer ? { fontStyle: 'italic', color: '#94a3b8' } : undefined}>
+                          {q.suggestedAnswer || 'Nên chuẩn bị câu trả lời theo mô hình STAR (Tình huống - Nhiệm vụ - Hành động - Kết quả), nêu rõ các giải pháp công nghệ và số liệu minh họa thực tế.'}
                         </div>
                       </div>
                     </div>
