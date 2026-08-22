@@ -321,7 +321,7 @@ export function useInterviewSession() {
             };
 
             if (isWarmupText(activeQText)) {
-              let warmupIdx = updatedQuestions.findIndex(q => {
+              const warmupIdx = updatedQuestions.findIndex(q => {
                 const qStr = typeof q.question === 'object' && q.question !== null ? (q.question as { question?: string }).question : q.question;
                 return isWarmupText(qStr) || q.topicTag === 'Warmup';
               });

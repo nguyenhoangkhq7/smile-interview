@@ -498,7 +498,7 @@ export function InterviewChatMode() {
         };
 
         if (isWarmupText(activeQText)) {
-          let warmupIdx = updated.findIndex(q => {
+          const warmupIdx = updated.findIndex(q => {
             const qStr = typeof q.question === 'object' && q.question !== null ? q.question.question : q.question;
             return isWarmupText(qStr) || q.topicTag === 'Warmup';
           });
@@ -517,7 +517,7 @@ export function InterviewChatMode() {
             });
           }
         } else {
-          let targetIdx = updated.findIndex((q) => {
+          const targetIdx = updated.findIndex((q) => {
             const qStr = typeof q.question === 'object' && q.question !== null ? q.question.question : q.question;
             return qStr && activeQText && qStr.trim() === activeQText.trim();
           });
