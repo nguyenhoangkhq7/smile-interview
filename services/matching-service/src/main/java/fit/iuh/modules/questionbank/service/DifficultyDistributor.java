@@ -27,6 +27,12 @@ public class DifficultyDistributor {
             Integer overallMatchScore,
             List<EvidenceItemPair> evidenceItems) {
 
+        String levelStr = level != null ? level.name() : "MID";
+        Optional<LevelDistributionRule> ruleOpt = levelRuleRepository.findByLevel(levelStr);
+        if (ruleOpt.isPresent() && ruleOpt.get().getTotalQuestions() != null && ruleOpt.get().getTotalQuestions() > 0) {
+            totalCount = ruleOpt.get().getTotalQuestions();
+        }
+
         if (totalCount <= 0) return Collections.emptyList();
 
         Map<String, Double> categoryRatios = getCategoryRatiosForLevel(level);

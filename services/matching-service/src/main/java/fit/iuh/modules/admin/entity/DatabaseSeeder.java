@@ -103,6 +103,7 @@ public class DatabaseSeeder implements CommandLineRunner {
                         .technicalPct(50.0)
                         .codingPct(20.0)
                         .systemDesignPct(0.0)
+                        .totalQuestions(5)
                         .build(),
 
                 LevelDistributionRule.builder()
@@ -111,6 +112,7 @@ public class DatabaseSeeder implements CommandLineRunner {
                         .technicalPct(50.0)
                         .codingPct(25.0)
                         .systemDesignPct(0.0)
+                        .totalQuestions(5)
                         .build(),
 
                 LevelDistributionRule.builder()
@@ -119,6 +121,7 @@ public class DatabaseSeeder implements CommandLineRunner {
                         .technicalPct(45.0)
                         .codingPct(25.0)
                         .systemDesignPct(10.0)
+                        .totalQuestions(6)
                         .build(),
 
                 LevelDistributionRule.builder()
@@ -127,6 +130,7 @@ public class DatabaseSeeder implements CommandLineRunner {
                         .technicalPct(40.0)
                         .codingPct(25.0)
                         .systemDesignPct(20.0)
+                        .totalQuestions(6)
                         .build(),
 
                 LevelDistributionRule.builder()
@@ -135,6 +139,7 @@ public class DatabaseSeeder implements CommandLineRunner {
                         .technicalPct(30.0)
                         .codingPct(20.0)
                         .systemDesignPct(35.0)
+                        .totalQuestions(8)
                         .build(),
 
                 LevelDistributionRule.builder()
@@ -143,6 +148,7 @@ public class DatabaseSeeder implements CommandLineRunner {
                         .technicalPct(25.0)
                         .codingPct(10.0)
                         .systemDesignPct(40.0)
+                        .totalQuestions(10)
                         .build()
         );
 

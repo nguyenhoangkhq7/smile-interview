@@ -321,6 +321,9 @@ public class RuleAdminServiceImpl implements RuleAdminService {
         entity.setTechnicalPct(dto.technicalPct());
         entity.setCodingPct(dto.codingPct());
         entity.setSystemDesignPct(dto.systemDesignPct());
+        if (dto.totalQuestions() != null && dto.totalQuestions() > 0) {
+            entity.setTotalQuestions(dto.totalQuestions());
+        }
 
         LevelDistributionRule updated = levelRuleRepository.save(entity);
         log.info("[AdminService] Updated LevelRule level={}", updated.getLevel());
@@ -374,7 +377,8 @@ public class RuleAdminServiceImpl implements RuleAdminService {
         return new LevelDistributionRuleDto(
                 e.getId(), e.getLevel(),
                 e.getBehavioralPct(), e.getTechnicalPct(),
-                e.getCodingPct(), e.getSystemDesignPct()
+                e.getCodingPct(), e.getSystemDesignPct(),
+                e.getTotalQuestions() != null ? e.getTotalQuestions() : 5
         );
     }
 

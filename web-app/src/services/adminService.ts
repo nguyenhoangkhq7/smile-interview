@@ -34,6 +34,7 @@ export interface LevelDistributionRuleDto {
   technical_pct: number;
   coding_pct: number;
   system_design_pct: number;
+  total_questions?: number;
 }
 
 export interface SystemSettingDto {
@@ -55,7 +56,7 @@ export type UpdateEvaluationCriteriaPayload = Pick<EvaluationCriteriaDto, 'name'
 export type CreateMappingPayload = Pick<CategoryCriteriaMappingDto, 'category_id' | 'criteria_id' | 'level' | 'weight_percentage'>;
 export type UpdateMappingPayload = Pick<CategoryCriteriaMappingDto, 'weight_percentage'>;
 
-export type UpdateLevelRulePayload = Pick<LevelDistributionRuleDto, 'behavioral_pct' | 'technical_pct' | 'coding_pct' | 'system_design_pct'>;
+export type UpdateLevelRulePayload = Pick<LevelDistributionRuleDto, 'behavioral_pct' | 'technical_pct' | 'coding_pct' | 'system_design_pct' | 'total_questions'>;
 export type UpdateSystemSettingPayload = Pick<SystemSettingDto, 'setting_value'>;
 
 // ─── Service ──────────────────────────────────────────────────────────────────

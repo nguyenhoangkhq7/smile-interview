@@ -33,4 +33,7 @@ public class LevelDistributionRule {
 
     @Column(name = "system_design_pct", nullable = false)
     private Double systemDesignPct;
+
+    @Column(name = "total_questions")
+    private Integer totalQuestions;
 }
