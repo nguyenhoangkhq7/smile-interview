@@ -484,10 +484,6 @@ export function InterviewChatMode() {
           return qStr && activeQText && qStr.trim() === activeQText.trim();
         });
 
-        if (targetIdx === -1) {
-          targetIdx = updated.findIndex((q) => !q.answer);
-        }
-
         if (targetIdx !== -1) {
           updated[targetIdx] = { ...updated[targetIdx], answer: text };
         } else {

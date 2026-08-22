@@ -37,7 +37,16 @@ public class LlmChatResponse {
         if (choices == null || choices.isEmpty()) return null;
         Choice first = choices.get(0);
         if (first.getMessage() == null) return null;
-        return first.getMessage().getContent();
+        if (first.getMessage().getContent() != null && !first.getMessage().getContent().isBlank()) {
+            return first.getMessage().getContent();
+        }
+        if (first.getMessage().getReasoning() != null && !first.getMessage().getReasoning().isBlank()) {
+            return first.getMessage().getReasoning();
+        }
+        if (first.getMessage().getReasoningContent() != null && !first.getMessage().getReasoningContent().isBlank()) {
+            return first.getMessage().getReasoningContent();
+        }
+        return null;
     }
 
     // -------------------------------------------------------------------------
@@ -69,6 +78,12 @@ public class LlmChatResponse {
 
         @JsonProperty("content")
         private String content;
+
+        @JsonProperty("reasoning")
+        private String reasoning;
+
+        @JsonProperty("reasoning_content")
+        private String reasoningContent;
     }
 
     @Data

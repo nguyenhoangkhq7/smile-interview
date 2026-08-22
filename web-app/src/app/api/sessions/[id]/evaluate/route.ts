@@ -36,13 +36,16 @@ export async function POST(
       return NextResponse.json({ success: true, message: 'No questions answered' });
     }
 
+    const answeredTurns = turns.filter(t => t.answer && t.answer.trim().length > 0);
+    const turnsToEvaluate = answeredTurns.length > 0 ? answeredTurns : turns;
+
     const matchingServiceUrl = process.env.MATCHING_SERVICE_URL || 'http://localhost:8081';
     const targetUrl = `${matchingServiceUrl}/api/v2/assess-resume/evaluate-session`;
 
     const payload = {
       role_title: session.role_title || '',
       interview_type: session.interview_type || 'Technical',
-      turns: turns.map(t => ({
+      turns: turnsToEvaluate.map(t => ({
         question: t.question || '',
         answer: t.answer || '',
         score: t.score || 0
@@ -110,8 +113,8 @@ export async function POST(
     if (evaluatedQuestions.length > 0) {
       for (let i = 0; i < evaluatedQuestions.length; i++) {
         const eq = evaluatedQuestions[i];
-        if (i < turns.length) {
-          const turnId = turns[i].id;
+        if (i < turnsToEvaluate.length) {
+          const turnId = turnsToEvaluate[i].id;
           let turnScore = typeof eq.score === 'number' ? eq.score : (parseInt(eq.score) || 0);
           if (turnScore > 0 && turnScore <= 10) {
             turnScore = Math.round(turnScore * 10);

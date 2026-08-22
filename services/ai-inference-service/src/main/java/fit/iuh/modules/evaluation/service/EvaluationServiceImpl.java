@@ -6,6 +6,7 @@ import fit.iuh.common.exception.LlmInferenceException;
 import fit.iuh.common.util.JsonSanitizer;
 import fit.iuh.grpc.inference.FinalReportRequest;
 import fit.iuh.grpc.inference.InferenceRequest;
+import fit.iuh.grpc.inference.QAContext;
 import fit.iuh.modules.evaluation.client.OpenRouterClient;
 import fit.iuh.modules.evaluation.model.EvaluationResult;
 import fit.iuh.modules.evaluation.model.FinalReportResult;
@@ -13,6 +14,11 @@ import fit.iuh.modules.evaluation.prompt.PromptBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Orchestrates the AI evaluation workflow for interview sessions on Virtual Threads.
@@ -107,6 +113,24 @@ public class EvaluationServiceImpl implements EvaluationService {
                     .isFallback(result.isFallback())
                     .excludedFromScoring(result.isExcludedFromScoring())
                     .build();
+        } else if ("FOLLOW_UP".equalsIgnoreCase(result.getDecision())
+                && result.getFollowUpQuestion() != null
+                && !result.getFollowUpQuestion().isBlank()) {
+            // 4. Programmatic duplicate / repetition check against current and historical questions
+            String newQ = result.getFollowUpQuestion();
+            if (isRepetitiveQuestion(newQ, request.getCurrentQuestion(), request.getConversationThreadList())) {
+                log.warn("[EvaluateResponse] Detected repetitive follow-up question for session {}: '{}'. Forcing NEXT_TOPIC.",
+                        request.getSessionId(), newQ);
+                result = EvaluationResult.builder()
+                        .decision("NEXT_TOPIC")
+                        .followUpQuestion("")
+                        .reasoning("Ứng viên đã trả lời các khía cạnh trọng tâm của chủ đề này, chuyển sang câu hỏi tiếp theo.")
+                        .score(result.getScore())
+                        .evaluation(result.getEvaluation())
+                        .isFallback(result.isFallback())
+                        .excludedFromScoring(result.isExcludedFromScoring())
+                        .build();
+            }
         }
 
         return result;
@@ -176,6 +200,53 @@ public class EvaluationServiceImpl implements EvaluationService {
             log.error("[GenerateFinalReport] JSON parse failed after retry. Raw: {}", rawContent, e);
             throw new LlmInferenceException("Failed to parse final report response from LLM", e);
         }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Repetition and duplicate question detection helpers
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private boolean isRepetitiveQuestion(String newQ, String currentQ, List<QAContext> thread) {
+        if (newQ == null || newQ.isBlank()) return false;
+        if (isSimilar(newQ, currentQ)) return true;
+        if (thread != null) {
+            for (QAContext ctx : thread) {
+                if (isSimilar(newQ, ctx.getQuestion())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean isSimilar(String q1, String q2) {
+        if (q1 == null || q2 == null) return false;
+        String s1 = sanitizeText(q1);
+        String s2 = sanitizeText(q2);
+        if (s1.isBlank() || s2.isBlank()) return false;
+        if (s1.equals(s2)) return true;
+
+        Set<String> words1 = new HashSet<>(Arrays.asList(s1.split("\\s+")));
+        Set<String> words2 = new HashSet<>(Arrays.asList(s2.split("\\s+")));
+
+        // Remove short stopwords
+        words1.removeIf(w -> w.length() <= 2);
+        words2.removeIf(w -> w.length() <= 2);
+
+        if (words1.isEmpty() || words2.isEmpty()) return false;
+
+        Set<String> intersection = new HashSet<>(words1);
+        intersection.retainAll(words2);
+
+        double similarity = (double) intersection.size() / Math.min(words1.size(), words2.size());
+        return similarity >= 0.55;
+    }
+
+    private String sanitizeText(String text) {
+        return text.toLowerCase()
+                .replaceAll("[^a-z0-9àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ\\s]", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
     }
 
     // ─────────────────────────────────────────────────────────────────────────
