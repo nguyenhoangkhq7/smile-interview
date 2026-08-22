@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.3.5</version>
+        <version>3.5.16</version>
         <relativePath/>
     </parent>
     <groupId>fit.iuh</groupId>
@@ -16,11 +16,37 @@
 
     <properties>
         <java.version>21</java.version>
-        <grpc.version>1.62.2</grpc.version>
-        <protobuf.version>3.25.1</protobuf.version>
+        <grpc.version>1.75.0</grpc.version>
+        <protobuf.version>3.25.5</protobuf.version>
+
+        <!-- Security fixes for Trivy vulnerability scan -->
+        <jackson-bom.version>2.18.9</jackson-bom.version>
+        <netty.version>4.1.136.Final</netty.version>
+        <spring-framework.version>6.2.19</spring-framework.version>
+        <tomcat.version>10.1.55</tomcat.version>
+        <log4j2.version>2.25.5</log4j2.version>
     </properties>
 
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>io.grpc</groupId>
+                <artifactId>grpc-bom</artifactId>
+                <version>${grpc.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <dependencies>
+        <!-- Security fix: explicit protobuf-java version -->
+        <dependency>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-java</artifactId>
+            <version>${protobuf.version}</version>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>

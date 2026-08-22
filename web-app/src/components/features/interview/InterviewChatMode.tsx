@@ -479,7 +479,7 @@ export function InterviewChatMode() {
           : [];
         const activeQText = currentQuestionRef.current;
 
-        let targetIdx = updated.findIndex((q) => {
+        const targetIdx = updated.findIndex((q) => {
           const qStr = typeof q.question === 'object' && q.question !== null ? q.question.question : q.question;
           return qStr && activeQText && qStr.trim() === activeQText.trim();
         });
