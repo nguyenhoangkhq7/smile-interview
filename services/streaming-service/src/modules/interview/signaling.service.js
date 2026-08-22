@@ -8,9 +8,164 @@ import {
   appendTurn,
   appendToConversationThread,
   resetConversationThread,
+  restartSession,
 } from './session.service.js';
 import { evaluateCandidateResponse, generateFinalReport } from './engine.client.js';
 import { generateAvatarAction } from './mockAvatar.service.js';
+
+/**
+ * Detects whether the text is predominantly Vietnamese or English.
+ */
+export const detectLanguage = (text, defaultLang = 'vi') => {
+  if (!text || typeof text !== 'string') return defaultLang;
+  // Vietnamese diacritics regex
+  const viPattern = /[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i;
+  if (viPattern.test(text)) return 'vi';
+  
+  // Common Vietnamese words without diacritics
+  const viWords = /\b(ban|cua|cho|voi|trong|hay|nhu|the nao|kinh nghiem|phong van|chuc mung)\b/i;
+  if (viWords.test(text)) return 'vi';
+
+  return 'en';
+};
+
+/**
+ * Determines natural pronouns & addressing forms based on candidate's name and age/year of birth.
+ * AI Interviewer acts as Senior Interviewer / Tech Lead (~30-35 years old).
+ */
+export const getHonorific = (name, age, yearOfBirth, lang = 'vi') => {
+  const cleanName = (name || '').trim();
+  const displayName = cleanName ? (cleanName.includes(' ') ? cleanName.split(' ').pop() : cleanName) : '';
+
+  if (lang === 'en') {
+    return {
+      pronoun: cleanName || 'you',
+      address: cleanName ? `${cleanName}` : 'there',
+      fullName: cleanName,
+      displayName: displayName || cleanName || 'there',
+    };
+  }
+
+  let calculatedAge = Number(age) || 0;
+  if (!calculatedAge && yearOfBirth) {
+    const currentYear = new Date().getFullYear();
+    calculatedAge = currentYear - Number(yearOfBirth);
+  }
+
+  let pronoun = 'bạn';
+  if (calculatedAge > 0) {
+    if (calculatedAge < 27) {
+      pronoun = 'em';
+    } else if (calculatedAge > 35) {
+      pronoun = 'anh/chị';
+    }
+  }
+
+  const address = displayName ? `${pronoun} ${displayName}` : pronoun;
+
+  return {
+    pronoun,
+    address,
+    fullName: cleanName,
+    displayName: displayName || pronoun,
+  };
+};
+
+/**
+ * Heuristically extracts candidate name and birth year from CV / Resume text if not provided directly.
+ */
+export const extractCandidateInfoFromResume = (resumeText) => {
+  if (!resumeText || typeof resumeText !== 'string') return {};
+  const info = {};
+
+  const nameMatch = resumeText.match(/(?:Họ\s*(?:và|&)?\s*tên|Full\s*Name|Candidate\s*Name)\s*[:：]\s*([^\r\n,]+)/i);
+  if (nameMatch && nameMatch[1]) {
+    info.name = nameMatch[1].trim();
+  }
+
+  const yobMatch = resumeText.match(/(?:Năm\s*sinh|DOB|Date\s*of\s*birth|Sinh\s*năm|Year\s*of\s*birth)\s*[:：]\s*(\d{4})/i)
+                || resumeText.match(/\b(19\d{2}|200\d)\b/);
+  if (yobMatch && yobMatch[1]) {
+    const yob = parseInt(yobMatch[1], 10);
+    const currentYear = new Date().getFullYear();
+    if (yob >= 1960 && yob <= currentYear - 16) {
+      info.yearOfBirth = yob;
+      info.age = currentYear - yob;
+    }
+  }
+  return info;
+};
+
+const DIALOGUE_TEMPLATES = {
+  vi: {
+    greeting: (jobTitle, _firstQuestion, candidateInfo = {}) => {
+      const { address, pronoun } = getHonorific(
+        candidateInfo.candidateName, candidateInfo.candidateAge, candidateInfo.candidateYearOfBirth, 'vi'
+      );
+      const nameGreeting = candidateInfo.candidateName ? ` ${address}` : ' bạn';
+      return `Xin chào${nameGreeting}! Rất vui được gặp ${address} trong buổi phỏng vấn vị trí **${jobTitle}** hôm nay. Mình là người phỏng vấn AI đồng hành cùng ${pronoun}.\n\nTrước khi bắt đầu các câu hỏi chuyên sâu, ${address} hãy giữ tâm lý thật thoải mái và tự tin nhé! Để cùng làm quen và khởi động buổi trao đổi, ${address} có thể giới thiệu đôi nét về bản thân cũng như chia sẻ về một dự án hoặc công nghệ gần đây mà ${pronoun} tâm đắc nhất được không?`;
+    },
+    warmupAcknowledgement: (jobTitle, firstQuestion, candidateInfo = {}) => {
+      const { address, pronoun } = getHonorific(
+        candidateInfo.candidateName, candidateInfo.candidateAge, candidateInfo.candidateYearOfBirth, 'vi'
+      );
+      return `Cảm ơn phần giới thiệu rất tự tin và cởi mở của ${address}! Rất vui được hiểu thêm về định hướng và kinh nghiệm của ${pronoun}.\n\nBây giờ, chúng ta sẽ chính thức bước vào câu hỏi chuyên môn đầu tiên nhé:\n\n👉 ${firstQuestion}`;
+    },
+    transitions: (candidateInfo = {}, lang = 'vi') => {
+      const { address, pronoun } = getHonorific(
+        candidateInfo.candidateName, candidateInfo.candidateAge, candidateInfo.candidateYearOfBirth, 'vi'
+      );
+      return [
+        `Cảm ơn phần chia sẻ của ${address} về chủ đề vừa rồi. Tiếp theo, chúng ta cùng trao đổi về một khía cạnh khác nhé:`,
+        `Mình đã ghi nhận câu trả lời của ${address}. Bây giờ ${pronoun} hãy cùng thảo luận về tình huống tiếp theo:`,
+        `Rất tốt! Chúng ta sẽ chuyển sang một nội dung chuyên môn tiếp theo:`,
+        `Cảm ơn ${address}. Tiếp theo, mình muốn lắng nghe thêm góc nhìn của ${pronoun} về câu hỏi sau:`,
+      ];
+    },
+    concluding: (candidateInfo = {}, lang = 'vi') => {
+      const { address } = getHonorific(
+        candidateInfo.candidateName, candidateInfo.candidateAge, candidateInfo.candidateYearOfBirth, 'vi'
+      );
+      const capAddress = address.charAt(0).toUpperCase() + address.slice(1);
+      return `Cảm ơn ${address} rất nhiều! Đó là tất cả các câu hỏi cho buổi phỏng vấn hôm nay. ${capAddress} đã chia sẻ rất nhiệt tình và chi tiết về kinh nghiệm của mình. Hệ thống đang tiến hành tổng hợp báo cáo đánh giá. Chúc ${address} một ngày làm việc thật vui vẻ và thành công!`;
+    },
+  },
+  en: {
+    greeting: (jobTitle, _firstQuestion, candidateInfo = {}) => {
+      const { displayName } = getHonorific(
+        candidateInfo.candidateName, candidateInfo.candidateAge, candidateInfo.candidateYearOfBirth, 'en'
+      );
+      const nameGreeting = displayName && displayName !== 'there' ? ` ${displayName}` : '';
+      return `Hello${nameGreeting}! Welcome to the interview session for the **${jobTitle}** position today. I am your AI interviewer.\n\nBefore we dive into technical topics, please take a deep breath and feel completely at ease. To kick things off and break the ice, could you briefly introduce yourself and share a bit about a recent project or technology you've enjoyed working with?`;
+    },
+    warmupAcknowledgement: (jobTitle, firstQuestion, candidateInfo = {}) => {
+      const { displayName } = getHonorific(
+        candidateInfo.candidateName, candidateInfo.candidateAge, candidateInfo.candidateYearOfBirth, 'en'
+      );
+      const nameSuffix = displayName && displayName !== 'there' ? `, ${displayName}` : '';
+      return `Thank you for the wonderful introduction${nameSuffix}! It is great learning about your background and experience.\n\nNow, let's officially dive into our first technical topic:\n\n👉 ${firstQuestion}`;
+    },
+    transitions: (candidateInfo = {}, lang = 'en') => {
+      const { displayName } = getHonorific(
+        candidateInfo.candidateName, candidateInfo.candidateAge, candidateInfo.candidateYearOfBirth, 'en'
+      );
+      const nameSuffix = displayName && displayName !== 'there' ? `, ${displayName}` : '';
+      return [
+        `Thank you for sharing your thoughts${nameSuffix}. Let's move on to our next topic:`,
+        `Got it, thank you. Now let's explore another interesting scenario:`,
+        `Great perspective! Let's proceed to the next technical area:`,
+        `Thanks for your explanation. Next, I'd love to hear your insights on this:`,
+      ];
+    },
+    concluding: (candidateInfo = {}, lang = 'en') => {
+      const { displayName } = getHonorific(
+        candidateInfo.candidateName, candidateInfo.candidateAge, candidateInfo.candidateYearOfBirth, 'en'
+      );
+      const nameSuffix = displayName && displayName !== 'there' ? ` ${displayName}` : '';
+      return `Thank you very much${nameSuffix}! That concludes our interview session for today. You did a great job sharing your experience and insights. We are compiling your performance evaluation now. Wishing you a wonderful day ahead!`;
+    },
+  }
+};
 
 /**
  * Saves socket metadata mapping in Redis.
@@ -38,19 +193,70 @@ const getOrCreateSession = async (interviewId, userId, initialQuestions, baseQue
   console.log(`[Signaling] Fetched existing session from Redis:`, session ? 'Found' : 'Null');
   if (!session) {
     console.log(`[Signaling] Creating new session in Redis with initialQuestions:`, initialQuestions);
+    const firstQText = (initialQuestions && initialQuestions.length > 0)
+      ? (typeof initialQuestions[0] === 'object' && initialQuestions[0] !== null ? initialQuestions[0].question : initialQuestions[0])
+      : '';
+    const detectedLang = data.language || detectLanguage(firstQText || data.jdText || data.targetJobTitle, 'vi');
+
+    const resumeInfo = extractCandidateInfoFromResume(data.resumeText);
+    const candidateName = data.candidateName || data.fullName || data.name || resumeInfo.name || '';
+    const candidateAge = data.candidateAge || data.age || resumeInfo.age || '';
+    const candidateYearOfBirth = data.candidateYearOfBirth || data.yearOfBirth || resumeInfo.yearOfBirth || '';
+    const candidateGender = data.candidateGender || data.gender || '';
+
     session = await createSession(interviewId, userId, initialQuestions, baseQuestionIndex, {
       interviewDomain: data.interviewDomain || 'IT',
-      targetJobTitle: data.targetJobTitle || 'IT Engineer',
+      targetJobTitle: data.targetJobTitle || (detectedLang === 'en' ? 'Software Engineer' : 'Kỹ sư Phần mềm'),
       resumeText: data.resumeText || '',
       jdText: data.jdText || '',
+      language: detectedLang,
+      candidateName,
+      candidateAge,
+      candidateYearOfBirth,
+      candidateGender,
       // Chat mode flag — bypasses avatar generation and TTS on the server side
       chatMode: data.chatMode === true || data.chatMode === 'true',
     });
   } else {
-    // If reconnecting in chat mode, propagate the flag to the existing session
-    if ((data.chatMode === true || data.chatMode === 'true') && session.chatMode !== 'true') {
-      await redisClient.hSet(`session:${interviewId}`, { chatMode: 'true' });
-      session.chatMode = 'true';
+    // If client explicitly requested a restart upon joining
+    if (data.restart === true || data.forceRestart === true) {
+      console.log(`[Signaling] Forced restart requested on join for session: ${interviewId}`);
+      session = await restartSession(interviewId);
+    } else {
+      const updates = {};
+      if ((data.chatMode === true || data.chatMode === 'true') && session.chatMode !== 'true') {
+        updates.chatMode = 'true';
+        session.chatMode = 'true';
+      }
+      // Update candidate profile fields if they were missing or updated
+      const resumeInfo = extractCandidateInfoFromResume(data.resumeText || session.resumeText);
+      const candidateName = data.candidateName || data.fullName || data.name || resumeInfo.name;
+      const candidateAge = data.candidateAge || data.age || resumeInfo.age;
+      const candidateYearOfBirth = data.candidateYearOfBirth || data.yearOfBirth || resumeInfo.yearOfBirth;
+
+      if (!session.candidateName && candidateName) {
+        updates.candidateName = candidateName;
+        session.candidateName = candidateName;
+      }
+      if (!session.candidateAge && candidateAge) {
+        updates.candidateAge = String(candidateAge);
+        session.candidateAge = String(candidateAge);
+      }
+      if (!session.candidateYearOfBirth && candidateYearOfBirth) {
+        updates.candidateYearOfBirth = String(candidateYearOfBirth);
+        session.candidateYearOfBirth = String(candidateYearOfBirth);
+      }
+      if (data.resumeText && !session.resumeText) {
+        updates.resumeText = data.resumeText;
+        session.resumeText = data.resumeText;
+      }
+      if (data.jdText && !session.jdText) {
+        updates.jdText = data.jdText;
+        session.jdText = data.jdText;
+      }
+      if (Object.keys(updates).length > 0) {
+        await updateSession(interviewId, updates);
+      }
     }
   }
   return session;
@@ -71,7 +277,7 @@ const emitStateUpdate = (target, session) => {
 };
 
 /**
- * Triggers the start of the interview by broadcasting the first question.
+ * Triggers the start of the interview by broadcasting the greeting and first question.
  */
 const startFirstQuestion = async (io, interviewId, session) => {
   const firstQuestionObj = session.questions[session.questionState?.baseQuestionIndex || 0];
@@ -79,11 +285,16 @@ const startFirstQuestion = async (io, interviewId, session) => {
     ? firstQuestionObj.question
     : firstQuestionObj;
 
+  const lang = session.language ? session.language : (detectLanguage(firstQuestion) === 'en' ? 'en' : 'vi');
+  const templates = DIALOGUE_TEMPLATES[lang] || DIALOGUE_TEMPLATES.vi;
+  const jobTitle = session.targetJobTitle || (lang === 'en' ? 'Software Engineer' : 'Kỹ sư Phần mềm');
+  const greetingMessage = templates.greeting(jobTitle, firstQuestion, session);
+
   const isChatMode = session.chatMode === true || session.chatMode === 'true';
-  console.log(`[Signaling] Session INIT. Broadcasting first question: "${firstQuestion}" (chatMode=${isChatMode})`);
+  console.log(`[Signaling] Session INIT. Broadcasting warmup icebreaker greeting (lang=${lang}, chatMode=${isChatMode})`);
 
   // In chat mode, skip avatar generation entirely — it is an unnecessary async I/O hop
-  const avatarAction = isChatMode ? null : await generateAvatarAction(firstQuestion, 'NEUTRAL');
+  const avatarAction = isChatMode ? null : await generateAvatarAction(greetingMessage, 'NEUTRAL');
 
   await updateSession(interviewId, { status: 'IN_PROGRESS' });
   console.log(`[Signaling] Updated Redis session to IN_PROGRESS`);
@@ -93,8 +304,8 @@ const startFirstQuestion = async (io, interviewId, session) => {
     payload: {
       actionId: `action-${Date.now()}`,
       actionType: 'TRANSITION',
-      text: firstQuestion,
-      reasoning: 'Starting the interview.',
+      text: greetingMessage,
+      reasoning: 'Warmup greeting and icebreaker introduction.',
       score: null,
       evaluation: '',
       isFallback: false,
@@ -133,6 +344,45 @@ export const joinInterview = async (io, socket, data) => {
 
   if (session.status === 'INIT' && session.questions.length > 0) {
     await startFirstQuestion(io, interviewId, session);
+  } else if (session.status === 'IN_PROGRESS' && session.questions && session.questions.length > 0) {
+    // When a client resumes or reconnects to an ongoing interview session,
+    // broadcast the current active question so the candidate can answer immediately.
+    const qState = session.questionState || { baseQuestionIndex: 0, currentFollowUpDepth: 0 };
+    let activeQuestionText = '';
+    if (qState.isWarmup) {
+      const sampleQuestion = session.questions[0];
+      const sampleText = typeof sampleQuestion === 'object' && sampleQuestion !== null ? sampleQuestion.question : sampleQuestion;
+      const lang = session.language === 'en' || detectLanguage(sampleText) === 'en' ? 'en' : 'vi';
+      const templates = DIALOGUE_TEMPLATES[lang] || DIALOGUE_TEMPLATES.vi;
+      const jobTitle = session.targetJobTitle || (lang === 'en' ? 'Software Engineer' : 'Kỹ sư Phần mềm');
+      activeQuestionText = templates.greeting(jobTitle, '', session);
+    } else {
+      const currentQuestionObj = session.questions[qState.baseQuestionIndex];
+      const baseQuestionText = typeof currentQuestionObj === 'object' && currentQuestionObj !== null
+        ? currentQuestionObj.question
+        : currentQuestionObj;
+      activeQuestionText = (qState.currentFollowUpDepth > 0 && qState.currentFollowUpQuestion)
+        ? qState.currentFollowUpQuestion
+        : baseQuestionText;
+    }
+
+    if (activeQuestionText) {
+      console.log(`[Signaling] Resuming session ${interviewId}. Emitting current question to socket ${socket.id}`);
+      socket.emit('orchestration-event', {
+        type: 'INTERVIEWER_ACTION',
+        payload: {
+          actionId: `action-resume-${Date.now()}`,
+          actionType: qState.currentFollowUpDepth > 0 ? 'FOLLOW_UP' : 'TRANSITION',
+          text: activeQuestionText,
+          reasoning: 'Resumed ongoing session question.',
+          score: null,
+          evaluation: '',
+          isFallback: false,
+          audioUrl: null,
+          avatarTriggers: null,
+        },
+      });
+    }
   }
 };
 
@@ -166,6 +416,9 @@ const runFastEvaluation = async (sessionId, session, currentQuestion, candidateT
       conversationThread: session.conversationThread || [],
       fastMode: true,
       cvText,
+      candidateName: session.candidateName || '',
+      candidateAge: session.candidateAge || '',
+      candidateGender: session.candidateGender || '',
     });
   } catch (error) {
     console.error('[Signaling] Fast evaluation failed. Using fallback.', error);
@@ -225,6 +478,9 @@ const triggerSlowEvaluation = (sessionId, session, currentQuestion, candidateTex
     fastMode: false,
     cvText,
     goodAnswerSignals,
+    candidateName: session.candidateName || '',
+    candidateAge: session.candidateAge || '',
+    candidateGender: session.candidateGender || '',
   };
 
   (async () => {
@@ -246,17 +502,30 @@ const transitionToNextTopic = async (sessionId, session, qState) => {
   const nextQState = { ...qState };
   nextQState.baseQuestionIndex += 1;
   nextQState.currentFollowUpDepth = 0;
+  nextQState.currentFollowUpQuestion = ''; // clear tracked follow-up on topic transition
   await resetConversationThread(sessionId);
 
   let nextQuestionText = '';
   let actionType = '';
 
+  const sampleQuestion = session.questions[0];
+  const sampleText = typeof sampleQuestion === 'object' && sampleQuestion !== null ? sampleQuestion.question : sampleQuestion;
+  const lang = session.language === 'en' || detectLanguage(sampleText) === 'en' ? 'en' : 'vi';
+  const templates = DIALOGUE_TEMPLATES[lang] || DIALOGUE_TEMPLATES.vi;
+
   if (nextQState.baseQuestionIndex < session.questions.length) {
     const nextObj = session.questions[nextQState.baseQuestionIndex];
-    nextQuestionText = typeof nextObj === 'object' && nextObj !== null ? nextObj.question : nextObj;
+    const rawQuestion = typeof nextObj === 'object' && nextObj !== null ? nextObj.question : nextObj;
+    const transitionList = typeof templates.transitions === 'function'
+      ? templates.transitions(session, lang)
+      : templates.transitions;
+    const prefix = transitionList[Math.floor(Math.random() * transitionList.length)];
+    nextQuestionText = `${prefix}\n\n👉 ${rawQuestion}`;
     actionType = 'TRANSITION';
   } else {
-    nextQuestionText = 'Thank you. That concludes our technical questions.';
+    nextQuestionText = typeof templates.concluding === 'function'
+      ? templates.concluding(session, lang)
+      : templates.concluding;
     actionType = 'CONCLUDING';
   }
 
@@ -274,6 +543,9 @@ const determineNextQuestion = async (sessionId, session, qState, engineResponse)
   if (actionType === 'FOLLOW_UP' && !engineResponse.isFallback) {
     nextQuestionText = engineResponse.followUpQuestion || '';
     nextQState.currentFollowUpDepth += 1;
+    // Track the follow-up question text so handleCandidateTextSubmit can use it
+    // when the candidate responds (instead of incorrectly using the base question).
+    nextQState.currentFollowUpQuestion = nextQuestionText;
     console.log(`[Signaling] AI follow-up: "${nextQuestionText}" (depth: ${nextQState.currentFollowUpDepth})`);
 
     if (!nextQuestionText.trim()) {
@@ -342,11 +614,73 @@ const handleCandidateTextSubmit = async (io, sessionId, session, candidateText) 
     console.log(`[Signaling][ChatMode] Text submit received for session ${sessionId}: "${candidateText?.slice(0, 80)}..."`);
   }
 
-  const qState = session.questionState;
+  const qState = session.questionState || { baseQuestionIndex: 0, currentFollowUpDepth: 0 };
+
+  // ── Case 0: Warm-up / Small talk turn ─────────────────────────────────────
+  if (qState.isWarmup) {
+    console.log(`[Signaling] Candidate submitted answer for Warm-up / Small talk turn.`);
+    const sampleQuestion = session.questions[0];
+    const sampleText = typeof sampleQuestion === 'object' && sampleQuestion !== null ? sampleQuestion.question : sampleQuestion;
+    const lang = session.language ? session.language : (detectLanguage(sampleText) === 'en' ? 'en' : 'vi');
+    const templates = DIALOGUE_TEMPLATES[lang] || DIALOGUE_TEMPLATES.vi;
+    const jobTitle = session.targetJobTitle || (lang === 'en' ? 'Software Engineer' : 'Kỹ sư Phần mềm');
+
+    const firstQuestionObj = session.questions[0];
+    const firstQuestionText = typeof firstQuestionObj === 'object' && firstQuestionObj !== null
+      ? firstQuestionObj.question
+      : (firstQuestionObj || '');
+
+    const greetingQuestion = templates.greeting(jobTitle, '', session);
+    const nextQuestionText = templates.warmupAcknowledgement(jobTitle, firstQuestionText, session);
+
+    // Save warmup turn (excluded from scoring)
+    await appendToConversationThread(sessionId, {
+      question: greetingQuestion,
+      answer: candidateText,
+      wasFollowUp: false,
+    });
+
+    await appendTurn(sessionId, {
+      question: greetingQuestion,
+      answer: candidateText,
+      score: null,
+      evaluation: 'Khởi động / Giới thiệu làm quen (Icebreaker)',
+      wasFollowUp: false,
+      excludedFromScoring: true,
+    });
+
+    const nextQState = {
+      ...qState,
+      isWarmup: false,
+      baseQuestionIndex: 0,
+      currentFollowUpDepth: 0,
+      currentFollowUpQuestion: '',
+    };
+
+    const updatedSession = await updateSession(sessionId, {
+      questionState: nextQState,
+      status: 'IN_PROGRESS',
+    });
+
+    emitStateUpdate(io.to(sessionId), updatedSession);
+
+    await broadcastInterviewerAction(
+      io, sessionId, nextQuestionText, 'TRANSITION',
+      'Completed warm-up small talk, moving to Question 1.', false, isChatMode
+    );
+    return;
+  }
+
   const currentQuestionObj = session.questions[qState.baseQuestionIndex];
-  const currentQuestion = typeof currentQuestionObj === 'object' && currentQuestionObj !== null
+  const baseQuestionText = typeof currentQuestionObj === 'object' && currentQuestionObj !== null
     ? currentQuestionObj.question
     : currentQuestionObj;
+
+  // If we're responding to a follow-up, use the tracked follow-up question text.
+  // This ensures the turn is recorded with the correct follow-up question, not the base question.
+  const currentQuestion = (qState.currentFollowUpDepth > 0 && qState.currentFollowUpQuestion)
+    ? qState.currentFollowUpQuestion
+    : baseQuestionText;
 
   const goodAnswerSignals = currentQuestionObj?.good_answer_signals || [];
   const cvText = session.resumeText || '';
@@ -465,7 +799,14 @@ export const handleOrchestrationEvent = async (io, socket, data) => {
     return;
   }
 
-  if (data.type === 'CANDIDATE_TEXT_SUBMIT') {
+  if (data.type === 'RESTART_INTERVIEW' || data.type === 'RESET_INTERVIEW') {
+    console.log(`[Signaling] RESTART_INTERVIEW requested for session ${sessionId}`);
+    const restartedSession = await restartSession(sessionId);
+    emitStateUpdate(io.to(sessionId), restartedSession);
+    if (restartedSession.questions && restartedSession.questions.length > 0) {
+      await startFirstQuestion(io, sessionId, restartedSession);
+    }
+  } else if (data.type === 'CANDIDATE_TEXT_SUBMIT') {
     const candidateText = data.payload?.text;
     if (!candidateText || typeof candidateText !== 'string' || !candidateText.trim()) {
       console.warn(`[Signaling] CANDIDATE_TEXT_SUBMIT received with empty/invalid text for session ${sessionId}`);

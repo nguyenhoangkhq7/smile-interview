@@ -223,11 +223,15 @@ export function useInterviewSession() {
       window.speechSynthesis.cancel();
       if (mockAnalyserIntervalRef.current) clearInterval(mockAnalyserIntervalRef.current);
 
+      const isVi = /[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i.test(text);
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'vi-VN';
+      utterance.lang = isVi ? 'vi-VN' : 'en-US';
 
-      const viVoice = window.speechSynthesis.getVoices().find(v => v.lang.includes('VI') || v.lang.includes('vi'));
-      if (viVoice) utterance.voice = viVoice;
+      const voices = window.speechSynthesis.getVoices();
+      const voice = isVi
+        ? voices.find(v => v.lang.includes('VI') || v.lang.includes('vi'))
+        : voices.find(v => v.lang.includes('EN') || v.lang.includes('en'));
+      if (voice) utterance.voice = voice;
 
       const mockAnalyserNode = {
         frequencyBinCount: 128,
@@ -899,14 +903,70 @@ export function useInterviewSession() {
         console.error('Failed to parse initialQuestions', e);
       }
       
+      const sampleQ = initialQuestions[0]?.question || '';
+      const isVi = /[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i.test(sampleQ);
+      const detectedLang = isVi ? 'vi' : 'en';
+
+      const user = useAuthStore.getState().user;
       socketRef.current.emit('join-interview', { 
         interviewId: id, 
-        userId: 'candidate-user', 
+        userId: user?.id || 'candidate-user', 
+        candidateName: user?.username || '',
         initialQuestions,
-        baseQuestionIndex
+        baseQuestionIndex,
+        interviewDomain: session?.interviewType || 'IT',
+        targetJobTitle: session?.roleTitle || (detectedLang === 'en' ? 'Software Engineer' : 'Kỹ sư Phần mềm'),
+        resumeText: session?.cvExtractedText || '',
+        jdText: session?.jdExtractedText || '',
+        language: detectedLang,
       });
     }
   };
+
+  const handleRestartInterview = useCallback(async () => {
+    setShowExitModal(false);
+    setChatLog([]);
+    setUserAnswerDraft('');
+    setKeyboardAnswer('');
+    setBaseQuestionIndex(0);
+    setQuestionCount(0);
+    setTimeLeft(900);
+    setSessionState('INITIALIZING');
+    currentQuestionRef.current = '';
+
+    try {
+      const currentSession = await historyService.getSessionById(id);
+      if (currentSession?.questions) {
+        const resetQuestions = currentSession.questions.map((q) => ({
+          ...q,
+          answer: '',
+          score: 0,
+          strengths: '',
+          improvements: '',
+          suggestedAnswer: '',
+        }));
+        await historyService.saveSession({
+          ...currentSession,
+          status: 'In progress',
+          overallScore: undefined,
+          overallFeedback: undefined,
+          questions: resetQuestions,
+          replaceQuestions: true,
+        });
+      }
+    } catch (e) {
+      console.warn('[useInterviewSession] Failed to reset session history for restart:', e);
+    }
+
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('orchestration-event', {
+        type: 'RESTART_INTERVIEW',
+        payload: { sessionId: id },
+      });
+    } else {
+      handleStartInterview();
+    }
+  }, [id]);
 
   useEffect(() => {
     if (sessionState !== 'LISTENING') return;
@@ -1010,6 +1070,7 @@ export function useInterviewSession() {
     toggleCamera,
     toggleMic,
     handleStartInterview,
+    handleRestartInterview,
     handleEndEarlyConfirm,
     handleToggleSessionRecording,
     handleDownloadVideo,

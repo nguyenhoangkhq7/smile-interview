@@ -44,4 +44,7 @@ public class CandidateContextDto {
 
     @JsonProperty("role_type")
     private JobCategory roleType;
+
+    @JsonProperty("cv_project_highlights")
+    private List<String> cvProjectHighlights;
 }

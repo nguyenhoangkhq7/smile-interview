@@ -24,7 +24,21 @@ public class QuestionConfigDto {
     @JsonProperty("distribution")
     private Map<String, Integer> distribution;
 
+    @JsonProperty("mode")
+    private String mode; // "SCREENING" | "DEEP_DIVE"
+
+    @JsonProperty("interview_channel")
+    private String interviewChannel; // "VOICE" | "TEXT_IDE"
+
     public int getTotalQuestions() {
         return total != null ? total : 10;
+    }
+
+    public String getMode() {
+        return (mode != null && !mode.isBlank()) ? mode.toUpperCase() : "SCREENING";
+    }
+
+    public String getInterviewChannel() {
+        return (interviewChannel != null && !interviewChannel.isBlank()) ? interviewChannel.toUpperCase() : "VOICE";
     }
 }

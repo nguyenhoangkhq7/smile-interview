@@ -50,14 +50,17 @@ public class ResumeAssessment {
     private EligibilityStatus eligibility;
 
     @OneToMany(mappedBy = "assessment", cascade = CascadeType.ALL, orphanRemoval = true)
+    @org.hibernate.annotations.BatchSize(size = 50)
     @Builder.Default
     private List<EvidenceItem> evidenceItems = new ArrayList<>();
 
     @OneToMany(mappedBy = "assessment", cascade = CascadeType.ALL, orphanRemoval = true)
+    @org.hibernate.annotations.BatchSize(size = 50)
     @Builder.Default
     private List<ScoreBreakdown> scoreBreakdowns = new ArrayList<>();
 
     @OneToMany(mappedBy = "assessment", cascade = CascadeType.ALL, orphanRemoval = true)
+    @org.hibernate.annotations.BatchSize(size = 50)
     @Builder.Default
     private List<Improvement> improvements = new ArrayList<>();
 

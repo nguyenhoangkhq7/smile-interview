@@ -255,6 +255,7 @@ public class GlobalExceptionHandler {
                         .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
                         .errorCode("INTERNAL_SERVER_ERROR")
                         .message("An unexpected error occurred. Please contact support.")
+                        .detail(ex.getMessage())
                         .path(request.getRequestURI())
                         .build());
     }

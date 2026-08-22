@@ -24,6 +24,8 @@ public class EvidenceItem {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "assessment_id", nullable = false)
+    @lombok.ToString.Exclude
+    @lombok.EqualsAndHashCode.Exclude
     private ResumeAssessment assessment;
 
     @Column(name = "criteria_id")

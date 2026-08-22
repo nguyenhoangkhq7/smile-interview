@@ -30,6 +30,12 @@ public class SemanticCacheKeyGenerator {
         return KEY_PREFIX + "adhoc:" + nameHash + ":" + safeStatus + ":" + safeLevel;
     }
 
+    public String generateKeyForGeneric(String category, SeniorityLevel level) {
+        String safeCategory = category != null ? category.toLowerCase(Locale.ROOT).strip() : "general";
+        String safeLevel = level != null ? level.name() : "MID";
+        return KEY_PREFIX + "generic:" + safeCategory + ":" + safeLevel;
+    }
+
     public String generateCacheKey(String type, Long criteriaId, String status, SeniorityLevel level, String difficulty) {
         String safeType = type != null ? type.toLowerCase(Locale.ROOT).strip() : "general";
         String safeStatus = status != null ? status.toLowerCase(Locale.ROOT).strip() : "unknown";

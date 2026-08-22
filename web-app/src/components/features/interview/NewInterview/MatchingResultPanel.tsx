@@ -17,6 +17,7 @@ import {
   AlignLeft,
   Zap,
   Target,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -69,6 +70,10 @@ interface Props {
   keywordMetadata: KeywordMetadata | null | undefined;
   criteriaFilter: CriteriaFilter;
   activeView: ActiveView;
+  interviewMode?: 'SCREENING' | 'DEEP_DIVE';
+  interviewChannel?: 'VOICE' | 'TEXT_IDE';
+  onInterviewModeChange?: (mode: 'SCREENING' | 'DEEP_DIVE') => void;
+  onInterviewChannelChange?: (channel: 'VOICE' | 'TEXT_IDE') => void;
   onCriteriaFilter: (v: CriteriaFilter) => void;
   onActiveView: (v: ActiveView) => void;
   onRefreshAssessment: () => void;
@@ -253,9 +258,12 @@ function parseSectionText(raw: string): string[] {
 
 
 export function MatchingResultPanel({
-  assessment, roleTitle, analyzing: _analyzing, generating,
+  assessment, roleTitle, analyzing, generating,
   rawCvText, rawJdText, cvDisplayName, jdDisplayName, keywordMetadata,
-  criteriaFilter, activeView, onCriteriaFilter, onActiveView,
+  criteriaFilter, activeView,
+  interviewMode = 'DEEP_DIVE', interviewChannel = 'VOICE',
+  onInterviewModeChange, onInterviewChannelChange,
+  onCriteriaFilter, onActiveView,
   onRefreshAssessment, onReset, onContinue,
 }: Props) {
   const gateItems = (assessment.gateEvidenceItems || []) as Criterion[];
@@ -341,12 +349,17 @@ export function MatchingResultPanel({
             <span className={`size-2 rounded-full ${assessment.cached ? 'bg-emerald-500' : 'bg-amber-500'}`} />
             {assessment.cached ? 'Kết quả từ Cache' : 'Phân tích mới'}
           </Badge>
-          {assessment.cached && (
-            <Button size="sm" variant="outline" onClick={onRefreshAssessment}
-              className="border-brand-orange text-brand-orange hover:bg-brand-orange/5">
-              <RefreshCw size={12} className="mr-1.5" /> Đánh giá lại
-            </Button>
-          )}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onRefreshAssessment}
+            disabled={analyzing}
+            className="border-brand-orange text-brand-orange hover:bg-brand-orange/5"
+            title="Đánh giá lại toàn diện bằng AI (Bỏ qua cache)"
+          >
+            <RefreshCw size={12} className={`mr-1.5 ${analyzing ? 'animate-spin' : ''}`} />
+            {analyzing ? 'Đang phân tích lại...' : 'Đánh giá lại (AI Refresh)'}
+          </Button>
         </div>
       </div>
 
@@ -693,12 +706,119 @@ export function MatchingResultPanel({
         </div>
       )}
 
+      {/* Interview Generation Configuration Card */}
+      <div className="rounded-xl border border-brand-orange/20 bg-brand-orange/5 p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles className="size-4 text-brand-orange" />
+            <h4 className="text-xs font-bold text-foreground uppercase tracking-wide">Cấu hình Phòng Phỏng Vấn AI</h4>
+          </div>
+          <span className="text-[11px] text-muted-foreground">Tùy chỉnh phong cách phỏng vấn</span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+          {/* Mode Option */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+              <Target className="size-3.5 text-brand-orange" /> Chế độ sinh câu hỏi:
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => onInterviewModeChange?.('DEEP_DIVE')}
+                className={`flex flex-col p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
+                  interviewMode === 'DEEP_DIVE'
+                    ? 'border-brand-orange bg-white shadow-sm ring-1 ring-brand-orange'
+                    : 'border-border bg-card/60 hover:bg-card text-muted-foreground'
+                }`}
+              >
+                <span className="text-xs font-bold text-foreground flex items-center gap-1">
+                  🎯 Chuyên sâu (Tech Lead)
+                </span>
+                <span className="text-[10px] text-muted-foreground mt-0.5 leading-tight">
+                  Soi sâu dự án, kiến trúc & metrics trong CV
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onInterviewModeChange?.('SCREENING')}
+                className={`flex flex-col p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
+                  interviewMode === 'SCREENING'
+                    ? 'border-brand-orange bg-white shadow-sm ring-1 ring-brand-orange'
+                    : 'border-border bg-card/60 hover:bg-card text-muted-foreground'
+                }`}
+              >
+                <span className="text-xs font-bold text-foreground flex items-center gap-1">
+                  ⚡ Sơ loại nhanh
+                </span>
+                <span className="text-[10px] text-muted-foreground mt-0.5 leading-tight">
+                  Tối ưu tốc độ, kiểm tra nền tảng CS & kỹ năng
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {/* Channel Option */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+              <Zap className="size-3.5 text-brand-orange" /> Kênh phỏng vấn:
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => onInterviewChannelChange?.('VOICE')}
+                className={`flex flex-col p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
+                  interviewChannel === 'VOICE'
+                    ? 'border-brand-orange bg-white shadow-sm ring-1 ring-brand-orange'
+                    : 'border-border bg-card/60 hover:bg-card text-muted-foreground'
+                }`}
+              >
+                <span className="text-xs font-bold text-foreground">🎙️ AI Avatar / Voice</span>
+                <span className="text-[10px] text-muted-foreground mt-0.5 leading-tight">
+                  Đàm thoại tự nhiên, câu hỏi ngắn gọn cho TTS
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onInterviewChannelChange?.('TEXT_IDE')}
+                className={`flex flex-col p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
+                  interviewChannel === 'TEXT_IDE'
+                    ? 'border-brand-orange bg-white shadow-sm ring-1 ring-brand-orange'
+                    : 'border-border bg-card/60 hover:bg-card text-muted-foreground'
+                }`}
+              >
+                <span className="text-xs font-bold text-foreground">💻 Live Code / IDE</span>
+                <span className="text-[10px] text-muted-foreground mt-0.5 leading-tight">
+                  Kèm code snippet, thuật toán & test cases
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       { }
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
-        <Button variant="outline" onClick={onReset}>Tải lại tài liệu khác</Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={onReset} disabled={analyzing || generating}>
+            Tải lại tài liệu khác
+          </Button>
+          <Button
+            variant="outline"
+            onClick={onRefreshAssessment}
+            disabled={analyzing || generating}
+            className="border-brand-orange text-brand-orange hover:bg-brand-orange/5"
+            title="Đánh giá lại toàn diện bằng AI (Bỏ qua cache)"
+          >
+            <RefreshCw size={14} className={`mr-1.5 ${analyzing ? 'animate-spin' : ''}`} />
+            {analyzing ? 'Đang đánh giá lại...' : 'Đánh giá lại (Force Refresh)'}
+          </Button>
+        </div>
         <Button
           onClick={onContinue}
-          disabled={generating}
+          disabled={analyzing || generating}
           className="bg-brand-orange text-white hover:bg-brand-orange-hover"
         >
           {generating ? 'Đang tạo ngân hàng câu hỏi...' : 'Bắt đầu Phỏng vấn →'}

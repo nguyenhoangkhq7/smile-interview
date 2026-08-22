@@ -10,12 +10,7 @@ import java.util.UUID;
 
 public interface ResumeAssessmentRepository extends JpaRepository<ResumeAssessment, UUID> {
 
-    @EntityGraph(attributePaths = {"evidenceItems", "scoreBreakdowns", "improvements"})
     Optional<ResumeAssessment> findBySessionId(String sessionId);
-
-    @Override
-    @EntityGraph(attributePaths = {"evidenceItems", "scoreBreakdowns", "improvements"})
-    Optional<ResumeAssessment> findById(UUID id);
 
     boolean existsBySessionId(String sessionId);
 

@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { FolderOpen, Lightbulb, AlertTriangle, CheckCircle, AlertCircle, MessageSquare, BarChart3, CheckCircle2, XCircle, Download } from 'lucide-react';
+import { FolderOpen, Lightbulb, AlertTriangle, CheckCircle, AlertCircle, MessageSquare, BarChart3, CheckCircle2, XCircle, Download, CornerDownRight } from 'lucide-react';
 import { historyService, SessionHistoryItem } from '@/services/historyService';
 import { exportQuestionBankToCSV } from '@/lib/exportUtils';
 import styles from './result.module.css';
@@ -49,7 +49,10 @@ export default function InterviewResultPage() {
         if (!active) return;
 
         if (data) {
-          const isEvaluated = data.status !== 'Completed' || (data.overallFeedback !== undefined && data.overallFeedback !== null && data.overallFeedback.trim() !== '');
+          const hasFeedback = data.overallFeedback !== undefined && data.overallFeedback !== null && data.overallFeedback.trim() !== '';
+          const hasScore = data.overallScore !== undefined && data.overallScore !== null && data.overallScore > 0;
+          const isEvaluated = data.status !== 'Completed' || hasFeedback || hasScore;
+
 
           if (isEvaluated || pollCount >= maxPolls) {
             setSession(data);
@@ -165,11 +168,12 @@ export default function InterviewResultPage() {
   let overallFeedbackText = '';
   let hiringRecommendation = '';
 
-  const isPostInterviewEvaluated = session.status === 'Completed' || report !== null;
+  const isPostInterviewEvaluated = (session.status === 'Completed' && report !== null) ||
+    (session.status === 'Completed' && (session.overallScore !== undefined && session.overallScore !== null && session.overallScore > 0));
 
   if (isPostInterviewEvaluated) {
     // 1. Post-interview report loaded
-    score = session.overallScore || 0;
+    score = session.overallScore ?? 0;
     overallFeedbackText = session.overallFeedback || '';
     hiringRecommendation = session.hiringRecommendation || '';
 
@@ -179,8 +183,8 @@ export default function InterviewResultPage() {
       recommendations = report.recommendations || report.actionableSuggestions || recommendations;
 
       const rawScore = report.overall_score !== undefined ? report.overall_score : report.overallScore;
-      if (rawScore !== undefined) {
-        score = rawScore <= 10 ? rawScore * 10 : rawScore;
+      if (rawScore !== undefined && rawScore !== null) {
+        score = rawScore <= 10 ? Math.round(rawScore * 10) : rawScore;
       }
 
       overallFeedbackText = report.overall_summary || report.overallFeedback || overallFeedbackText;
@@ -200,15 +204,20 @@ export default function InterviewResultPage() {
         hiringRecommendation = 'Strong No Hire';
       }
     }
+  } else if (session.status === 'Completed') {
+    // Status is Completed but evaluate API hasn't finished yet — show pending state
+    score = 0;
+    overallFeedbackText = 'Đang chờ AI phân tích kết quả phỏng vấn... Vui lòng đợi trong giây lát.';
+    hiringRecommendation = '';
   } else {
     // 2. CV Evaluation report loaded
     score = session.competencyFitScore || 0;
 
     // Construct a beautiful CV match overall feedback summary
-    overallFeedbackText = `Báo cáo đánh giá mức độ tương thích của hồ sơ ứng viên (CV) đối với mô tả công việc (JD).\n` +
-      `• Mức độ phù hợp năng lực: ${session.matchLevel || 'N/A'}\n` +
-      `• Cấp độ ứng viên phù hợp: ${session.candidateLevel || 'N/A'}\n` +
-      `• Ước tính số năm kinh nghiệm: ${session.yearsOfExperienceEstimate || 'N/A'}`;
+    overallFeedbackText = 'Báo cáo đánh giá mức độ tương thích của hồ sơ ứng viên (CV) đối với mô tả công việc (JD).\n' +
+      '• Mức độ phù hợp năng lực: ' + (session.matchLevel || 'N/A') + '\n' +
+      '• Cấp độ ứng viên phù hợp: ' + (session.candidateLevel || 'N/A') + '\n' +
+      '• Ước tính số năm kinh nghiệm: ' + (session.yearsOfExperienceEstimate || 'N/A');
 
     hiringRecommendation = 'Đánh giá CV';
   }
@@ -440,94 +449,161 @@ export default function InterviewResultPage() {
                 </Link>
               )}
             </div>
-          ) : (
-            <div className={styles.accordionList}>
-              {session.questions.map((q, index) => {
-                const isExpanded = expandedIndexes.includes(index);
-                return (
-                  <div key={index} className={styles.accordionItem}>
-                    {/* Header */}
-                    <button className={styles.accordionHeader} onClick={() => toggleAccordion(index)}>
-                      <div className={styles.headerMain}>
-                        <div className={styles.headerMeta}>
-                          <span className={styles.qNum}>CÂU HỎI {index + 1}</span>
-                          <span className={styles.topicBadge}>
-                            {q.topicTag || (typeof q.question === 'object' && q.question !== null ? (q.question as unknown as QuestionObject).topic : '')}
+          ) : (() => {
+            // ── Build question groups: base question + its follow-ups ──────────
+            type QGroup = {
+              base: typeof session.questions[0];
+              baseGlobalIdx: number;      // original index in session.questions[]
+              baseNum: number;            // base question display number (1, 2, 3…)
+              followUps: { q: typeof session.questions[0]; globalIdx: number }[];
+            };
+            const groups: QGroup[] = [];
+            let baseNum = 0;
+            for (let i = 0; i < session.questions.length; i++) {
+              const q = session.questions[i];
+              if (!q.isDeepDive) {
+                baseNum++;
+                groups.push({ base: q, baseGlobalIdx: i, baseNum, followUps: [] });
+              } else if (groups.length > 0) {
+                groups[groups.length - 1].followUps.push({ q, globalIdx: i });
+              } else {
+                // Orphan follow-up (shouldn't happen, treat as base)
+                baseNum++;
+                groups.push({ base: q, baseGlobalIdx: i, baseNum, followUps: [] });
+              }
+            }
+
+            // ── Helper: render an accordion item (shared for base & follow-up) ─
+            const renderAccordionItem = (
+              q: typeof session.questions[0],
+              globalIdx: number,
+              label: string,
+              isFollowUp: boolean
+            ) => {
+              const isExpanded = expandedIndexes.includes(globalIdx);
+              const qText = typeof q.question === 'object' && q.question !== null
+                ? (q.question as unknown as QuestionObject).question
+                : q.question;
+              const topicText = q.topicTag || (
+                typeof q.question === 'object' && q.question !== null
+                  ? (q.question as unknown as QuestionObject).topic
+                  : ''
+              );
+
+              return (
+                <div
+                  key={globalIdx}
+                  className={styles.accordionItem}
+                  style={isFollowUp ? {
+                    marginLeft: '1.5rem',
+                    borderLeft: '3px solid #a5b4fc',
+                    borderRadius: '0 0.75rem 0.75rem 0',
+                  } : undefined}
+                >
+                  {/* Header */}
+                  <button className={styles.accordionHeader} onClick={() => toggleAccordion(globalIdx)}>
+                    <div className={styles.headerMain}>
+                      <div className={styles.headerMeta}>
+                        {isFollowUp ? (
+                          <span
+                            className={styles.qNum}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', color: '#6366f1', backgroundColor: '#eef2ff', borderColor: '#c7d2fe' }}
+                          >
+                            <CornerDownRight size={11} />
+                            {label}
                           </span>
-                          {q.isDeepDive && (
-                            <span className={styles.deepDiveBadge}>Hỏi sâu (Deep dive)</span>
-                          )}
-                        </div>
-                        <div className={styles.qText}>
-                          {typeof q.question === 'object' && q.question !== null ? (q.question as unknown as QuestionObject).question : q.question}
-                        </div>
+                        ) : (
+                          <span className={styles.qNum}>{label}</span>
+                        )}
+                        {topicText && <span className={styles.topicBadge}>{topicText}</span>}
+                        {isFollowUp && (
+                          <span className={styles.deepDiveBadge}>Hỏi sâu</span>
+                        )}
+                      </div>
+                      <div className={styles.qText}>{qText}</div>
+                    </div>
+
+                    <div className={styles.headerRight}>
+                      <div className={styles.qScore}>
+                        <span className={styles.qScoreNum}>{q.score}</span>
+                        <span className={styles.qScoreLabel}>Điểm</span>
+                      </div>
+                      <span className={`${styles.arrowIcon} ${isExpanded ? styles.arrowExpanded : ''}`}>
+                        ▼
+                      </span>
+                    </div>
+                  </button>
+
+                  {/* Body */}
+                  {isExpanded && (
+                    <div className={styles.accordionBody}>
+                      {/* Candidate Answer */}
+                      <div className={styles.sectionBlock}>
+                        <h4 style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <MessageSquare size={16} style={{ color: '#4f46e5' }} />
+                          <span>Câu trả lời của bạn</span>
+                        </h4>
+                        <p className={styles.userAnswerText}>{q.answer}</p>
                       </div>
 
-                      <div className={styles.headerRight}>
-                        <div className={styles.qScore}>
-                          <span className={styles.qScoreNum}>{q.score}</span>
-                          <span className={styles.qScoreLabel}>Điểm</span>
-                        </div>
-                        <span className={`${styles.arrowIcon} ${isExpanded ? styles.arrowExpanded : ''}`}>
-                          ▼
-                        </span>
-                      </div>
-                    </button>
-
-                    {/* Body */}
-                    {isExpanded && (
-                      <div className={styles.accordionBody}>
-                        {/* Candidate Answer */}
-                        <div className={styles.sectionBlock}>
-                          <h4 style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-                            <MessageSquare size={16} style={{ color: '#4f46e5' }} />
-                            <span>Câu trả lời của bạn</span>
-                          </h4>
-                          <p className={styles.userAnswerText}>{q.answer}</p>
-                        </div>
-
-                        {/* AI Strengths & Improvements */}
-                        <div className={styles.sectionBlock}>
-                          <h4 style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-                            <BarChart3 size={16} style={{ color: '#4f46e5' }} />
-                            <span>Phân tích câu trả lời của AI</span>
-                          </h4>
-                          <div className={styles.aiFeedbackGrid}>
-                            <div className={`${styles.feedbackBox} ${styles.feedbackStrength}`}>
-                              <strong style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', marginBottom: '0.25rem' }}>
-                                <CheckCircle2 size={14} style={{ color: '#10b981' }} />
-                                <span>Điểm mạnh:</span>
-                              </strong>
-                              <div>{q.strengths}</div>
-                            </div>
-                            <div className={`${styles.feedbackBox} ${styles.feedbackImprovement}`}>
-                              <strong style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', marginBottom: '0.25rem' }}>
-                                <XCircle size={14} style={{ color: '#f59e0b' }} />
-                                <span>Cần cải thiện:</span>
-                              </strong>
-                              <div>{q.improvements}</div>
-                            </div>
+                      {/* AI Strengths & Improvements */}
+                      <div className={styles.sectionBlock}>
+                        <h4 style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <BarChart3 size={16} style={{ color: '#4f46e5' }} />
+                          <span>Phân tích câu trả lời của AI</span>
+                        </h4>
+                        <div className={styles.aiFeedbackGrid}>
+                          <div className={`${styles.feedbackBox} ${styles.feedbackStrength}`}>
+                            <strong style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', marginBottom: '0.25rem' }}>
+                              <CheckCircle2 size={14} style={{ color: '#10b981' }} />
+                              <span>Điểm mạnh:</span>
+                            </strong>
+                            <div>{q.strengths}</div>
                           </div>
-                        </div>
-
-                        {/* Suggested Answer */}
-                        <div className={styles.sectionBlock}>
-                          <h4 style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-                            <Lightbulb size={16} style={{ color: '#4f46e5' }} />
-                            <span>Gợi ý câu trả lời tốt hơn từ AI</span>
-                          </h4>
-                          <div className={styles.suggestedAnswerBox}>
-                            {q.suggestedAnswer}
+                          <div className={`${styles.feedbackBox} ${styles.feedbackImprovement}`}>
+                            <strong style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', marginBottom: '0.25rem' }}>
+                              <XCircle size={14} style={{ color: '#f59e0b' }} />
+                              <span>Cần cải thiện:</span>
+                            </strong>
+                            <div>{q.improvements}</div>
                           </div>
                         </div>
                       </div>
+
+                      {/* Suggested Answer */}
+                      <div className={styles.sectionBlock}>
+                        <h4 style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <Lightbulb size={16} style={{ color: '#4f46e5' }} />
+                          <span>Gợi ý câu trả lời tốt hơn từ AI</span>
+                        </h4>
+                        <div className={styles.suggestedAnswerBox}>
+                          {q.suggestedAnswer}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            };
+
+            return (
+              <div className={styles.accordionList}>
+                {groups.map((group) => (
+                  <div key={group.baseGlobalIdx} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {/* Base question */}
+                    {renderAccordionItem(group.base, group.baseGlobalIdx, `CÂU HỎI ${group.baseNum}`, false)}
+
+                    {/* Follow-up questions indented below */}
+                    {group.followUps.map(({ q, globalIdx }, fuIdx) =>
+                      renderAccordionItem(q, globalIdx, `Hỏi sâu ${fuIdx + 1}`, true)
                     )}
                   </div>
-                );
-              })}
-            </div>
-          )}
+                ))}
+              </div>
+            );
+          })()}
         </section>
+
 
         {/* CTAs Button Bar */}
         <div className={styles.actions}>

@@ -3,6 +3,7 @@ package fit.iuh.modules.evaluation.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fit.iuh.common.exception.LlmInferenceException;
+import fit.iuh.common.util.JsonSanitizer;
 import fit.iuh.grpc.inference.FinalReportRequest;
 import fit.iuh.grpc.inference.InferenceRequest;
 import fit.iuh.modules.evaluation.client.OpenRouterClient;
@@ -11,23 +12,11 @@ import fit.iuh.modules.evaluation.model.FinalReportResult;
 import fit.iuh.modules.evaluation.prompt.PromptBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
-
 /**
- * Orchestrates the AI evaluation workflow for interview sessions.
- * <p>
- * Responsibilities (and only these):
- * <ol>
- *   <li>Select the appropriate prompt mode (fast vs. full scoring).</li>
- *   <li>Delegate prompt construction to {@link PromptBuilder}.</li>
- *   <li>Call the LLM via {@link OpenRouterClient} within a timeout boundary.</li>
- *   <li>Parse the JSON response and handle retries / fallbacks.</li>
- * </ol>
+ * Orchestrates the AI evaluation workflow for interview sessions on Virtual Threads.
+ * Enforces business constraints, sanitizes outputs, and manages retries/fallbacks.
  */
 @Service
 public class EvaluationServiceImpl implements EvaluationService {
@@ -37,20 +26,14 @@ public class EvaluationServiceImpl implements EvaluationService {
     private final OpenRouterClient openRouterClient;
     private final ObjectMapper objectMapper;
     private final PromptBuilder promptBuilder;
-    private final int timeoutSeconds;
-    private final int finalReportTimeoutSeconds;
 
     public EvaluationServiceImpl(
             OpenRouterClient openRouterClient,
             ObjectMapper objectMapper,
-            PromptBuilder promptBuilder,
-            @Value("${llm.timeout-seconds:20}") int timeoutSeconds,
-            @Value("${llm.final-report-timeout-seconds:60}") int finalReportTimeoutSeconds) {
+            PromptBuilder promptBuilder) {
         this.openRouterClient = openRouterClient;
         this.objectMapper = objectMapper;
         this.promptBuilder = promptBuilder;
-        this.timeoutSeconds = timeoutSeconds;
-        this.finalReportTimeoutSeconds = finalReportTimeoutSeconds;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -68,14 +51,65 @@ public class EvaluationServiceImpl implements EvaluationService {
 
         String userPrompt = promptBuilder.buildEvalUserPrompt(request);
 
+        EvaluationResult result;
         try {
-            return CompletableFuture.supplyAsync(() ->
-                    callAndParseEvaluation(systemPrompt, userPrompt, true)
-            ).get(timeoutSeconds, TimeUnit.SECONDS);
+            result = callAndParseEvaluation(systemPrompt, userPrompt, true);
         } catch (Exception e) {
-            log.error("[EvaluateResponse] Inference failed or timed out. Falling back to NEXT_TOPIC.", e);
+            log.error("[EvaluateResponse] Inference failed for session {}. Falling back to NEXT_TOPIC.",
+                    request.getSessionId(), e);
             return buildFallbackResult();
         }
+
+        // Programmatic enforcement:
+        // 1. If follow-up quota is reached, force NEXT_TOPIC
+        boolean limitReached = request.getMaxFollowUpCount() > 0
+                && request.getCurrentFollowUpCount() >= request.getMaxFollowUpCount();
+
+        if (limitReached && !"NEXT_TOPIC".equalsIgnoreCase(result.getDecision())) {
+            log.info("[EvaluateResponse] Follow-up quota reached ({}/{}). Enforcing NEXT_TOPIC.",
+                    request.getCurrentFollowUpCount(), request.getMaxFollowUpCount());
+            result = EvaluationResult.builder()
+                    .decision("NEXT_TOPIC")
+                    .followUpQuestion("")
+                    .reasoning((result.getReasoning() != null && !result.getReasoning().isBlank())
+                            ? result.getReasoning()
+                            : "Đã đạt giới hạn đào sâu của chủ đề này, chuyển sang câu hỏi tiếp theo.")
+                    .score(result.getScore())
+                    .evaluation(result.getEvaluation())
+                    .isFallback(result.isFallback())
+                    .excludedFromScoring(result.isExcludedFromScoring())
+                    .build();
+        } else if (result.getScore() != null && result.getScore() >= 8 && !"NEXT_TOPIC".equalsIgnoreCase(result.getDecision())) {
+            // 2. If candidate scored high (>= 8), force NEXT_TOPIC to prevent redundant probes
+            log.info("[EvaluateResponse] Candidate scored {} >= 8. Overriding decision to NEXT_TOPIC.", result.getScore());
+            result = EvaluationResult.builder()
+                    .decision("NEXT_TOPIC")
+                    .followUpQuestion("")
+                    .reasoning((result.getReasoning() != null && !result.getReasoning().isBlank())
+                            ? result.getReasoning()
+                            : "Câu trả lời đạt chất lượng tốt (" + result.getScore() + "/10), chuyển sang câu hỏi tiếp theo.")
+                    .score(result.getScore())
+                    .evaluation(result.getEvaluation())
+                    .isFallback(result.isFallback())
+                    .excludedFromScoring(result.isExcludedFromScoring())
+                    .build();
+        } else if (result.getScore() != null && result.getScore() <= 2 && !"NEXT_TOPIC".equalsIgnoreCase(result.getDecision())) {
+            // 3. If candidate scored <= 2 (doesn't know or completely off-topic), force NEXT_TOPIC
+            log.info("[EvaluateResponse] Candidate scored {} <= 2. Overriding decision to NEXT_TOPIC.", result.getScore());
+            result = EvaluationResult.builder()
+                    .decision("NEXT_TOPIC")
+                    .followUpQuestion("")
+                    .reasoning((result.getReasoning() != null && !result.getReasoning().isBlank())
+                            ? result.getReasoning()
+                            : "Câu trả lời chưa đúng trọng tâm hoặc ứng viên chưa nắm kiến thức, chuyển sang câu hỏi tiếp theo.")
+                    .score(result.getScore())
+                    .evaluation(result.getEvaluation())
+                    .isFallback(result.isFallback())
+                    .excludedFromScoring(result.isExcludedFromScoring())
+                    .build();
+        }
+
+        return result;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -88,19 +122,11 @@ public class EvaluationServiceImpl implements EvaluationService {
         String userPrompt = promptBuilder.buildFinalReportUserPrompt(request);
 
         try {
-            return CompletableFuture.supplyAsync(() ->
-                    callAndParseFinalReport(systemPrompt, userPrompt)
-            ).get(finalReportTimeoutSeconds, TimeUnit.SECONDS);
+            return callAndParseFinalReport(systemPrompt, userPrompt, true);
         } catch (Exception e) {
-            log.error("[GenerateFinalReport] Final report generation failed or timed out.", e);
-            return FinalReportResult.builder()
-                    .overallScore(0)
-                    .overallSummary("Không thể tổng hợp báo cáo do lỗi hệ thống.")
-                    .strengths(List.of())
-                    .weaknesses(List.of())
-                    .recommendations(List.of())
-                    .hiringRecommendation("No Hire")
-                    .build();
+            log.error("[GenerateFinalReport] Final report generation failed for session {}: {}",
+                    request.getSessionId(), e.getMessage(), e);
+            throw new LlmInferenceException("Failed to generate final report: " + e.getMessage(), e);
         }
     }
 
@@ -109,38 +135,46 @@ public class EvaluationServiceImpl implements EvaluationService {
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * Calls the evaluation model and parses its JSON response.
-     * Retries once with an explicit schema reminder if the initial response is malformed.
+     * Calls the evaluation model and parses its JSON response with markdown sanitization and retry.
      */
     private EvaluationResult callAndParseEvaluation(String systemPrompt, String userPrompt, boolean allowRetry) {
-        String rawJson = openRouterClient.evaluationCompletion(systemPrompt, userPrompt).block();
+        String rawContent = openRouterClient.evaluationCompletion(systemPrompt, userPrompt);
+        String cleanJson = JsonSanitizer.sanitize(rawContent);
+
         try {
-            return objectMapper.readValue(rawJson, EvaluationResult.class);
+            return objectMapper.readValue(cleanJson, EvaluationResult.class);
         } catch (JsonProcessingException e) {
-            log.warn("[EvaluateResponse] JSON parse failed (retry={}): {}", allowRetry, e.getMessage());
+            log.warn("[EvaluateResponse] JSON parse failed (retryAllowed={}): {}", allowRetry, e.getMessage());
             if (allowRetry) {
                 String retryUserPrompt = userPrompt
-                        + "\n\n[SYSTEM] Output trước không đúng JSON schema."
-                        + " Hãy trả lại ĐÚNG schema JSON đã được chỉ định, không thêm text ngoài JSON.";
+                        + "\n\n[SYSTEM NOTICE] Output trước không đúng định dạng JSON chuẩn."
+                        + " Hãy trả lời CHỈ bằng JSON đúng schema đã cung cấp, không thêm bất kỳ văn bản giải thích nào.";
                 return callAndParseEvaluation(systemPrompt, retryUserPrompt, false);
             }
-            log.error("[EvaluateResponse] JSON parse failed after retry. Falling back.", e);
+            log.error("[EvaluateResponse] JSON parse failed after retry. Raw: {}", rawContent, e);
             return buildFallbackResult();
         }
     }
 
     /**
-     * Calls the final-report model and parses its JSON response.
-     * Throws {@link LlmInferenceException} on parse failure — no fallback,
-     * since a malformed final report cannot be silently ignored.
+     * Calls the final-report model and parses its JSON response with markdown sanitization and retry.
      */
-    private FinalReportResult callAndParseFinalReport(String systemPrompt, String userPrompt) {
-        String rawJson = openRouterClient.finalReportCompletion(systemPrompt, userPrompt).block();
+    private FinalReportResult callAndParseFinalReport(String systemPrompt, String userPrompt, boolean allowRetry) {
+        String rawContent = openRouterClient.finalReportCompletion(systemPrompt, userPrompt);
+        String cleanJson = JsonSanitizer.sanitize(rawContent);
+
         try {
-            return objectMapper.readValue(rawJson, FinalReportResult.class);
+            return objectMapper.readValue(cleanJson, FinalReportResult.class);
         } catch (JsonProcessingException e) {
-            log.error("[GenerateFinalReport] JSON parse failed: {}", e.getMessage());
-            throw new LlmInferenceException("Failed to parse final report response", e);
+            log.warn("[GenerateFinalReport] JSON parse failed (retryAllowed={}): {}", allowRetry, e.getMessage());
+            if (allowRetry) {
+                String retryUserPrompt = userPrompt
+                        + "\n\n[SYSTEM NOTICE] Output trước không đúng định dạng JSON chuẩn."
+                        + " Hãy trả lời CHỈ bằng JSON đúng schema, không thêm text ngoài JSON.";
+                return callAndParseFinalReport(systemPrompt, retryUserPrompt, false);
+            }
+            log.error("[GenerateFinalReport] JSON parse failed after retry. Raw: {}", rawContent, e);
+            throw new LlmInferenceException("Failed to parse final report response from LLM", e);
         }
     }
 

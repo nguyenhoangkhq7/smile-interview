@@ -24,6 +24,8 @@ public class ScoreBreakdown {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "assessment_id", nullable = false)
+    @lombok.ToString.Exclude
+    @lombok.EqualsAndHashCode.Exclude
     private ResumeAssessment assessment;
 
     @Column(name = "category", length = 100)

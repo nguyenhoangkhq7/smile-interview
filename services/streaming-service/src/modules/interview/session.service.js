@@ -32,13 +32,22 @@ export const createSession = async (
     // Resume and JD full text for Final Synthesis
     resumeText: options.resumeText || '',
     jdText: options.jdText || '',
+    // Candidate profile for personal addressing & small talk
+    candidateName: options.candidateName || options.fullName || options.name || '',
+    candidateAge: options.candidateAge || options.age ? String(options.candidateAge || options.age) : '',
+    candidateYearOfBirth: options.candidateYearOfBirth || options.yearOfBirth ? String(options.candidateYearOfBirth || options.yearOfBirth) : '',
+    candidateGender: options.candidateGender || options.gender || '',
     // Text-only chat mode flag — disables avatar generation and server-side TTS
     chatMode: options.chatMode === true || options.chatMode === 'true' ? 'true' : 'false',
+    // Language: 'vi' or 'en'
+    language: options.language || 'vi',
     questions: JSON.stringify(questionsList),
     questionState: JSON.stringify({
+      isWarmup: true,
       baseQuestionIndex,
       currentFollowUpDepth: 0,
       maxFollowUpDepth: 3,
+      currentFollowUpQuestion: '',
       isTransitioning: false
     }),
     // Current topic's conversation thread (resets on NEXT_TOPIC)
@@ -158,4 +167,41 @@ export const resetConversationThread = async (sessionId) => {
     conversationThread: JSON.stringify([]),
     updatedAt: new Date().toISOString()
   });
+};
+
+/**
+ * Resets an active session to the initial state to restart interview from question 0.
+ *
+ * @param {string} sessionId
+ * @returns {Promise<Object>} The reset session object
+ */
+export const restartSession = async (sessionId) => {
+  const existing = await getSession(sessionId);
+  if (!existing) {
+    throw new Error(`Session ${sessionId} not found`);
+  }
+
+  const maxDepth = existing.questionState?.maxFollowUpDepth || 3;
+
+  const resetData = {
+    ...existing,
+    status: 'INIT',
+    questionState: {
+      isWarmup: true,
+      baseQuestionIndex: 0,
+      currentFollowUpDepth: 0,
+      maxFollowUpDepth: maxDepth,
+      currentFollowUpQuestion: '',
+      isTransitioning: false,
+    },
+    conversationThread: [],
+    turns: [],
+    metrics: {
+      technicalScoreEstimate: 0,
+      communicationScoreEstimate: 0,
+    },
+    updatedAt: new Date().toISOString(),
+  };
+
+  return await updateSession(sessionId, resetData);
 };

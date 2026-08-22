@@ -16,6 +16,11 @@ openrouter:
 llm:
   timeout-seconds: ${LLM_TIMEOUT_SECONDS:60}
   final-report-timeout-seconds: ${LLM_FINAL_REPORT_TIMEOUT_SECONDS:180}
+  max-retries: ${LLM_MAX_RETRIES:2}
+  retry-backoff-ms: ${LLM_RETRY_BACKOFF_MS:1000}
+  max-cv-length: ${LLM_MAX_CV_LENGTH:8000}
+  max-jd-length: ${LLM_MAX_JD_LENGTH:8000}
+  max-answer-length: ${LLM_MAX_ANSWER_LENGTH:4000}
 
 grpc:
   server:

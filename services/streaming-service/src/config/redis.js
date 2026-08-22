@@ -5,7 +5,7 @@ dotenv.config();
 
 let redisClient;
 
-if (process.env.NODE_ENV === 'test') {
+if (process.env.NODE_ENV === 'test' || process.env.npm_lifecycle_event === 'test') {
   const store = new Map();
   redisClient = {
     isOpen: true,
