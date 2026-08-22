@@ -25,6 +25,9 @@ message InferenceRequest {
   bool fast_mode = 9;
   string cv_text = 10;
   repeated string good_answer_signals = 11;
+  string candidate_name = 12;
+  int32 candidate_age = 13;
+  string candidate_gender = 14;
 }
 
 message QAContext {

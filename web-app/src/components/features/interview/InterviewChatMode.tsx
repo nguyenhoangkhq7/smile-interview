@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   Timer,
   LogOut,
+  RotateCcw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -90,6 +91,7 @@ export function InterviewChatMode() {
   const [baseQuestionIndex, setBaseQuestionIndex] = useState(0);
   const [timeLeft, setTimeLeft] = useState(900); // 15 min
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [showRestartConfirm, setShowRestartConfirm] = useState(false);
 
   // ── Refs ─────────────────────────────────────────────────────────────────
   const socketRef = useRef<Socket | null>(null);
@@ -131,18 +133,10 @@ export function InterviewChatMode() {
       const currentSession = await historyService.getSessionById(sessionId);
       if (currentSession) {
         currentSession.status = 'Completed';
-        if (currentSession.questions.length > 0) {
-          const scoredQuestions = currentSession.questions.filter((q: { score?: number }) => (q.score || 0) > 0);
-          if (scoredQuestions.length > 0) {
-            const totalScores = scoredQuestions.reduce(
-              (sum: number, q: { score?: number }) => sum + (q.score || 0),
-              0
-            );
-            currentSession.overallScore = Math.round(totalScores / scoredQuestions.length);
-          }
-        } else {
-          currentSession.overallScore = 60;
-        }
+        // NOTE: Do NOT calculate or write overallScore here.
+        // The evaluate API (called below fire-and-forget) reads session_turns from DB
+        // and computes the real score via LLM. Writing a 0/placeholder here would
+        // overwrite that result. We only update the status field.
         await historyService.saveSession({ ...currentSession, replaceQuestions: true });
 
         const token = useAuthStore.getState().token;
@@ -245,8 +239,45 @@ export function InterviewChatMode() {
           return;
         }
 
-        // Persist updated question score to history service
-        if (evaluation && score !== undefined) {
+        // ── Persist the incoming follow-up question to DB ──────────────────────
+        // This is critical: follow-up questions are AI-generated and not in the
+        // initial question bank. We add them here so handleSend() can find and
+        // match them by text when the candidate submits their answer.
+        if (actionType === 'FOLLOW_UP' && text) {
+          historyService.getSessionById(sessionId).then((sess) => {
+            if (sess) {
+              const updated = sess.questions
+                ? [...(sess.questions as unknown as ChatSessionQuestion[])]
+                : [];
+              const alreadyExists = updated.some((q) => {
+                const qStr = typeof q.question === 'object' && q.question !== null ? q.question.question : q.question;
+                return qStr && qStr.trim() === text.trim();
+              });
+              if (!alreadyExists) {
+                updated.push({
+                  question: text,
+                  answer: '',
+                  score: 0,
+                  strengths: '',
+                  improvements: '',
+                  suggestedAnswer: '',
+                  topicTag: '',
+                  isDeepDive: true,
+                });
+                historyService.saveSession({
+                  ...sess,
+                  questions: updated as unknown as QuestionFeedback[],
+                  replaceQuestions: true,
+                });
+              }
+            }
+          });
+        }
+
+        // ── Persist score/evaluation on the previously answered question ────────
+        // NOTE: Server currently emits score: null in INTERVIEWER_ACTION, so this
+        // block is effectively reserved for future use when server sends real scores.
+        if (score !== null && score !== undefined) {
           historyService.getSessionById(sessionId).then((session) => {
             if (session?.questions) {
               const updated = [...(session.questions as unknown as ChatSessionQuestion[])];
@@ -276,25 +307,6 @@ export function InterviewChatMode() {
                 };
               }
 
-              // 2. Check if new question already exists in list before adding
-              const newQExists = updated.some((q) => {
-                const qStr = typeof q.question === 'object' && q.question !== null ? q.question.question : q.question;
-                return qStr && text && qStr.trim() === text.trim();
-              });
-
-              if (!newQExists && text) {
-                updated.push({
-                  question: text,
-                  answer: '',
-                  score: 0,
-                  strengths: '',
-                  improvements: '',
-                  suggestedAnswer: '',
-                  topicTag: '',
-                  isDeepDive: actionType === 'FOLLOW_UP',
-                });
-              }
-
               historyService.saveSession({
                 ...session,
                 questions: updated as unknown as QuestionFeedback[],
@@ -304,23 +316,41 @@ export function InterviewChatMode() {
           });
         }
 
-        currentQuestionRef.current = text || '';
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: generateId(),
-            sender: 'ai',
-            text: text || '',
-            time: formatCurrentTime(),
-            isDeepDive: actionType === 'FOLLOW_UP',
-          },
-        ]);
+        // ── For TRANSITION: update currentQuestionRef to the base question text ─
+        // The server sends the full "prefix\n\n👉 rawQuestion" as `text`.
+        // Extract just the rawQuestion portion so handleSend can match it in DB.
+        if (actionType === 'TRANSITION' && text) {
+          const arrowIdx = text.indexOf('👉');
+          currentQuestionRef.current = arrowIdx !== -1
+            ? text.slice(arrowIdx + 2).trim()  // text after "👉 "
+            : text;
+        } else {
+          currentQuestionRef.current = text || '';
+        }
+
+        setMessages((prev) => {
+          if (prev.length > 0 && prev[prev.length - 1].text === text) {
+            return prev;
+          }
+          return [
+            ...prev,
+            {
+              id: generateId(),
+              sender: 'ai',
+              text: text || '',
+              time: formatCurrentTime(),
+              isDeepDive: actionType === 'FOLLOW_UP',
+            },
+          ];
+        });
         setSessionState('LISTENING');
         setTimeout(() => textareaRef.current?.focus(), 100);
       } else if (data.type === 'STATE_UPDATE') {
         const { status } = (data.payload || {}) as { status?: string };
         if (status === 'COMPLETED') {
           handleFinishInterview();
+        } else if (status === 'IN_PROGRESS') {
+          setSessionState((prev) => (prev === 'AI_THINKING' ? 'LISTENING' : prev));
         }
       }
     });
@@ -354,15 +384,22 @@ export function InterviewChatMode() {
     }
 
     if (socketRef.current?.connected) {
+      const sampleQ = initialQuestions[0]?.question || '';
+      const isVi = /[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i.test(sampleQ);
+      const detectedLang = isVi ? 'vi' : 'en';
+      const user = useAuthStore.getState().user;
+
       socketRef.current.emit('join-interview', {
         interviewId: sessionId,
-        userId: 'candidate-user',
+        userId: user?.id || 'candidate-user',
+        candidateName: user?.username || '',
         initialQuestions,
         baseQuestionIndex,
         interviewDomain: data?.interviewType || 'IT',
-        targetJobTitle: data?.roleTitle || 'IT Engineer',
-        resumeText: '',
-        jdText: '',
+        targetJobTitle: data?.roleTitle || (detectedLang === 'en' ? 'Software Engineer' : 'Kỹ sư Phần mềm'),
+        resumeText: data?.cvExtractedText || '',
+        jdText: data?.jdExtractedText || '',
+        language: detectedLang,
         chatMode: true,  // ← signals server to bypass avatar generation & TTS
       });
     } else {
@@ -370,6 +407,52 @@ export function InterviewChatMode() {
       setSessionState('INITIALIZING');
     }
   }, [sessionId, startTimer, baseQuestionIndex]);
+
+  // ── Restart interview from beginning ─────────────────────────────────────
+  const handleRestartInterview = useCallback(async () => {
+    setShowRestartConfirm(false);
+    setMessages([]);
+    setInputValue('');
+    setBaseQuestionIndex(0);
+    setTimeLeft(900);
+    setSessionState('INITIALIZING');
+    currentQuestionRef.current = '';
+
+    // Reset saved question answers and scores in local storage / session history
+    try {
+      const currentSession = await historyService.getSessionById(sessionId);
+      if (currentSession?.questions) {
+        const resetQuestions = currentSession.questions.map((q) => ({
+          ...q,
+          answer: '',
+          score: 0,
+          strengths: '',
+          improvements: '',
+          suggestedAnswer: '',
+        }));
+        await historyService.saveSession({
+          ...currentSession,
+          status: 'In progress',
+          overallScore: undefined,
+          overallFeedback: undefined,
+          questions: resetQuestions,
+          replaceQuestions: true,
+        });
+      }
+    } catch (e) {
+      console.warn('[ChatMode] Failed to reset session history for restart:', e);
+    }
+
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('orchestration-event', {
+        type: 'RESTART_INTERVIEW',
+        payload: { sessionId },
+      });
+    } else {
+      // Re-trigger start interview with force restart if socket was disconnected
+      handleStartInterview();
+    }
+  }, [sessionId, handleStartInterview]);
 
   // ── Send candidate answer ─────────────────────────────────────────────────
   const handleSend = useCallback(() => {
@@ -513,6 +596,17 @@ export function InterviewChatMode() {
             <Timer size={14} />
             {formatCountdown(timeLeft)}
           </div>
+
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setShowRestartConfirm(true)}
+            className="text-xs text-slate-600 border-slate-300 hover:border-amber-400 hover:text-amber-700 gap-1.5"
+            title="Làm lại phỏng vấn từ đầu"
+          >
+            <RotateCcw size={12} />
+            Phỏng vấn lại
+          </Button>
 
           <Button
             size="sm"
@@ -689,6 +783,30 @@ export function InterviewChatMode() {
           )}
         </div>
       </div>
+
+      {/* ── Restart confirm modal ── */}
+      {showRestartConfirm && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full">
+            <h3 className="text-base font-bold text-slate-800 mb-2">Phỏng vấn lại từ đầu?</h3>
+            <p className="text-sm text-slate-500 leading-relaxed mb-5">
+              Toàn bộ câu trả lời trước đó trong phiên này sẽ được làm mới và bắt đầu lại từ câu hỏi đầu tiên. Bạn có chắc chắn không?
+            </p>
+            <div className="flex gap-3 justify-end">
+              <Button variant="outline" size="sm" onClick={() => setShowRestartConfirm(false)}>
+                Hủy bỏ
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleRestartInterview}
+                className="bg-amber-600 hover:bg-amber-700 text-white font-semibold"
+              >
+                Xác nhận làm lại
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Exit confirm modal ── */}
       {showExitConfirm && (

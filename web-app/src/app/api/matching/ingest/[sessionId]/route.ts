@@ -121,7 +121,7 @@ export async function POST(
         finalJdId = insertJdRes.rows[0].id;
       } else if (jdText && jdText.trim() !== '') {
         const existingJdRes = await query(
-          'SELECT id FROM job_descriptions WHERE extracted_text = $1 LIMIT 1',
+          'SELECT id FROM job_descriptions WHERE parsed_content = $1 LIMIT 1',
           [jdText]
         );
         if (existingJdRes.rows.length > 0) {
@@ -129,7 +129,7 @@ export async function POST(
           finalJdId = existingJdRes.rows[0].id;
         } else {
           const insertJdRes = await query(
-            'INSERT INTO job_descriptions (user_id, title, extracted_text) VALUES ($1, $2, $3) RETURNING id',
+            'INSERT INTO job_descriptions (user_id, title, parsed_content) VALUES ($1, $2, $3) RETURNING id',
             [authUserId, 'JD_Text_' + Date.now(), jdText]
           );
           finalJdId = insertJdRes.rows[0].id;
@@ -137,8 +137,8 @@ export async function POST(
       }
     }
 
-    // ── 3. Fetch cached data: extracted_text (markdown) AND raw_text ──────────
-    // extracted_text → used to decide whether to call Java (Groq LLM bypass)
+    // ── 3. Fetch cached data: parsed_content (markdown) AND raw_text ──────────
+    // parsed_content → used to decide whether to call Java (Groq LLM bypass)
     // raw_text       → used for visual keyword matching (pre-LLM plain text)
     let cvMarkdownToSend: string | null = null;
     let cvFileToSend: Blob | null = null;
@@ -147,17 +147,17 @@ export async function POST(
 
     if (finalResumeId) {
       const resumeRes = await query(
-        'SELECT file_name, file_url, extracted_text, raw_text FROM resumes WHERE id = $1',
+        'SELECT file_name, file_url, parsed_content, raw_text FROM resumes WHERE id = $1',
         [finalResumeId]
       );
       if (resumeRes.rows.length > 0) {
         const row = resumeRes.rows[0];
         cvFileName = row.file_name;
-        cachedRawCvText = row.raw_text || null;
+        cachedRawCvText = row.raw_text || row.parsed_content || null;
 
-        if (row.extracted_text) {
-          cvMarkdownToSend = row.extracted_text;
-        } else if (row.file_url) {
+        if (row.parsed_content) {
+          cvMarkdownToSend = row.parsed_content;
+        } else if (row.file_url && row.file_url.trim() !== '') {
           try {
             const fileRes = await fetch(row.file_url);
             if (fileRes.ok) {
@@ -181,32 +181,28 @@ export async function POST(
 
     if (finalJdId) {
       const jdRes = await query(
-        'SELECT title, file_url, extracted_text, raw_text FROM job_descriptions WHERE id = $1',
+        'SELECT title, file_url, parsed_content, raw_text FROM job_descriptions WHERE id = $1',
         [finalJdId]
       );
       if (jdRes.rows.length > 0) {
         const row = jdRes.rows[0];
         jdFileName = row.title;
-        cachedRawJdText = row.raw_text || null;
+        cachedRawJdText = row.raw_text || row.parsed_content || null;
 
-        if (row.file_url) {
-          if (row.extracted_text) {
-            jdMarkdownToSend = row.extracted_text;
-          } else {
-            try {
-              const fileRes = await fetch(row.file_url);
-              if (fileRes.ok) {
-                const arrayBuffer = await fileRes.arrayBuffer();
-                jdFileToSend = new Blob([arrayBuffer], { type: 'application/pdf' });
-              } else {
-                console.error(`[API Proxy Ingest] Failed to fetch JD from URL ${row.file_url}:`, fileRes.statusText);
-              }
-            } catch (fetchError) {
-              console.error('[API Proxy Ingest] Error fetching JD from URL:', fetchError);
+        if (row.parsed_content) {
+          jdMarkdownToSend = row.parsed_content;
+        } else if (row.file_url && row.file_url.trim() !== '') {
+          try {
+            const fileRes = await fetch(row.file_url);
+            if (fileRes.ok) {
+              const arrayBuffer = await fileRes.arrayBuffer();
+              jdFileToSend = new Blob([arrayBuffer], { type: 'application/pdf' });
+            } else {
+              console.error(`[API Proxy Ingest] Failed to fetch JD from URL ${row.file_url}:`, fileRes.statusText);
             }
+          } catch (fetchError) {
+            console.error('[API Proxy Ingest] Error fetching JD from URL:', fetchError);
           }
-        } else {
-          jdTextToSend = row.extracted_text;
         }
       }
     } else {
@@ -324,7 +320,10 @@ export async function POST(
       // ── 5a. Cache newly generated Markdowns ────────────────────────────────
       if (result.cvMarkdown && finalResumeId && !cvMarkdownToSend) {
         try {
-          await query('UPDATE resumes SET extracted_text = $1 WHERE id = $2', [result.cvMarkdown, finalResumeId]);
+          await query(
+            'UPDATE resumes SET parsed_content = $1 WHERE id = $2',
+            [result.cvMarkdown, finalResumeId]
+          );
           console.log(`[API Proxy Ingest] Successfully cached CV Markdown for resume ID: ${finalResumeId}`);
         } catch (dbError) {
           console.error(`[API Proxy Ingest] Failed to cache CV Markdown for resume ID ${finalResumeId}:`, dbError);
@@ -333,7 +332,10 @@ export async function POST(
 
       if (result.jdMarkdown && finalJdId && !jdMarkdownToSend) {
         try {
-          await query('UPDATE job_descriptions SET extracted_text = $1 WHERE id = $2', [result.jdMarkdown, finalJdId]);
+          await query(
+            'UPDATE job_descriptions SET parsed_content = $1 WHERE id = $2',
+            [result.jdMarkdown, finalJdId]
+          );
           console.log(`[API Proxy Ingest] Successfully cached JD Markdown for job description ID: ${finalJdId}`);
         } catch (dbError) {
           console.error(`[API Proxy Ingest] Failed to cache JD Markdown for job description ID ${finalJdId}:`, dbError);

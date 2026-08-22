@@ -43,6 +43,12 @@ public class Question {
     @Column(name = "difficulty", length = 50)
     private String difficulty;
 
+    @Column(name = "topic", length = 150)
+    private String topic;
+
+    @Column(name = "details", columnDefinition = "TEXT")
+    private String details;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 

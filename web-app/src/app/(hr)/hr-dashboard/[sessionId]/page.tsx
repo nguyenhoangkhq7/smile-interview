@@ -32,9 +32,9 @@ async function getSessionData(sessionId: string): Promise<SessionHistoryItem | n
       SELECT DISTINCT ON (s.id)
         s.*,
         r.file_url AS cv_file_url,
-        COALESCE(r.raw_text, r.parsed_content, r.extracted_text) AS cv_extracted_text,
+        COALESCE(r.raw_text, r.parsed_content) AS cv_extracted_text,
         j.file_url AS jd_file_url,
-        COALESCE(j.raw_text, j.parsed_content, j.extracted_text) AS jd_extracted_text
+        COALESCE(j.raw_text, j.parsed_content) AS jd_extracted_text
       FROM sessions s
       LEFT JOIN resumes r ON (s.resume_id = r.id OR (s.resume_id IS NULL AND s.cv_filename = r.file_name))
       LEFT JOIN job_descriptions j ON (s.jd_id = j.id OR (s.jd_id IS NULL AND s.jd_filename = j.title))

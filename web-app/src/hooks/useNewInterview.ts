@@ -4,13 +4,15 @@ import { useState, useEffect, useRef, useCallback, type ChangeEvent, type DragEv
 import { useRouter } from 'next/navigation';
 import { cvJdMatchingService, type AssessmentResponse } from '@/services/cvJdMatching';
 import { historyService } from '@/services/historyService';
-import { type ActiveSession } from '@/components/interview/ActiveSessionsList';
+import { type ActiveSession, type SessionStage } from '@/components/features/interview/NewInterview/ActiveSessionsPanel';
 import { useAuthStore } from '@/store/authStore';
 
 export type CvSource  = 'upload' | 'saved' | 'default';
 export type JdSource  = 'upload' | 'text' | 'saved';
 export type CriteriaFilter = 'all' | 'matched' | 'partial' | 'weak' | 'missing';
 export type ActiveView = 'ai-cards' | 'visual-match';
+export type InterviewGenerationMode = 'SCREENING' | 'DEEP_DIVE';
+export type InterviewChannel = 'VOICE' | 'TEXT_IDE';
 
 
 const ROLE_MAP: Record<string, string> = {
@@ -155,8 +157,9 @@ export function useNewInterview() {
   const [activeJdId,       setActiveJdId]       = useState<number | null>(null);
   const [criteriaFilter,   setCriteriaFilter]   = useState<CriteriaFilter>('all');
   const [activeView,       setActiveView]       = useState<ActiveView>('ai-cards');
+  const [interviewMode,    setInterviewMode]    = useState<InterviewGenerationMode>('DEEP_DIVE');
+  const [interviewChannel, setInterviewChannel] = useState<InterviewChannel>('VOICE');
 
-  
   const [viewerOpen,  setViewerOpen]  = useState(false);
   const [viewerUrl,   setViewerUrl]   = useState('');
   const [viewerTitle, setViewerTitle] = useState('');
@@ -175,11 +178,35 @@ export function useNewInterview() {
           sessions
             .filter((s) => s.status !== 'Completed')
             .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-            .map((s) => ({
-              sessionId: s.id, roleTitle: s.roleTitle, cvFilename: s.cvFilename,
-              jdFilename: s.jdFilename, status: s.status, date: s.date,
-              hasAssessment: s.competencyFitScore !== undefined,
-            }))
+            .map((s) => {
+              const hasAssessment = s.competencyFitScore !== undefined && s.competencyFitScore !== null;
+              const questions = s.questions || [];
+              const hasQuestions = questions.length > 0;
+              const answeredCount = questions.filter((q) => q.answer && q.answer.trim() !== '').length;
+              const totalQuestions = questions.length;
+
+              let stage: SessionStage = 'UPLOADED';
+              if (hasQuestions) {
+                stage = 'INTERVIEWING';
+              } else if (hasAssessment) {
+                stage = 'ASSESSED';
+              }
+
+              return {
+                sessionId: s.id,
+                roleTitle: s.roleTitle,
+                cvFilename: s.cvFilename,
+                jdFilename: s.jdFilename,
+                status: s.status,
+                date: s.date,
+                hasAssessment,
+                hasQuestions,
+                competencyFitScore: s.competencyFitScore,
+                stage,
+                answeredCount,
+                totalQuestions,
+              };
+            })
         );
       } catch (e) { console.error('[useNewInterview] sessions', e); }
 
@@ -327,22 +354,108 @@ export function useNewInterview() {
   }, []);
 
   
+  const handleRunAssessment = useCallback(async (
+    forceRefresh = false,
+    overrideSessionId?: string | null,
+    overrideResumeId?: number | null,
+    overrideJdId?: number | null
+  ) => {
+    const targetSessionId = overrideSessionId || sessionId;
+    const targetResumeId = overrideResumeId !== undefined ? overrideResumeId : selectedResumeId;
+    const targetJdId = overrideJdId !== undefined ? overrideJdId : selectedJdId;
+
+    if (!targetSessionId) return;
+    setAnalyzing(true);
+    setApiError(null);
+    try {
+      const result = await cvJdMatchingService.getAssessment(targetSessionId, forceRefresh, targetResumeId, targetJdId);
+      setAssessment(result);
+
+      const displayCvName = cvSource === 'upload' && cvFile
+        ? cvFile.name : (savedResumes.find((r) => r.id === targetResumeId)?.file_name || 'Saved_CV.pdf');
+      const displayJdName = jdSource === 'upload' && jdFile
+        ? jdFile.name : jdSource === 'text' ? 'JD_Pasted_Text.txt'
+        : (savedJds.find((j) => j.id === targetJdId)?.title || 'Saved_JD.pdf');
+      const defaultRoleName = jdSource === 'saved' && targetJdId
+        ? (savedJds.find((j) => j.id === targetJdId)?.title || 'Software Engineer')
+        : jdSource === 'upload' && jdFile
+        ? jdFile.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ')
+        : 'Software Engineer';
+
+      const finalRole = result.roleTypeDetected
+        ? getDisplayRoleTitle(result.roleTypeDetected)
+        : defaultRoleName;
+
+      const finalSessionId = result.sessionId || targetSessionId;
+      setSessionId(finalSessionId);
+      setRoleTitle(finalRole);
+      await historyService.saveSession({
+        id: finalSessionId, date: new Date().toISOString(),
+        interviewType: 'Technical', roleTitle: finalRole,
+        cvFilename: displayCvName, jdFilename: displayJdName,
+        resumeId: targetResumeId || undefined, jdId: targetJdId || undefined,
+        status: 'In progress', questions: [], replaceQuestions: false,
+        overallScore: result.competencyFitScore,
+        competencyFitScore: result.competencyFitScore,
+        technicalDepthScore: result.technicalDepthScore,
+        matchLevel: result.matchLevel, candidateLevel: result.candidateLevel,
+        roleTypeDetected: result.roleTypeDetected,
+        yearsOfExperienceEstimate: result.yearsOfExperienceEstimate,
+        strongAreas: result.strongAreas, gapAreas: result.gapAreas,
+        criticalMissingSkills: result.criticalMissingSkills,
+        sectionWiseFeedback: result.sectionWiseFeedback,
+        actionableSuggestions: result.actionableImprovementSuggestions,
+        quickWins: result.quickWins,
+        skillGaps: result.skillGaps,
+        gateEvidenceItems: result.gateEvidenceItems || [],
+        mustHaveEvidenceItems: result.mustHaveEvidenceItems || result.evidenceItems,
+        preferToHaveEvidenceItems: result.preferToHaveEvidenceItems || result.additionalEvidenceItems,
+        evidenceItems: result.mustHaveEvidenceItems || result.evidenceItems,
+        additionalEvidenceItems: result.preferToHaveEvidenceItems || result.additionalEvidenceItems,
+        scoreBreakdown: result.scoreBreakdown,
+        topPriorityImprovements: result.topPriorityImprovements,
+        eligibility: result.eligibility,
+      });
+    } catch (err) {
+      const error = err as Error;
+      console.error('[useNewInterview] assessment error:', error);
+      setApiError('Đã xảy ra lỗi khi kết nối với máy chủ AI. Vui lòng thử lại sau.');
+    } finally {
+      setAnalyzing(false);
+    }
+  }, [cvFile, cvSource, jdFile, jdSource, savedJds, savedResumes, selectedJdId, selectedResumeId, sessionId]);
+
+  
   const handleResumeSession = useCallback(async (id: string) => {
     try {
       const session = await historyService.getSessionById(id);
       if (session) {
-        const hasQ = session.questions?.length > 0;
+        const hasQ = session.questions && session.questions.length > 0;
+        // Giai đoạn 1: Mới upload CV & JD, chưa có đánh giá và chưa có câu hỏi
         if (session.competencyFitScore === undefined && !hasQ) {
-          setSessionId(session.id); setRoleTitle(session.roleTitle);
-          setIngested(true); setAssessment(null); return;
+          setSessionId(session.id);
+          setRoleTitle(session.roleTitle);
+          setIngested(true);
+          setAssessment(null);
+          if (session.resumeId) setActiveResumeId(session.resumeId);
+          if (session.jdId)     setActiveJdId(session.jdId);
+          if (session.cvFilename) setCvDisplayName(session.cvFilename);
+          if (session.jdFilename) setJdDisplayName(session.jdFilename);
+          await handleRunAssessment(false, session.id, session.resumeId, session.jdId);
+          return;
         }
+        // Giai đoạn 2: Đã có đánh giá tương thích nhưng chưa phỏng vấn
         if (session.competencyFitScore !== undefined && !hasQ) {
-          await handleViewAssessment(id); return;
+          await handleViewAssessment(id);
+          return;
         }
+        // Giai đoạn 3: Đã có câu hỏi phỏng vấn -> vào phòng phỏng vấn trực tiếp
+        router.push(`/interview/session/${id}`);
+        return;
       }
     } catch (e) { console.error('[useNewInterview] resume', e); }
     router.push(`/interview/session/${id}`);
-  }, [handleViewAssessment, router]);
+  }, [handleRunAssessment, handleViewAssessment, router]);
 
   
   const handleRestart = useCallback(async (id: string) => {
@@ -378,19 +491,23 @@ export function useNewInterview() {
 
   // ── Continue to Interview Room & Gen Questions ─────────────
   const handleContinueToSelection = useCallback(async () => {
-    if (!assessment || !sessionId) return;
+    const targetSessionId = assessment?.sessionId || sessionId;
+    if (!assessment || !targetSessionId) {
+      console.warn('[useNewInterview] cannot continue: missing assessment or sessionId', { assessment, sessionId });
+      return;
+    }
     setGenerating(true);
     setApiError(null);
     try {
-      const displayCvName = cvSource === 'upload' && cvFile
+      const displayCvName = cvDisplayName || (cvSource === 'upload' && cvFile
         ? cvFile.name
-        : (savedResumes.find((r) => r.id === selectedResumeId)?.file_name || 'Saved_CV.pdf');
+        : (savedResumes.find((r) => r.id === selectedResumeId)?.file_name || 'Saved_CV.pdf'));
 
-      const displayJdName = jdSource === 'upload' && jdFile
+      const displayJdName = jdDisplayName || (jdSource === 'upload' && jdFile
         ? jdFile.name
         : (jdSource === 'text'
           ? 'JD_Pasted_Text.txt'
-          : (savedJds.find((j) => j.id === selectedJdId)?.title || 'Saved_JD.pdf'));
+          : (savedJds.find((j) => j.id === selectedJdId)?.title || 'Saved_JD.pdf')));
 
       const token = useAuthStore.getState().token;
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -402,12 +519,30 @@ export function useNewInterview() {
         method: 'POST',
         headers,
         body: JSON.stringify({
-          sessionId: assessment.sessionId,
-          questionConfig: { behavioural: 1, technical: 3, coding: 1, systemDesign: 0 },
+          sessionId: targetSessionId,
+          questionConfig: {
+            behavioural: 1,
+            technical: 3,
+            coding: 1,
+            systemDesign: 0,
+            mode: interviewMode,
+            interviewChannel: interviewChannel,
+          },
         }),
       });
 
-      if (!qbRes.ok) throw new Error('Failed to generate question bank');
+      if (!qbRes.ok) {
+        const errText = await qbRes.text();
+        console.error('[useNewInterview] Question bank generation failed:', errText);
+        let detail = 'Không thể tạo ngân hàng câu hỏi';
+        try {
+          const parsed = JSON.parse(errText);
+          detail = parsed.error || parsed.message || detail;
+        } catch {
+          detail = errText || detail;
+        }
+        throw new Error(detail);
+      }
       const qbData = await qbRes.json();
 
       const questionsToSave = (qbData.questionBank || qbData.question_bank || []).map((q: QuestionBankItem) => ({
@@ -427,7 +562,7 @@ export function useNewInterview() {
         : roleTitle;
 
       await historyService.saveSession({
-        id: assessment.sessionId,
+        id: targetSessionId,
         date: new Date().toISOString(),
         interviewType: 'Technical',
         roleTitle: finalRole,
@@ -459,13 +594,18 @@ export function useNewInterview() {
         eligibility: assessment.eligibility,
       });
 
-      router.push(`/interview/session/${assessment.sessionId}`);
+      router.push(`/interview/session/${targetSessionId}`);
     } catch (err) {
       console.error('[useNewInterview] continue to selection error:', err);
-      setApiError('Đã xảy ra lỗi khi tạo ngân hàng câu hỏi. Vui lòng thử lại sau.');
+      const errorMsg = err instanceof Error ? err.message : 'Đã xảy ra lỗi khi tạo ngân hàng câu hỏi. Vui lòng thử lại sau.';
+      setApiError(errorMsg);
       setGenerating(false);
     }
-  }, [assessment, sessionId, cvFile, cvSource, jdFile, jdSource, savedJds, savedResumes, selectedJdId, selectedResumeId, roleTitle, router]);
+  }, [
+    assessment, sessionId, cvFile, cvSource, jdFile, jdSource,
+    savedJds, savedResumes, selectedJdId, selectedResumeId,
+    roleTitle, router, interviewMode, interviewChannel, cvDisplayName, jdDisplayName
+  ]);
 
   
   const handleUploadAndIngest = useCallback(async () => {
@@ -546,6 +686,9 @@ export function useNewInterview() {
       setJdDisplayName(displayJdName);
       if (ingestRes.rawCvText) setRawCvText(ingestRes.rawCvText);
       if (ingestRes.rawJdText) setRawJdText(ingestRes.rawJdText);
+
+      // Auto-fetch assessment (instantly displays if cached)
+      await handleRunAssessment(false, newSessionId, ingestRes.resumeId, ingestRes.jdId);
     } catch (err) {
       const error = err as Error;
       console.error('[useNewInterview] ingest error:', error);
@@ -555,68 +698,7 @@ export function useNewInterview() {
       setAnalyzing(false);
       clearInterval(tick);
     }
-  }, [cvFile, cvSource, jdFile, jdSource, jdText, savedJds, savedResumes, selectedJdId, selectedResumeId]);
-
-  
-  const handleRunAssessment = useCallback(async (forceRefresh = false) => {
-    if (!sessionId) return;
-    setAnalyzing(true);
-    setApiError(null);
-    try {
-      const result = await cvJdMatchingService.getAssessment(sessionId, forceRefresh, selectedResumeId, selectedJdId);
-      setAssessment(result);
-
-      const displayCvName = cvSource === 'upload' && cvFile
-        ? cvFile.name : (savedResumes.find((r) => r.id === selectedResumeId)?.file_name || 'Saved_CV.pdf');
-      const displayJdName = jdSource === 'upload' && jdFile
-        ? jdFile.name : jdSource === 'text' ? 'JD_Pasted_Text.txt'
-        : (savedJds.find((j) => j.id === selectedJdId)?.title || 'Saved_JD.pdf');
-      const defaultRoleName = jdSource === 'saved' && selectedJdId
-        ? (savedJds.find((j) => j.id === selectedJdId)?.title || 'Software Engineer')
-        : jdSource === 'upload' && jdFile
-        ? jdFile.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ')
-        : 'Software Engineer';
-
-      const finalRole = result.roleTypeDetected
-        ? getDisplayRoleTitle(result.roleTypeDetected)
-        : defaultRoleName;
-
-      setRoleTitle(finalRole);
-      await historyService.saveSession({
-        id: result.sessionId || sessionId!, date: new Date().toISOString(),
-        interviewType: 'Technical', roleTitle: finalRole,
-        cvFilename: displayCvName, jdFilename: displayJdName,
-        resumeId: selectedResumeId || undefined, jdId: selectedJdId || undefined,
-        status: 'In progress', questions: [], replaceQuestions: false,
-        overallScore: result.competencyFitScore,
-        competencyFitScore: result.competencyFitScore,
-        technicalDepthScore: result.technicalDepthScore,
-        matchLevel: result.matchLevel, candidateLevel: result.candidateLevel,
-        roleTypeDetected: result.roleTypeDetected,
-        yearsOfExperienceEstimate: result.yearsOfExperienceEstimate,
-        strongAreas: result.strongAreas, gapAreas: result.gapAreas,
-        criticalMissingSkills: result.criticalMissingSkills,
-        sectionWiseFeedback: result.sectionWiseFeedback,
-        actionableSuggestions: result.actionableImprovementSuggestions,
-        quickWins: result.quickWins,
-        skillGaps: result.skillGaps,
-        gateEvidenceItems: result.gateEvidenceItems || [],
-        mustHaveEvidenceItems: result.mustHaveEvidenceItems || result.evidenceItems,
-        preferToHaveEvidenceItems: result.preferToHaveEvidenceItems || result.additionalEvidenceItems,
-        evidenceItems: result.mustHaveEvidenceItems || result.evidenceItems,
-        additionalEvidenceItems: result.preferToHaveEvidenceItems || result.additionalEvidenceItems,
-        scoreBreakdown: result.scoreBreakdown,
-        topPriorityImprovements: result.topPriorityImprovements,
-        eligibility: result.eligibility,
-      });
-    } catch (err) {
-      const error = err as Error;
-      console.error('[useNewInterview] assessment error:', error);
-      setApiError('Đã xảy ra lỗi khi kết nối với máy chủ AI. Vui lòng thử lại sau.');
-    } finally {
-      setAnalyzing(false);
-    }
-  }, [cvFile, cvSource, jdFile, jdSource, savedJds, savedResumes, selectedJdId, selectedResumeId, sessionId]);
+  }, [cvFile, cvSource, jdFile, jdSource, jdText, savedJds, savedResumes, selectedJdId, selectedResumeId, handleRunAssessment]);
 
   return {
     user,
@@ -639,6 +721,8 @@ export function useNewInterview() {
     cvDisplayName, jdDisplayName,
     criteriaFilter, setCriteriaFilter,
     activeView, setActiveView,
+    interviewMode, setInterviewMode,
+    interviewChannel, setInterviewChannel,
     
     viewerOpen, setViewerOpen, viewerUrl, setViewerUrl, viewerTitle, setViewerTitle,
     

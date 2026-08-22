@@ -49,10 +49,16 @@ public class QuestionBankServiceImpl implements QuestionBankService {
     @Transactional
     public QuestionBankResponseDto generate(GenerateQuestionBankRequest request) {
         String sessionId = request.getSessionId();
-        QuestionConfigDto config = request.getQuestionConfig();
+        QuestionConfigDto config = request.getQuestionConfig() != null
+                ? request.getQuestionConfig()
+                : QuestionConfigDto.builder().total(10).build();
 
-        if (config.getTotalQuestions() <= 0) {
-            throw new QuestionBankException("Total requested questions count must be at least 1.");
+        int rawTotal = config.getTotalQuestions();
+        if (rawTotal <= 0) {
+            config.setTotal(10);
+        } else if (rawTotal > 30) {
+            log.warn("[QuestionBank] Requested total questions {} exceeds maximum limit 30, clamping to 30", rawTotal);
+            config.setTotal(30);
         }
 
         log.info("[QuestionBank] Starting generation for session={}, total questions={}", sessionId, config.getTotalQuestions());
@@ -80,23 +86,28 @@ public class QuestionBankServiceImpl implements QuestionBankService {
                 .distinct()
                 .collect(Collectors.toList());
 
-        List<String> rawTechPossessed = allEvidencePairs.stream()
-                .filter(p -> "matched".equalsIgnoreCase(p.status()) || "partial".equalsIgnoreCase(p.status()) || "weak".equalsIgnoreCase(p.status()))
-                .map(EvidenceItemPair::cvEvidence)
-                .filter(s -> s != null && !s.isBlank())
-                .distinct()
-                .collect(Collectors.toList());
+        List<String> rawTechPossessed = new ArrayList<>();
+        List<String> rawTechRequired = new ArrayList<>();
+        if (assessment.getEvidenceItems() != null) {
+            for (var e : assessment.getEvidenceItems()) {
+                if (e.getCriteriaName() != null) {
+                    if ("matched".equalsIgnoreCase(e.getStatus()) || "weak".equalsIgnoreCase(e.getStatus()) || "partial".equalsIgnoreCase(e.getStatus())) {
+                        rawTechPossessed.add(e.getCriteriaName());
+                    }
+                    rawTechRequired.add(e.getCriteriaName());
+                }
+                if (e.getCvEvidence() != null && !e.getCvEvidence().isBlank()) {
+                    rawTechPossessed.add(e.getCvEvidence());
+                }
+                if (e.getJdRequirement() != null && !e.getJdRequirement().isBlank()) {
+                    rawTechRequired.add(e.getJdRequirement());
+                }
+            }
+        }
         List<String> techStackPossessed = extractTechKeywords(rawTechPossessed);
-
-        List<String> rawTechRequired = allEvidencePairs.stream()
-                .filter(p -> "missing".equalsIgnoreCase(p.status()))
-                .map(EvidenceItemPair::jdRequirement)
-                .filter(s -> s != null && !s.isBlank())
-                .distinct()
-                .collect(Collectors.toList());
         List<String> techStackRequired = extractTechKeywords(rawTechRequired);
 
-        Session session = sessionRepository.findById(sessionId).orElse(null);
+        Session session = (sessionRepository != null) ? sessionRepository.findById(sessionId).orElse(null) : null;
 
         String cvContent = (session != null && session.getResume() != null) ? session.getResume().getParsedContent() : null;
         String jdContent = (session != null && session.getJobDescription() != null) ? session.getJobDescription().getParsedContent() : null;
@@ -117,23 +128,34 @@ public class QuestionBankServiceImpl implements QuestionBankService {
 
         String targetDomain = detectTargetDomain(cvContent, jdContent);
 
+        Integer calculatedYoe = null;
+        if (cvContent != null && !cvContent.isBlank()) {
+            double yoeDouble = fit.iuh.modules.assessment.util.ResumeHeuristicsUtil.calculateCandidateYoe(cvContent);
+            if (yoeDouble > 0) {
+                calculatedYoe = (int) Math.round(yoeDouble);
+            }
+        }
+
+        List<String> projectHighlights = extractProjectHighlights(cvContent);
+
         CandidateContextDto context = CandidateContextDto.builder()
                 .candidateLevel(assessment.getSeniorityLevel())
                 .overallMatch(assessment.getOverallMatchScore() != null
                         ? (assessment.getOverallMatchScore() >= 80 ? "high"
                            : assessment.getOverallMatchScore() >= 50 ? "medium" : "low")
                         : "medium")
-                .yearsOfExperience(null)
+                .yearsOfExperience(calculatedYoe)
                 .strongAreas(strongAreas)
                 .gapAreas(gapAreas)
                 .techStackRequired(techStackRequired)
                 .techStackPossessed(techStackPossessed)
                 .targetDomain(targetDomain)
                 .roleType(assessment.getJobCategory())
+                .cvProjectHighlights(projectHighlights)
                 .build();
 
         List<QuestionAssignment> assignments = difficultyDistributor.distribute(
-                config.getTotalQuestions(),
+                config,
                 context.getCandidateLevel(),
                 assessment.getOverallMatchScore(),
                 allEvidencePairs
@@ -142,85 +164,176 @@ public class QuestionBankServiceImpl implements QuestionBankService {
         Map<String, List<QuestionAssignment>> assignmentsByCategory = assignments.stream()
                 .collect(Collectors.groupingBy(QuestionAssignment::category, LinkedHashMap::new, Collectors.toList()));
 
-        List<QuestionDto> allQuestions = new ArrayList<>();
+        Set<String> chosenQuestionTexts = Collections.synchronizedSet(new HashSet<>());
+        Map<String, List<QuestionDto>> cachedQuestionsByCategory = new LinkedHashMap<>();
+        Map<String, List<QuestionAssignment>> missedAssignmentsByCategory = new LinkedHashMap<>();
 
+        boolean isDeepDive = "DEEP_DIVE".equalsIgnoreCase(config.getMode());
+
+        // First pass: Check Redis Semantic Cache for each category (bypassed if DEEP_DIVE mode)
         for (var entry : assignmentsByCategory.entrySet()) {
             String type = entry.getKey();
             List<QuestionAssignment> typeAssignments = entry.getValue();
 
-            List<QuestionDto> typeQuestions = new ArrayList<>();
-            List<QuestionAssignment> missedAssignments = new ArrayList<>();
+            List<QuestionDto> typeCached = new ArrayList<>();
+            List<QuestionAssignment> missed = new ArrayList<>();
 
             for (QuestionAssignment qa : typeAssignments) {
-                String cacheKey = null;
-                if (qa.item() != null) {
-                    cacheKey = resolveCacheKey(qa.item(), assessment.getSeniorityLevel());
+                boolean hit = false;
+                if (!isDeepDive) {
+                    String cacheKey = resolveCacheKey(qa.item(), assessment.getSeniorityLevel(), type);
                     if (qa.isFollowUp()) {
                         cacheKey += "|followup:true";
                     }
-                }
 
-                boolean hit = false;
-                if (cacheKey != null) {
-                    List<QuestionDto> cachedList = cacheService.get(cacheKey);
-                    if (cachedList != null && !cachedList.isEmpty()) {
-                        Optional<QuestionDto> match = cachedList.stream()
-                                .filter(q -> type.equalsIgnoreCase(q.getType()) && qa.difficulty().equalsIgnoreCase(q.getDifficulty()))
-                                .findFirst();
+                    if (cacheKey != null) {
+                        List<QuestionDto> cachedList = cacheService.get(cacheKey);
+                        if (cachedList != null && !cachedList.isEmpty()) {
+                            List<QuestionDto> matchingPool = cachedList.stream()
+                                    .filter(q -> type.equalsIgnoreCase(q.getType())
+                                            && qa.difficulty().equalsIgnoreCase(q.getDifficulty())
+                                            && q.getQuestion() != null
+                                            && !chosenQuestionTexts.contains(q.getQuestion().strip()))
+                                    .collect(Collectors.toList());
 
-                        if (match.isPresent()) {
-                            typeQuestions.add(match.get());
-                            hit = true;
-                            log.info("[QuestionBank] Cache HIT reused: {} '{}' question for criteria '{}' (followUp={})",
-                                    qa.difficulty(), type, qa.item().criteriaName(), qa.isFollowUp());
+                            if (!matchingPool.isEmpty()) {
+                                // Random sampling from question pool to prevent duplicate questions across candidates
+                                int randomIndex = java.util.concurrent.ThreadLocalRandom.current().nextInt(matchingPool.size());
+                                QuestionDto cachedQuestion = matchingPool.get(randomIndex);
+                                chosenQuestionTexts.add(cachedQuestion.getQuestion().strip());
+                                typeCached.add(cachedQuestion);
+                                hit = true;
+                                log.info("[QuestionBank] Cache HIT (pool size {}): picked random {} '{}' question for criteria '{}'",
+                                        matchingPool.size(), qa.difficulty(), type, qa.item() != null ? qa.item().criteriaName() : "generic");
+                            }
                         }
                     }
                 }
 
                 if (!hit) {
-                    missedAssignments.add(qa);
+                    missed.add(qa);
                 }
             }
 
-            if (!missedAssignments.isEmpty()) {
-                log.info("[QuestionBank] Generating {} missing '{}' questions via LLM...", missedAssignments.size(), type);
-                List<QuestionDto> newQs = questionGenerationService.generateForCategory(
-                        type, context, missedAssignments, config);
-                typeQuestions.addAll(newQs);
+            cachedQuestionsByCategory.put(type, typeCached);
+            missedAssignmentsByCategory.put(type, missed);
+        }
 
-                Map<String, List<QuestionDto>> generatedByItem = newQs.stream()
-                        .filter(q -> q.getExpectedCompetency() != null && q.getExpectedCompetency().startsWith("item_"))
-                        .collect(Collectors.groupingBy(QuestionDto::getExpectedCompetency));
+        // Second pass: Generate missing questions in parallel via CompletableFuture
+        Map<String, java.util.concurrent.CompletableFuture<List<QuestionDto>>> futuresByCategory = new LinkedHashMap<>();
+        for (var entry : missedAssignmentsByCategory.entrySet()) {
+            String type = entry.getKey();
+            List<QuestionAssignment> missed = entry.getValue();
+            if (!missed.isEmpty()) {
+                log.info("[QuestionBank] Scheduling async generation of {} missing '{}' questions (mode: {}) via LLM...",
+                        missed.size(), type, config.getMode());
+                futuresByCategory.put(type, java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+                    List<QuestionDto> generated = questionGenerationService.generateForCategory(
+                            type, context, missed, config);
 
-                generatedByItem.forEach((itemId, itemQuestions) -> {
-                    int assignmentIdx = parseItemIndex(itemId);
-                    if (assignmentIdx >= 0 && assignmentIdx < missedAssignments.size()) {
-                        QuestionAssignment qa = missedAssignments.get(assignmentIdx);
-                        if (qa.item() != null) {
-                            String cacheKey = resolveCacheKey(qa.item(), assessment.getSeniorityLevel());
-                            if (qa.isFollowUp()) {
-                                cacheKey += "|followup:true";
-                            }
+                    // Write newly generated questions to cache only if in SCREENING mode (keep generic questions cached)
+                    if (!isDeepDive) {
+                        Map<String, List<QuestionDto>> generatedByItem = generated.stream()
+                                .filter(q -> (q.getId() != null && q.getId().startsWith("item_")) ||
+                                             (q.getExpectedCompetency() != null && q.getExpectedCompetency().startsWith("item_")))
+                                .collect(Collectors.groupingBy(q -> (q.getId() != null && q.getId().startsWith("item_"))
+                                        ? q.getId() : q.getExpectedCompetency()));
 
-                            List<QuestionDto> existing = cacheService.get(cacheKey);
-                            List<QuestionDto> merged = new ArrayList<>();
-                            if (existing != null) merged.addAll(existing);
+                        if (!generatedByItem.isEmpty()) {
+                            generatedByItem.forEach((itemId, itemQuestions) -> {
+                                int assignmentIdx = parseItemIndex(itemId);
+                                if (assignmentIdx >= 0 && assignmentIdx < missed.size()) {
+                                    QuestionAssignment qa = missed.get(assignmentIdx);
+                                    String cacheKey = resolveCacheKey(qa.item(), assessment.getSeniorityLevel(), type);
+                                    if (qa.isFollowUp()) {
+                                        cacheKey += "|followup:true";
+                                    }
 
-                            for (QuestionDto nq : newQs) {
+                                    List<QuestionDto> existing = cacheService.get(cacheKey);
+                                    List<QuestionDto> merged = (existing != null) ? new ArrayList<>(existing) : new ArrayList<>();
+
+                                    for (QuestionDto nq : itemQuestions) {
+                                        nq.setType(type);
+                                        boolean duplicate = merged.stream().anyMatch(eq ->
+                                                Objects.equals(eq.getType(), nq.getType()) &&
+                                                Objects.equals(eq.getQuestion(), nq.getQuestion())
+                                        );
+                                        if (!duplicate) merged.add(nq);
+                                    }
+                                    // Keep up to 5 questions in pool per key
+                                    if (merged.size() > 5) {
+                                        merged = merged.subList(merged.size() - 5, merged.size());
+                                    }
+                                    cacheService.put(cacheKey, merged, Duration.ofDays(7));
+                                }
+                            });
+                        } else if (generated.size() == missed.size()) {
+                            for (int i = 0; i < generated.size(); i++) {
+                                QuestionDto nq = generated.get(i);
+                                QuestionAssignment qa = missed.get(i);
+                                String cacheKey = resolveCacheKey(qa.item(), assessment.getSeniorityLevel(), type);
+                                if (qa.isFollowUp()) {
+                                    cacheKey += "|followup:true";
+                                }
+                                List<QuestionDto> existing = cacheService.get(cacheKey);
+                                List<QuestionDto> merged = (existing != null) ? new ArrayList<>(existing) : new ArrayList<>();
+
                                 nq.setType(type);
                                 boolean duplicate = merged.stream().anyMatch(eq ->
                                         Objects.equals(eq.getType(), nq.getType()) &&
                                         Objects.equals(eq.getQuestion(), nq.getQuestion())
                                 );
-                                if (!duplicate) merged.add(nq);
+                                if (!duplicate) {
+                                    merged.add(nq);
+                                }
+                                if (merged.size() > 5) {
+                                    merged = merged.subList(merged.size() - 5, merged.size());
+                                }
+                                cacheService.put(cacheKey, merged, Duration.ofDays(7));
                             }
-                            cacheService.put(cacheKey, merged, Duration.ofDays(7));
                         }
                     }
-                });
-            }
 
-            allQuestions.addAll(typeQuestions);
+                    return generated;
+                }));
+            }
+        }
+
+        // Wait for all async generation tasks
+        if (!futuresByCategory.isEmpty()) {
+            try {
+                java.util.concurrent.CompletableFuture.allOf(futuresByCategory.values().toArray(new java.util.concurrent.CompletableFuture[0])).join();
+            } catch (Exception e) {
+                log.warn("[QuestionBank] One or more category generation tasks encountered an error: {}", e.getMessage());
+            }
+        }
+
+        // Assemble all questions in order of categories with graceful degradation
+        List<QuestionDto> allQuestions = new ArrayList<>();
+        for (var entry : assignmentsByCategory.entrySet()) {
+            String type = entry.getKey();
+            List<QuestionDto> cachedPart = cachedQuestionsByCategory.getOrDefault(type, Collections.emptyList());
+            allQuestions.addAll(cachedPart);
+
+            if (futuresByCategory.containsKey(type)) {
+                try {
+                    List<QuestionDto> generatedPart = futuresByCategory.get(type).join();
+                    if (generatedPart != null) {
+                        for (QuestionDto gq : generatedPart) {
+                            if (gq.getQuestion() != null) {
+                                chosenQuestionTexts.add(gq.getQuestion().strip());
+                            }
+                            allQuestions.add(gq);
+                        }
+                    }
+                } catch (Exception e) {
+                    log.error("[QuestionBank] Category '{}' generation failed, proceeding with remaining categories: {}", type, e.getMessage(), e);
+                }
+            }
+        }
+
+        if (allQuestions.isEmpty()) {
+            throw new QuestionBankException("Failed to generate any questions for session " + sessionId + ". Please try again.");
         }
 
         for (int i = 0; i < allQuestions.size(); i++) {
@@ -308,15 +421,42 @@ public class QuestionBankServiceImpl implements QuestionBankService {
                     ? dto.getId() 
                     : (sessionId + "_" + (dto.getId() != null ? dto.getId() : UUID.randomUUID().toString()));
             
+            String detailsJson = null;
+            try {
+                Map<String, Object> detailsMap = new LinkedHashMap<>();
+                if (dto.getHints() != null && !dto.getHints().isEmpty()) {
+                    detailsMap.put("hints", dto.getHints());
+                }
+                if (dto.getStarPrompt() != null && !dto.getStarPrompt().isBlank()) {
+                    detailsMap.put("star_prompt", dto.getStarPrompt());
+                }
+                if (dto.getComponentsToCover() != null && !dto.getComponentsToCover().isEmpty()) {
+                    detailsMap.put("components_to_cover", dto.getComponentsToCover());
+                }
+                if (dto.getFollowUpQuestions() != null && !dto.getFollowUpQuestions().isEmpty()) {
+                    detailsMap.put("follow_up_questions", dto.getFollowUpQuestions());
+                }
+                if (dto.getRationale() != null && !dto.getRationale().isBlank()) {
+                    detailsMap.put("rationale", dto.getRationale());
+                }
+                if (!detailsMap.isEmpty()) {
+                    detailsJson = objectMapper.writeValueAsString(detailsMap);
+                }
+            } catch (Exception e) {
+                log.warn("[QuestionBank] Failed to serialize details for question {}: {}", dto.getId(), e.getMessage());
+            }
+
             questionEntities.add(fit.iuh.modules.questionbank.entity.Question.builder()
                     .questionBank(entity)
                     .id(uniqueQId)
                     .category(dto.getType())
                     .questionType(dto.getType())
+                    .topic(dto.getTopic())
                     .expectedCompetency(dto.getExpectedCompetency())
                     .questionText(dto.getQuestion())
                     .expectedAnswer(dto.getEvaluationCriteria())
                     .difficulty(dto.getDifficulty())
+                    .details(detailsJson)
                     .build());
         }
         entity.setQuestions(questionEntities);
@@ -372,7 +512,7 @@ public class QuestionBankServiceImpl implements QuestionBankService {
         fit.iuh.modules.questionbank.entity.Question targetEntity = null;
         if (questions != null) {
             for (var q : questions) {
-                if (questionId.equalsIgnoreCase(q.getId())) {
+                if (questionId.equalsIgnoreCase(q.getId()) || (q.getId() != null && q.getId().endsWith("_" + questionId))) {
                     targetEntity = q;
                     break;
                 }
@@ -403,6 +543,33 @@ public class QuestionBankServiceImpl implements QuestionBankService {
         targetEntity.setQuestionText(regenerated.getQuestion());
         targetEntity.setExpectedAnswer(regenerated.getEvaluationCriteria());
         targetEntity.setExpectedCompetency(regenerated.getExpectedCompetency());
+        if (regenerated.getTopic() != null && !regenerated.getTopic().isBlank()) {
+            targetEntity.setTopic(regenerated.getTopic());
+        }
+
+        try {
+            Map<String, Object> detailsMap = new LinkedHashMap<>();
+            if (regenerated.getHints() != null && !regenerated.getHints().isEmpty()) {
+                detailsMap.put("hints", regenerated.getHints());
+            }
+            if (regenerated.getStarPrompt() != null && !regenerated.getStarPrompt().isBlank()) {
+                detailsMap.put("star_prompt", regenerated.getStarPrompt());
+            }
+            if (regenerated.getComponentsToCover() != null && !regenerated.getComponentsToCover().isEmpty()) {
+                detailsMap.put("components_to_cover", regenerated.getComponentsToCover());
+            }
+            if (regenerated.getFollowUpQuestions() != null && !regenerated.getFollowUpQuestions().isEmpty()) {
+                detailsMap.put("follow_up_questions", regenerated.getFollowUpQuestions());
+            }
+            if (regenerated.getRationale() != null && !regenerated.getRationale().isBlank()) {
+                detailsMap.put("rationale", regenerated.getRationale());
+            }
+            if (!detailsMap.isEmpty()) {
+                targetEntity.setDetails(objectMapper.writeValueAsString(detailsMap));
+            }
+        } catch (Exception e) {
+            log.warn("[QuestionBank] Failed to update details for regenerated question: {}", e.getMessage());
+        }
 
         bank = questionBankRepo.save(bank);
 
@@ -472,48 +639,67 @@ public class QuestionBankServiceImpl implements QuestionBankService {
         return pairs;
     }
 
-    private String resolveCacheKey(EvidenceItemPair pair, SeniorityLevel level) {
-        if (pair.criteriaId() != null) {
-            return cacheKeyGenerator.generateKey(pair.criteriaId(), pair.status(), level);
+    private String resolveCacheKey(EvidenceItemPair pair, SeniorityLevel level, String category) {
+        if (pair != null) {
+            if (pair.criteriaId() != null) {
+                return cacheKeyGenerator.generateKey(pair.criteriaId(), pair.status(), level);
+            } else {
+                return cacheKeyGenerator.generateKeyForAdHoc(pair.criteriaName(), pair.status(), level);
+            }
         } else {
-            return cacheKeyGenerator.generateKeyForAdHoc(pair.criteriaName(), pair.status(), level);
+            return cacheKeyGenerator.generateKeyForGeneric(category, level);
         }
     }
 
     private int parseItemIndex(String itemId) {
-        if (itemId == null || !itemId.startsWith("item_")) return 0;
+        if (itemId == null || !itemId.startsWith("item_")) return -1;
         try {
             return Integer.parseInt(itemId.substring("item_".length()));
         } catch (NumberFormatException e) {
-            return 0;
+            return -1;
         }
     }
 
-    private String detectTargetDomain(String cvMarkdown, String jdMarkdown) {
-        String combined = ((cvMarkdown != null ? cvMarkdown : "") + " "
-                + (jdMarkdown != null ? jdMarkdown : "")).toLowerCase();
+    public static String detectTargetDomain(String cvMarkdown, String jdMarkdown) {
+        return fit.iuh.modules.questionbank.util.DomainTaxonomyDictionary.detectDomain(cvMarkdown, jdMarkdown);
+    }
 
-        if (combined.contains("wallet") || combined.contains("transaction")
-                || combined.contains("payment") || combined.contains("bank")
-                || combined.contains("fintech")) {
-            return "fintech";
-        } else if (combined.contains("cart") || combined.contains("shop")
-                || combined.contains("checkout") || combined.contains("e-commerce")
-                || combined.contains("order")) {
-            return "e-commerce";
-        } else if (combined.contains("health") || combined.contains("hospital")
-                || combined.contains("medical") || combined.contains("patient")) {
-            return "healthcare";
-        } else if (combined.contains("saas") || combined.contains("multi-tenant")
-                || combined.contains("billing")) {
-            return "saas";
-        } else if (combined.contains("enterprise") || combined.contains("b2b")) {
-            return "enterprise";
-        } else if (combined.contains("startup") || combined.contains("funding")
-                || combined.contains("mvp")) {
-            return "startup";
+    public static List<String> extractProjectHighlights(String cvContent) {
+        if (cvContent == null || cvContent.isBlank()) {
+            return Collections.emptyList();
         }
-        return "other";
+        List<String> highlights = new ArrayList<>();
+        String[] lines = cvContent.split("\\r?\\n");
+        boolean inProjectSection = false;
+
+        for (String line : lines) {
+            String trimmed = line.trim();
+            if (trimmed.isBlank()) continue;
+
+            String lower = trimmed.toLowerCase();
+            if (lower.contains("project") || lower.contains("dự án") || lower.contains("kinh nghiệm") || lower.contains("experience")) {
+                inProjectSection = true;
+            }
+
+            if (inProjectSection && (trimmed.startsWith("-") || trimmed.startsWith("*") || trimmed.startsWith("•") || trimmed.startsWith("#"))) {
+                String cleanLine = trimmed.replaceAll("^[\\-*#•\\s]+", "").trim();
+                if (cleanLine.length() >= 20 && cleanLine.length() <= 300) {
+                    highlights.add(cleanLine);
+                    if (highlights.size() >= 8) break;
+                }
+            }
+        }
+
+        if (highlights.isEmpty()) {
+            for (String line : lines) {
+                String trimmed = line.trim();
+                if (trimmed.length() >= 25 && (trimmed.startsWith("-") || trimmed.startsWith("*") || trimmed.startsWith("•"))) {
+                    highlights.add(trimmed.replaceAll("^[\\-*#•\\s]+", "").trim());
+                    if (highlights.size() >= 5) break;
+                }
+            }
+        }
+        return highlights;
     }
 
     private QuestionBankResponseDto toResponseDto(QuestionBank entity) {
@@ -564,8 +750,33 @@ public class QuestionBankServiceImpl implements QuestionBankService {
                 dto.setQuestion(q.getQuestionText());
                 dto.setEvaluationCriteria(q.getExpectedAnswer());
                 dto.setDifficulty(q.getDifficulty());
-                dto.setType(q.getQuestionType());
+                dto.setType(q.getQuestionType() != null ? q.getQuestionType() : q.getCategory());
                 dto.setExpectedCompetency(q.getExpectedCompetency());
+                dto.setTopic(q.getTopic());
+
+                if (q.getDetails() != null && !q.getDetails().isBlank()) {
+                    try {
+                        Map<String, Object> detailsMap = objectMapper.readValue(q.getDetails(), Map.class);
+                        if (detailsMap.containsKey("hints")) {
+                            dto.setHints(objectMapper.convertValue(detailsMap.get("hints"), new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {}));
+                        }
+                        if (detailsMap.containsKey("star_prompt")) {
+                            dto.setStarPrompt((String) detailsMap.get("star_prompt"));
+                        }
+                        if (detailsMap.containsKey("components_to_cover")) {
+                            dto.setComponentsToCover(objectMapper.convertValue(detailsMap.get("components_to_cover"), new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {}));
+                        }
+                        if (detailsMap.containsKey("follow_up_questions")) {
+                            dto.setFollowUpQuestions(objectMapper.convertValue(detailsMap.get("follow_up_questions"), new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {}));
+                        }
+                        if (detailsMap.containsKey("rationale")) {
+                            dto.setRationale((String) detailsMap.get("rationale"));
+                        }
+                    } catch (Exception e) {
+                        log.warn("[QuestionBank] Failed to parse details JSON for question {}: {}", q.getId(), e.getMessage());
+                    }
+                }
+
                 questionDtos.add(dto);
             }
         }

@@ -33,6 +33,8 @@ export async function POST(request: NextRequest) {
         sessionId: sessionId,
         questionConfig: {
           total: total,
+          mode: questionConfig.mode || 'SCREENING',
+          interview_channel: questionConfig.interviewChannel || questionConfig.interview_channel || 'VOICE',
           distribution: {
             behavioral: behavioural,
             technical: technical,

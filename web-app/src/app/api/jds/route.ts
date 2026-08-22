@@ -24,12 +24,12 @@ export async function GET(request: NextRequest) {
     let result;
     if (authUserId) {
       result = await query(
-        'SELECT id, user_id, title, file_url, cloudinary_id, extracted_text, created_at FROM job_descriptions WHERE user_id = $1 ORDER BY created_at DESC',
+        'SELECT id, user_id, title, file_url, cloudinary_id, parsed_content, raw_text, created_at FROM job_descriptions WHERE user_id = $1 ORDER BY created_at DESC',
         [authUserId]
       );
     } else {
       result = await query(
-        'SELECT id, user_id, title, file_url, cloudinary_id, extracted_text, created_at FROM job_descriptions ORDER BY created_at DESC'
+        'SELECT id, user_id, title, file_url, cloudinary_id, parsed_content, raw_text, created_at FROM job_descriptions ORDER BY created_at DESC'
       );
     }
     return NextResponse.json(result.rows);
@@ -65,11 +65,11 @@ export async function POST(request: NextRequest) {
       const formData = await request.formData();
       const file = formData.get('file') as File | null;
       const title = formData.get('title') as string | null;
-      const text = formData.get('extracted_text') as string | null;
+      const text = (formData.get('parsed_content') || formData.get('extracted_text')) as string | null;
       const userId = formData.get('user_id') as string | null;
 
       if (!file && !text) {
-        return NextResponse.json({ error: 'Either file or extracted_text is required' }, { status: 400 });
+        return NextResponse.json({ error: 'Either file or parsed_content is required' }, { status: 400 });
       }
 
       let fileUrl = null;
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
       }
 
       const result = await query(
-        'INSERT INTO job_descriptions (user_id, title, file_url, cloudinary_id, extracted_text) VALUES ($1, $2, $3, $4, $5) RETURNING id, title, file_url, cloudinary_id, created_at',
+        'INSERT INTO job_descriptions (user_id, title, file_url, cloudinary_id, parsed_content) VALUES ($1, $2, $3, $4, $5) RETURNING id, title, file_url, cloudinary_id, parsed_content, created_at',
         [userId || authUserId || null, finalTitle, fileUrl, cloudinaryId, text || null]
       );
 
@@ -113,10 +113,11 @@ export async function POST(request: NextRequest) {
     } else {
       // JSON payload
       const body = await request.json();
-      const { user_id, title, extracted_text, file_content } = body;
+      const { user_id, title, parsed_content, extracted_text, file_content } = body;
+      const finalParsedContent = parsed_content || extracted_text || null;
 
-      if (!title && !extracted_text) {
-        return NextResponse.json({ error: 'Either title or extracted_text is required' }, { status: 400 });
+      if (!title && !finalParsedContent) {
+        return NextResponse.json({ error: 'Either title or parsed_content is required' }, { status: 400 });
       }
 
       const finalTitle = title || 'JD_' + Date.now();
@@ -149,8 +150,8 @@ export async function POST(request: NextRequest) {
       }
 
       const result = await query(
-        'INSERT INTO job_descriptions (user_id, title, file_url, cloudinary_id, extracted_text) VALUES ($1, $2, $3, $4, $5) RETURNING id, title, file_url, cloudinary_id, created_at',
-        [user_id || authUserId || null, finalTitle, fileUrl, cloudinaryId, extracted_text || null]
+        'INSERT INTO job_descriptions (user_id, title, file_url, cloudinary_id, parsed_content) VALUES ($1, $2, $3, $4, $5) RETURNING id, title, file_url, cloudinary_id, parsed_content, created_at',
+        [user_id || authUserId || null, finalTitle, fileUrl, cloudinaryId, finalParsedContent]
       );
 
       return NextResponse.json({ success: true, jd: result.rows[0] });

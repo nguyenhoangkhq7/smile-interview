@@ -6,6 +6,7 @@ import { useNewInterview } from '@/hooks/useNewInterview';
 import { UploadStep } from '@/components/features/interview/NewInterview/UploadStep';
 import { ActiveSessionsPanel } from '@/components/features/interview/NewInterview/ActiveSessionsPanel';
 import { MatchingResultPanel } from '@/components/features/interview/NewInterview/MatchingResultPanel';
+import { InterviewProgressStepper, InterviewFlowStep } from '@/components/features/interview/NewInterview/InterviewProgressStepper';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, AlertTriangle } from 'lucide-react';
 
@@ -23,22 +24,30 @@ export default function NewInterviewPage() {
     handleDragOver, handleDragLeave, handleDrop, handleFileChange, triggerFileSelect,
     fileInputCvRef, fileInputJdRef,
     cvError, jdError, uploading, analyzing, generating, uploadProgress, apiError,
-    roleTitle, ingested, assessment, activeSessions, isCloning,
+    roleTitle, ingested, assessment, activeSessions,
     keywordMetadata, rawCvText, rawJdText,
     cvDisplayName, jdDisplayName,
     criteriaFilter, setCriteriaFilter,
     activeView, setActiveView,
+    interviewMode, setInterviewMode,
+    interviewChannel, setInterviewChannel,
     viewerOpen, setViewerOpen, viewerUrl, setViewerUrl, viewerTitle, setViewerTitle,
     handleUploadAndIngest, handleRunAssessment,
-    handleResumeSession, handleRestart, handleViewAssessment, handleReset, handleContinueToSelection,
+    handleResumeSession, handleViewAssessment, handleReset, handleContinueToSelection,
   } = useNewInterview();
+
+  const currentStep: InterviewFlowStep = generating
+    ? 'interview'
+    : (assessment || analyzing || ingested)
+    ? 'assessment'
+    : 'upload';
 
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gradient-to-br from-brand-orange/5 via-background to-brand-green/5 text-foreground flex flex-col font-sans">
         <main className="max-w-5xl w-full mx-auto px-4 py-12 flex-1 flex flex-col justify-center">
-          {}
-          <div className="mb-10 text-center space-y-2">
+          {/* Header */}
+          <div className="mb-8 text-center space-y-2">
             <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl text-foreground">
               Khởi tạo phỏng vấn
             </h1>
@@ -47,13 +56,25 @@ export default function NewInterviewPage() {
             </p>
           </div>
 
-          {}
+          {/* Progress Tracking Bar */}
+          <InterviewProgressStepper
+            currentStep={currentStep}
+            uploading={uploading}
+            analyzing={analyzing}
+            generating={generating}
+            hasAssessment={!!assessment}
+            onSelectStep={(step) => {
+              if (step === 'upload' && (assessment || ingested)) {
+                handleReset();
+              }
+            }}
+          />
+
+          {/* Active Sessions Panel */}
           {!assessment && !uploading && !analyzing && (
             <ActiveSessionsPanel
               sessions={activeSessions}
-              cloningId={isCloning}
               onResume={handleResumeSession}
-              onRestart={handleRestart}
               onViewAssessment={handleViewAssessment}
             />
           )}
@@ -175,6 +196,10 @@ export default function NewInterviewPage() {
                 keywordMetadata={keywordMetadata}
                 criteriaFilter={criteriaFilter}
                 activeView={activeView}
+                interviewMode={interviewMode}
+                interviewChannel={interviewChannel}
+                onInterviewModeChange={setInterviewMode}
+                onInterviewChannelChange={setInterviewChannel}
                 onCriteriaFilter={setCriteriaFilter}
                 onActiveView={setActiveView}
                 onRefreshAssessment={() => handleRunAssessment(true)}

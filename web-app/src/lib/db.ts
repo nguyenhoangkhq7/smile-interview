@@ -52,14 +52,12 @@ export async function initDb() {
       file_name VARCHAR(255) NOT NULL,
       parsed_content TEXT,
       raw_text TEXT,
-      extracted_text TEXT,
       file_url VARCHAR(500),
       cloudinary_id VARCHAR(255),
       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );
 
     ALTER TABLE resumes ALTER COLUMN id SET DEFAULT gen_random_uuid();
-    ALTER TABLE resumes ADD COLUMN IF NOT EXISTS extracted_text TEXT;
 
     CREATE TABLE IF NOT EXISTS job_descriptions (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -67,14 +65,12 @@ export async function initDb() {
       title VARCHAR(255) NOT NULL,
       parsed_content TEXT,
       raw_text TEXT,
-      extracted_text TEXT,
       file_url VARCHAR(500),
       cloudinary_id VARCHAR(255),
       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );
 
     ALTER TABLE job_descriptions ALTER COLUMN id SET DEFAULT gen_random_uuid();
-    ALTER TABLE job_descriptions ADD COLUMN IF NOT EXISTS extracted_text TEXT;
 
     CREATE TABLE IF NOT EXISTS resume_assessments (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

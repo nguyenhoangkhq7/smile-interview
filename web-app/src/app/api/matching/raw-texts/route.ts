@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
 
     if (resumeIdStr) {
       const res = await query(
-        'SELECT file_name, raw_text FROM resumes WHERE id = $1',
+        'SELECT file_name, COALESCE(raw_text, parsed_content) as raw_text FROM resumes WHERE id = $1',
         [resumeIdStr]
       );
       if (res.rows.length > 0) {
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
 
     if (jdIdStr) {
       const res = await query(
-        'SELECT title, raw_text FROM job_descriptions WHERE id = $1',
+        'SELECT title, COALESCE(raw_text, parsed_content) as raw_text FROM job_descriptions WHERE id = $1',
         [jdIdStr]
       );
       if (res.rows.length > 0) {

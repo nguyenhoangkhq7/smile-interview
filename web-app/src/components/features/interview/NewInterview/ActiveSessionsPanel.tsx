@@ -2,11 +2,13 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { RefreshCw, FileText, X, MessageCircle, Briefcase, Play, Clock, Sparkles } from 'lucide-react';
+import { FileText, X, MessageCircle, Briefcase, Play, Clock, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+export type SessionStage = 'UPLOADED' | 'ASSESSED' | 'INTERVIEWING';
 
 export interface ActiveSession {
   sessionId: string;
@@ -16,42 +18,62 @@ export interface ActiveSession {
   status: string;
   date: string;
   hasAssessment?: boolean;
+  hasQuestions?: boolean;
+  competencyFitScore?: number;
+  stage?: SessionStage;
+  answeredCount?: number;
+  totalQuestions?: number;
 }
 
 interface ActiveSessionsPanelProps {
   sessions: ActiveSession[];
-  cloningId: string | null;
   onResume: (sessionId: string) => void;
-  onRestart: (sessionId: string) => void;
   onViewAssessment: (sessionId: string) => void;
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const isProgress = status === 'In progress';
+function StageBadge({ session }: { session: ActiveSession }) {
+  if (session.stage === 'UPLOADED') {
+    return (
+      <Badge variant="outline" className="text-[10px] gap-1 font-bold bg-blue-500/10 text-blue-600 border-blue-200">
+        <FileText size={10} />
+        Chờ đánh giá
+      </Badge>
+    );
+  }
+
+  if (session.stage === 'ASSESSED') {
+    return (
+      <Badge variant="outline" className="text-[10px] gap-1 font-bold bg-amber-500/10 text-amber-700 border-amber-200">
+        <Sparkles size={10} />
+        Đã đánh giá {session.competencyFitScore !== undefined ? `(${session.competencyFitScore}%)` : ''}
+      </Badge>
+    );
+  }
+
   return (
-    <Badge variant={isProgress ? 'default' : 'secondary'} className={`text-[10px] gap-1 font-bold ${isProgress ? 'bg-brand-orange/15 text-brand-orange hover:bg-brand-orange/25' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
-      <Clock size={10} />
-      {isProgress ? 'Đang phỏng vấn' : 'Chưa bắt đầu'}
+    <Badge variant="outline" className="text-[10px] gap-1 font-bold bg-emerald-500/10 text-emerald-700 border-emerald-200">
+      <Play size={10} />
+      {session.totalQuestions
+        ? `Đang phỏng vấn (${session.answeredCount || 0}/${session.totalQuestions})`
+        : 'Đang phỏng vấn'}
     </Badge>
   );
 }
 
 interface SessionCardProps {
   session: ActiveSession;
-  isCloning: boolean;
   onResume: (id: string) => void;
-  onRestart: (id: string) => void;
   onViewAssessment: (id: string) => void;
 }
 
-function SessionCard({ session, isCloning, onResume, onRestart, onViewAssessment }: SessionCardProps) {
+function SessionCard({ session, onResume, onViewAssessment }: SessionCardProps) {
   return (
-    <div className="rounded-xl border border-border bg-card p-4 shadow-sm hover:border-brand-orange/20 transition-all">
+    <div className="rounded-xl border border-border bg-card p-4 shadow-sm hover:border-brand-orange/30 transition-all">
       <div className="flex items-center justify-between gap-2">
         <strong className="text-sm font-bold text-foreground truncate max-w-[200px]" title={session.roleTitle}>
           {session.roleTitle}
         </strong>
-        <StatusBadge status={session.status} />
+        <StageBadge session={session} />
       </div>
 
       <div className="my-3 space-y-1.5">
@@ -70,21 +92,55 @@ function SessionCard({ session, isCloning, onResume, onRestart, onViewAssessment
         Cập nhật: {new Date(session.date).toLocaleString('vi-VN')}
       </div>
 
-      <div className={`grid gap-2 ${session.hasAssessment ? 'grid-cols-2' : 'grid-cols-1'}`}>
-        {session.hasAssessment && (
-          <Button size="sm" variant="outline" onClick={() => onViewAssessment(session.sessionId)} className="text-xs h-9 border-brand-orange/20 text-brand-orange hover:bg-brand-orange/5">
-            <Sparkles size={13} className="mr-1" />
-            Đánh giá CV
+      <div>
+        {/* Stage 1: Uploaded only */}
+        {session.stage === 'UPLOADED' && (
+          <Button
+            size="sm"
+            onClick={() => onResume(session.sessionId)}
+            className="w-full bg-brand-orange text-white hover:bg-brand-orange-hover text-xs h-9 shadow-sm"
+          >
+            <Sparkles size={13} className="mr-1.5" />
+            Tiến hành Đánh giá
           </Button>
         )}
-        <Button size="sm" variant="outline" onClick={() => onRestart(session.sessionId)} disabled={isCloning} className="text-xs h-9">
-          <RefreshCw size={13} className={`mr-1 ${isCloning ? 'animate-spin' : ''}`} />
-          Thực hiện lại
-        </Button>
-        <Button size="sm" onClick={() => onResume(session.sessionId)} className="col-span-full bg-brand-orange text-white hover:bg-brand-orange-hover text-xs h-9">
-          <Play size={13} fill="currentColor" className="mr-1" />
-          Tiếp tục phỏng vấn
-        </Button>
+
+        {/* Stage 2: Assessed */}
+        {session.stage === 'ASSESSED' && (
+          <Button
+            size="sm"
+            onClick={() => onViewAssessment(session.sessionId)}
+            className="w-full bg-brand-orange text-white hover:bg-brand-orange-hover text-xs h-9 shadow-sm"
+          >
+            <Sparkles size={13} className="mr-1.5" />
+            Xem đánh giá & Bắt đầu phỏng vấn
+          </Button>
+        )}
+
+        {/* Stage 3: In Interview */}
+        {session.stage === 'INTERVIEWING' && (
+          <div className={`grid gap-2 ${session.hasAssessment ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            {session.hasAssessment && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onViewAssessment(session.sessionId)}
+                className="text-xs h-9 border-brand-orange/20 text-brand-orange hover:bg-brand-orange/5"
+              >
+                <Sparkles size={13} className="mr-1" />
+                Xem đánh giá
+              </Button>
+            )}
+            <Button
+              size="sm"
+              onClick={() => onResume(session.sessionId)}
+              className="bg-emerald-600 text-white hover:bg-emerald-700 text-xs h-9 shadow-sm"
+            >
+              <Play size={13} fill="currentColor" className="mr-1.5" />
+              Tiếp tục Phỏng vấn
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -92,9 +148,7 @@ function SessionCard({ session, isCloning, onResume, onRestart, onViewAssessment
 
 export function ActiveSessionsPanel({
   sessions,
-  cloningId,
   onResume,
-  onRestart,
   onViewAssessment,
 }: ActiveSessionsPanelProps) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -150,9 +204,7 @@ export function ActiveSessionsPanel({
                   <SessionCard
                     key={session.sessionId}
                     session={session}
-                    isCloning={cloningId === session.sessionId}
                     onResume={onResume}
-                    onRestart={onRestart}
                     onViewAssessment={onViewAssessment}
                   />
                 ))}
@@ -172,7 +224,7 @@ export function ActiveSessionsPanel({
         </div>
       )}
 
-      {}
+      {/* Full Modal for all active sessions */}
       <Dialog open={showAllModal} onOpenChange={setShowAllModal}>
         <DialogContent className="max-w-[700px] max-h-[85vh] flex flex-col p-0">
           <DialogHeader className="px-6 py-4 border-b border-border flex flex-row items-center justify-between gap-4">
@@ -204,9 +256,7 @@ export function ActiveSessionsPanel({
                   <SessionCard
                     key={session.sessionId}
                     session={session}
-                    isCloning={cloningId === session.sessionId}
                     onResume={(id) => { onResume(id); setShowAllModal(false); }}
-                    onRestart={(id) => { onRestart(id); setShowAllModal(false); }}
                     onViewAssessment={(id) => { onViewAssessment(id); setShowAllModal(false); }}
                   />
                 ))}

@@ -31,9 +31,9 @@ export async function GET(request: NextRequest) {
         SELECT DISTINCT ON (s.id)
           s.*,
           r.file_url AS cv_file_url,
-          r.extracted_text AS cv_extracted_text,
+          r.parsed_content AS cv_extracted_text,
           j.file_url AS jd_file_url,
-          j.extracted_text AS jd_extracted_text
+          j.parsed_content AS jd_extracted_text
         FROM sessions s
         LEFT JOIN resumes r ON (s.resume_id = r.id OR s.cv_filename = r.file_name)
         LEFT JOIN job_descriptions j ON (s.jd_id = j.id OR s.jd_filename = j.title)
@@ -46,9 +46,9 @@ export async function GET(request: NextRequest) {
         SELECT DISTINCT ON (s.id)
           s.*,
           r.file_url AS cv_file_url,
-          r.extracted_text AS cv_extracted_text,
+          r.parsed_content AS cv_extracted_text,
           j.file_url AS jd_file_url,
-          j.extracted_text AS jd_extracted_text
+          j.parsed_content AS jd_extracted_text
         FROM sessions s
         LEFT JOIN resumes r ON (s.resume_id = r.id OR s.cv_filename = r.file_name)
         LEFT JOIN job_descriptions j ON (s.jd_id = j.id OR s.jd_filename = j.title)
@@ -175,9 +175,9 @@ export async function POST(request: NextRequest) {
         role_title = EXCLUDED.role_title,
         cv_filename = EXCLUDED.cv_filename,
         jd_filename = EXCLUDED.jd_filename,
-        overall_score = EXCLUDED.overall_score,
+        overall_score = COALESCE(EXCLUDED.overall_score, sessions.overall_score),
         status = EXCLUDED.status,
-        overall_feedback = EXCLUDED.overall_feedback,
+        overall_feedback = COALESCE(EXCLUDED.overall_feedback, sessions.overall_feedback),
         competency_fit_score = EXCLUDED.competency_fit_score,
         technical_depth_score = EXCLUDED.technical_depth_score,
         match_level = EXCLUDED.match_level,
@@ -195,7 +195,7 @@ export async function POST(request: NextRequest) {
         additional_evidence_items = EXCLUDED.additional_evidence_items,
         score_breakdown = EXCLUDED.score_breakdown,
         top_priority_improvements = EXCLUDED.top_priority_improvements,
-        hiring_recommendation = EXCLUDED.hiring_recommendation,
+        hiring_recommendation = COALESCE(EXCLUDED.hiring_recommendation, sessions.hiring_recommendation),
         eligibility = EXCLUDED.eligibility,
         gate_evidence_items = EXCLUDED.gate_evidence_items,
         must_have_evidence_items = EXCLUDED.must_have_evidence_items,

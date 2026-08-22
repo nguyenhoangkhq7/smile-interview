@@ -17,9 +17,9 @@ export async function GET(
       SELECT DISTINCT ON (s.id)
         s.*,
         r.file_url AS cv_file_url,
-        r.extracted_text AS cv_extracted_text,
+        r.parsed_content AS cv_extracted_text,
         j.file_url AS jd_file_url,
-        j.extracted_text AS jd_extracted_text
+        j.parsed_content AS jd_extracted_text
       FROM sessions s
       LEFT JOIN resumes r ON (s.resume_id = r.id OR s.cv_filename = r.file_name)
       LEFT JOIN job_descriptions j ON (s.jd_id = j.id OR s.jd_filename = j.title)

@@ -7,6 +7,7 @@ import fit.iuh.modules.admin.repository.SystemSettingRepository;
 import fit.iuh.modules.assessment.entity.SeniorityLevel;
 import fit.iuh.modules.questionbank.dto.EvidenceItemPair;
 import fit.iuh.modules.questionbank.dto.QuestionAssignment;
+import fit.iuh.modules.questionbank.dto.QuestionConfigDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -22,15 +23,25 @@ public class DifficultyDistributor {
     private final SystemSettingRepository settingRepository;
 
     public List<QuestionAssignment> distribute(
-            int totalCount,
+            QuestionConfigDto config,
             SeniorityLevel level,
             Integer overallMatchScore,
             List<EvidenceItemPair> evidenceItems) {
 
+        int totalCount = (config != null) ? config.getTotalQuestions() : 10;
         if (totalCount <= 0) return Collections.emptyList();
 
-        Map<String, Double> categoryRatios = getCategoryRatiosForLevel(level);
-        Map<String, Integer> categoryCounts = allocateCounts(categoryRatios, totalCount);
+        Map<String, Integer> categoryCounts;
+        if (config != null && config.getDistribution() != null && !config.getDistribution().isEmpty()) {
+            categoryCounts = parseCustomDistribution(config.getDistribution(), totalCount);
+        } else {
+            Map<String, Double> categoryRatios = getCategoryRatiosForLevel(level);
+            categoryCounts = allocateCounts(categoryRatios, totalCount);
+        }
+
+        if (config != null) {
+            config.setDistribution(new LinkedHashMap<>(categoryCounts));
+        }
 
         List<EvidenceItemPair> matchedItems = new ArrayList<>();
         List<EvidenceItemPair> gapItems = new ArrayList<>();
@@ -78,13 +89,52 @@ public class DifficultyDistributor {
 
             for (int i = 0; i < gapCount; i++) {
                 EvidenceItemPair item = pickItemForQuestion(categoryItems, categoryGap, categoryMatched, i);
-                String difficulty = determineDifficulty(item, level, overallMatchScore, true);
+                String difficulty = determineDifficulty(item, level, overallMatchScore, false);
                 String promptStrategy = determinePromptStrategy(category, false);
-                result.add(new QuestionAssignment(category, difficulty, item, true, promptStrategy));
+                result.add(new QuestionAssignment(category, difficulty, item, false, promptStrategy));
             }
         }
 
         return result;
+    }
+
+    public List<QuestionAssignment> distribute(
+            int totalCount,
+            SeniorityLevel level,
+            Integer overallMatchScore,
+            List<EvidenceItemPair> evidenceItems) {
+        return distribute(
+                QuestionConfigDto.builder().total(totalCount).build(),
+                level,
+                overallMatchScore,
+                evidenceItems
+        );
+    }
+
+    private Map<String, Integer> parseCustomDistribution(Map<String, Integer> customDist, int totalCount) {
+        Map<String, Double> ratios = new LinkedHashMap<>();
+        for (var entry : customDist.entrySet()) {
+            String key = normalizeCategoryKey(entry.getKey());
+            if (entry.getValue() != null && entry.getValue() > 0) {
+                ratios.put(key, entry.getValue().doubleValue());
+            }
+        }
+        if (ratios.isEmpty()) {
+            return allocateCounts(Map.of("technical", 100.0), totalCount);
+        }
+        return allocateCounts(ratios, totalCount);
+    }
+
+    private String normalizeCategoryKey(String key) {
+        if (key == null) return "technical";
+        String lower = key.toLowerCase(Locale.ROOT).replace("-", "_").replace(" ", "_");
+        return switch (lower) {
+            case "behavioral", "behavioural" -> "behavioural";
+            case "technical" -> "technical";
+            case "coding", "code" -> "coding";
+            case "system_design", "systemdesign", "design" -> "system_design";
+            default -> lower;
+        };
     }
 
     private Map<String, Double> getCategoryRatiosForLevel(SeniorityLevel level) {

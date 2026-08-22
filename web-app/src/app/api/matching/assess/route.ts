@@ -31,16 +31,30 @@ export async function GET(request: NextRequest) {
     const isValidUuid = (val?: string | null) => 
       !!val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
 
-    // Cache lookup: Check if we have an existing completed assessment for this resumeId & jdId
-    if (forceRefresh !== 'true' && isValidUuid(resumeId) && isValidUuid(jdId)) {
-      console.log(`[API Proxy Assess] Checking local DB cache for resumeId=${resumeId}, jdId=${jdId}`);
-      const cachedSessionRes = await query(
-        `SELECT * FROM sessions 
-         WHERE resume_id = $1::uuid AND jd_id = $2::uuid 
-           AND competency_fit_score IS NOT NULL 
-         ORDER BY date DESC LIMIT 1`,
-        [resumeId, jdId]
-      );
+    // Cache lookup: Check if we have an existing completed assessment for this sessionId or (resumeId & jdId)
+    if (forceRefresh !== 'true') {
+      const validResumeUuid = isValidUuid(resumeId) ? resumeId : null;
+      const validJdUuid = isValidUuid(jdId) ? jdId : null;
+
+      let cachedSessionRes;
+      if (validResumeUuid && validJdUuid) {
+        console.log(`[API Proxy Assess] Checking local DB cache for sessionId=${sessionId} OR (resumeId=${validResumeUuid}, jdId=${validJdUuid})`);
+        cachedSessionRes = await query(
+          `SELECT * FROM sessions 
+           WHERE (id = $1 OR (resume_id = $2::uuid AND jd_id = $3::uuid))
+             AND competency_fit_score IS NOT NULL 
+           ORDER BY (CASE WHEN id = $1 THEN 0 ELSE 1 END), date DESC LIMIT 1`,
+          [sessionId, validResumeUuid, validJdUuid]
+        );
+      } else {
+        console.log(`[API Proxy Assess] Checking local DB cache for sessionId=${sessionId}`);
+        cachedSessionRes = await query(
+          `SELECT * FROM sessions 
+           WHERE id = $1 AND competency_fit_score IS NOT NULL 
+           LIMIT 1`,
+          [sessionId]
+        );
+      }
 
       if (cachedSessionRes.rows.length > 0) {
         const cachedSession = cachedSessionRes.rows[0];

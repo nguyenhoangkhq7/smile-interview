@@ -64,19 +64,44 @@ public class QuestionGenerationServiceImpl implements QuestionGenerationService 
             default -> type;
         };
 
-        String systemPrompt = String.format(
-                QuestionBankPrompts.SYSTEM_PROMPT_QUESTION_GENERATION,
-                context.getCandidateLevel() != null ? context.getCandidateLevel().name() : "MID",
-                context.getRoleType() != null ? context.getRoleType().name() : "OTHER",
-                context.getTargetDomain() != null ? context.getTargetDomain() : "other",
-                context.getStrongAreas() != null ? String.join(", ", context.getStrongAreas()) : "None",
-                context.getGapAreas() != null ? String.join(", ", context.getGapAreas()) : "None",
-                context.getTechStackPossessed() != null ? String.join(", ", context.getTechStackPossessed()) : "None",
-                context.getTechStackRequired() != null ? String.join(", ", context.getTechStackRequired()) : "None",
-                typeFullName,
-                QuestionBankPrompts.getTypeInstructions(type),
-                QuestionBankPrompts.getTypeSpecificOutputFields(type)
-        );
+        String interviewChannel = (config != null) ? config.getInterviewChannel() : "VOICE";
+        boolean isDeepDive = config != null && "DEEP_DIVE".equalsIgnoreCase(config.getMode());
+
+        String systemPrompt;
+        if (isDeepDive) {
+            String projectHighlights = (context.getCvProjectHighlights() != null && !context.getCvProjectHighlights().isEmpty())
+                    ? String.join("\n- ", context.getCvProjectHighlights())
+                    : "No specific project highlight parsed; ground questions in candidate's experienced tech stack.";
+
+            systemPrompt = String.format(
+                    QuestionBankPrompts.SYSTEM_PROMPT_QUESTION_GENERATION_DEEP_DIVE,
+                    context.getCandidateLevel() != null ? context.getCandidateLevel().name() : "MID",
+                    context.getRoleType() != null ? context.getRoleType().name() : "OTHER",
+                    context.getTargetDomain() != null ? context.getTargetDomain() : "other",
+                    context.getStrongAreas() != null ? String.join(", ", context.getStrongAreas()) : "None",
+                    context.getGapAreas() != null ? String.join(", ", context.getGapAreas()) : "None",
+                    context.getTechStackPossessed() != null ? String.join(", ", context.getTechStackPossessed()) : "None",
+                    context.getTechStackRequired() != null ? String.join(", ", context.getTechStackRequired()) : "None",
+                    projectHighlights,
+                    typeFullName,
+                    QuestionBankPrompts.getTypeInstructions(type, interviewChannel),
+                    QuestionBankPrompts.getTypeSpecificOutputFields(type)
+            );
+        } else {
+            systemPrompt = String.format(
+                    QuestionBankPrompts.SYSTEM_PROMPT_QUESTION_GENERATION,
+                    context.getCandidateLevel() != null ? context.getCandidateLevel().name() : "MID",
+                    context.getRoleType() != null ? context.getRoleType().name() : "OTHER",
+                    context.getTargetDomain() != null ? context.getTargetDomain() : "other",
+                    context.getStrongAreas() != null ? String.join(", ", context.getStrongAreas()) : "None",
+                    context.getGapAreas() != null ? String.join(", ", context.getGapAreas()) : "None",
+                    context.getTechStackPossessed() != null ? String.join(", ", context.getTechStackPossessed()) : "None",
+                    context.getTechStackRequired() != null ? String.join(", ", context.getTechStackRequired()) : "None",
+                    typeFullName,
+                    QuestionBankPrompts.getTypeInstructions(type, interviewChannel),
+                    QuestionBankPrompts.getTypeSpecificOutputFields(type)
+            );
+        }
 
         String evidenceItemsText = buildEvidenceAssignmentsText(assignments);
 
