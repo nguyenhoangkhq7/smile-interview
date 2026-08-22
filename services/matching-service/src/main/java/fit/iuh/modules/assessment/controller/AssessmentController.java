@@ -23,13 +23,12 @@ public class AssessmentController {
     public ResponseEntity<AssessmentResponse> assessResume(
             @RequestParam("sessionId") String sessionId,
             @RequestParam(value = "forceRefresh", required = false, defaultValue = "false") boolean forceRefresh,
-            @RequestParam(value = "fromSessionId", required = false) String fromSessionId,
-            @RequestParam(value = "includeNotApplicable", required = false) Boolean includeNotApplicable) {
+            @RequestParam(value = "fromSessionId", required = false) String fromSessionId) {
 
-        log.info("Received assessment request for sessionId={}, forceRefresh={}, fromSessionId={}, includeNotApplicable={}",
-                sessionId, forceRefresh, fromSessionId, includeNotApplicable);
+        log.info("Received assessment request for sessionId={}, forceRefresh={}, fromSessionId={}",
+                sessionId, forceRefresh, fromSessionId);
 
-        AssessmentResponse response = assessmentService.assessResumeBlocking(sessionId, forceRefresh, fromSessionId, includeNotApplicable);
+        AssessmentResponse response = assessmentService.assessResumeBlocking(sessionId, forceRefresh, fromSessionId);
         return ResponseEntity.ok(response);
     }
 

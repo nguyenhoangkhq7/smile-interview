@@ -10,12 +10,41 @@ public final class AssessmentPrompts {
             """
             Role: IT Job Criteria Pre-Filter.
             Task: Return matched database criteria IDs for the Job Description (JD).
-            STRICT JSON OUTPUT: {"matched_ids": [<long>]}
+            STRICT JSON OUTPUT: {"evaluations": [{"criteria_id": <long>, "matched": <boolean>, "reason": "<string>"}]}
             RULES:
             1. Include framework/architecture criteria for explicitly required tech (e.g., Spring Boot -> Backend Frameworks).
             2. Include quality principles (SOLID, Design Patterns) for "Clean Code"/"Maintainable Code".
-            3. Output ONLY JSON with "matched_ids".
+            3. Output ONLY JSON.
             """;
+
+    public static String buildCriteriaPreFilterUserPrompt(String jdMarkdown, String criteriaListPrompt) {
+        return """
+                ====== DATABASE CRITERIA LIST ======
+                %s
+
+                ====== JOB DESCRIPTION ======
+                %s
+
+                Return JSON evaluation.
+                """.formatted(criteriaListPrompt != null ? criteriaListPrompt : "", jdMarkdown != null ? jdMarkdown : "");
+    }
+
+    public static String buildMetadataUserPrompt(String jdMarkdown) {
+        return "Job Description:\n" + (jdMarkdown != null ? jdMarkdown : "");
+    }
+
+    public static String buildClassifierUserPrompt(String jdMarkdown, String criteriaBlock, String seniorityLevel) {
+        return """
+                ====== DATABASE CRITERIA LIST ======
+                %s
+
+                ====== JOB DESCRIPTION ======
+                %s
+
+                Target Seniority Level: %s
+                Output STRICT JSON ONLY.
+                """.formatted(criteriaBlock != null ? criteriaBlock : "", jdMarkdown != null ? jdMarkdown : "", seniorityLevel != null ? seniorityLevel : "MID");
+    }
 
     public static final String SYSTEM_PROMPT_CONSOLIDATED_JD_PREPARATION =
             """
@@ -32,7 +61,7 @@ public final class AssessmentPrompts {
             1. CATEGORY: BACKEND (APIs/Java/Go/Node), FRONTEND (React/Vue/CSS), FULLSTACK (both), DEVOPS (CI/CD/Docker/K8s), DATA_ENGINEERING (ETL/Spark/Pipelines), AI_ML (ML/LLM/Models), MOBILE (iOS/Android/Flutter), SECURITY (SAST/DAST), QA_TESTING (Automation/QA), OTHER.
             2. LEVEL: Check title/first 10 lines. Return an array of accepted levels. INTERN (0 exp/student), FRESHER (0-1 yr/fresh grad), JUNIOR (1-2 yrs), MID (2-5 yrs), SENIOR (5-8 yrs), LEAD (8+ yrs/Lead/Architect).
             3. GATES: Extract YOE, Education, GPA, Certifications explicitly in JD. Return [] if none. DO NOT extract technical skills, tools, frameworks, system design concepts (e.g. C4 Model), or programming languages as GATES — those MUST be classified as criteria.
-            4. CLASSIFIED: 'required' (mandatory), 'preferred' (nice-to-have), 'not_in_jd' (absent). For INTERN/FRESHER, heavy DevOps/Cloud = 'preferred'.
+            4. CLASSIFIED: 'required' (mandatory), 'preferred' (nice-to-have), 'not_in_jd' (absent).
             5. EXTRA SKILLS: List unique JD skills NOT in DB criteria list.
             """;
 
@@ -75,20 +104,6 @@ public final class AssessmentPrompts {
             }
             """;
 
-    public static final String SYSTEM_PROMPT_CV_LEVEL_EXTRACTION =
-            """
-            Role: Candidate Seniority Assessor.
-            Task: Extract the candidate's actual seniority level based strictly on their total Years of Experience (YOE) and Job Titles in their CV.
-            STRICT JSON OUTPUT: {"level": "<INTERN|FRESHER|JUNIOR|MID|SENIOR|LEAD>"}
-            RULES:
-            - INTERN: 0 exp/student/internships
-            - FRESHER: < 1 yr total exp
-            - JUNIOR: 1-2 yrs total exp
-            - MID: 2-5 yrs total exp
-            - SENIOR: 5-8 yrs total exp
-            - LEAD: 8+ yrs or explicit Lead/Architect titles
-            """;
-
     public static final String SYSTEM_PROMPT_CRITERIA_CLASSIFICATION =
             """
             Role: JD Criteria Classifier & Extra Skill Extractor.
@@ -102,7 +117,6 @@ public final class AssessmentPrompts {
             2. 'preferred': Optional, nice-to-have, or secondary skills mentioned in JD.
             3. 'not_in_jd': STRICTLY mark any Database Criterion as 'not_in_jd' if it is NOT mentioned, NOT implied, or NOT required in the Job Description! Do NOT assign 'preferred' or 'required' to criteria that are completely absent from the JD.
             4. EXTRA SKILLS (jd_extras): Extract ONLY unique, highly specific technologies explicitly in JD that are NOT ALREADY COVERED by any item in the Database Criteria List above. DO NOT extract duplicate skills (e.g. do NOT extract 'Docker', 'MySQL', 'Agile', 'Git' if Docker/Databases/Agile/Git are in the DB criteria list). Limit to maximum 3-5 distinct extra skills. Default importance to 'preferred'.
-            5. SENIORITY: For INTERN/FRESHER candidates, mark heavy DevOps/Cloud criteria as 'preferred'.
             """;
 
     public static String buildAssessmentSystemPrompt() {
@@ -111,11 +125,16 @@ public final class AssessmentPrompts {
                 Evaluate CV context chunks against criteria batch. Output STRICT RAW JSON ONLY.
 
                 RULES:
-                1. STATUS: 'matched' (direct proof), 'weak' (listed without project proof / English CV without certificate), 'missing' (absent), 'not_applicable' ([NOT_IN_JD]).
-                2. GROUNDING: Zero hallucination. For 'matched'/'weak', `cv_evidence` MUST contain concrete evidence extracted directly from CV context. If absent, status='missing', `cv_evidence`=null.
+                1. STATUS:
+                   - 'matched': Strong direct proof with project implementation, metrics, or production experience in CV.
+                   - 'partial': Moderate proof — candidate has practical experience or related skills, but is missing depth, senior-level requirements, or some sub-requirements.
+                   - 'weak': Minimal proof — only listed as a skill keyword without project description/context, or basic introductory usage (e.g. English CV without official English certificate).
+                   - 'missing': No evidence found in the CV.
+                   - 'not_applicable': Criteria marked as [NOT_IN_JD].
+                2. GROUNDING: Zero hallucination. For 'matched'/'partial'/'weak', `cv_evidence` MUST contain concrete evidence extracted directly from CV context. If absent, status='missing', `cv_evidence`=null.
                 3. ID & ARRAYS: Copy `[ID: <id>]` to `criteria_id`. Put [REQUIRED] in `must_have_evidence_items`, [PREFERRED]/[NOT_IN_JD] in `prefer_to_have_evidence_items`.
                 4. LANGUAGE & SUMMARY: All text in English. `jd_requirement` must be a concise 5-15 word summary. Do NOT evaluate unlisted criteria.
-                5. ENGLISH PROFICIENCY: English CV = 'weak' floor (needs_manual_review=true); 'matched' requires IELTS/TOEIC/ex-pat proof.
+                5. ENGLISH PROFICIENCY: English CV without official certificate = 'weak' floor; 'partial' requires self-assessed fluency with international projects; 'matched' requires IELTS/TOEIC/ex-pat proof.
 
                 OUTPUT SCHEMA:
                 {
@@ -126,7 +145,7 @@ public final class AssessmentPrompts {
                       "importance": "REQUIRED",
                       "jd_requirement": "<5-15 word English summary>",
                       "cv_evidence": "<English evidence from CV or null>",
-                      "status": "<matched|weak|missing>",
+                      "status": "<matched|partial|weak|missing>",
                       "reasoning": "<1 sentence English explanation>"
                     }
                   ],
@@ -137,16 +156,12 @@ public final class AssessmentPrompts {
                       "importance": "<PREFERRED|NOT_APPLICABLE>",
                       "jd_requirement": "<English summary>",
                       "cv_evidence": "<English evidence from CV or null>",
-                      "status": "<matched|weak|missing|not_applicable>",
+                      "status": "<matched|partial|weak|missing|not_applicable>",
                       "reasoning": "<1 sentence English explanation>"
                     }
                   ]
                 }
                 """;
-    }
-
-    public static String buildAssessmentSystemPrompt(String criteriaInstructions) {
-        return buildAssessmentSystemPrompt();
     }
 
     public static String buildAssessmentUserPrompt(String cvContextMarkdown, String criteriaInstructions) {
@@ -159,10 +174,6 @@ public final class AssessmentPrompts {
 
                 Evaluate criteria against candidate CV context. Output STRICT JSON ONLY.
                 """.formatted(cvContextMarkdown, criteriaInstructions);
-    }
-
-    public static String buildAssessmentUserPrompt(String cvContextMarkdown, String fullJdMarkdown, String criteriaInstructions) {
-        return buildAssessmentUserPrompt(cvContextMarkdown, criteriaInstructions);
     }
 
     public static final String SYSTEM_PROMPT_IMPROVEMENT_ADVISOR =
@@ -185,10 +196,6 @@ public final class AssessmentPrompts {
                - Skill Gaps (Technology X is missing from CV): Frame as a practice recommendation: "If you have practiced X in a lab/personal project, write: 'Built a lab prototype using X to...'". DO NOT recommend taking online courses/LeetCode.
             3. Provide exact professional CV bullet points in English. Zero hallucination.
             """;
-
-    public static String buildImprovementUserPrompt(String missingAndWeakItemsJson) {
-        return buildImprovementUserPrompt(missingAndWeakItemsJson, "");
-    }
 
     public static String buildImprovementUserPrompt(String missingAndWeakItemsJson, String cvMarkdown) {
         return """

@@ -224,6 +224,60 @@ public class DatabaseSeeder implements CommandLineRunner {
                 "false",
                 "Whether to include NOT_APPLICABLE criteria in assessment results (true = 360 degree audit, false = strict JD matching)"
         );
+
+        seedSettingIfAbsent(
+                "MATCHED_QUESTIONS_RATIO",
+                "0.6",
+                "Tỷ lệ câu hỏi dành cho các kỹ năng Matched (0.6 = 60%)"
+        );
+
+        seedSettingIfAbsent(
+                "PROMPT_TECH_MATCHED",
+                "Đào sâu (Drill-down): Hỏi về cơ chế hoạt động ngầm, edge-cases, và best practices.",
+                "Chiến lược sinh câu hỏi Technical khi kỹ năng Matched"
+        );
+
+        seedSettingIfAbsent(
+                "PROMPT_TECH_MISSING",
+                "Đánh giá Khái niệm (Conceptual): Hỏi định nghĩa ở mức High-level và yêu cầu so sánh.",
+                "Chiến lược sinh câu hỏi Technical khi kỹ năng Missing/Weak"
+        );
+
+        seedSettingIfAbsent(
+                "PROMPT_CODE_MATCHED",
+                "Tối ưu hóa (Optimization): Đưa ra bài toán yêu cầu viết code tối ưu về Time/Space Complexity, chú trọng Clean Code và bắt lỗi (Exception Handling).",
+                "Chiến lược sinh câu hỏi Coding khi kỹ năng Matched"
+        );
+
+        seedSettingIfAbsent(
+                "PROMPT_CODE_MISSING",
+                "Mã giả (Pseudo-code): Yêu cầu mô tả thuật toán bằng mã giả hoặc bằng ngôn ngữ thế mạnh để giải quyết bài toán tương tự.",
+                "Chiến lược sinh câu hỏi Coding khi kỹ năng Missing/Weak"
+        );
+
+        seedSettingIfAbsent(
+                "PROMPT_SYS_MATCHED",
+                "Thiết kế & Đánh đổi (Trade-offs): Yêu cầu bóc tách kiến trúc phức tạp, cách xử lý phân tán, mTLS hoặc bảo mật Zero Trust.",
+                "Chiến lược sinh câu hỏi System Design khi kỹ năng Matched"
+        );
+
+        seedSettingIfAbsent(
+                "PROMPT_SYS_MISSING",
+                "Nhận diện Vấn đề (Bottleneck Identification): Đưa ra một luồng hệ thống có sẵn và yêu cầu chỉ ra điểm nghẽn (Single point of failure) dựa trên tư duy logic thông thường.",
+                "Chiến lược sinh câu hỏi System Design khi kỹ năng Missing/Weak"
+        );
+
+        seedSettingIfAbsent(
+                "PROMPT_BEHAV_MATCHED",
+                "Kiểm chứng Thực tế (STAR Method): Yêu cầu kể lại một dự án khó nhất đã làm, cách xử lý xung đột trong team, hoặc vai trò trong việc ra quyết định kỹ thuật.",
+                "Chiến lược sinh câu hỏi Behavioral khi kỹ năng Matched"
+        );
+
+        seedSettingIfAbsent(
+                "PROMPT_BEHAV_MISSING",
+                "Khả năng Tự học (Learnability): Đưa ra kịch bản giả định: 'Dự án tuần sau yêu cầu dùng công nghệ này ngay lập tức, bạn sẽ lên kế hoạch tiếp cận và triển khai nó như thế nào trong 3 ngày?'",
+                "Chiến lược sinh câu hỏi Behavioral khi kỹ năng Missing/Weak"
+        );
     }
 
     private void seedSettingIfAbsent(String key, String defaultValue, String description) {

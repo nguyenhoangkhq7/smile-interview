@@ -4,5 +4,6 @@ public record QuestionAssignment(
         String category,
         String difficulty,
         EvidenceItemPair item,
-        boolean isFollowUp
+        boolean isFollowUp,
+        String promptStrategy
 ) {}

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Star, Send, CheckCircle2, Lock, MessageSquare, Award } from 'lucide-react';
+import { Star, Send, CheckCircle2, Lock, Award } from 'lucide-react';
 
 import { useAuthStore } from '@/store/authStore';
 

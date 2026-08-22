@@ -1,22 +1,62 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 
-export async function GET() {
+// ─── JWT helper ───────────────────────────────────────────────────────────────
+function extractUserId(request: NextRequest): string | null {
+  const authHeader = request.headers.get('Authorization');
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    try {
+      const token = authHeader.substring(7);
+      const parts = token.split('.');
+      if (parts.length === 3) {
+        const payload = Buffer.from(parts[1], 'base64').toString('utf-8');
+        const claims = JSON.parse(payload);
+        return claims.id || null;
+      }
+    } catch (e) {
+      console.error('[API History] Error decoding JWT:', e);
+    }
+  }
+  return null;
+}
+
+export async function GET(request: NextRequest) {
   try {
-    // 1. Get all sessions with joined resumes & job_descriptions for Cloudinary URLs
-    const sql = `
-      SELECT DISTINCT ON (s.id)
-        s.*,
-        r.file_url AS cv_file_url,
-        r.extracted_text AS cv_extracted_text,
-        j.file_url AS jd_file_url,
-        j.extracted_text AS jd_extracted_text
-      FROM sessions s
-      LEFT JOIN resumes r ON (s.resume_id = r.id OR s.cv_filename = r.file_name)
-      LEFT JOIN job_descriptions j ON (s.jd_id = j.id OR s.jd_filename = j.title)
-      ORDER BY s.id, s.date DESC
-    `;
-    const sessionsRes = await query(sql);
+    const authUserId = extractUserId(request);
+    let sql: string;
+    let params: unknown[] = [];
+
+    if (authUserId) {
+      sql = `
+        SELECT DISTINCT ON (s.id)
+          s.*,
+          r.file_url AS cv_file_url,
+          r.extracted_text AS cv_extracted_text,
+          j.file_url AS jd_file_url,
+          j.extracted_text AS jd_extracted_text
+        FROM sessions s
+        LEFT JOIN resumes r ON (s.resume_id = r.id OR s.cv_filename = r.file_name)
+        LEFT JOIN job_descriptions j ON (s.jd_id = j.id OR s.jd_filename = j.title)
+        WHERE s.user_id = $1 OR s.user_id IS NULL
+        ORDER BY s.id, s.date DESC
+      `;
+      params = [authUserId];
+    } else {
+      sql = `
+        SELECT DISTINCT ON (s.id)
+          s.*,
+          r.file_url AS cv_file_url,
+          r.extracted_text AS cv_extracted_text,
+          j.file_url AS jd_file_url,
+          j.extracted_text AS jd_extracted_text
+        FROM sessions s
+        LEFT JOIN resumes r ON (s.resume_id = r.id OR s.cv_filename = r.file_name)
+        LEFT JOIN job_descriptions j ON (s.jd_id = j.id OR s.jd_filename = j.title)
+        ORDER BY s.id, s.date DESC
+      `;
+    }
+
+    const sessionsRes = await query(sql, params);
     const sessions = sessionsRes.rows;
 
     if (sessions.length === 0) {
@@ -41,6 +81,7 @@ export async function GET() {
 
         return {
           id: sess.id,
+          userId: sess.user_id,
           date: sess.date,
           interviewType: sess.interview_type,
           roleTitle: sess.role_title,
@@ -109,13 +150,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Session details with id are required' }, { status: 400 });
     }
 
+    const authUserId = extractUserId(request);
+    const userIdToSave = authUserId || session.userId || null;
+
     const isValidUuid = (val?: string | null) => 
       !!val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(val));
 
     // 1. Upsert session info
     const upsertSessionSql = `
       INSERT INTO sessions (
-        id, date, interview_type, role_title, cv_filename, jd_filename,
+        id, user_id, date, interview_type, role_title, cv_filename, jd_filename,
         overall_score, status, overall_feedback, competency_fit_score,
         technical_depth_score, match_level, candidate_level, role_type_detected,
         years_of_experience_estimate, strong_areas, gap_areas, critical_missing_skills,
@@ -123,8 +167,9 @@ export async function POST(request: NextRequest) {
         evidence_items, additional_evidence_items, score_breakdown, top_priority_improvements,
         hiring_recommendation, eligibility, gate_evidence_items, must_have_evidence_items, prefer_to_have_evidence_items,
         quick_wins, skill_gaps
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34)
       ON CONFLICT (id) DO UPDATE SET
+        user_id = COALESCE(EXCLUDED.user_id, sessions.user_id),
         date = EXCLUDED.date,
         interview_type = EXCLUDED.interview_type,
         role_title = EXCLUDED.role_title,
@@ -161,6 +206,7 @@ export async function POST(request: NextRequest) {
 
     await query(upsertSessionSql, [
       session.id,
+      isValidUuid(userIdToSave) ? userIdToSave : null,
       session.date || new Date().toISOString(),
       session.interviewType || 'Technical',
       session.roleTitle || '',

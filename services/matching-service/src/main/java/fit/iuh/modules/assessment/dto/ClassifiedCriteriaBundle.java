@@ -2,10 +2,12 @@ package fit.iuh.modules.assessment.dto;
 
 import java.util.List;
 
+@com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
 public record ClassifiedCriteriaBundle(
         List<ClassifiedCriteria> dbCriteria,
         List<JdExtraCriteria> jdExtras
 ) {
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
     public record ClassifiedCriteria(
             Long criteriaId,
             String criteriaName,
@@ -14,6 +16,7 @@ public record ClassifiedCriteriaBundle(
             String importance  // "required" | "preferred" | "not_in_jd"
     ) {}
 
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
     public record JdExtraCriteria(
             String name,
             String importance,         // "required" | "preferred"
@@ -21,17 +24,9 @@ public record ClassifiedCriteriaBundle(
     ) {}
 
     /**
-     * Returns DB criteria to send to the LLM for evaluation.
-     *  - comprehensive=true  : ALL criteria (including not_in_jd) — used for full analysis mode
-     *  - comprehensive=false : Excludes not_in_jd criteria to save LLM tokens.
-     *                         The JdCriteriaClassifier MUST be conservative: only assign
-     *                         not_in_jd to criteria completely unrelated to the job domain.
-     *                         Anything even tangentially relevant should be "preferred".
+     * Returns active DB criteria to send to the LLM for evaluation (excludes not_in_jd criteria to save LLM tokens).
      */
-    public List<ClassifiedCriteria> dbCriteriaForMode(boolean comprehensive) {
-        if (comprehensive) {
-            return dbCriteria != null ? dbCriteria : List.of();
-        }
+    public List<ClassifiedCriteria> activeDbCriteria() {
         if (dbCriteria == null) return List.of();
         return dbCriteria.stream()
                 .filter(c -> !"not_in_jd".equalsIgnoreCase(c.importance()))

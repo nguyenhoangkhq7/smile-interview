@@ -75,4 +75,29 @@ class SkillKnowledgeGraphServiceTest {
         assertNotNull(related);
         assertTrue(related.contains("Frontend Framework"));
     }
+
+    @Test
+    @DisplayName("Should correctly match special character skills like C++, C#, .NET, and CI/CD")
+    void testSpecialCharacterSkillsMatch() {
+        ontologyRepository.addRelation(new SkillRelationDto("C++", "Systems Programming", "IS_A", 0.95));
+        ontologyRepository.addRelation(new SkillRelationDto("C#", "Backend Framework", "IS_A", 0.95));
+        ontologyRepository.addRelation(new SkillRelationDto(".NET", "Backend Framework", "IS_A", 0.95));
+        ontologyRepository.addRelation(new SkillRelationDto("CI/CD", "DevOps", "IS_A", 0.95));
+
+        GraphMatchResult rCpp = graphService.matchSkills("C++", "Candidate has 3 years of experience in C++ and Python.");
+        assertEquals(1.0, rCpp.similarityScore(), 0.001);
+        assertEquals("MATCHED", rCpp.matchStatus());
+
+        GraphMatchResult rCSharp = graphService.matchSkills("C#", "Developed backend services using C# and .NET.");
+        assertEquals(1.0, rCSharp.similarityScore(), 0.001);
+        assertEquals("MATCHED", rCSharp.matchStatus());
+
+        GraphMatchResult rDotNet = graphService.matchSkills(".NET", "Strong expertise in .NET and ASP.NET Core.");
+        assertEquals(1.0, rDotNet.similarityScore(), 0.001);
+        assertEquals("MATCHED", rDotNet.matchStatus());
+
+        GraphMatchResult rCiCd = graphService.matchSkills("CI/CD", "Maintained automated CI/CD pipelines via GitHub Actions.");
+        assertEquals(1.0, rCiCd.similarityScore(), 0.001);
+        assertEquals("MATCHED", rCiCd.matchStatus());
+    }
 }

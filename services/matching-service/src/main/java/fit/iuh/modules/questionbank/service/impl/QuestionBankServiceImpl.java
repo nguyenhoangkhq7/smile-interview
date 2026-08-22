@@ -74,14 +74,14 @@ public class QuestionBankServiceImpl implements QuestionBankService {
                 .collect(Collectors.toList());
 
         List<String> gapAreas = allEvidencePairs.stream()
-                .filter(p -> "missing".equalsIgnoreCase(p.status()) || "weak".equalsIgnoreCase(p.status()))
+                .filter(p -> "missing".equalsIgnoreCase(p.status()) || "weak".equalsIgnoreCase(p.status()) || "partial".equalsIgnoreCase(p.status()))
                 .map(EvidenceItemPair::criteriaName)
                 .filter(Objects::nonNull)
                 .distinct()
                 .collect(Collectors.toList());
 
         List<String> rawTechPossessed = allEvidencePairs.stream()
-                .filter(p -> "matched".equalsIgnoreCase(p.status()) || "weak".equalsIgnoreCase(p.status()))
+                .filter(p -> "matched".equalsIgnoreCase(p.status()) || "partial".equalsIgnoreCase(p.status()) || "weak".equalsIgnoreCase(p.status()))
                 .map(EvidenceItemPair::cvEvidence)
                 .filter(s -> s != null && !s.isBlank())
                 .distinct()

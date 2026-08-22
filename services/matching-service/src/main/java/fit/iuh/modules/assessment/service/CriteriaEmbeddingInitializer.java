@@ -127,32 +127,9 @@ public class CriteriaEmbeddingInitializer {
 
     /**
      * Builds the text fed to the embedding model for a given criteria.
-     * Format mirrors what AssessmentCriteriaPreparer used at runtime before this optimisation.
      */
     public static String buildCriteriaText(EvaluationCriteria c) {
         return c.getName() + ": " + (c.getPromptInstruction() != null ? c.getPromptInstruction() : "");
-    }
-
-    /**
-     * Same text format, but from a CriteriaWeightProjection (used by AssessmentCriteriaPreparer).
-     */
-    public static String buildCriteriaText(String name, String promptInstruction) {
-        return name + ": " + (promptInstruction != null ? promptInstruction : "");
-    }
-
-    /**
-     * Deserializes a JSON embedding string into a float array.
-     * Returns null if the string is null or malformed.
-     */
-    public float[] deserializeEmbedding(String json) {
-        if (json == null || json.isBlank()) return null;
-        try {
-            float[] vector = objectMapper.readValue(json, float[].class);
-            return vector.length > 0 ? vector : null;
-        } catch (JsonProcessingException ex) {
-            log.warn("[CriteriaEmbedding] Failed to deserialize embedding JSON: {}", ex.getMessage());
-            return null;
-        }
     }
 
     // -------------------------------------------------------------------------

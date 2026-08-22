@@ -29,7 +29,7 @@ function broadcastSSE(eventName: string, data: unknown) {
  * GET /api/hr-realtime
  * Establishes an SSE stream for HR Dashboard clients
  */
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   let controllerRef: SSEController | null = null;
 
   const stream = new ReadableStream<Uint8Array>({

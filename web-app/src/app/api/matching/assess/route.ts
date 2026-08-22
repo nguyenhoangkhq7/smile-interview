@@ -218,6 +218,9 @@ export async function GET(request: NextRequest) {
       if (matchedText) {
         sectionWiseFeedback['tech_stack_alignment'] = `Các điểm tương thích tốt: ${matchedText}.`;
       }
+      if (weakText) {
+        sectionWiseFeedback['practical_experience'] = `Kinh nghiệm cần bổ sung hoặc làm rõ: ${weakText}.`;
+      }
       if (missingText) {
         sectionWiseFeedback['cs_fundamentals'] = `Yêu cầu quan trọng trong JD nhưng thiếu trong CV: ${missingText}.`;
       }

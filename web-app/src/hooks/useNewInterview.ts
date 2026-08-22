@@ -9,7 +9,7 @@ import { useAuthStore } from '@/store/authStore';
 
 export type CvSource  = 'upload' | 'saved' | 'default';
 export type JdSource  = 'upload' | 'text' | 'saved';
-export type CriteriaFilter = 'all' | 'matched' | 'weak' | 'missing';
+export type CriteriaFilter = 'all' | 'matched' | 'partial' | 'weak' | 'missing';
 export type ActiveView = 'ai-cards' | 'visual-match';
 
 
@@ -645,15 +645,4 @@ export function useNewInterview() {
     handleUploadAndIngest, handleRunAssessment,
     handleResumeSession, handleRestart, handleViewAssessment, handleReset, handleContinueToSelection,
   };
-}
-
-
-function initialRoleTitle({ jdSource, selectedJdId, savedJds, jdFile }: {
-  jdSource: JdSource; selectedJdId: number | null; savedJds: DatabaseJd[]; jdFile: File | null;
-}): string {
-  if (jdSource === 'saved' && selectedJdId)
-    return savedJds.find((j) => j.id === selectedJdId)?.title || 'Software Engineer';
-  if (jdSource === 'upload' && jdFile)
-    return jdFile.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
-  return 'Software Engineer';
 }

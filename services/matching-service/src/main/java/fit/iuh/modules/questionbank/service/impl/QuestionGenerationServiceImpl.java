@@ -104,6 +104,7 @@ public class QuestionGenerationServiceImpl implements QuestionGenerationService 
 
         while (attempts < maxAttempts) {
             attempts++;
+            long startTime = System.currentTimeMillis();
             try {
                 LlmChatRequest request = LlmChatRequest.builder()
                         .model(model)
@@ -130,17 +131,28 @@ public class QuestionGenerationServiceImpl implements QuestionGenerationService 
                         )
                         .block();
 
+                long durationMs = System.currentTimeMillis() - startTime;
+
                 if (response == null || response.getFirstChoiceContent() == null) {
                     throw new QuestionBankException("LLM returned an empty response for question generation.");
                 }
 
                 if (response.getUsage() != null) {
                     LlmChatResponse.Usage usage = response.getUsage();
-                    log.info("[LLM_USAGE] Model: {} | Prompt (Input): {} | Completion (Output): {} | Total: {}",
-                            response.getModel(),
+                    log.info("[LLM METRICS] Task: QuestionGeneration ({}) | Model: {} | Duration: {} ms ({} s) | Prompt Tokens: {} | Completion Tokens: {} | Total Tokens: {}",
+                            type,
+                            response.getModel() != null ? response.getModel() : model,
+                            durationMs,
+                            String.format("%.2f", durationMs / 1000.0),
                             usage.getPromptTokens(),
                             usage.getCompletionTokens(),
                             usage.getTotalTokens());
+                } else {
+                    log.info("[LLM METRICS] Task: QuestionGeneration ({}) | Model: {} | Duration: {} ms ({} s) | Usage: N/A",
+                            type,
+                            response.getModel() != null ? response.getModel() : model,
+                            durationMs,
+                            String.format("%.2f", durationMs / 1000.0));
                 }
 
                 String rawJson = response.getFirstChoiceContent().strip();
@@ -338,6 +350,9 @@ public class QuestionGenerationServiceImpl implements QuestionGenerationService 
                     item != null && item.status() != null ? item.status() : "unknown",
                     qa.difficulty()
             ));
+            if (qa.promptStrategy() != null && !qa.promptStrategy().isBlank()) {
+                sb.append(String.format("- Prompt Strategy: %s%n", qa.promptStrategy()));
+            }
             if (item != null) {
                 sb.append(String.format("- Criteria: %s%n", item.criteriaName() != null ? item.criteriaName() : "Ad-hoc"));
                 sb.append(String.format("- JD Requirement: %s%n", item.jdRequirement() != null ? item.jdRequirement() : "N/A"));

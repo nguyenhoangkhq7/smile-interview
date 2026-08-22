@@ -1,4 +1,5 @@
 import type { ImprovementItem } from './cvJdMatching';
+import { useAuthStore } from '@/store/authStore';
 
 export interface QuestionFeedback {
   id?: string;
@@ -16,6 +17,7 @@ export interface QuestionFeedback {
 
 export interface SessionHistoryItem {
   id: string;
+  userId?: string;
   date: string;
   interviewType: 'Technical' | 'Behavioural' | 'Live Coding' | 'Case Study' | 'System Design';
   roleTitle: string;
@@ -62,7 +64,6 @@ export interface SessionHistoryItem {
   currentStage?: 'CV_JD_MATCHED' | 'QUESTION_BANK_READY' | 'INTERVIEW_IN_PROGRESS' | 'COMPLETED' | string;
 }
 
-
 export interface SessionEligibility {
   status?: string;
   gate_checks?: {
@@ -89,13 +90,29 @@ function getFetchUrl(path: string): string {
   return `${baseUrl}${path}`;
 }
 
+function getAuthHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json'
+  };
+  if (typeof window !== 'undefined') {
+    const token = useAuthStore.getState().token;
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+  }
+  return headers;
+}
+
 export const historyService = {
   /**
    * Fetch all past practice sessions
    */
   async getHistory(): Promise<SessionHistoryItem[]> {
     try {
-      const res = await fetch(getFetchUrl('/api/history'), { cache: 'no-store' });
+      const res = await fetch(getFetchUrl('/api/history'), {
+        headers: getAuthHeaders(),
+        cache: 'no-store',
+      });
       if (!res.ok) {
         throw new Error(`Failed to fetch history: ${res.statusText}`);
       }
@@ -111,7 +128,10 @@ export const historyService = {
    */
   async getSessionById(id: string): Promise<SessionHistoryItem | null> {
     try {
-      const res = await fetch(getFetchUrl(`/api/history/${id}`), { cache: 'no-store' });
+      const res = await fetch(getFetchUrl(`/api/history/${id}`), {
+        headers: getAuthHeaders(),
+        cache: 'no-store',
+      });
       if (!res.ok) {
         if (res.status === 404) return null;
         throw new Error(`Failed to fetch session: ${res.statusText}`);
@@ -130,9 +150,7 @@ export const historyService = {
     try {
       const res = await fetch('/api/history', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(session)
       });
 
@@ -179,6 +197,7 @@ export const historyService = {
   async cloneSession(sessionId: string): Promise<string> {
     const res = await fetch(`/api/history/${sessionId}/clone`, {
       method: 'POST',
+      headers: getAuthHeaders(),
     });
     if (!res.ok) {
       throw new Error(`Failed to clone session: ${res.statusText}`);

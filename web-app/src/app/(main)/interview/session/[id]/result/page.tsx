@@ -8,13 +8,6 @@ import { historyService, SessionHistoryItem } from '@/services/historyService';
 import { exportQuestionBankToCSV } from '@/lib/exportUtils';
 import styles from './result.module.css';
 
-interface GateCheck {
-  status: string;
-  criteria_name: string;
-  required_value: string;
-  actual_value: string;
-}
-
 interface StrengthObject {
   area?: string;
   name?: string;

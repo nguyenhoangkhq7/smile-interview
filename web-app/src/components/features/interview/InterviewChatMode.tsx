@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useParams } from 'next/navigation';
-import { historyService } from '@/services/historyService';
+import { historyService, QuestionFeedback } from '@/services/historyService';
 import { useAuthStore } from '@/store/authStore';
 import {
   Send,
@@ -30,6 +30,37 @@ interface ChatMessage {
   text: string;
   time: string;
   isDeepDive?: boolean;
+}
+
+interface ChatSessionQuestion {
+  question: string | { question: string };
+  answer?: string;
+  score?: number;
+  strengths?: string;
+  improvements?: string;
+  suggestedAnswer?: string;
+  topicTag?: string;
+  isDeepDive?: boolean;
+  goodAnswerSignals?: string[];
+}
+
+interface SocketInitialQuestion {
+  question: string;
+  good_answer_signals: string[];
+  topic: string;
+}
+
+interface OrchestrationEventPayload {
+  actionType?: string;
+  text?: string;
+  score?: number | null;
+  evaluation?: string;
+  [key: string]: unknown;
+}
+
+interface OrchestrationEvent {
+  type: string;
+  payload?: OrchestrationEventPayload;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -140,13 +171,12 @@ export function InterviewChatMode() {
       if (data?.questions && data.questions.length > 0) {
         const pastMessages: ChatMessage[] = [];
         let answeredBaseCount = 0;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        data.questions.forEach((q: any) => {
+        (data.questions as unknown as ChatSessionQuestion[]).forEach((q) => {
           if (q.answer) {
             const qText =
-              typeof q.question === 'object'
+              typeof q.question === 'object' && q.question !== null
                 ? (q.question as { question: string }).question
-                : q.question;
+                : (q.question as string);
             if (qText) {
               pastMessages.push({
                 id: generateId(),
@@ -192,14 +222,13 @@ export function InterviewChatMode() {
       setSocketConnected(false);
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    socket.on('orchestration-event', (data: any) => {
+    socket.on('orchestration-event', (data: OrchestrationEvent) => {
       if (data.type === 'INTERVIEWER_ACTION') {
-        const { actionType, text, score, evaluation } = data.payload as {
-          actionType: string;
-          text: string;
-          score: number | null;
-          evaluation: string;
+        const { actionType, text, score, evaluation } = (data.payload || {}) as {
+          actionType?: string;
+          text?: string;
+          score?: number | null;
+          evaluation?: string;
         };
 
         if (actionType === 'CONCLUDING') {
@@ -220,12 +249,11 @@ export function InterviewChatMode() {
         if (evaluation && score !== undefined) {
           historyService.getSessionById(sessionId).then((session) => {
             if (session?.questions) {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const updated = [...(session.questions as any[])];
+              const updated = [...(session.questions as unknown as ChatSessionQuestion[])];
               const answeredQText = currentQuestionRef.current;
 
               // 1. Find and update the question that was just answered
-              let answeredIdx = updated.findIndex((q: any) => {
+              let answeredIdx = updated.findIndex((q) => {
                 const qStr = typeof q.question === 'object' && q.question !== null ? q.question.question : q.question;
                 return qStr && answeredQText && qStr.trim() === answeredQText.trim();
               });
@@ -249,7 +277,7 @@ export function InterviewChatMode() {
               }
 
               // 2. Check if new question already exists in list before adding
-              const newQExists = updated.some((q: any) => {
+              const newQExists = updated.some((q) => {
                 const qStr = typeof q.question === 'object' && q.question !== null ? q.question.question : q.question;
                 return qStr && text && qStr.trim() === text.trim();
               });
@@ -269,20 +297,20 @@ export function InterviewChatMode() {
 
               historyService.saveSession({
                 ...session,
-                questions: updated,
+                questions: updated as unknown as QuestionFeedback[],
                 replaceQuestions: true,
               });
             }
           });
         }
 
-        currentQuestionRef.current = text;
+        currentQuestionRef.current = text || '';
         setMessages((prev) => [
           ...prev,
           {
             id: generateId(),
             sender: 'ai',
-            text,
+            text: text || '',
             time: formatCurrentTime(),
             isDeepDive: actionType === 'FOLLOW_UP',
           },
@@ -290,7 +318,7 @@ export function InterviewChatMode() {
         setSessionState('LISTENING');
         setTimeout(() => textareaRef.current?.focus(), 100);
       } else if (data.type === 'STATE_UPDATE') {
-        const { status } = data.payload as { status: string };
+        const { status } = (data.payload || {}) as { status?: string };
         if (status === 'COMPLETED') {
           handleFinishInterview();
         }
@@ -301,7 +329,6 @@ export function InterviewChatMode() {
       socket.disconnect();
       if (timerRef.current) clearInterval(timerRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
   // ── Start interview (join socket room) ────────────────────────────────────
@@ -310,16 +337,14 @@ export function InterviewChatMode() {
     startTimer();
 
     const data = await historyService.getSessionById(sessionId);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let initialQuestions: any[] = [];
+    let initialQuestions: SocketInitialQuestion[] = [];
     try {
       if (data?.questions && data.questions.length > 0) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        initialQuestions = (data.questions as any[]).map((q) => ({
+        initialQuestions = (data.questions as unknown as ChatSessionQuestion[]).map((q) => ({
           question:
-            typeof q.question === 'object'
+            typeof q.question === 'object' && q.question !== null
               ? (q.question as { question: string }).question
-              : q.question,
+              : (q.question as string),
           good_answer_signals: q.goodAnswerSignals || [],
           topic: q.topicTag || '',
         }));
@@ -366,17 +391,18 @@ export function InterviewChatMode() {
     // Persist to history matching currentQuestionRef
     historyService.getSessionById(sessionId).then((session) => {
       if (session) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const updated: any[] = session.questions ? [...(session.questions as any[])] : [];
+        const updated: ChatSessionQuestion[] = session.questions
+          ? [...(session.questions as unknown as ChatSessionQuestion[])]
+          : [];
         const activeQText = currentQuestionRef.current;
 
-        let targetIdx = updated.findIndex((q: any) => {
+        let targetIdx = updated.findIndex((q) => {
           const qStr = typeof q.question === 'object' && q.question !== null ? q.question.question : q.question;
           return qStr && activeQText && qStr.trim() === activeQText.trim();
         });
 
         if (targetIdx === -1) {
-          targetIdx = updated.findIndex((q: any) => !q.answer);
+          targetIdx = updated.findIndex((q) => !q.answer);
         }
 
         if (targetIdx !== -1) {
@@ -393,7 +419,11 @@ export function InterviewChatMode() {
             isDeepDive: false,
           });
         }
-        historyService.saveSession({ ...session, questions: updated, replaceQuestions: true });
+        historyService.saveSession({
+          ...session,
+          questions: updated as unknown as QuestionFeedback[],
+          replaceQuestions: true,
+        });
       }
     });
 

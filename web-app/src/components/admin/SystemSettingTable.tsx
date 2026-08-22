@@ -17,14 +17,39 @@ const SETTING_META: Record<string, { label: string; description: string; unit?: 
     description: 'Điểm tham chiếu để tính hệ số điều chỉnh f trong DifficultyDistributor. Score > Pivot → tăng câu hỏi khó.',
     unit: 'điểm (0-100)',
   },
+  STATUS_MATCHED_COEFF: {
+    label: 'Hệ số "Matched"',
+    description: 'Hệ số điểm khi tiêu chí khớp hoàn toàn (có bằng chứng dự án/thực chiến rõ ràng).',
+    unit: 'hệ số (0.0 - 1.0)',
+  },
+  STATUS_PARTIAL_COEFF: {
+    label: 'Hệ số "Partial"',
+    description: 'Hệ số điểm khi tiêu chí khớp một phần (đã làm qua nhưng thiếu chiều sâu hoặc thiếu một số yêu cầu phụ).',
+    unit: 'hệ số (0.0 - 1.0)',
+  },
   STATUS_WEAK_COEFF: {
     label: 'Hệ số "Weak"',
-    description: 'Điểm được cộng khi tiêu chí có trạng thái "weak" trong ScoringService. "matched" = 1.0, "missing" = 0.0.',
+    description: 'Điểm được cộng khi tiêu chí ở mức cơ bản / chỉ liệt kê từ khóa mà chưa có dự án chứng minh.',
+    unit: 'hệ số (0.0 - 1.0)',
+  },
+  STATUS_MISSING_COEFF: {
+    label: 'Hệ số "Missing"',
+    description: 'Hệ số điểm khi tiêu chí hoàn toàn không xuất hiện trong CV.',
+    unit: 'hệ số (0.0 - 1.0)',
+  },
+  PARTIAL_COEFF_INTERN_FRESHER: {
+    label: 'Hệ số Partial (Intern/Fresher)',
+    description: 'Hệ số điểm cho trạng thái Partial đối với ứng viên Intern/Fresher.',
     unit: 'hệ số (0.0 - 1.0)',
   },
   WEAK_COEFF_INTERN_FRESHER: {
     label: 'Hệ số Weak (Intern/Fresher)',
     description: 'Hệ số điểm cộng cho tiêu chí ở trạng thái Weak đối với ứng viên Intern hoặc Fresher (chấp nhận lý thuyết).',
+    unit: 'hệ số (0.0 - 1.0)',
+  },
+  PARTIAL_COEFF_SENIOR_LEAD: {
+    label: 'Hệ số Partial (Senior/Lead)',
+    description: 'Hệ số điểm cho trạng thái Partial đối với ứng viên Senior/Lead.',
     unit: 'hệ số (0.0 - 1.0)',
   },
   WEAK_COEFF_SENIOR_LEAD: {
@@ -101,6 +126,51 @@ const SETTING_META: Record<string, { label: string; description: string; unit?: 
     label: 'Độ khó câu hỏi Senior/Lead - Matched',
     description: 'Độ khó câu hỏi khi ứng viên Senior/Lead ở mức tốt (matched) tiêu chí kỹ năng.',
     unit: 'easy | medium | hard',
+  },
+  MATCHED_QUESTIONS_RATIO: {
+    label: 'Tỷ lệ câu hỏi Matched',
+    description: 'Tỷ lệ câu hỏi (0.0 - 1.0) tập trung vào các kỹ năng thế mạnh (Matched) của ứng viên. Phần còn lại dành cho Missing/Weak.',
+    unit: 'tỷ lệ (0.0 - 1.0)',
+  },
+  PROMPT_TECH_MATCHED: {
+    label: 'Prompt Strategy (Technical - Matched)',
+    description: 'Chiến lược đặt câu hỏi Technical khi ứng viên có thế mạnh (Matched).',
+    unit: 'văn bản',
+  },
+  PROMPT_TECH_MISSING: {
+    label: 'Prompt Strategy (Technical - Missing)',
+    description: 'Chiến lược đặt câu hỏi Technical khi ứng viên bị thiếu kỹ năng (Missing/Weak).',
+    unit: 'văn bản',
+  },
+  PROMPT_CODE_MATCHED: {
+    label: 'Prompt Strategy (Coding - Matched)',
+    description: 'Chiến lược đặt bài tập Coding khi ứng viên có thế mạnh (Matched).',
+    unit: 'văn bản',
+  },
+  PROMPT_CODE_MISSING: {
+    label: 'Prompt Strategy (Coding - Missing)',
+    description: 'Chiến lược đặt bài tập Coding khi ứng viên bị thiếu kỹ năng (Missing/Weak).',
+    unit: 'văn bản',
+  },
+  PROMPT_SYS_MATCHED: {
+    label: 'Prompt Strategy (System Design - Matched)',
+    description: 'Chiến lược đặt câu hỏi System Design khi ứng viên có thế mạnh (Matched).',
+    unit: 'văn bản',
+  },
+  PROMPT_SYS_MISSING: {
+    label: 'Prompt Strategy (System Design - Missing)',
+    description: 'Chiến lược đặt câu hỏi System Design khi ứng viên bị thiếu kỹ năng (Missing/Weak).',
+    unit: 'văn bản',
+  },
+  PROMPT_BEHAV_MATCHED: {
+    label: 'Prompt Strategy (Behavioral - Matched)',
+    description: 'Chiến lược đặt câu hỏi Hành vi (Behavioral) khi ứng viên có thế mạnh.',
+    unit: 'văn bản',
+  },
+  PROMPT_BEHAV_MISSING: {
+    label: 'Prompt Strategy (Behavioral - Missing)',
+    description: 'Chiến lược đặt câu hỏi Hành vi (Behavioral) khi ứng viên bị thiếu kỹ năng (Missing/Weak).',
+    unit: 'văn bản',
   },
 };
 

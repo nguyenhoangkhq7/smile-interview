@@ -54,4 +54,57 @@ public final class TextSanitizationUtil {
         }
         return cleaned;
     }
+
+    public static boolean containsSkillTerm(String haystack, String needle) {
+        if (haystack == null || needle == null || haystack.isBlank() || needle.isBlank()) return false;
+
+        String h = haystack.toLowerCase(Locale.ROOT);
+        String n = needle.trim().toLowerCase(Locale.ROOT);
+
+        int index = 0;
+        int nLen = n.length();
+        int hLen = h.length();
+
+        while ((index = h.indexOf(n, index)) != -1) {
+            int prevIdx = index - 1;
+            int nextIdx = index + nLen;
+
+            boolean validStart = (prevIdx < 0) || !isSkillWordChar(h.charAt(prevIdx));
+            boolean validEnd = (nextIdx >= hLen) || !isSkillWordChar(h.charAt(nextIdx));
+
+            // Guard: If needle doesn't end with '+' or '#', do not match if immediately followed by '+' or '#' (e.g. 'C' vs 'C++')
+            if (!n.endsWith("+") && !n.endsWith("#") && nextIdx < hLen) {
+                char nextChar = h.charAt(nextIdx);
+                if (nextChar == '+' || nextChar == '#') {
+                    validEnd = false;
+                }
+            }
+
+            // Special handling for terms ending with '+' or '#' (like C++ or C#)
+            if ((n.endsWith("+") || n.endsWith("#")) && nextIdx < hLen) {
+                char nextChar = h.charAt(nextIdx);
+                validEnd = Character.isWhitespace(nextChar) || isPunctuation(nextChar);
+            }
+
+            // Special handling for terms starting with '.' (like .NET)
+            if (n.startsWith(".") && prevIdx >= 0) {
+                char prevChar = h.charAt(prevIdx);
+                validStart = Character.isWhitespace(prevChar) || isPunctuation(prevChar);
+            }
+
+            if (validStart && validEnd) {
+                return true;
+            }
+            index += 1;
+        }
+        return false;
+    }
+
+    private static boolean isSkillWordChar(char c) {
+        return Character.isLetterOrDigit(c) || c == '_';
+    }
+
+    private static boolean isPunctuation(char c) {
+        return ",.;:!?'\"()[]{}<>\\/`~@$%^*-=".indexOf(c) >= 0;
+    }
 }

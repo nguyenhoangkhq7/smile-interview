@@ -35,6 +35,7 @@ public interface JobCriteriaRepository extends JpaRepository<CategoryCriteriaMap
         Integer getSourceDepth();
     }
 
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
     public record ConcreteCriteriaWeightDto(
         Long criteriaId,
         String criteriaName,

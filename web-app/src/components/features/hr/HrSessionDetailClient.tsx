@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { SessionHistoryItem, QuestionFeedback } from '@/services/historyService';
+import { SessionHistoryItem } from '@/services/historyService';
 import {
   AiContextBanner,
   QuestionCardList,
@@ -29,7 +29,7 @@ export const HrSessionDetailClient: React.FC<HrSessionDetailClientProps> = ({
   return (
     <div className="space-y-6">
       <Tabs
-        defaultValue="matching"
+        value={activeTab}
         onValueChange={(val) => setActiveTab(val as 'matching' | 'questions' | 'transcript')}
         className="w-full space-y-6"
       >

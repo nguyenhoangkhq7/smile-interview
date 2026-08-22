@@ -1,7 +1,7 @@
 import React from 'react';
 import { historyService, SessionHistoryItem } from '@/services/historyService';
 import { HrSessionTable } from '@/components/features/hr';
-import { ShieldCheck, Sparkles, Users } from 'lucide-react';
+import { Sparkles, Users } from 'lucide-react';
 
 export const revalidate = 0; // Always fetch fresh history data
 

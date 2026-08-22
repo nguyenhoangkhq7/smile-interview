@@ -61,6 +61,7 @@ public class StandardizationServiceImpl implements StandardizationService {
                 ))
                 .build();
 
+        long startTime = System.currentTimeMillis();
         try {
             LlmChatResponse response = llmWebClient.post()
                     .uri(appProperties.getLlm().getChatPath())
@@ -69,6 +70,8 @@ public class StandardizationServiceImpl implements StandardizationService {
                     .bodyToMono(LlmChatResponse.class)
                     .timeout(Duration.ofSeconds(timeoutSeconds))
                     .block();
+
+            long durationMs = System.currentTimeMillis() - startTime;
 
             log.info("[RAW_LLM_RESPONSE_DIAGNOSTIC] Doc={} | ReqMaxTokens={} | ResponseObj={} | ChoicesCount={} | FirstFinishReason={} | Usage={}",
                     documentLabel, request.getMaxTokens(),
@@ -96,9 +99,16 @@ public class StandardizationServiceImpl implements StandardizationService {
 
             if (response.getUsage() != null) {
                 var usage = response.getUsage();
-                log.info("[LLM_USAGE] Document={} | Model={} | PromptTokens={} | CompletionTokens={} | TotalTokens={}",
-                        documentLabel, response.getModel(),
+                log.info("[LLM METRICS] Task: Standardization ({}) | Model: {} | Duration: {} ms ({} s) | Prompt Tokens: {} | Completion Tokens: {} | Total Tokens: {}",
+                        documentLabel, response.getModel() != null ? response.getModel() : model,
+                        durationMs,
+                        String.format("%.2f", durationMs / 1000.0),
                         usage.getPromptTokens(), usage.getCompletionTokens(), usage.getTotalTokens());
+            } else {
+                log.info("[LLM METRICS] Task: Standardization ({}) | Model: {} | Duration: {} ms ({} s) | Usage: N/A",
+                        documentLabel, response.getModel() != null ? response.getModel() : model,
+                        durationMs,
+                        String.format("%.2f", durationMs / 1000.0));
             }
 
             return markdownOutput;

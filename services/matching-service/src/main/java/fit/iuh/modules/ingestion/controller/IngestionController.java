@@ -1,11 +1,13 @@
 package fit.iuh.modules.ingestion.controller;
 
+import fit.iuh.modules.auth.entity.User;
 import fit.iuh.modules.ingestion.dto.IngestionResponse;
 import fit.iuh.modules.ingestion.service.IngestionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -32,22 +34,25 @@ public class IngestionController {
             @RequestParam(value = "jdCategory", required = false) String jdCategory,
             @RequestParam(value = "jdAcceptedLevels", required = false) String jdAcceptedLevels,
             @RequestParam(value = "cvCategory", required = false) String cvCategory,
-            @RequestParam(value = "cvSeniorityLevel", required = false) String cvSeniorityLevel) {
+            @RequestParam(value = "cvSeniorityLevel", required = false) String cvSeniorityLevel,
+            @RequestParam(value = "roleTitle", required = false) String roleTitle,
+            @RequestParam(value = "interviewType", required = false) String interviewType,
+            @AuthenticationPrincipal User currentUser) {
 
-        log.info("Received ingestion request: sessionId={}, cvFile={}, jdFile={}, jdCategory={}, jdLevels={}, cvCategory={}, cvLevel={}",
+        log.info("Received ingestion request: sessionId={}, user={}, cvFile={}, jdFile={}, jdCategory={}, jdLevels={}, cvCategory={}, cvLevel={}, roleTitle={}, interviewType={}",
                 sessionId,
+                currentUser != null ? currentUser.getUsername() : "anonymous",
                 cvFile != null ? cvFile.getOriginalFilename() : "null",
                 jdFile != null ? jdFile.getOriginalFilename() : "null",
-                jdCategory, jdAcceptedLevels, cvCategory, cvSeniorityLevel);
+                jdCategory, jdAcceptedLevels, cvCategory, cvSeniorityLevel, roleTitle, interviewType);
 
         IngestionResponse response = ingestionService.ingest(
                 sessionId, cvFile, jdFile, jdText, resumeMarkdown, jdMarkdown,
-                jdCategory, jdAcceptedLevels, cvCategory, cvSeniorityLevel);
+                jdCategory, jdAcceptedLevels, cvCategory, cvSeniorityLevel,
+                roleTitle, interviewType, currentUser);
 
         return ResponseEntity.ok(response);
     }
-
-
 
     @DeleteMapping("/{sessionId}")
     public ResponseEntity<java.util.Map<String, String>> deleteSession(@PathVariable String sessionId) {

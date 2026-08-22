@@ -1,7 +1,9 @@
 package fit.iuh.modules.questionbank.service;
 
 import fit.iuh.modules.admin.entity.LevelDistributionRule;
+import fit.iuh.modules.admin.entity.SystemSetting;
 import fit.iuh.modules.admin.repository.LevelDistributionRuleRepository;
+import fit.iuh.modules.admin.repository.SystemSettingRepository;
 import fit.iuh.modules.assessment.entity.SeniorityLevel;
 import fit.iuh.modules.questionbank.dto.EvidenceItemPair;
 import fit.iuh.modules.questionbank.dto.QuestionAssignment;
@@ -17,6 +19,7 @@ import java.util.*;
 public class DifficultyDistributor {
 
     private final LevelDistributionRuleRepository levelRuleRepository;
+    private final SystemSettingRepository settingRepository;
 
     public List<QuestionAssignment> distribute(
             int totalCount,
@@ -36,7 +39,7 @@ public class DifficultyDistributor {
             for (EvidenceItemPair item : evidenceItems) {
                 if ("matched".equalsIgnoreCase(item.status())) {
                     matchedItems.add(item);
-                } else if ("missing".equalsIgnoreCase(item.status()) || "weak".equalsIgnoreCase(item.status())) {
+                } else if ("missing".equalsIgnoreCase(item.status()) || "weak".equalsIgnoreCase(item.status()) || "partial".equalsIgnoreCase(item.status())) {
                     gapItems.add(item);
                 }
             }
@@ -53,19 +56,31 @@ public class DifficultyDistributor {
             List<EvidenceItemPair> categoryMatched = filterItemsForCategory(category, matchedItems);
             List<EvidenceItemPair> categoryGap = filterItemsForCategory(category, gapItems);
 
-            int mainCount = (int) Math.ceil(countForCategory * 0.7);
-            int followUpCount = countForCategory - mainCount;
+            double matchedRatio = 0.6;
+            try {
+                Optional<SystemSetting> setting = settingRepository.findBySettingKey("MATCHED_QUESTIONS_RATIO");
+                if (setting.isPresent()) {
+                    matchedRatio = Double.parseDouble(setting.get().getSettingValue());
+                }
+            } catch (Exception e) {
+                log.warn("Invalid MATCHED_QUESTIONS_RATIO setting, falling back to 0.6");
+            }
+            
+            int matchedCount = (int) Math.round(countForCategory * matchedRatio);
+            int gapCount = countForCategory - matchedCount;
 
-            for (int i = 0; i < mainCount; i++) {
-                EvidenceItemPair item = pickItemForQuestion(categoryItems, categoryGap, categoryMatched, i);
+            for (int i = 0; i < matchedCount; i++) {
+                EvidenceItemPair item = pickItemForQuestion(categoryItems, categoryMatched, categoryGap, i);
                 String difficulty = determineDifficulty(item, level, overallMatchScore, false);
-                result.add(new QuestionAssignment(category, difficulty, item, false));
+                String promptStrategy = determinePromptStrategy(category, true);
+                result.add(new QuestionAssignment(category, difficulty, item, false, promptStrategy));
             }
 
-            for (int i = 0; i < followUpCount; i++) {
-                EvidenceItemPair item = pickItemForQuestion(categoryItems, categoryMatched, categoryGap, i);
+            for (int i = 0; i < gapCount; i++) {
+                EvidenceItemPair item = pickItemForQuestion(categoryItems, categoryGap, categoryMatched, i);
                 String difficulty = determineDifficulty(item, level, overallMatchScore, true);
-                result.add(new QuestionAssignment(category, difficulty, item, true));
+                String promptStrategy = determinePromptStrategy(category, false);
+                result.add(new QuestionAssignment(category, difficulty, item, true, promptStrategy));
             }
         }
 
@@ -205,5 +220,49 @@ public class DifficultyDistributor {
             case JUNIOR, MID -> 2;
             case SENIOR, LEAD -> 3;
         };
+    }
+
+    private String determinePromptStrategy(String category, boolean isMatched) {
+        if (category == null) return "";
+        String type = category.toLowerCase();
+        
+        String settingKey = "";
+        String defaultStrategy = "";
+        
+        switch (type) {
+            case "technical":
+                settingKey = isMatched ? "PROMPT_TECH_MATCHED" : "PROMPT_TECH_MISSING";
+                defaultStrategy = isMatched 
+                    ? "Đào sâu (Drill-down): Hỏi về cơ chế hoạt động ngầm, edge-cases, và best practices."
+                    : "Đánh giá Khái niệm (Conceptual): Hỏi định nghĩa ở mức High-level và yêu cầu so sánh.";
+                break;
+            case "coding":
+                settingKey = isMatched ? "PROMPT_CODE_MATCHED" : "PROMPT_CODE_MISSING";
+                defaultStrategy = isMatched 
+                    ? "Tối ưu hóa (Optimization): Đưa ra bài toán yêu cầu viết code tối ưu về Time/Space Complexity, chú trọng Clean Code và bắt lỗi (Exception Handling)."
+                    : "Mã giả (Pseudo-code): Yêu cầu mô tả thuật toán bằng mã giả hoặc bằng ngôn ngữ thế mạnh để giải quyết bài toán tương tự.";
+                break;
+            case "system_design":
+                settingKey = isMatched ? "PROMPT_SYS_MATCHED" : "PROMPT_SYS_MISSING";
+                defaultStrategy = isMatched 
+                    ? "Thiết kế & Đánh đổi (Trade-offs): Yêu cầu bóc tách kiến trúc phức tạp, cách xử lý phân tán, mTLS hoặc bảo mật Zero Trust."
+                    : "Nhận diện Vấn đề (Bottleneck Identification): Đưa ra một luồng hệ thống có sẵn và yêu cầu chỉ ra điểm nghẽn (Single point of failure) dựa trên tư duy logic thông thường.";
+                break;
+            case "behavioural", "behavioral":
+                settingKey = isMatched ? "PROMPT_BEHAV_MATCHED" : "PROMPT_BEHAV_MISSING";
+                defaultStrategy = isMatched 
+                    ? "Kiểm chứng Thực tế (STAR Method): Yêu cầu kể lại một dự án khó nhất đã làm, cách xử lý xung đột trong team, hoặc vai trò trong việc ra quyết định kỹ thuật."
+                    : "Khả năng Tự học (Learnability): Đưa ra kịch bản giả định: 'Dự án tuần sau yêu cầu dùng công nghệ này ngay lập tức, bạn sẽ lên kế hoạch tiếp cận và triển khai nó như thế nào trong 3 ngày?'";
+                break;
+            default:
+                return "";
+        }
+        
+        Optional<SystemSetting> setting = settingRepository.findBySettingKey(settingKey);
+        if (setting.isPresent() && setting.get().getSettingValue() != null && !setting.get().getSettingValue().isBlank()) {
+            return setting.get().getSettingValue();
+        }
+        
+        return defaultStrategy;
     }
 }

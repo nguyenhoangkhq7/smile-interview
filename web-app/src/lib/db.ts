@@ -186,6 +186,11 @@ export async function initDb() {
     ALTER TABLE sessions ADD COLUMN IF NOT EXISTS skill_gaps TEXT;
     ALTER TABLE sessions ADD COLUMN IF NOT EXISTS current_stage VARCHAR(50) DEFAULT 'CV_JD_MATCHED';
     CREATE INDEX IF NOT EXISTS idx_sessions_current_stage ON sessions(current_stage);
+    CREATE INDEX IF NOT EXISTS idx_evidence_items_assessment_id ON evidence_items(assessment_id);
+    CREATE INDEX IF NOT EXISTS idx_score_breakdowns_assessment_id ON score_breakdowns(assessment_id);
+    CREATE INDEX IF NOT EXISTS idx_improvements_assessment_id ON improvements(assessment_id);
+    CREATE INDEX IF NOT EXISTS idx_sessions_resume_jd ON sessions(resume_id, jd_id);
+    CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
 
     CREATE TABLE IF NOT EXISTS session_questions (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

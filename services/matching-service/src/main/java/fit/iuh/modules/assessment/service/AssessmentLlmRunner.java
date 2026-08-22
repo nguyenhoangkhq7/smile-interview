@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
  * High-cohesion service responsible for LLM execution:
  * 1. Low-level LLM calls with global concurrency semaphore & retry logic
  * 2. Parsing & sanitizing LLM JSON responses
- * 3. Batched execution & self-consistency voting algorithm
+ * 3. Batched criteria assessment execution & evidence grounding
  */
 @Slf4j
 @Service
@@ -39,7 +39,6 @@ public class AssessmentLlmRunner {
     private static final Map<String, String> JSON_RESPONSE_FORMAT = Map.of("type", "json_object");
 
     private static final int DEFAULT_BATCH_SIZE = 10;
-    private static final int DEFAULT_SELF_CONSISTENCY_RUNS = 1;
     private static final double DEFAULT_GROUNDING_THRESHOLD = 0.75;
     private static final int DEFAULT_BATCH_CONCURRENCY = 3;
 
@@ -50,6 +49,7 @@ public class AssessmentLlmRunner {
     private final Semaphore globalLlmSemaphore;
     private final SystemSettingRepository systemSettingRepository;
     private final EvidenceGroundingValidator evidenceGroundingValidator;
+    private final java.util.concurrent.Executor assessmentTaskExecutor;
 
     @Autowired
     public AssessmentLlmRunner(
@@ -57,12 +57,14 @@ public class AssessmentLlmRunner {
             @Qualifier("llmWebClient") WebClient llmWebClient,
             ObjectMapper objectMapper,
             SystemSettingRepository systemSettingRepository,
-            EvidenceGroundingValidator evidenceGroundingValidator) {
+            EvidenceGroundingValidator evidenceGroundingValidator,
+            @Qualifier("assessmentTaskExecutor") java.util.concurrent.Executor assessmentTaskExecutor) {
         this.appProperties = appProperties;
         this.llmWebClient = llmWebClient;
         this.objectMapper = objectMapper;
         this.systemSettingRepository = systemSettingRepository;
         this.evidenceGroundingValidator = evidenceGroundingValidator;
+        this.assessmentTaskExecutor = assessmentTaskExecutor;
 
         int concurrency = appProperties.getLlm().getGlobalConcurrency() > 0
                 ? appProperties.getLlm().getGlobalConcurrency() : 10;
@@ -129,6 +131,7 @@ public class AssessmentLlmRunner {
                 ? appProperties.getLlm().getRateLimitSleepMs() : 35000;
 
         for (int i = 0; i <= maxRetries; i++) {
+            long startTime = System.currentTimeMillis();
             try {
                 String responseBody = llmWebClient.post()
                         .uri(appProperties.getLlm().getChatPath())
@@ -137,6 +140,8 @@ public class AssessmentLlmRunner {
                         .bodyToMono(String.class)
                         .timeout(Duration.ofSeconds(timeoutSec))
                         .block();
+
+                long durationMs = System.currentTimeMillis() - startTime;
 
                 if (responseBody == null || responseBody.isBlank()) {
                     throw new LlmApiException("LLM API returned empty HTTP body during assessment.");
@@ -150,6 +155,23 @@ public class AssessmentLlmRunner {
                 if (response.getFirstChoiceContent() == null) {
                     throw new LlmApiException("LLM API returned empty assessment response.");
                 }
+
+                var usage = response.getUsage();
+                if (usage != null) {
+                    log.info("[LLM METRICS] Model: {} | Duration: {} ms ({} s) | Prompt Tokens: {} | Completion Tokens: {} | Total Tokens: {}",
+                            response.getModel() != null ? response.getModel() : targetModel,
+                            durationMs,
+                            String.format("%.2f", durationMs / 1000.0),
+                            usage.getPromptTokens(),
+                            usage.getCompletionTokens(),
+                            usage.getTotalTokens());
+                } else {
+                    log.info("[LLM METRICS] Model: {} | Duration: {} ms ({} s) | Usage: N/A",
+                            response.getModel() != null ? response.getModel() : targetModel,
+                            durationMs,
+                            String.format("%.2f", durationMs / 1000.0));
+                }
+
                 return response.getFirstChoiceContent().strip();
 
             } catch (WebClientResponseException e) {
@@ -242,7 +264,7 @@ public class AssessmentLlmRunner {
     }
 
     // =========================================================================
-    // 3. BATCHED ASSESSMENT EXECUTION & SELF-CONSISTENCY VOTING
+    // 3. BATCHED ASSESSMENT EXECUTION
     // =========================================================================
 
     /**
@@ -257,23 +279,18 @@ public class AssessmentLlmRunner {
         private static final long serialVersionUID = 1L;
     }
 
-    /** Convenience factory preserving backward-compatibility for callers that don't have depth info. */
-    public static CriteriaInstructionItem criteriaItem(Long criteriaId, String name, String label, String promptInstruction) {
-        return new CriteriaInstructionItem(criteriaId, name, label, promptInstruction, null);
-    }
     public record BatchResult(
             List<AssessmentResponseDto.EvidenceItem> evidenceItems,
             List<AssessmentResponseDto.AdHocEvidenceItem> preferToHaveEvidenceItems
     ) {}
 
-    public AssessmentResponseDto runBatchedAssessmentWithSelfConsistencyClassified(
+    public AssessmentResponseDto runBatchedAssessment(
             String sessionId,
             String fullCvMarkdown,
             String fullJdMarkdown,
-            ClassifiedCriteriaBundle bundle,
-            boolean comprehensiveMode) {
+            ClassifiedCriteriaBundle bundle) {
 
-        List<ClassifiedCriteriaBundle.ClassifiedCriteria> dbCriteria = bundle.dbCriteriaForMode(comprehensiveMode);
+        List<ClassifiedCriteriaBundle.ClassifiedCriteria> dbCriteria = bundle.activeDbCriteria();
         List<ClassifiedCriteriaBundle.JdExtraCriteria> jdExtras = bundle.jdExtras();
 
         List<CriteriaInstructionItem> allItems = new ArrayList<>();
@@ -292,10 +309,10 @@ public class AssessmentLlmRunner {
             allItems.add(new CriteriaInstructionItem(null, extra.name(), label, extra.promptInstruction(), null));
         }
 
-        return executeBatchedSelfConsistency(sessionId, fullCvMarkdown, allItems);
+        return executeBatchedAssessment(sessionId, fullCvMarkdown, allItems);
     }
 
-    public AssessmentResponseDto runBatchedAssessmentWithSelfConsistency(
+    public AssessmentResponseDto runBatchedCriteriaAssessment(
             String sessionId,
             String fullCvMarkdown,
             String fullJdMarkdown,
@@ -311,17 +328,16 @@ public class AssessmentLlmRunner {
                 allItems.add(new CriteriaInstructionItem(c.getCriteriaId(), c.getCriteriaName(), "[REQUIRED]", promptInst, depth));
             }
         }
-        return executeBatchedSelfConsistency(sessionId, fullCvMarkdown, allItems);
+        return executeBatchedAssessment(sessionId, fullCvMarkdown, allItems);
     }
 
-    private AssessmentResponseDto executeBatchedSelfConsistency(
+    private AssessmentResponseDto executeBatchedAssessment(
             String sessionId,
             String fullCvMarkdown,
             List<CriteriaInstructionItem> allItems) {
 
         int maxBatchSize = getSystemSettingInt("CRITERIA_BATCH_SIZE", DEFAULT_BATCH_SIZE);
         if (maxBatchSize < 1) maxBatchSize = 1;
-        int selfConsistencyRuns = getSystemSettingInt("SELF_CONSISTENCY_RUNS", DEFAULT_SELF_CONSISTENCY_RUNS);
         double groundingThreshold = getSystemSettingDouble("EVIDENCE_GROUNDING_THRESHOLD", DEFAULT_GROUNDING_THRESHOLD);
         int batchConcurrency = getSystemSettingInt("CRITERIA_BATCH_CONCURRENCY", DEFAULT_BATCH_CONCURRENCY);
 
@@ -337,8 +353,8 @@ public class AssessmentLlmRunner {
                     if (!acquired) {
                         throw new LlmApiException("Batch concurrency limit reached waiting for permit.");
                     }
-                    return processBatchInstructionItemsWithSelfConsistency(
-                            sessionId, fullCvMarkdown, batchItems, selfConsistencyRuns, groundingThreshold
+                    return processBatchInstructionItems(
+                            sessionId, fullCvMarkdown, batchItems, groundingThreshold
                     );
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -346,7 +362,7 @@ public class AssessmentLlmRunner {
                 } finally {
                     if (acquired) batchSemaphore.release();
                 }
-            });
+            }, assessmentTaskExecutor);
             batchFutures.add(batchFuture);
         }
 
@@ -367,11 +383,10 @@ public class AssessmentLlmRunner {
         return new AssessmentResponseDto(deduplicatedEvidenceItems, aggregatedAdHocItems);
     }
 
-    private BatchResult processBatchInstructionItemsWithSelfConsistency(
+    private BatchResult processBatchInstructionItems(
             String sessionId,
             String fullCvMarkdown,
             List<CriteriaInstructionItem> batchItems,
-            int selfConsistencyRuns,
             double groundingThreshold) {
 
         StringBuilder sb = new StringBuilder();
@@ -389,27 +404,15 @@ public class AssessmentLlmRunner {
         }
         String criteriaInstructions = sb.toString().strip();
 
-        String cvToSupply = fullCvMarkdown;
-
         String systemPrompt = AssessmentPrompts.buildAssessmentSystemPrompt();
-        String userPrompt = AssessmentPrompts.buildAssessmentUserPrompt(cvToSupply, criteriaInstructions);
+        String userPrompt = AssessmentPrompts.buildAssessmentUserPrompt(fullCvMarkdown, criteriaInstructions);
 
         var taskConfig = appProperties.getLlm().getTasks().getAssessment();
-        int totalRuns = Math.max(1, selfConsistencyRuns);
 
-        List<AssessmentResponseDto> runDtos = new ArrayList<>();
-        for (int run = 1; run <= totalRuns; run++) {
-            try {
-                String llmResponse = callLlmBlockingWithSemaphore(taskConfig, systemPrompt, userPrompt);
-                AssessmentResponseDto dto = parseAssessmentDto(sessionId, llmResponse);
-                if (dto != null) runDtos.add(dto);
-            } catch (Exception e) {
-                log.error("[AssessmentLlmRunner] Run {}/{} failed for batch: {}", run, totalRuns, e.getMessage());
-            }
-        }
-
-        if (runDtos.isEmpty()) {
-            throw new LlmApiException("All self-consistency runs failed for session " + sessionId);
+        String llmResponse = callLlmBlockingWithSemaphore(taskConfig, systemPrompt, userPrompt);
+        AssessmentResponseDto dto = parseAssessmentDto(sessionId, llmResponse);
+        if (dto == null) {
+            throw new LlmApiException("Failed to parse LLM assessment response for session " + sessionId);
         }
 
         Map<Long, String> labelMap = new HashMap<>();
@@ -424,54 +427,56 @@ public class AssessmentLlmRunner {
             }
         }
 
-        List<AssessmentResponseDto.EvidenceItem> votedEvidenceItems = new ArrayList<>();
-        Map<Long, List<AssessmentResponseDto.EvidenceItem>> groupedById = new LinkedHashMap<>();
+        Map<Long, AssessmentResponseDto.EvidenceItem> evaluatedItemsMap = new LinkedHashMap<>();
 
-        for (AssessmentResponseDto dto : runDtos) {
-            if (dto.mustHaveEvidenceItems() != null) {
-                for (AssessmentResponseDto.EvidenceItem item : dto.mustHaveEvidenceItems()) {
-                    Long cid = item.criteriaId();
-                    if (cid == null && item.criteriaName() != null) {
-                        cid = nameToIdMap.get(item.criteriaName().trim().toLowerCase(Locale.ROOT));
-                    }
-                    if (cid != null) {
-                        AssessmentResponseDto.EvidenceItem resolved = new AssessmentResponseDto.EvidenceItem(
-                                cid, item.criteriaName(), item.importance(), item.jdRequirement(),
-                                item.cvEvidence(), item.cvQuote(), item.status(), item.reasoning(),
-                                item.weightUsed(), item.scoreContribution(), item.groundingScore(),
-                                item.confidenceVotes(), item.lowConfidence(), item.needsManualReview(), item.matchMetadata()
-                        );
-                        groupedById.computeIfAbsent(cid, k -> new ArrayList<>()).add(resolved);
-                    }
+        if (dto.mustHaveEvidenceItems() != null) {
+            for (AssessmentResponseDto.EvidenceItem item : dto.mustHaveEvidenceItems()) {
+                Long cid = item.criteriaId();
+                if (cid == null && item.criteriaName() != null) {
+                    cid = nameToIdMap.get(item.criteriaName().trim().toLowerCase(Locale.ROOT));
+                }
+                if (cid != null) {
+                    String rawLabel = labelMap.getOrDefault(cid, "[REQUIRED]");
+                    String importance = parseLabelToImportance(rawLabel);
+                    AssessmentResponseDto.EvidenceItem resolved = new AssessmentResponseDto.EvidenceItem(
+                            cid, item.criteriaName(), importance, item.jdRequirement(),
+                            item.cvEvidence(), item.cvQuote(), item.status(), item.reasoning(),
+                            item.weightUsed(), item.scoreContribution(), item.groundingScore(),
+                            null, false, false, item.matchMetadata()
+                    );
+                    evaluatedItemsMap.put(cid, resolved);
                 }
             }
-            if (dto.preferToHaveEvidenceItems() != null) {
-                for (AssessmentResponseDto.AdHocEvidenceItem item : dto.preferToHaveEvidenceItems()) {
-                    Long cid = item.criteriaId();
-                    if (cid == null && item.criteriaName() != null) {
-                        cid = nameToIdMap.get(item.criteriaName().trim().toLowerCase(Locale.ROOT));
-                    }
-                    if (cid != null) {
-                        AssessmentResponseDto.EvidenceItem converted = new AssessmentResponseDto.EvidenceItem(
-                                cid,
-                                item.criteriaName(),
-                                item.importance() != null ? item.importance() : "PREFERRED",
-                                item.jdRequirement(),
-                                item.cvEvidence(),
-                                item.cvQuote(),
-                                item.status(),
-                                item.reasoning(),
-                                null, null, null, null, null, null, null
-                        );
-                        groupedById.computeIfAbsent(cid, k -> new ArrayList<>()).add(converted);
-                    }
+        }
+
+        if (dto.preferToHaveEvidenceItems() != null) {
+            for (AssessmentResponseDto.AdHocEvidenceItem item : dto.preferToHaveEvidenceItems()) {
+                Long cid = item.criteriaId();
+                if (cid == null && item.criteriaName() != null) {
+                    cid = nameToIdMap.get(item.criteriaName().trim().toLowerCase(Locale.ROOT));
+                }
+                if (cid != null && !evaluatedItemsMap.containsKey(cid)) {
+                    String rawLabel = labelMap.getOrDefault(cid, "[PREFERRED]");
+                    String importance = parseLabelToImportance(rawLabel);
+                    AssessmentResponseDto.EvidenceItem converted = new AssessmentResponseDto.EvidenceItem(
+                            cid,
+                            item.criteriaName(),
+                            importance,
+                            item.jdRequirement(),
+                            item.cvEvidence(),
+                            item.cvQuote(),
+                            item.status(),
+                            item.reasoning(),
+                            null, null, null, null, false, false, null
+                    );
+                    evaluatedItemsMap.put(cid, converted);
                 }
             }
         }
 
         // Fallback for any DB criteria in this batch that LLM missed or returned without matching ID
         for (CriteriaInstructionItem item : batchItems) {
-            if (item.criteriaId() != null && !groupedById.containsKey(item.criteriaId())) {
+            if (item.criteriaId() != null && !evaluatedItemsMap.containsKey(item.criteriaId())) {
                 log.warn("[AssessmentLlmRunner] Fallback: criterion id {} ('{}') was omitted by LLM. Inserting default missing item.",
                         item.criteriaId(), item.name());
                 AssessmentResponseDto.EvidenceItem fallbackItem = new AssessmentResponseDto.EvidenceItem(
@@ -485,72 +490,27 @@ public class AssessmentLlmRunner {
                         "Criterion evaluated as missing (not directly addressed in CV)",
                         null, null, null, null, false, false, null
                 );
-                groupedById.put(item.criteriaId(), List.of(fallbackItem));
+                evaluatedItemsMap.put(item.criteriaId(), fallbackItem);
             }
         }
 
-        for (Map.Entry<Long, List<AssessmentResponseDto.EvidenceItem>> entry : groupedById.entrySet()) {
-            Long criteriaId = entry.getKey();
-            List<AssessmentResponseDto.EvidenceItem> votes = entry.getValue();
-
-            Map<String, Long> statusCounts = votes.stream()
-                    .collect(Collectors.groupingBy(i -> i.status() != null ? i.status().toLowerCase() : "missing", Collectors.counting()));
-
-            String winningStatus = statusCounts.entrySet().stream()
-                    .max(Map.Entry.comparingByValue())
-                    .map(Map.Entry::getKey)
-                    .orElse("missing");
-
-            long winningVotes = statusCounts.getOrDefault(winningStatus, 0L);
-            int confidenceCount = (int) winningVotes;
-            boolean lowConfidence = totalRuns > 1 && confidenceCount <= (totalRuns / 2);
-            boolean needsManualReview = lowConfidence;
-
-            AssessmentResponseDto.EvidenceItem sample = votes.stream()
-                    .filter(i -> i.status() != null && i.status().equalsIgnoreCase(winningStatus))
-                    .findFirst()
-                    .orElse(votes.get(0));
-
-            String rawLabel = labelMap.getOrDefault(criteriaId, "[REQUIRED]");
-            String importance = parseLabelToImportance(rawLabel);
-
-            Map<String, Integer> confidenceVotesMap = statusCounts.entrySet().stream()
-                    .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().intValue()));
-
-            AssessmentResponseDto.EvidenceItem aggregated = new AssessmentResponseDto.EvidenceItem(
-                    criteriaId,
-                    sample.criteriaName(),
-                    importance,
-                    sample.jdRequirement(),
-                    sample.cvEvidence(),
-                    sample.cvQuote(),
-                    winningStatus,
-                    sample.reasoning(),
-                    sample.weightUsed(),
-                    sample.scoreContribution(),
-                    sample.groundingScore(),
-                    confidenceVotesMap,
-                    lowConfidence,
-                    needsManualReview,
-                    null
-            );
-
+        List<AssessmentResponseDto.EvidenceItem> evidenceItems = new ArrayList<>();
+        for (AssessmentResponseDto.EvidenceItem item : evaluatedItemsMap.values()) {
+            AssessmentResponseDto.EvidenceItem validated = item;
             if (evidenceGroundingValidator != null) {
-                aggregated = evidenceGroundingValidator.validateAndApply(aggregated, fullCvMarkdown, groundingThreshold);
+                validated = evidenceGroundingValidator.validateAndApply(validated, fullCvMarkdown, groundingThreshold);
             }
-            votedEvidenceItems.add(aggregated);
+            evidenceItems.add(validated);
         }
 
         List<AssessmentResponseDto.AdHocEvidenceItem> preferToHaveItems = new ArrayList<>();
-        for (AssessmentResponseDto dto : runDtos) {
-            if (dto.preferToHaveEvidenceItems() != null) {
-                for (AssessmentResponseDto.AdHocEvidenceItem item : dto.preferToHaveEvidenceItems()) {
-                    if (item != null && item.criteriaId() == null && item.criteriaName() != null && !item.criteriaName().isBlank()) {
-                        // Ensure it's not a DB criterion name
-                        String normName = item.criteriaName().trim().toLowerCase(Locale.ROOT);
-                        if (!nameToIdMap.containsKey(normName)) {
-                            preferToHaveItems.add(item);
-                        }
+        if (dto.preferToHaveEvidenceItems() != null) {
+            for (AssessmentResponseDto.AdHocEvidenceItem item : dto.preferToHaveEvidenceItems()) {
+                if (item != null && item.criteriaId() == null && item.criteriaName() != null && !item.criteriaName().isBlank()) {
+                    // Ensure it's not a DB criterion name
+                    String normName = item.criteriaName().trim().toLowerCase(Locale.ROOT);
+                    if (!nameToIdMap.containsKey(normName)) {
+                        preferToHaveItems.add(item);
                     }
                 }
             }
@@ -558,10 +518,10 @@ public class AssessmentLlmRunner {
 
         Map<String, AssessmentResponseDto.AdHocEvidenceItem> deduplicatedAdHoc = new LinkedHashMap<>();
         for (AssessmentResponseDto.AdHocEvidenceItem item : preferToHaveItems) {
-            deduplicatedAdHoc.putIfAbsent(item.criteriaName().trim().toLowerCase(), item);
+            deduplicatedAdHoc.putIfAbsent(item.criteriaName().trim().toLowerCase(Locale.ROOT), item);
         }
 
-        return new BatchResult(votedEvidenceItems, new ArrayList<>(deduplicatedAdHoc.values()));
+        return new BatchResult(evidenceItems, new ArrayList<>(deduplicatedAdHoc.values()));
     }
 
     private String parseLabelToImportance(String label) {
