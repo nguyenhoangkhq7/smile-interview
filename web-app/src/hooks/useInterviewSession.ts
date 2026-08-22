@@ -178,14 +178,40 @@ export function useInterviewSession() {
       if (currentSession) {
         currentSession.status = 'Completed';
 
-        if (currentSession.questions.length > 0) {
-          const scoredQuestions = currentSession.questions.filter((q) => (q.score || 0) > 0);
-          if (scoredQuestions.length > 0) {
-            const totalScores = scoredQuestions.reduce((sum, q) => sum + (q.score || 0), 0);
-            currentSession.overallScore = Math.round(totalScores / scoredQuestions.length);
+        if (currentSession.questions && currentSession.questions.length > 0) {
+          const isWarmup = (q: QuestionFeedback) => {
+            const rawQ = typeof q.question === 'object' && q.question !== null ? (q.question as { question?: string }).question : q.question;
+            const text = (rawQ || '').toLowerCase();
+            return q.topicTag === 'Warmup' || q.topicTag === 'Khởi động' || text.includes('giới thiệu đôi nét về bản thân') || text.includes('giới thiệu về bản thân');
+          };
+
+          type QG = { base: QuestionFeedback; followUps: QuestionFeedback[] };
+          const groups: QG[] = [];
+          for (const q of currentSession.questions) {
+            if (isWarmup(q)) continue;
+            if (!q.isDeepDive) {
+              groups.push({ base: q, followUps: [] });
+            } else if (groups.length > 0) {
+              groups[groups.length - 1].followUps.push(q);
+            } else {
+              groups.push({ base: q, followUps: [] });
+            }
           }
+
+          const totalBaseQuestions = Math.max(groups.length, 1);
+          let totalScore = 0;
+          for (const g of groups) {
+            const isBaseAnswered = !!(g.base.answer && g.base.answer.trim().length > 0);
+            if (!isBaseAnswered) continue;
+            const answeredInGroup = [g.base, ...g.followUps].filter(t => t.answer && t.answer.trim().length > 0);
+            if (answeredInGroup.length > 0) {
+              const sum = answeredInGroup.reduce((acc, t) => acc + (t.score || 0), 0);
+              totalScore += Math.round(sum / answeredInGroup.length);
+            }
+          }
+          currentSession.overallScore = Math.round(totalScore / totalBaseQuestions);
         } else {
-          currentSession.overallScore = 60;
+          currentSession.overallScore = 0;
         }
 
         await historyService.saveSession({
@@ -288,28 +314,82 @@ export function useInterviewSession() {
             const updatedQuestions: QuestionFeedback[] = session.questions ? [...session.questions] : [];
             const activeQText = currentQuestionRef.current;
 
-            let targetIdx = updatedQuestions.findIndex((q) => {
-              const qStr = typeof q.question === 'object' && q.question !== null ? (q.question as { question?: string }).question : q.question;
-              return qStr && activeQText && qStr.trim() === activeQText.trim();
-            });
+            const isWarmupText = (t?: string) => {
+              if (!t) return false;
+              const low = t.toLowerCase();
+              return low.includes('giới thiệu đôi nét về bản thân') || low.includes('giới thiệu về bản thân') || low.includes('khởi động');
+            };
 
-            if (targetIdx === -1) {
-              targetIdx = updatedQuestions.findIndex((q) => !q.answer);
-            }
-
-            if (targetIdx !== -1) {
-              updatedQuestions[targetIdx] = { ...updatedQuestions[targetIdx], answer: answer };
-            } else {
-              updatedQuestions.push({
-                question: activeQText || 'Câu hỏi',
-                answer: answer,
-                score: 0,
-                strengths: '',
-                improvements: '',
-                suggestedAnswer: '',
-                topicTag: topicTag || '',
-                isDeepDive: Boolean(isDeepDive)
+            if (isWarmupText(activeQText)) {
+              let warmupIdx = updatedQuestions.findIndex(q => {
+                const qStr = typeof q.question === 'object' && q.question !== null ? (q.question as { question?: string }).question : q.question;
+                return isWarmupText(qStr) || q.topicTag === 'Warmup';
               });
+              if (warmupIdx !== -1) {
+                updatedQuestions[warmupIdx] = { ...updatedQuestions[warmupIdx], answer };
+              } else {
+                updatedQuestions.unshift({
+                  question: activeQText || 'Giới thiệu bản thân',
+                  answer: answer,
+                  score: 0,
+                  strengths: 'Khởi động / Giới thiệu làm quen',
+                  improvements: '',
+                  suggestedAnswer: '',
+                  topicTag: 'Warmup',
+                  isDeepDive: false
+                });
+              }
+            } else {
+              let targetIdx = updatedQuestions.findIndex((q) => {
+                const qStr = typeof q.question === 'object' && q.question !== null ? (q.question as { question?: string }).question : q.question;
+                return qStr && activeQText && qStr.trim() === activeQText.trim();
+              });
+
+              if (targetIdx === -1) {
+                if (isDeepDive) {
+                  // Insert follow-up question right after the last answered question
+                  let lastAnsweredIdx = -1;
+                  for (let i = updatedQuestions.length - 1; i >= 0; i--) {
+                    if (updatedQuestions[i].answer) {
+                      lastAnsweredIdx = i;
+                      break;
+                    }
+                  }
+                  const newFollowUp: QuestionFeedback = {
+                    question: activeQText || 'Câu hỏi đào sâu',
+                    answer: answer,
+                    score: 0,
+                    strengths: '',
+                    improvements: '',
+                    suggestedAnswer: '',
+                    topicTag: topicTag || '',
+                    isDeepDive: true
+                  };
+                  if (lastAnsweredIdx !== -1) {
+                    updatedQuestions.splice(lastAnsweredIdx + 1, 0, newFollowUp);
+                  } else {
+                    updatedQuestions.push(newFollowUp);
+                  }
+                } else {
+                  targetIdx = updatedQuestions.findIndex((q) => !q.answer && !isWarmupText(typeof q.question === 'object' ? (q.question as { question?: string })?.question : q.question));
+                  if (targetIdx !== -1) {
+                    updatedQuestions[targetIdx] = { ...updatedQuestions[targetIdx], answer: answer };
+                  } else {
+                    updatedQuestions.push({
+                      question: activeQText || 'Câu hỏi',
+                      answer: answer,
+                      score: 0,
+                      strengths: '',
+                      improvements: '',
+                      suggestedAnswer: '',
+                      topicTag: topicTag || '',
+                      isDeepDive: Boolean(isDeepDive)
+                    });
+                  }
+                }
+              } else {
+                updatedQuestions[targetIdx] = { ...updatedQuestions[targetIdx], answer: answer };
+              }
             }
 
             historyService.saveSession({

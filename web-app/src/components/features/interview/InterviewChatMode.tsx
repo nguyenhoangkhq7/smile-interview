@@ -254,7 +254,14 @@ export function InterviewChatMode() {
                 return qStr && qStr.trim() === text.trim();
               });
               if (!alreadyExists) {
-                updated.push({
+                let lastAnsweredIdx = -1;
+                for (let i = updated.length - 1; i >= 0; i--) {
+                  if (updated[i].answer) {
+                    lastAnsweredIdx = i;
+                    break;
+                  }
+                }
+                const newFollowUp: ChatSessionQuestion = {
                   question: text,
                   answer: '',
                   score: 0,
@@ -263,7 +270,12 @@ export function InterviewChatMode() {
                   suggestedAnswer: '',
                   topicTag: '',
                   isDeepDive: true,
-                });
+                };
+                if (lastAnsweredIdx !== -1) {
+                  updated.splice(lastAnsweredIdx + 1, 0, newFollowUp);
+                } else {
+                  updated.push(newFollowUp);
+                }
                 historyService.saveSession({
                   ...sess,
                   questions: updated as unknown as QuestionFeedback[],
@@ -479,24 +491,63 @@ export function InterviewChatMode() {
           : [];
         const activeQText = currentQuestionRef.current;
 
-        const targetIdx = updated.findIndex((q) => {
-          const qStr = typeof q.question === 'object' && q.question !== null ? q.question.question : q.question;
-          return qStr && activeQText && qStr.trim() === activeQText.trim();
-        });
+        const isWarmupText = (t?: string) => {
+          if (!t) return false;
+          const low = t.toLowerCase();
+          return low.includes('giới thiệu đôi nét về bản thân') || low.includes('giới thiệu về bản thân') || low.includes('khởi động');
+        };
 
-        if (targetIdx !== -1) {
-          updated[targetIdx] = { ...updated[targetIdx], answer: text };
-        } else {
-          updated.push({
-            question: activeQText || 'Câu hỏi',
-            answer: text,
-            score: 0,
-            strengths: '',
-            improvements: '',
-            suggestedAnswer: '',
-            topicTag: '',
-            isDeepDive: false,
+        if (isWarmupText(activeQText)) {
+          let warmupIdx = updated.findIndex(q => {
+            const qStr = typeof q.question === 'object' && q.question !== null ? q.question.question : q.question;
+            return isWarmupText(qStr) || q.topicTag === 'Warmup';
           });
+          if (warmupIdx !== -1) {
+            updated[warmupIdx] = { ...updated[warmupIdx], answer: text };
+          } else {
+            updated.unshift({
+              question: activeQText || 'Giới thiệu bản thân',
+              answer: text,
+              score: 0,
+              strengths: 'Khởi động / Giới thiệu làm quen',
+              improvements: '',
+              suggestedAnswer: '',
+              topicTag: 'Warmup',
+              isDeepDive: false,
+            });
+          }
+        } else {
+          let targetIdx = updated.findIndex((q) => {
+            const qStr = typeof q.question === 'object' && q.question !== null ? q.question.question : q.question;
+            return qStr && activeQText && qStr.trim() === activeQText.trim();
+          });
+
+          if (targetIdx !== -1) {
+            updated[targetIdx] = { ...updated[targetIdx], answer: text };
+          } else {
+            let lastAnsweredIdx = -1;
+            for (let i = updated.length - 1; i >= 0; i--) {
+              if (updated[i].answer) {
+                lastAnsweredIdx = i;
+                break;
+              }
+            }
+            const newTurn: ChatSessionQuestion = {
+              question: activeQText || 'Câu hỏi',
+              answer: text,
+              score: 0,
+              strengths: '',
+              improvements: '',
+              suggestedAnswer: '',
+              topicTag: '',
+              isDeepDive: false,
+            };
+            if (lastAnsweredIdx !== -1) {
+              updated.splice(lastAnsweredIdx + 1, 0, newTurn);
+            } else {
+              updated.push(newTurn);
+            }
+          }
         }
         historyService.saveSession({
           ...session,

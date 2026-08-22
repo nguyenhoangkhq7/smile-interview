@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { FolderOpen, Lightbulb, AlertTriangle, CheckCircle, AlertCircle, MessageSquare, BarChart3, CheckCircle2, XCircle, Download, CornerDownRight } from 'lucide-react';
-import { historyService, SessionHistoryItem } from '@/services/historyService';
+import { historyService, SessionHistoryItem, QuestionFeedback } from '@/services/historyService';
 import { exportQuestionBankToCSV } from '@/lib/exportUtils';
 import { useAuthStore } from '@/store/authStore';
 import styles from './result.module.css';
@@ -411,35 +411,70 @@ export default function InterviewResultPage() {
               )}
             </div>
           ) : (() => {
-            // ── Build question groups: base question + its follow-ups ──────────
-            type QGroup = {
-              base: typeof session.questions[0];
-              baseGlobalIdx: number;      // original index in session.questions[]
-              baseNum: number;            // base question display number (1, 2, 3…)
-              followUps: { q: typeof session.questions[0]; globalIdx: number }[];
+            // ── 1. Separate warmup introduction turns from technical questions ──
+            const isWarmup = (q: QuestionFeedback) => {
+              const rawQ = typeof q.question === 'object' && q.question !== null
+                ? (q.question as unknown as QuestionObject).question
+                : (q.question as string);
+              const text = (rawQ || '').toLowerCase();
+              return (
+                q.topicTag === 'Warmup' ||
+                q.topicTag === 'Khởi động' ||
+                text.includes('giới thiệu đôi nét về bản thân') ||
+                text.includes('giới thiệu về bản thân') ||
+                text.includes('khởi động')
+              );
             };
+
+            const questionsList = session.questions || [];
+            const warmupTurns = questionsList.filter(isWarmup);
+
+            // ── 2. Build question groups: base question + its follow-ups ──────────
+            type QGroup = {
+              base: QuestionFeedback;
+              baseGlobalIdx: number;      // index in session.questions[]
+              baseNum: number;            // base question display number (1, 2, 3…)
+              followUps: { q: QuestionFeedback; globalIdx: number }[];
+            };
+
             const groups: QGroup[] = [];
             let baseNum = 0;
-            for (let i = 0; i < session.questions.length; i++) {
-              const q = session.questions[i];
+            for (let i = 0; i < questionsList.length; i++) {
+              const q = questionsList[i];
+              if (isWarmup(q)) continue;
+
               if (!q.isDeepDive) {
                 baseNum++;
                 groups.push({ base: q, baseGlobalIdx: i, baseNum, followUps: [] });
               } else if (groups.length > 0) {
                 groups[groups.length - 1].followUps.push({ q, globalIdx: i });
               } else {
-                // Orphan follow-up (shouldn't happen, treat as base)
                 baseNum++;
                 groups.push({ base: q, baseGlobalIdx: i, baseNum, followUps: [] });
               }
             }
 
-            // ── Helper: render an accordion item (shared for base & follow-up) ─
+            // Calculate combined average score for a group
+            const getGroupScore = (group: QGroup) => {
+              if (!group.base.answer || group.base.answer.trim().length === 0) {
+                return 0;
+              }
+              const answeredInGroup = [group.base, ...group.followUps.map(f => f.q)].filter(
+                t => t.answer && t.answer.trim().length > 0
+              );
+              if (answeredInGroup.length === 0) return 0;
+              const sum = answeredInGroup.reduce((acc, t) => acc + (t.score || 0), 0);
+              return Math.round(sum / answeredInGroup.length);
+            };
+
+            // ── Helper: render an accordion item ─
             const renderAccordionItem = (
-              q: typeof session.questions[0],
+              q: QuestionFeedback,
               globalIdx: number,
               label: string,
-              isFollowUp: boolean
+              isFollowUp: boolean,
+              displayScore?: number,
+              hasFollowUps?: boolean
             ) => {
               const isExpanded = expandedIndexes.includes(globalIdx);
               const qText = typeof q.question === 'object' && q.question !== null
@@ -450,6 +485,7 @@ export default function InterviewResultPage() {
                   ? (q.question as unknown as QuestionObject).topic
                   : ''
               );
+              const finalScore = displayScore !== undefined ? displayScore : (q.score || 0);
 
               return (
                 <div
@@ -480,13 +516,18 @@ export default function InterviewResultPage() {
                         {isFollowUp && (
                           <span className={styles.deepDiveBadge}>Hỏi sâu</span>
                         )}
+                        {hasFollowUps && !isFollowUp && (
+                          <span style={{ fontSize: '0.7rem', color: '#6366f1', backgroundColor: '#eef2ff', border: '1px solid #c7d2fe', padding: '0.15rem 0.5rem', borderRadius: '9999px', fontWeight: 600 }}>
+                            Điểm TB gồm câu hỏi sâu
+                          </span>
+                        )}
                       </div>
                       <div className={styles.qText}>{qText}</div>
                     </div>
 
                     <div className={styles.headerRight}>
                       <div className={styles.qScore}>
-                        <span className={styles.qScoreNum}>{q.score}</span>
+                        <span className={styles.qScoreNum}>{finalScore}</span>
                         <span className={styles.qScoreLabel}>Điểm</span>
                       </div>
                       <span className={`${styles.arrowIcon} ${isExpanded ? styles.arrowExpanded : ''}`}>
@@ -551,17 +592,72 @@ export default function InterviewResultPage() {
 
             return (
               <div className={styles.accordionList}>
-                {groups.map((group) => (
-                  <div key={group.baseGlobalIdx} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {/* Base question */}
-                    {renderAccordionItem(group.base, group.baseGlobalIdx, `CÂU HỎI ${group.baseNum}`, false)}
+                {/* ── Warmup Introduction Section (if present) ── */}
+                {warmupTurns.map((wt, wIdx) => {
+                  const qText = typeof wt.question === 'object' && wt.question !== null
+                    ? (wt.question as unknown as QuestionObject).question
+                    : wt.question;
+                  return (
+                    <div
+                      key={`warmup-${wIdx}`}
+                      style={{
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #e0e7ff',
+                        borderRadius: '0.75rem',
+                        padding: '1.25rem',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                        marginBottom: '0.5rem'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: '#4338ca', backgroundColor: '#e0e7ff', padding: '0.2rem 0.6rem', borderRadius: '9999px' }}>
+                            Khởi động / Giới thiệu
+                          </span>
+                          <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                            (Không tính điểm vào kết quả chuyên môn)
+                          </span>
+                        </div>
+                      </div>
+                      <div style={{ fontWeight: 600, fontSize: '0.92rem', color: '#1e293b', marginBottom: '0.5rem' }}>
+                        {qText}
+                      </div>
+                      {wt.answer ? (
+                        <div style={{ backgroundColor: '#f8fafc', padding: '0.75rem 1rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0', fontSize: '0.85rem', color: '#334155' }}>
+                          <strong>Câu trả lời của bạn: </strong>{wt.answer}
+                        </div>
+                      ) : (
+                        <div style={{ fontStyle: 'italic', fontSize: '0.85rem', color: '#94a3b8' }}>
+                          Ứng viên chưa trả lời phần giới thiệu này.
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
 
-                    {/* Follow-up questions indented below */}
-                    {group.followUps.map(({ q, globalIdx }, fuIdx) =>
-                      renderAccordionItem(q, globalIdx, `Hỏi sâu ${fuIdx + 1}`, true)
-                    )}
-                  </div>
-                ))}
+                {/* ── Technical Questions ── */}
+                {groups.map((group) => {
+                  const groupScore = getGroupScore(group);
+                  const hasFollowUps = group.followUps.length > 0;
+                  return (
+                    <div key={group.baseGlobalIdx} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      {/* Base question (displays group average score if follow-ups exist) */}
+                      {renderAccordionItem(
+                        group.base,
+                        group.baseGlobalIdx,
+                        `CÂU HỎI ${group.baseNum}`,
+                        false,
+                        hasFollowUps ? groupScore : group.base.score,
+                        hasFollowUps
+                      )}
+
+                      {/* Follow-up questions indented below */}
+                      {group.followUps.map(({ q, globalIdx }, fuIdx) =>
+                        renderAccordionItem(q, globalIdx, `Hỏi sâu ${fuIdx + 1}`, true, q.score, false)
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             );
           })()}
