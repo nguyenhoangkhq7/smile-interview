@@ -19,40 +19,113 @@ export async function POST(
     }
     const session = sessionRes.rows[0];
 
-    // 2. Fetch turns (QA details) for the session
+    // 2. Fetch all turns (QA details) for the session in chronological order
     const turnsRes = await query('SELECT * FROM session_turns WHERE session_id = $1 ORDER BY id ASC', [id]);
     const turns = turnsRes.rows;
 
     if (turns.length === 0) {
-      // If no questions were answered, just update status and default scores
+      // If no questions exist, update status and 0 scores
       await query(
         `UPDATE sessions SET 
           status = 'Completed', 
-          overall_score = 60, 
-          overall_feedback = 'Không có câu hỏi nào được trả lời trong phiên phỏng vấn này.' 
+          overall_score = 0, 
+          overall_feedback = 'Không có câu hỏi nào trong phiên phỏng vấn này.',
+          hiring_recommendation = 'Strong No Hire'
          WHERE id = $1`,
         [id]
       );
-      return NextResponse.json({ success: true, message: 'No questions answered' });
+      return NextResponse.json({ success: true, message: 'No questions found' });
     }
 
-    const answeredTurns = turns.filter(t => t.answer && t.answer.trim().length > 0);
-    const turnsToEvaluate = answeredTurns.length > 0 ? answeredTurns : turns;
+    // 3. Helper to detect warmup introduction turn
+    const isWarmupTurn = (t: { is_warmup?: boolean; topic_tag?: string; question?: string; evaluation?: string }) => {
+      const qText = (t.question || '').toLowerCase();
+      return (
+        t.is_warmup === true ||
+        t.topic_tag === 'Warmup' ||
+        t.topic_tag === 'Khởi động' ||
+        qText.includes('giới thiệu đôi nét về bản thân') ||
+        qText.includes('giới thiệu về bản thân') ||
+        qText.includes('khởi động') ||
+        (t.evaluation && t.evaluation.includes('Icebreaker'))
+      );
+    };
 
+    const technicalTurns = turns.filter(t => !isWarmupTurn(t));
+    const warmupTurns = turns.filter(t => isWarmupTurn(t));
+
+    // Update warmup turns in DB (excluded from technical scoring)
+    for (const wt of warmupTurns) {
+      await query(
+        `UPDATE session_turns SET 
+          score = 0,
+          strengths = COALESCE(strengths, 'Khởi động / Giới thiệu làm quen'),
+          improvements = COALESCE(improvements, '')
+         WHERE id = $1`,
+        [wt.id]
+      );
+    }
+
+    // 4. Group technical turns into Base Question groups
+    interface TechnicalGroup {
+      baseTurn: typeof turns[0];
+      followUpTurns: typeof turns;
+    }
+
+    const groups: TechnicalGroup[] = [];
+    for (const turn of technicalTurns) {
+      if (!turn.is_deep_dive || groups.length === 0) {
+        groups.push({ baseTurn: turn, followUpTurns: [] });
+      } else {
+        groups[groups.length - 1].followUpTurns.push(turn);
+      }
+    }
+
+    const totalBaseQuestions = Math.max(groups.length, 1);
+    const answeredTechnicalTurns = technicalTurns.filter(t => t.answer && t.answer.trim().length > 0);
+
+    if (answeredTechnicalTurns.length === 0) {
+      // If no technical questions were answered, mark 0 points for all
+      for (const t of technicalTurns) {
+        await query(
+          `UPDATE session_turns SET 
+            score = 0,
+            improvements = 'Ứng viên chưa trả lời câu hỏi này trong phiên phỏng vấn.'
+           WHERE id = $1`,
+          [t.id]
+        );
+      }
+
+      await query(
+        `UPDATE sessions SET 
+          status = 'Completed', 
+          overall_score = 0, 
+          overall_feedback = 'Ứng viên chưa trả lời câu hỏi chuyên môn nào trong phiên phỏng vấn này.',
+          hiring_recommendation = 'Strong No Hire'
+         WHERE id = $1`,
+        [id]
+      );
+      return NextResponse.json({ success: true, message: 'No technical questions answered' });
+    }
+
+    // 5. Send answered technical turns to matching-service for LLM evaluation
     const matchingServiceUrl = process.env.MATCHING_SERVICE_URL || 'http://localhost:8081';
     const targetUrl = `${matchingServiceUrl}/api/v2/assess-resume/evaluate-session`;
 
     const payload = {
       role_title: session.role_title || '',
       interview_type: session.interview_type || 'Technical',
-      turns: turnsToEvaluate.map(t => ({
+      total_base_questions: totalBaseQuestions,
+      turns: answeredTechnicalTurns.map(t => ({
         question: t.question || '',
         answer: t.answer || '',
-        score: t.score || 0
+        score: t.score || 0,
+        is_deep_dive: Boolean(t.is_deep_dive),
+        is_warmup: false
       }))
     };
 
-    console.log(`[API Evaluate] Forwarding evaluation to matching-service: ${targetUrl}`);
+    console.log(`[API Evaluate] Forwarding evaluation to matching-service: ${targetUrl} (totalBaseQuestions=${totalBaseQuestions})`);
     const authHeader = request.headers.get('Authorization');
     const headers: Record<string, string> = {
       'Content-Type': 'application/json'
@@ -75,18 +148,95 @@ export async function POST(
     const evalResult = await backendRes.json();
     console.log('[Evaluate] Raw backend response:', evalResult);
 
-    let overallScore = evalResult.overall_score !== undefined ? evalResult.overall_score : (evalResult.overallScore !== undefined ? evalResult.overallScore : 60);
-    if (typeof overallScore === 'number' && overallScore > 0 && overallScore <= 10) {
-      overallScore = Math.round(overallScore * 10);
+    const evaluatedQuestions = evalResult.turns || evalResult.evaluatedQuestions || [];
+
+    // Map evaluated scores back to answered turns
+    for (let i = 0; i < answeredTechnicalTurns.length; i++) {
+      const turnId = answeredTechnicalTurns[i].id;
+      let turnScore = 0;
+      let strengths = '';
+      let improvements = '';
+      let suggestedAnswer = '';
+
+      if (i < evaluatedQuestions.length) {
+        const eq = evaluatedQuestions[i];
+        turnScore = typeof eq.score === 'number' ? eq.score : (parseInt(eq.score) || 0);
+        if (turnScore > 0 && turnScore <= 10) {
+          turnScore = Math.round(turnScore * 10);
+        }
+        strengths = eq.evaluation || eq.strengths || '';
+        improvements = eq.improvements || '';
+        suggestedAnswer = eq.suggested_answer || eq.suggestedAnswer || '';
+      }
+
+      answeredTechnicalTurns[i].score = turnScore;
+
+      await query(
+        `UPDATE session_turns SET 
+          score = $1,
+          strengths = $2,
+          improvements = $3,
+          suggested_answer = $4
+         WHERE id = $5`,
+        [turnScore, strengths, improvements, suggestedAnswer, turnId]
+      );
     }
-    const overallFeedback = JSON.stringify(evalResult);
+
+    // For unanswered technical turns: score = 0
+    const unansweredTechnicalTurns = technicalTurns.filter(t => !t.answer || t.answer.trim().length === 0);
+    for (const ut of unansweredTechnicalTurns) {
+      ut.score = 0;
+      await query(
+        `UPDATE session_turns SET 
+          score = 0,
+          strengths = '',
+          improvements = 'Ứng viên chưa trả lời câu hỏi này trong phiên phỏng vấn.'
+         WHERE id = $1`,
+        [ut.id]
+      );
+    }
+
+    // 6. Deterministically calculate Question Score (averaging followups) and Overall Score
+    let totalScoreSum = 0;
+    for (const group of groups) {
+      const isBaseAnswered = !!(group.baseTurn.answer && group.baseTurn.answer.trim().length > 0);
+      if (!isBaseAnswered) {
+        // Unanswered base question scores 0
+        continue;
+      }
+
+      const turnsInGroup = [group.baseTurn, ...group.followUpTurns].filter(
+        t => t.answer && t.answer.trim().length > 0
+      );
+
+      if (turnsInGroup.length > 0) {
+        const groupSum = turnsInGroup.reduce((sum, t) => sum + (t.score || 0), 0);
+        const groupAvg = Math.round(groupSum / turnsInGroup.length);
+        totalScoreSum += groupAvg;
+      }
+    }
+
+    const calculatedOverallScore = Math.round(totalScoreSum / totalBaseQuestions);
+
+    let hiringRecommendation = 'Strong No Hire';
+    if (calculatedOverallScore >= 90) {
+      hiringRecommendation = 'Strong Hire';
+    } else if (calculatedOverallScore >= 70) {
+      hiringRecommendation = 'Hire';
+    } else if (calculatedOverallScore >= 40) {
+      hiringRecommendation = 'No Hire';
+    }
+
+    const overallFeedback = JSON.stringify({
+      ...evalResult,
+      overallScore: calculatedOverallScore,
+      hiringRecommendation: hiringRecommendation
+    });
     const strengthsList = evalResult.strengths || evalResult.strongAreas || [];
     const weaknessesList = evalResult.weaknesses || evalResult.gapAreas || [];
     const recommendationsList = evalResult.recommendations || evalResult.actionableSuggestions || [];
-    const hiringRecommendation = evalResult.hiring_recommendation || evalResult.hiringRecommendation || 'N/A';
 
-    // 5. Update Database
-    // Update session table
+    // 7. Update Session table in PostgreSQL
     await query(
       `UPDATE sessions SET 
         status = 'Completed',
@@ -98,7 +248,7 @@ export async function POST(
         hiring_recommendation = $6
        WHERE id = $7`,
       [
-        overallScore,
+        calculatedOverallScore,
         overallFeedback,
         JSON.stringify(strengthsList),
         JSON.stringify(weaknessesList),
@@ -108,38 +258,15 @@ export async function POST(
       ]
     );
 
-    // Update turns table with granular evaluation using index to avoid minor question text mismatches from the LLM
-    const evaluatedQuestions = evalResult.turns || evalResult.evaluatedQuestions || [];
-    if (evaluatedQuestions.length > 0) {
-      for (let i = 0; i < evaluatedQuestions.length; i++) {
-        const eq = evaluatedQuestions[i];
-        if (i < turnsToEvaluate.length) {
-          const turnId = turnsToEvaluate[i].id;
-          let turnScore = typeof eq.score === 'number' ? eq.score : (parseInt(eq.score) || 0);
-          if (turnScore > 0 && turnScore <= 10) {
-            turnScore = Math.round(turnScore * 10);
-          }
-          await query(
-            `UPDATE session_turns SET 
-              score = $1,
-              strengths = $2,
-              improvements = $3,
-              suggested_answer = $4
-             WHERE id = $5`,
-            [
-              turnScore,
-              eq.evaluation || eq.strengths || '',
-              eq.improvements || '',
-              eq.suggested_answer || eq.suggestedAnswer || '',
-              turnId
-            ]
-          );
-        }
+    console.log(`[API Evaluate] Session ${id} successfully evaluated: overallScore=${calculatedOverallScore}/${totalBaseQuestions} base questions (${hiringRecommendation})`);
+    return NextResponse.json({
+      success: true,
+      data: {
+        ...evalResult,
+        overallScore: calculatedOverallScore,
+        hiringRecommendation: hiringRecommendation
       }
-    }
-
-    console.log(`[API Evaluate] Session ${id} successfully evaluated and saved.`);
-    return NextResponse.json({ success: true, data: evalResult });
+    });
 
   } catch (errorVal) { const error = errorVal as Error;
     console.error(`[API Evaluate] Error evaluating session:`, error);

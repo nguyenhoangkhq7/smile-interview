@@ -164,9 +164,9 @@ public class PromptBuilder {
                 Đọc kỹ từng cặp câu hỏi / câu trả lời, điểm số và nhận xét trong <transcript>. Phân biệt câu hỏi chính và câu hỏi đào sâu.
 
                 ## Bước 2 — Tính overall_score
-                Không lấy trung bình cộng đơn thuần. Hãy cân nhắc:
-                - Câu hỏi chính có trọng số cao hơn câu hỏi đào sâu (follow-up).
-                - Mức độ đồng đều kiến thức và xu hướng qua các chủ đề.
+                - Điểm của mỗi câu hỏi chính có câu hỏi phụ (follow-up) được tính bằng trung bình cộng giữa câu hỏi chính và các câu hỏi phụ thuộc câu đó.
+                - Những câu hỏi chính chưa được trả lời được tính 0 điểm.
+                - Điểm overall_score được tính bằng trung bình cộng của toàn bộ số câu hỏi chính ban đầu trong buổi phỏng vấn.
                 - Kết quả overall_score là số nguyên 0-10.
 
                 ## Bước 3 — Đối chiếu với hồ sơ ứng viên (nếu có <resume> / <job_description>)
