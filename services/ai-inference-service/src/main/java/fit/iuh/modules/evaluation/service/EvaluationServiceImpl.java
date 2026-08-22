@@ -206,6 +206,13 @@ public class EvaluationServiceImpl implements EvaluationService {
     // Repetition and duplicate question detection helpers
     // ─────────────────────────────────────────────────────────────────────────
 
+    private static final Set<String> COMMON_STOPWORDS = Set.of(
+            "bạn", "hãy", "cho", "thể", "giải", "thích", "biết", "hiểu", "như", "thế", "nào", "không", "thêm",
+            "cụ", "cảm", "ơn", "chia", "sẻ", "anh", "chị", "em", "với", "trong", "về", "của", "và", "là",
+            "các", "những", "này", "được", "nghe", "nhé", "nói", "rõ", "hơn",
+            "what", "how", "why", "explain", "describe", "could", "would", "please", "about", "more", "tell", "with", "your"
+    );
+
     private boolean isRepetitiveQuestion(String newQ, String currentQ, List<QAContext> thread) {
         if (newQ == null || newQ.isBlank()) return false;
         if (isSimilar(newQ, currentQ)) return true;
@@ -229,17 +236,20 @@ public class EvaluationServiceImpl implements EvaluationService {
         Set<String> words1 = new HashSet<>(Arrays.asList(s1.split("\\s+")));
         Set<String> words2 = new HashSet<>(Arrays.asList(s2.split("\\s+")));
 
-        // Remove short stopwords
-        words1.removeIf(w -> w.length() <= 2);
-        words2.removeIf(w -> w.length() <= 2);
+        // Remove short stopwords and conversational fillers
+        words1.removeIf(w -> w.length() <= 2 || COMMON_STOPWORDS.contains(w));
+        words2.removeIf(w -> w.length() <= 2 || COMMON_STOPWORDS.contains(w));
 
         if (words1.isEmpty() || words2.isEmpty()) return false;
 
         Set<String> intersection = new HashSet<>(words1);
         intersection.retainAll(words2);
 
-        double similarity = (double) intersection.size() / Math.min(words1.size(), words2.size());
-        return similarity >= 0.55;
+        Set<String> union = new HashSet<>(words1);
+        union.addAll(words2);
+
+        double jaccard = (double) intersection.size() / union.size();
+        return jaccard >= 0.75;
     }
 
     private String sanitizeText(String text) {

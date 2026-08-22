@@ -383,4 +383,40 @@ class EvaluationServiceTest {
         assertTrue(result.getFollowUpQuestion().contains("em An") || result.getFollowUpQuestion().contains("em"));
         verify(mockOpenRouterClient).evaluationCompletion(anyString(), org.mockito.ArgumentMatchers.contains("name=\"Nguyễn Văn An\""));
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Test 9: Repetitive question forces NEXT_TOPIC
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("Repetitive follow-up question forces NEXT_TOPIC")
+    void testRepetitiveFollowUpQuestionForcesNextTopic() {
+        String mockLlmJson = """
+                {
+                  "decision": "FOLLOW_UP",
+                  "follow_up_question": "Em hãy giải thích lại về transaction isolation levels trong database cho anh nghe nhé.",
+                  "reasoning": "Muốn hỏi lại.",
+                  "score": 6,
+                  "evaluation": "Điểm mạnh: Nắm cơ bản."
+                }
+                """;
+
+        when(mockOpenRouterClient.evaluationCompletion(anyString(), anyString()))
+                .thenReturn(mockLlmJson);
+
+        InferenceRequest request = InferenceRequest.newBuilder()
+                .setTargetJobTitle("Backend Engineer")
+                .setInterviewDomain("IT")
+                .setCurrentQuestion("Giải thích transaction isolation levels trong database.")
+                .setCandidateAnswer("Transaction isolation có Read Uncommitted, Read Committed, Repeatable Read, Serializable.")
+                .setCurrentFollowUpCount(0)
+                .setMaxFollowUpCount(3)
+                .build();
+
+        EvaluationResult result = service.evaluate(request);
+
+        assertNotNull(result);
+        assertEquals("NEXT_TOPIC", result.getDecision());
+        assertEquals("", result.getFollowUpQuestion());
+    }
 }
