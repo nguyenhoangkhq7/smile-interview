@@ -167,7 +167,11 @@ function buildCategoryTree(
       categoryMap.set(mapping.criteria_id, leafNode);
     }
 
-    leafNode.mappingsByLevel[mapping.level as SeniorityLevel] = mapping;
+    const levelKey = (mapping.level || 'ALL').toUpperCase().trim() as SeniorityLevel;
+    leafNode.mappingsByLevel[levelKey] = {
+      ...mapping,
+      level: levelKey,
+    };
   });
 
   const sortTree = (nodes: CategoryTreeNodeData[]) => {
@@ -243,12 +247,34 @@ function LevelTabs({
   );
 }
 
-interface CriteriaBadgePopoverProps {
-  criteriaCount: number;
-  mappedCriteria: MappingLeafNode[];
+function collectAllMappedLeavesInNode(
+  node: CategoryTreeNodeData,
+  currentDepth = 0
+): Array<{ category: JobCategoryDto; isDirect: boolean; leaves: MappingLeafNode[] }> {
+  const groups: Array<{ category: JobCategoryDto; isDirect: boolean; leaves: MappingLeafNode[] }> = [];
+
+  if (node.mappedCriteria.length > 0) {
+    groups.push({
+      category: node.category,
+      isDirect: currentDepth === 0,
+      leaves: node.mappedCriteria,
+    });
+  }
+
+  node.children.forEach((child) => {
+    groups.push(...collectAllMappedLeavesInNode(child, currentDepth + 1));
+  });
+
+  return groups;
 }
 
-function CriteriaBadgePopover({ criteriaCount, mappedCriteria }: CriteriaBadgePopoverProps) {
+interface CriteriaBadgePopoverProps {
+  totalCount: number;
+  groups: Array<{ category: JobCategoryDto; isDirect: boolean; leaves: MappingLeafNode[] }>;
+  selectedLevel: SeniorityLevel;
+}
+
+function CriteriaBadgePopover({ totalCount, groups, selectedLevel }: CriteriaBadgePopoverProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -288,41 +314,74 @@ function CriteriaBadgePopover({ criteriaCount, mappedCriteria }: CriteriaBadgePo
         tabIndex={0}
         onClick={togglePopover}
         onKeyDown={handleKeyDown}
-        className={`rounded-full border px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-[0.1em] cursor-pointer select-none transition-all duration-200 focus:outline-none ${
+        title="Nhấn để xem nhanh tất cả tiêu chí của danh mục và các nhánh con"
+        className={`rounded-full border px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.1em] cursor-pointer select-none transition-all duration-200 focus:outline-none ${
           isOpen
-            ? 'border-teal-400 bg-teal-950/40 text-teal-300 ring-1 ring-teal-400/20'
-            : 'border-slate-800 bg-slate-950/40 text-slate-500 hover:border-teal-500/50 hover:bg-teal-950/30 hover:text-teal-300 focus:border-teal-500/50 focus:bg-teal-950/30 focus:text-teal-300'
+            ? 'border-teal-400 bg-teal-950/60 text-teal-300 ring-1 ring-teal-400/20'
+            : 'border-slate-800 bg-slate-950/40 text-slate-400 hover:border-teal-500/50 hover:bg-teal-950/30 hover:text-teal-300 focus:border-teal-500/50 focus:bg-teal-950/30 focus:text-teal-300 shadow-sm'
         }`}
       >
-        {criteriaCount} criteria
+        {totalCount} criteria
       </span>
 
       {isOpen && (
         <div
           onClick={(e) => e.stopPropagation()}
-          className="absolute left-0 mt-2.5 w-64 origin-top-left rounded-xl border border-slate-700/80 bg-slate-900 px-4 py-3.5 shadow-2xl shadow-black/85 z-50 animate-in fade-in slide-in-from-top-1 duration-150"
+          className="absolute left-0 mt-2.5 w-72 origin-top-left rounded-xl border border-slate-700/80 bg-slate-900 px-4 py-3.5 shadow-2xl shadow-black/85 z-50 animate-in fade-in slide-in-from-top-1 duration-150"
         >
           <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              Criteria ({criteriaCount})
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300">
+              Tất cả tiêu chí ({totalCount})
+            </span>
+            <span className="text-[9px] font-bold uppercase tracking-wider text-teal-400">
+              Cấp: {SENIORITY_LABELS[selectedLevel]}
             </span>
           </div>
 
-          {mappedCriteria.length === 0 ? (
+          {groups.length === 0 ? (
             <div className="text-xs italic text-slate-500 py-1">
               Chưa có tiêu chí nào.
             </div>
           ) : (
-            <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1 scrollbar-thin">
-              {mappedCriteria.map((leaf) => (
-                <div
-                  key={leaf.criteria.id}
-                  className="flex items-start gap-2 py-0.5 text-xs text-slate-200 hover:text-white transition-colors"
-                >
-                  <span className="text-teal-400/80 select-none">•</span>
-                  <span className="font-medium truncate" title={leaf.criteria.name}>
-                    {leaf.criteria.name}
-                  </span>
+            <div className="max-h-60 overflow-y-auto space-y-2.5 pr-1 scrollbar-thin">
+              {groups.map((g) => (
+                <div key={g.category.id} className="space-y-1">
+                  {!g.isDirect && (
+                    <div className="text-[10px] font-semibold text-orange-400/90 uppercase tracking-wide pt-1 border-t border-slate-800/60">
+                      📂 {formatCategoryLabel(g.category.name)} ({g.leaves.length})
+                    </div>
+                  )}
+                  {g.leaves.map((leaf) => {
+                    const mapping = leaf.mappingsByLevel[selectedLevel] ?? leaf.mappingsByLevel['ALL'];
+                    const isDirectLevel = Boolean(leaf.mappingsByLevel[selectedLevel]);
+                    const weight = mapping?.weight_percentage;
+
+                    return (
+                      <div
+                        key={leaf.criteria.id}
+                        className="flex items-center justify-between gap-2 py-0.5 text-xs text-slate-200 hover:text-white transition-colors"
+                      >
+                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                          <span className="text-teal-400/80 select-none">•</span>
+                          <span className="font-medium truncate" title={leaf.criteria.name}>
+                            {leaf.criteria.name}
+                          </span>
+                        </div>
+                        {weight !== undefined ? (
+                          <span
+                            className={`font-mono text-[10px] font-bold shrink-0 ${
+                              isDirectLevel ? 'text-teal-400' : 'text-amber-400'
+                            }`}
+                            title={isDirectLevel ? 'Trọng số riêng' : 'Trọng số kế thừa từ ALL'}
+                          >
+                            {weight}%{!isDirectLevel && '*'}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-600 shrink-0">0%</span>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               ))}
             </div>
@@ -352,6 +411,12 @@ function CategoryTreeNode({
 }) {
   const isExpanded = expandedIds.has(node.category.id);
   const selectedLeaves = node.mappedCriteria;
+
+  const allMappedGroups = useMemo(() => collectAllMappedLeavesInNode(node), [node]);
+  const totalMappedCount = useMemo(
+    () => allMappedGroups.reduce((acc, g) => acc + g.leaves.length, 0),
+    [allMappedGroups]
+  );
 
   // Merge children categories and criteria leaf rows for proper vertical guide line calculations
   const childrenItems = useMemo(() => {
@@ -398,10 +463,11 @@ function CategoryTreeNode({
               <span className="rounded-md border border-slate-800 bg-slate-900/80 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-slate-400">
                 {node.children.length} child{node.children.length === 1 ? '' : 'ren'}
               </span>
-              {selectedLeaves.length > 0 && (
+              {totalMappedCount > 0 && (
                 <CriteriaBadgePopover
-                  criteriaCount={selectedLeaves.length}
-                  mappedCriteria={selectedLeaves}
+                  totalCount={totalMappedCount}
+                  groups={allMappedGroups}
+                  selectedLevel={selectedLevel}
                 />
               )}
             </div>
@@ -448,40 +514,115 @@ function CategoryTreeNode({
                     />
                   ) : (() => {
                     const leaf = item.data as MappingLeafNode;
-                    const selectedMapping = leaf.mappingsByLevel[selectedLevel] ?? null;
-                    const isSet = Boolean(selectedMapping);
+
+                    // Normalize & collect all configured levels for this criteria
+                    const configuredLevels = (
+                      Object.entries(leaf.mappingsByLevel) as [SeniorityLevel, CategoryCriteriaMappingDto][]
+                    ).filter(([_, m]) => m != null && m.weight_percentage !== undefined);
+
+                    const isAllTab = selectedLevel === 'ALL';
+                    const directMapping = leaf.mappingsByLevel[selectedLevel] ?? null;
+                    const allFallbackMapping = leaf.mappingsByLevel['ALL'] ?? null;
+
+                    const selectedMapping = isAllTab
+                      ? directMapping
+                      : directMapping ?? allFallbackMapping ?? null;
+
+                    const isDirectSet = Boolean(directMapping);
+                    const isFallbackAll = !isAllTab && !isDirectSet && Boolean(allFallbackMapping);
+                    const hasOtherLevels = isAllTab && !isDirectSet && configuredLevels.length > 0;
+
+                    // Weight calculation
                     const mappingWeight = selectedMapping?.weight_percentage ?? 0;
 
+                    // Min/Max weights across all configured levels for ALL tab overview
+                    const weightValues = configuredLevels.map(([_, m]) => m.weight_percentage);
+                    const minWeight = weightValues.length > 0 ? Math.min(...weightValues) : 0;
+                    const maxWeight = weightValues.length > 0 ? Math.max(...weightValues) : 0;
+                    const weightRangeDisplay =
+                      minWeight === maxWeight ? `${minWeight}%` : `${minWeight}% - ${maxWeight}%`;
+
                     return (
-                      <div className="group flex items-center justify-between gap-4 rounded-lg bg-transparent px-3 py-2 transition-all hover:bg-slate-800/40">
-                        <div className="min-w-0 flex-1">
+                      <div className="group flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl bg-transparent px-3 py-2.5 transition-all hover:bg-slate-800/40 border border-transparent hover:border-slate-700/50">
+                        <div className="min-w-0 flex-1 space-y-1">
+                          {/* Criteria Name & Status Badges */}
                           <div className="flex flex-wrap items-center gap-2">
                             <FileText size={15} className="text-emerald-400 shrink-0 shadow-[0_0_8px_rgba(52,211,153,0.15)]" />
                             <p className="text-sm font-semibold text-white tracking-wide">{leaf.criteria.name}</p>
-                            <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.1em] ${
-                              isSet
-                                ? 'border-teal-400/20 bg-teal-500/10 text-teal-300'
-                                : 'border-slate-800 bg-slate-900/50 text-slate-500'
-                            }`}>
-                              {SENIORITY_LABELS[selectedLevel]}
-                            </span>
+
+                            {hasOtherLevels ? (
+                              <span className="rounded-full border border-teal-500/30 bg-teal-950/60 px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.1em] text-teal-300">
+                                {configuredLevels.length} cấp bậc
+                              </span>
+                            ) : (
+                              <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.1em] ${
+                                isDirectSet
+                                  ? 'border-teal-400/20 bg-teal-500/10 text-teal-300'
+                                  : isFallbackAll
+                                    ? 'border-amber-400/20 bg-amber-500/10 text-amber-300'
+                                    : 'border-slate-800 bg-slate-900/50 text-slate-500'
+                              }`}>
+                                {SENIORITY_LABELS[selectedLevel]}
+                                {isFallbackAll && <span className="ml-0.5 opacity-70">(ALL)</span>}
+                              </span>
+                            )}
                           </div>
-                          <p className="mt-0.5 pl-6 text-xs text-slate-400">
-                            {isSet ? `Trọng số active: ${mappingWeight}%` : 'Không có cấu hình trọng số cho cấp bậc này.'}
-                          </p>
+
+                          {/* Description & Level Breakdown */}
+                          {hasOtherLevels ? (
+                            <div className="flex flex-wrap items-center gap-1.5 pl-6 pt-0.5">
+                              <span className="text-[11px] text-slate-400">Trọng số các cấp:</span>
+                              {configuredLevels.map(([lvl, m]) => (
+                                <button
+                                  key={lvl}
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onEditLeaf(node.category.id, leaf.criteria.id, lvl, e);
+                                  }}
+                                  title={`Bấm để xem và sửa trọng số cấp ${SENIORITY_LABELS[lvl]}`}
+                                  className="inline-flex items-center gap-1 rounded-md border border-slate-700/80 bg-slate-900/90 hover:border-teal-500/50 hover:bg-teal-950/40 px-1.5 py-0.5 text-[10px] text-slate-300 hover:text-teal-300 transition-all cursor-pointer select-none"
+                                >
+                                  <span className="font-semibold text-slate-400">{SENIORITY_LABELS[lvl]}:</span>
+                                  <span className="font-bold font-mono text-teal-400">{m.weight_percentage}%</span>
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="mt-0.5 pl-6 text-xs text-slate-400">
+                              {isDirectSet
+                                ? `Trọng số active: ${mappingWeight}%`
+                                : isFallbackAll
+                                  ? `Trọng số kế thừa từ ALL: ${mappingWeight}% — chưa có cấu hình riêng cho ${SENIORITY_LABELS[selectedLevel]}`
+                                  : configuredLevels.length > 0
+                                    ? `Chưa có cấu hình riêng cho ${SENIORITY_LABELS[selectedLevel]} (Hiện có ở: ${configuredLevels.map(([l, m]) => `${SENIORITY_LABELS[l]} ${m.weight_percentage}%`).join(', ')})`
+                                    : 'Chưa có cấu hình trọng số cho tiêu chí này.'}
+                            </p>
+                          )}
                         </div>
 
-                        <div className="flex items-center gap-4 shrink-0">
-                          <div className="min-w-[60px] text-right">
-                            <p className={`text-sm font-bold font-mono tabular-nums tracking-tight ${isSet ? 'text-teal-400' : 'text-slate-500'}`}>
-                              {isSet ? `${mappingWeight}%` : '0%'}
-                            </p>
+                        {/* Right: Weight display & Action buttons */}
+                        <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 pl-6 sm:pl-0">
+                          <div className="min-w-[70px] text-right">
+                            {hasOtherLevels ? (
+                              <p className="text-sm font-bold font-mono tabular-nums tracking-tight text-teal-400" title="Dải trọng số giữa các cấp bậc">
+                                {weightRangeDisplay}
+                              </p>
+                            ) : isDirectSet || isFallbackAll ? (
+                              <p className={`text-sm font-bold font-mono tabular-nums tracking-tight ${isDirectSet ? 'text-teal-400' : 'text-amber-400'}`}>
+                                {mappingWeight}%
+                              </p>
+                            ) : (
+                              <p className="text-sm font-bold font-mono tabular-nums tracking-tight text-slate-500">
+                                0%
+                              </p>
+                            )}
                           </div>
 
-                          {/* Action buttons wrapper hidden until row hover */}
+                          {/* Action buttons */}
                           <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
                             <ActionIconButton
-                              label={isSet ? 'Sửa trọng số' : 'Thêm trọng số'}
+                              label={isDirectSet ? 'Sửa trọng số' : hasOtherLevels ? 'Thêm trọng số cấp ALL' : 'Thêm trọng số'}
                               variant="accent"
                               onClick={(e) => onEditLeaf(node.category.id, leaf.criteria.id, selectedLevel, e)}
                               icon={(
@@ -492,13 +633,13 @@ function CategoryTreeNode({
                               )}
                             />
                             <ActionIconButton
-                              label="Xóa mapping"
+                              label={isFallbackAll ? 'Xóa mapping ALL' : 'Xóa mapping'}
                               variant="danger"
-                              disabled={!selectedMapping}
+                              disabled={!selectedMapping && configuredLevels.length === 0}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 e.preventDefault();
-                                onDeleteLeaf(node.category.id, leaf.criteria.id, selectedLevel);
+                                onDeleteLeaf(node.category.id, leaf.criteria.id, isFallbackAll ? 'ALL' : selectedLevel);
                               }}
                               icon={(
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

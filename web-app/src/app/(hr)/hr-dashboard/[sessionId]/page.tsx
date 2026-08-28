@@ -173,9 +173,16 @@ export default async function HrSessionDetailPage({
           <div>
             <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
               <FileCheck className="size-5 text-brand-orange" />
-              Chi Tiết Phỏng Vấn & So Khớp CV-JD
+              {sessionData
+                ? (() => {
+                    // Derive candidate name from cvFilename
+                    let name = (sessionData.cvFilename || '').replace(/\.[^.]+$/, '').replace(/^cv_/i, '').replace(/[_\s]+(test|upload|final|v\d+|\d{4}|draft|new|copy)$/i, '').replace(/[_-]+/g, ' ').trim();
+                    const role = sessionData.roleTitle || sessionData.roleTypeDetected || 'Đang xác định vị trí';
+                    return name ? `${name} — ${role}` : role;
+                  })()
+                : 'Chi Tiết Phỏng Vấn'}
             </h1>
-            <p className="text-xs text-slate-500 font-mono">Session ID: {sessionId}</p>
+            <p className="text-[11px] text-slate-400 font-mono mt-0.5">Session ID: {sessionId}</p>
           </div>
         </div>
       </div>

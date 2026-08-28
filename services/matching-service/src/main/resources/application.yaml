@@ -126,8 +126,8 @@ app:
         temperature: ${LLM_TEMPERATURE_QUESTION_GENERATION:0.4}
       interview-evaluation:
         model: ${LLM_MODEL_INTERVIEW_EVALUATION:${app.llm.model}}
-        max-tokens: ${LLM_MAX_TOKENS_INTERVIEW_EVALUATION:4096}
-        timeout-seconds: ${LLM_TIMEOUT_INTERVIEW_EVALUATION:60}
+        max-tokens: ${LLM_MAX_TOKENS_INTERVIEW_EVALUATION:8192}
+        timeout-seconds: ${LLM_TIMEOUT_INTERVIEW_EVALUATION:120}
         temperature: ${LLM_TEMPERATURE_INTERVIEW_EVALUATION:0.3}
 
     # Legacy model mapping compatibility

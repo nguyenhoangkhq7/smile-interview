@@ -40,12 +40,13 @@ export default function InterviewResultPage() {
   useEffect(() => {
     let active = true;
     let pollCount = 0;
-    const maxPolls = 30; // 60 seconds max
+    const maxPolls = 40; // ~120 seconds max (3s interval)
     let timerId: NodeJS.Timeout;
     let evalTriggered = false;
 
-    async function triggerEvaluationIfNeeded(sessionData: SessionHistoryItem) {
-      if (evalTriggered) return;
+    // Returns true if evaluation was actually triggered (i.e. data was incomplete)
+    async function triggerEvaluationIfNeeded(sessionData: SessionHistoryItem): Promise<boolean> {
+      if (evalTriggered) return false;
       const hasFeedback = !!(sessionData.overallFeedback && sessionData.overallFeedback.trim() !== '');
       const hasScore = sessionData.overallScore !== undefined && sessionData.overallScore !== null && sessionData.overallScore > 0;
       const answeredQs = (sessionData.questions || []).filter(q => q.answer && q.answer.trim().length > 0);
@@ -58,15 +59,18 @@ export default function InterviewResultPage() {
           const headers: Record<string, string> = { 'Content-Type': 'application/json' };
           if (token) headers['Authorization'] = `Bearer ${token}`;
           console.log(`[ResultPage] Triggering evaluation for session ${id}...`);
+          // Await the full LLM evaluation before continuing
           await fetch(`/api/sessions/${id}/evaluate`, { method: 'POST', headers });
         } catch (e) {
           console.error('[ResultPage] Error triggering evaluate:', e);
         }
+        return true; // evaluation was triggered — caller should reload immediately
       }
+      return false;
     }
 
     async function loadSession() {
-      if (!id) return;
+      if (!id || !active) return;
       try {
         const data = await historyService.getSessionById(id);
         if (!active) return;
@@ -83,17 +87,28 @@ export default function InterviewResultPage() {
 
           const isEvaluated = hasFeedback && hasScore && hasTurnEvaluation;
 
-          if (!isEvaluated && !evalTriggered) {
-            triggerEvaluationIfNeeded(data);
-          }
-
           if (isEvaluated || pollCount >= maxPolls) {
+            // Evaluation complete (or timeout) — render the page
             setSession(data);
             setLoading(false);
+          } else if (!evalTriggered) {
+            // Evaluation not yet done and not yet triggered — trigger it now
+            // and immediately reload once it finishes (no need to wait for polling)
+            setLoading(true);
+            const didTrigger = await triggerEvaluationIfNeeded(data);
+            if (didTrigger && active) {
+              // Evaluation just finished — fetch updated data immediately
+              loadSession();
+            } else if (active) {
+              // evalTriggered was already true by another path — fall back to polling
+              pollCount++;
+              timerId = setTimeout(loadSession, 3000);
+            }
           } else {
+            // Evaluation already triggered and running — keep polling every 3s
             pollCount++;
             setLoading(true);
-            timerId = setTimeout(loadSession, 2000);
+            timerId = setTimeout(loadSession, 3000);
           }
         } else {
           setSession(null);

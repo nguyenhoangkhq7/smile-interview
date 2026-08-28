@@ -284,6 +284,258 @@ function getInheritedCriteriaForCategory(
   return result;
 }
 
+// ─── Flatten all criteria within node & all descendants ──────────────────────
+interface CategoryCriteriaFlatGroup {
+  category: JobCategoryDto;
+  isDirect: boolean;
+  depth: number;
+  criteriaList: EvaluationCriteriaDto[];
+}
+
+function flattenCategoryCriteriaGroups(
+  rootNode: CategoryTreeNodeData,
+  currentDepth = 0
+): CategoryCriteriaFlatGroup[] {
+  const groups: CategoryCriteriaFlatGroup[] = [];
+
+  if (rootNode.criteriaList.length > 0) {
+    groups.push({
+      category: rootNode.category,
+      isDirect: currentDepth === 0,
+      depth: currentDepth,
+      criteriaList: rootNode.criteriaList,
+    });
+  }
+
+  rootNode.children.forEach((child) => {
+    groups.push(...flattenCategoryCriteriaGroups(child, currentDepth + 1));
+  });
+
+  return groups;
+}
+
+// ─── Modal: All Criteria of a Category (Direct + All Sub-Categories) ─────────
+interface CategoryAllCriteriaModalProps {
+  node: CategoryTreeNodeData | null;
+  allCategories: JobCategoryDto[];
+  onClose: () => void;
+  onViewPrompt: (crit: EvaluationCriteriaDto) => void;
+  onEditCriteria: (crit: EvaluationCriteriaDto) => void;
+  onDeleteCriteria: (id: number) => void;
+  deletingId: number | null;
+}
+
+function CategoryAllCriteriaModal({
+  node,
+  allCategories,
+  onClose,
+  onViewPrompt,
+  onEditCriteria,
+  onDeleteCriteria,
+  deletingId,
+}: CategoryAllCriteriaModalProps) {
+  const [search, setSearch] = useState('');
+
+  const groups = useMemo(() => {
+    if (!node) return [];
+    return flattenCategoryCriteriaGroups(node);
+  }, [node]);
+
+  const totalCount = useMemo(() => {
+    return groups.reduce((acc, g) => acc + g.criteriaList.length, 0);
+  }, [groups]);
+
+  const filteredGroups = useMemo(() => {
+    if (!search.trim()) return groups;
+    const query = search.toLowerCase().trim();
+
+    return groups
+      .map((g) => {
+        const catMatches = formatCategoryLabel(g.category.name).toLowerCase().includes(query);
+        const matchingCriteria = g.criteriaList.filter(
+          (c) =>
+            c.name.toLowerCase().includes(query) ||
+            c.prompt_instruction?.toLowerCase().includes(query) ||
+            c.mapped_levels?.some((lvl) => lvl.toLowerCase().includes(query)) ||
+            c.id.toString().includes(query)
+        );
+
+        if (catMatches) {
+          return g;
+        }
+        if (matchingCriteria.length > 0) {
+          return {
+            ...g,
+            criteriaList: matchingCriteria,
+          };
+        }
+        return null;
+      })
+      .filter((g): g is CategoryCriteriaFlatGroup => g !== null);
+  }, [groups, search]);
+
+  const filteredTotalCount = useMemo(() => {
+    return filteredGroups.reduce((acc, g) => acc + g.criteriaList.length, 0);
+  }, [filteredGroups]);
+
+  if (!node) return null;
+
+  return (
+    <Modal
+      open={Boolean(node)}
+      onClose={onClose}
+      title={`Tất cả tiêu chí: ${formatCategoryLabel(node.category.name)}`}
+      size="xl"
+    >
+      <div className="space-y-4">
+        {/* Top Header Information */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/60 p-3.5 rounded-xl border border-slate-800">
+          <div className="flex items-center gap-2 flex-wrap min-w-0 flex-1">
+            <span className="text-xs font-semibold text-slate-400 shrink-0">Danh mục:</span>
+            <HierarchyBreadcrumb category={node.category} allCategories={allCategories} />
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="rounded-full bg-teal-950/80 border border-teal-500/30 px-3 py-1 text-xs font-bold text-teal-300">
+              Tổng cộng {totalCount} tiêu chí
+            </span>
+          </div>
+        </div>
+
+        {/* Quick Search */}
+        <div className="relative">
+          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={`Tìm nhanh trong ${totalCount} tiêu chí của ${formatCategoryLabel(node.category.name)}...`}
+            className="w-full rounded-xl border border-slate-800 bg-slate-950/70 pl-10 pr-16 py-2.5 text-xs text-slate-200 placeholder-slate-500 focus:border-teal-500 focus:bg-slate-900 focus:outline-none focus:ring-1 focus:ring-teal-500 transition-colors"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-white transition-colors"
+            >
+              Xóa tìm
+            </button>
+          )}
+        </div>
+
+        {/* List of Criteria grouped by category */}
+        {filteredGroups.length === 0 ? (
+          <div className="py-10 text-center text-slate-400 bg-slate-950/40 rounded-xl border border-slate-800">
+            <p className="text-sm font-medium">Không tìm thấy tiêu chí nào phù hợp với từ khóa &quot;{search}&quot;.</p>
+            <p className="text-xs text-slate-500 mt-1">Hãy thử tìm theo tên, ID, cấp bậc hoặc từ khóa prompt.</p>
+          </div>
+        ) : (
+          <div className="space-y-4 max-h-[58vh] overflow-y-auto pr-1.5 scrollbar-thin">
+            {filteredGroups.map((g) => (
+              <div key={g.category.id} className="space-y-2 rounded-xl border border-slate-800/80 bg-slate-900/30 p-3.5">
+                {/* Group Header */}
+                <div className="flex items-center justify-between gap-2 border-b border-slate-800/80 pb-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Folder size={15} className={g.isDirect ? 'text-teal-400' : 'text-orange-400'} />
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200">
+                      {g.isDirect ? (
+                        <span className="text-teal-300">Tiêu chí trực tiếp của {formatCategoryLabel(g.category.name)}</span>
+                      ) : (
+                        <span>Danh mục con: {formatCategoryLabel(g.category.name)}</span>
+                      )}
+                    </h4>
+                    <span className="rounded-full bg-slate-800 border border-slate-700/60 px-2 py-0.2 text-[10px] font-semibold text-slate-300">
+                      {g.criteriaList.length} tiêu chí
+                    </span>
+                  </div>
+                  {g.isDirect && (
+                    <span className="text-[10px] font-medium text-teal-400/90 bg-teal-950/60 border border-teal-800/40 px-2 py-0.5 rounded-full">
+                      Dùng chung / Kế thừa
+                    </span>
+                  )}
+                </div>
+
+                {/* Criteria Cards */}
+                <div className="space-y-2 pt-1">
+                  {g.criteriaList.map((crit) => (
+                    <div
+                      key={crit.id}
+                      className="group flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg border border-slate-800/60 bg-slate-950/60 hover:bg-slate-900/90 hover:border-slate-700 transition-all"
+                    >
+                      {/* Left info */}
+                      <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                        <FileText size={15} className="text-teal-400 shrink-0 mt-0.5" />
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-mono text-[11px] text-slate-500">#{crit.id}</span>
+                            <h5 className="text-xs sm:text-sm font-semibold text-slate-100">{crit.name}</h5>
+                            {crit.question_type && (
+                              <span className="rounded bg-slate-800/90 px-1.5 py-0.2 text-[10px] text-slate-400 border border-slate-700/50">
+                                {crit.question_type}
+                              </span>
+                            )}
+                          </div>
+                          {crit.prompt_instruction && (
+                            <p className="line-clamp-2 text-xs text-slate-400 font-mono leading-relaxed">
+                              {crit.prompt_instruction}
+                            </p>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => onViewPrompt(crit)}
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-teal-400 hover:text-teal-300 transition-colors"
+                          >
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                              <path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                            </svg>
+                            Xem Full Prompt
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Right actions */}
+                      <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/40">
+                        <MappedLevelsBadges levels={crit.mapped_levels} />
+                        <div className="flex items-center gap-1 pl-2 border-l border-slate-800">
+                          <ActionIconButton
+                            label="Sửa"
+                            onClick={() => {
+                              onEditCriteria(crit);
+                            }}
+                            icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>}
+                          />
+                          <ActionIconButton
+                            label="Xóa"
+                            variant="danger"
+                            onClick={() => onDeleteCriteria(crit.id)}
+                            disabled={deletingId === crit.id}
+                            icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4h6v2" /></svg>}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+          <span className="text-xs text-slate-500">
+            Đang hiển thị {filteredTotalCount} / {totalCount} tiêu chí
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-sm text-slate-300 hover:text-white transition-colors"
+          >
+            Đóng
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 // ─── YouTube Comment Thread Style Curved Connector Line ──────────────────────
 function CurvedTreeConnector({ isLast }: { isLast: boolean }) {
   return (
@@ -321,6 +573,7 @@ function CategoryCriteriaTreeNode({
   onAddCriteriaForCat,
   onAddSiblingCat,
   onViewInherited,
+  onViewCategoryCriteria,
   deletingId,
   showEmptyCategories,
 }: {
@@ -334,6 +587,7 @@ function CategoryCriteriaTreeNode({
   onAddCriteriaForCat: (cat: JobCategoryDto) => void;
   onAddSiblingCat: (cat: JobCategoryDto) => void;
   onViewInherited: (cat: JobCategoryDto) => void;
+  onViewCategoryCriteria: (node: CategoryTreeNodeData) => void;
   deletingId: number | null;
   showEmptyCategories: boolean;
 }) {
@@ -376,7 +630,7 @@ function CategoryCriteriaTreeNode({
           }}
           className={`group/row flex items-center justify-between cursor-pointer select-none transition-all ${headerBgClass}`}
         >
-          {/* Left: chevron + icon + name + count + Inherited button */}
+          {/* Left: chevron + icon + name + count button + Inherited button */}
           <div className="flex items-center gap-2.5 min-w-0 flex-1 flex-wrap">
             <ChevronRight
               size={16}
@@ -393,9 +647,20 @@ function CategoryCriteriaTreeNode({
             >
               {formatCategoryLabel(node.category.name)}
             </span>
-            <span className="rounded-full bg-slate-800 border border-slate-700/60 px-2 py-0.5 text-[10px] font-semibold text-teal-300">
-              {totalCriteriaCount} tiêu chí
-            </span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onViewCategoryCriteria(node);
+              }}
+              title={`Nhấn để xem toàn bộ ${totalCriteriaCount} tiêu chí của ${formatCategoryLabel(node.category.name)}`}
+              className="inline-flex items-center gap-1 rounded-full bg-slate-800/90 hover:bg-teal-950/80 border border-slate-700/70 hover:border-teal-500/60 px-2.5 py-0.5 text-[10px] font-semibold text-teal-300 hover:text-teal-200 transition-all cursor-pointer select-none group/badge shadow-sm hover:shadow-[0_0_8px_rgba(20,184,166,0.25)] focus:outline-none focus:ring-1 focus:ring-teal-400/40"
+            >
+              <span>{totalCriteriaCount} tiêu chí</span>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-teal-400/70 group-hover/badge:text-teal-300 group-hover/badge:translate-x-0.5 transition-all">
+                <path d="m9 18 6-6-6-6" />
+              </svg>
+            </button>
             {node.category.parent_id != null && (
               <button
                 type="button"
@@ -469,6 +734,7 @@ function CategoryCriteriaTreeNode({
                       onAddCriteriaForCat={onAddCriteriaForCat}
                       onAddSiblingCat={onAddSiblingCat}
                       onViewInherited={onViewInherited}
+                      onViewCategoryCriteria={onViewCategoryCriteria}
                       deletingId={deletingId}
                       showEmptyCategories={showEmptyCategories}
                     />
@@ -638,9 +904,10 @@ export default function EvaluationCriteriaTable({ criteria, categories = [], map
   const [siblingContextCat, setSiblingContextCat] = useState<JobCategoryDto | null>(null);
   const [savingCat, setSavingCat] = useState(false);
 
-  // ── View prompt & View inherited criteria modals ──────────────────────────
+  // ── View prompt & View inherited criteria modals & View all category criteria ──
   const [viewCriteria, setViewCriteria] = useState<EvaluationCriteriaDto | null>(null);
   const [inheritedTargetCat, setInheritedTargetCat] = useState<JobCategoryDto | null>(null);
+  const [viewCategoryNode, setViewCategoryNode] = useState<CategoryTreeNodeData | null>(null);
 
   // ── Search & filter ───────────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState('');
@@ -944,6 +1211,7 @@ export default function EvaluationCriteriaTable({ criteria, categories = [], map
               onAddCriteriaForCat={openCreateCriteriaForCat}
               onAddSiblingCat={openAddSiblingCat}
               onViewInherited={setInheritedTargetCat}
+              onViewCategoryCriteria={setViewCategoryNode}
               deletingId={deletingId}
               showEmptyCategories={showEmptyCategories}
             />
@@ -1324,6 +1592,22 @@ export default function EvaluationCriteriaTable({ criteria, categories = [], map
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* ── Modal: View All Category Criteria (Direct + All Sub-Categories) ─── */}
+      {viewCategoryNode && (
+        <CategoryAllCriteriaModal
+          node={viewCategoryNode}
+          allCategories={categories}
+          onClose={() => setViewCategoryNode(null)}
+          onViewPrompt={setViewCriteria}
+          onEditCriteria={(crit) => {
+            setViewCategoryNode(null);
+            openEditCriteria(crit);
+          }}
+          onDeleteCriteria={handleDeleteCriteria}
+          deletingId={deletingId}
+        />
       )}
     </RuleDashboardSection>
   );

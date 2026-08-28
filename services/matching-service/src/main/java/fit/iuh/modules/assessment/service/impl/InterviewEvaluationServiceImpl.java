@@ -34,6 +34,9 @@ public class InterviewEvaluationServiceImpl implements InterviewEvaluationServic
         List<QuestionAnswerDto> turns = request.turns();
         if (turns != null) {
             int baseQuestionNumber = 0;
+            // Safety: each answer is capped at 800 chars to prevent LLM token overflow.
+            // The full answer is always preserved in the database.
+            final int MAX_ANSWER_CHARS = 800;
             for (int i = 0; i < turns.size(); i++) {
                 QuestionAnswerDto t = turns.get(i);
                 if (t.isWarmupQuestion()) {
@@ -45,9 +48,11 @@ public class InterviewEvaluationServiceImpl implements InterviewEvaluationServic
                     userPrompt.append("CÂU HỎI ").append(baseQuestionNumber).append(":\n");
                 }
                 userPrompt.append("Hỏi: ").append(t.question()).append("\n");
-                userPrompt.append("Trả lời: ")
-                        .append(t.answer() != null && !t.answer().trim().isEmpty() ? t.answer() : "[Không trả lời]")
-                        .append("\n");
+                String rawAnswer = t.answer() != null && !t.answer().trim().isEmpty() ? t.answer() : "[Không trả lời]";
+                String truncatedAnswer = rawAnswer.length() > MAX_ANSWER_CHARS
+                        ? rawAnswer.substring(0, MAX_ANSWER_CHARS) + "...[đã rút gọn]"
+                        : rawAnswer;
+                userPrompt.append("Trả lời: ").append(truncatedAnswer).append("\n");
                 if (t.score() != null && t.score() > 0) {
                     userPrompt.append("Điểm sơ bộ: ").append(t.score()).append("/100\n\n");
                 } else {
