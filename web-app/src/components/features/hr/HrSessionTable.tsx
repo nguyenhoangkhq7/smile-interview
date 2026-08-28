@@ -17,6 +17,22 @@ import {
 type SortOrder = 'newest' | 'oldest';
 type StageFilter = 'ALL' | 'CV_JD_MATCHED' | 'QUESTION_BANK_READY' | 'INTERVIEW_IN_PROGRESS' | 'COMPLETED';
 
+/** Derive a readable candidate name from a CV filename.
+ *  e.g. "CV_CaoThanhDong_Test.pdf" → "Cao Thanh Dong"
+ */
+function parseCandidateName(cvFilename?: string): string {
+  if (!cvFilename) return 'Ứng viên';
+  // Strip extension
+  let name = cvFilename.replace(/\.[^.]+$/, '');
+  // Strip leading CV_ or cv_ prefix
+  name = name.replace(/^cv_/i, '');
+  // Strip trailing noise tokens (_Test, _Upload, _Final, _v2, _2024 etc.)
+  name = name.replace(/[_\s]+(test|upload|final|v\d+|\d{4}|draft|new|copy)$/i, '');
+  // Replace remaining underscores/hyphens with spaces
+  name = name.replace(/[_-]+/g, ' ').trim();
+  return name || 'Ứng viên';
+}
+
 interface HrSessionTableProps {
   sessions: SessionHistoryItem[];
 }
@@ -103,17 +119,16 @@ export const HrSessionTable: React.FC<HrSessionTableProps> = ({ sessions: initia
     return list;
   }, [sessionList, searchQuery, sortOrder, stageFilter]);
 
-  const getStageBadge = (stage?: string, status?: string) => {
-    const s = stage || (status === 'Completed' ? 'COMPLETED' : status === 'In progress' ? 'INTERVIEW_IN_PROGRESS' : 'CV_JD_MATCHED');
-    switch (s) {
-      case 'CV_JD_MATCHED':
-        return <Badge className="bg-sky-100 text-sky-800 border-sky-300 gap-1 font-semibold text-[11px]"><Sparkles className="size-3 text-sky-600" /> CV-JD Matched</Badge>;
-      case 'QUESTION_BANK_READY':
-        return <Badge className="bg-amber-100 text-amber-900 border-amber-300 gap-1 font-semibold text-[11px]"><HelpCircle className="size-3 text-amber-600" /> Bank Ready</Badge>;
-      case 'INTERVIEW_IN_PROGRESS':
-        return <Badge className="bg-purple-100 text-purple-900 border-purple-300 gap-1 font-semibold text-[11px] animate-pulse"><Radio className="size-3 text-purple-600" /> Live...</Badge>;
-      default:
+  const getStatusBadge = (status?: string) => {
+    switch (status) {
+      case 'Completed':
         return <Badge className="bg-emerald-100 text-emerald-900 border-emerald-300 gap-1 font-semibold text-[11px]"><CheckCircle2 className="size-3 text-emerald-600" /> Hoàn tất</Badge>;
+      case 'In progress':
+        return <Badge className="bg-purple-100 text-purple-900 border-purple-300 gap-1 font-semibold text-[11px] animate-pulse"><Radio className="size-3 text-purple-600" /> Đang phỏng vấn</Badge>;
+      case 'Not started':
+        return <Badge className="bg-slate-100 text-slate-700 border-slate-300 gap-1 font-semibold text-[11px]"><HelpCircle className="size-3 text-slate-500" /> Chưa bắt đầu</Badge>;
+      default:
+        return <Badge className="bg-sky-100 text-sky-800 border-sky-300 gap-1 font-semibold text-[11px]"><Sparkles className="size-3 text-sky-600" /> {status || 'Chưa rõ'}</Badge>;
     }
   };
 
@@ -216,9 +231,9 @@ export const HrSessionTable: React.FC<HrSessionTableProps> = ({ sessions: initia
                 <tr>
                   <th className="px-5 py-3">Mã Phiên / Ngày tạo</th>
                   <th className="px-5 py-3">Vị Trí</th>
-                  <th className="px-5 py-3">CV / JD</th>
+                  <th className="px-5 py-3">Ứng Viên / Hồ Sơ</th>
                   <th className="px-5 py-3">Cấp độ & Phù hợp</th>
-                  <th className="px-5 py-3">Giai Đoạn</th>
+                  <th className="px-5 py-3">Trạng Thái</th>
                   <th className="px-5 py-3 text-right">Thao Tác</th>
                 </tr>
               </thead>
@@ -248,11 +263,14 @@ export const HrSessionTable: React.FC<HrSessionTableProps> = ({ sessions: initia
                       </div>
                     </td>
                     <td className="px-5 py-4">
-                      <div className="flex flex-col space-y-0.5 text-[11px] text-slate-600">
-                        <span className="truncate max-w-[150px] font-medium" title={session.cvFilename}>
-                          📄 {session.cvFilename || 'CV_Upload.pdf'}
+                      <div className="flex flex-col space-y-0.5">
+                        <span
+                          className="font-semibold text-slate-900 text-xs max-w-[160px] truncate"
+                          title={session.cvFilename}
+                        >
+                          {parseCandidateName(session.cvFilename)}
                         </span>
-                        <span className="truncate max-w-[150px] text-slate-400" title={session.jdFilename}>
+                        <span className="text-[10px] text-slate-400 truncate max-w-[160px]" title={session.jdFilename}>
                           📋 {session.jdFilename || 'JD_Requirement.pdf'}
                         </span>
                       </div>
@@ -268,7 +286,7 @@ export const HrSessionTable: React.FC<HrSessionTableProps> = ({ sessions: initia
                       </div>
                     </td>
                     <td className="px-5 py-4">
-                      {getStageBadge(session.currentStage, session.status)}
+                      {getStatusBadge(session.status)}
                     </td>
                     <td className="px-5 py-4 text-right">
                       <Link href={`/hr-dashboard/${session.id}`}>

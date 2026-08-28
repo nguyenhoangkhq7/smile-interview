@@ -140,7 +140,7 @@ export const CvJdMatchingView: React.FC<CvJdMatchingViewProps> = ({ session }) =
       {/* 2. BOTTOM SECTION: Matching & Evaluation Results */}
       {/* 2.1 Match Result Header Banner */}
       <Card className="border-blue-200 bg-gradient-to-r from-blue-50/90 via-indigo-50/50 to-slate-50 p-6 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center space-x-2">
               <Sparkles className="size-5 text-blue-600" />
@@ -151,6 +151,24 @@ export const CvJdMatchingView: React.FC<CvJdMatchingViewProps> = ({ session }) =
             <p className="text-xs text-slate-600">
               Vị trí tuyển dụng: <strong>{session.roleTitle || 'Chưa xác định'}</strong> | Cấp độ: <strong>{session.candidateLevel || 'N/A'}</strong>
             </p>
+            {/* Competency Fit Score — progress bar */}
+            {session.competencyFitScore !== undefined && (
+              <div className="mt-3 space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-slate-700">Điểm Phù Hợp Năng Lực Cốt Lõi</span>
+                  <span className="font-bold text-blue-700">{session.competencyFitScore}%</span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-slate-200 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      session.competencyFitScore >= 80 ? 'bg-emerald-500' :
+                      session.competencyFitScore >= 60 ? 'bg-sky-500' : 'bg-rose-500'
+                    }`}
+                    style={{ width: `${Math.min(100, session.competencyFitScore)}%` }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center space-x-3">
@@ -210,6 +228,7 @@ export const CvJdMatchingView: React.FC<CvJdMatchingViewProps> = ({ session }) =
             </div>
           )}
         </Card>
+
 
         {/* Gap Areas & Critical Missing Skills */}
         <Card className="border-slate-200 shadow-sm bg-white p-5 space-y-4">

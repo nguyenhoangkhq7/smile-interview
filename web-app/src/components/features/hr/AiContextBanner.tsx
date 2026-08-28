@@ -52,10 +52,10 @@ export const AiContextBanner: React.FC<AiContextBannerProps> = ({ metadata }) =>
             </div>
             <div>
               <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                Bối Cảnh Đánh Giá Phỏng Vấn AI
+                Ngân Hàng Câu Hỏi AI Tạo Tự Động
                 <Sparkles className="size-4 text-amber-500" />
               </h2>
-              <p className="text-xs text-slate-500">Tóm tắt phân tích CV/JD & Ngữ cảnh sinh câu hỏi tự động</p>
+              <p className="text-xs text-slate-500">Dựa trên ma trận thiếu hụt kỹ năng CV-JD — Tóm tắt phân tích và ngữ cảnh sinh câu hỏi tự động</p>
             </div>
           </div>
 
@@ -125,16 +125,14 @@ export const AiContextBanner: React.FC<AiContextBannerProps> = ({ metadata }) =>
           </div>
         </div>
 
-        {/* Generation Rationale Callout */}
+        {/* Compact rationale summary sentence */}
         {generation_rationale && (
-          <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4 min-w-0 w-full overflow-hidden">
-            <p className="mb-1 text-xs font-semibold text-amber-800 uppercase tracking-wide flex items-center gap-1.5">
-              <Sparkles className="size-3.5" /> Lý Do AI Đề Xuất Cấu Trúc Câu Hỏi (Rationale):
-            </p>
-            <p className="text-sm leading-relaxed text-slate-800 font-normal italic">
-              &quot;{generation_rationale}&quot;
-            </p>
-          </div>
+          <p className="text-xs text-slate-600 italic border-t border-slate-100 pt-3">
+            <Sparkles className="size-3 text-amber-500 inline mr-1" />
+            {generation_rationale.length > 200
+              ? generation_rationale.substring(0, 200) + '…'
+              : generation_rationale}
+          </p>
         )}
       </CardContent>
     </Card>

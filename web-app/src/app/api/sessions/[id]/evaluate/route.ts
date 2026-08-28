@@ -19,6 +19,24 @@ export async function POST(
     }
     const session = sessionRes.rows[0];
 
+    // 1a. Idempotency guard: skip re-evaluation if already completed
+    const alreadyEvaluated =
+      session.overall_score !== null &&
+      session.overall_score > 0 &&
+      session.overall_feedback !== null &&
+      session.overall_feedback !== '';
+    if (alreadyEvaluated) {
+      console.log(`[API Evaluate] Session ${id} already evaluated (score=${session.overall_score}). Skipping LLM call.`);
+      return NextResponse.json({
+        success: true,
+        cached: true,
+        data: {
+          overallScore: session.overall_score,
+          hiringRecommendation: session.hiring_recommendation,
+        }
+      });
+    }
+
     // 2. Fetch all turns (QA details) for the session in chronological order
     const turnsRes = await query('SELECT * FROM session_turns WHERE session_id = $1 ORDER BY id ASC', [id]);
     const turns = turnsRes.rows;

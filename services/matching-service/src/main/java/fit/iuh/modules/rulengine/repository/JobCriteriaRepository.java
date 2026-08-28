@@ -105,7 +105,19 @@ public interface JobCriteriaRepository extends JpaRepository<CategoryCriteriaMap
             FROM category_criteria_mapping m
             JOIN evaluation_criteria ec ON m.evaluation_criteria_id = ec.id
             JOIN category_tree ct       ON m.job_category_id = ct.id
-            WHERE (m.level = :seniorityLevel OR m.level = 'ALL')
+            WHERE (
+                m.level = :seniorityLevel
+                OR (
+                    m.level = 'ALL'
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM category_criteria_mapping m2
+                        WHERE m2.job_category_id      = m.job_category_id
+                          AND m2.evaluation_criteria_id = m.evaluation_criteria_id
+                          AND m2.level                  = :seniorityLevel
+                    )
+                )
+            )
             ORDER BY ct.source_depth ASC
             """, nativeQuery = true)
     List<CriteriaWeightProjection> findCriteriaTreeByCategory(
