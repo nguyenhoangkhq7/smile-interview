@@ -1,78 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query } from '@/lib/db';
-import cloudinary from '@/lib/cloudinary';
+import { forwardToBackend } from '@/lib/backendClient';
 
 export async function POST(request: NextRequest) {
   try {
-    let authUserId: string | null = null;
-    const authHeader = request.headers.get('Authorization');
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      try {
-        const token = authHeader.substring(7);
-        const parts = token.split('.');
-        if (parts.length === 3) {
-          const payload = Buffer.from(parts[1], 'base64').toString('utf-8');
-          const claims = JSON.parse(payload);
-          authUserId = claims.id || null;
-        }
-      } catch (e) {
-        console.error('[API Default Resume] Error decoding JWT:', e);
-      }
-    }
-
-    if (!authUserId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
     if (!file) {
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
     }
 
-    // Convert file to base64 for Cloudinary
-    let fileUrl;
-    let cloudinaryId;
-    const fileName = file.name;
+    // 1. Upload to resumes API
+    const uploadFormData = new FormData();
+    uploadFormData.append('file', file);
 
-    if (!process.env.CLOUDINARY_API_KEY) {
-      console.warn('[API Default Resume] CLOUDINARY_API_KEY is not set, using mock upload.');
-      fileUrl = `https://example.com/resumes/${encodeURIComponent(file.name)}`;
-      cloudinaryId = `mock_cv_${Date.now()}_${encodeURIComponent(file.name)}`;
-    } else {
-      const buffer = Buffer.from(await file.arrayBuffer());
-      const base64Data = `data:${file.type};base64,${buffer.toString('base64')}`;
+    const uploadRes = await forwardToBackend('/api/v1/resumes', request, {
+      method: 'POST',
+      body: uploadFormData,
+    });
 
-      console.log(`[API Default Resume] Uploading default CV to Cloudinary for user ${authUserId}...`);
-      const uploadRes = await cloudinary.uploader.upload(base64Data, {
-        folder: 'smile-interview/resumes',
-        resource_type: 'raw', // Support PDF/Docx raw upload
-      });
-
-      fileUrl = uploadRes.secure_url;
-      cloudinaryId = uploadRes.public_id;
-      console.log(`[API Default Resume] Cloudinary upload success. URL: ${fileUrl}`);
+    if (!uploadRes.ok) {
+      const err = await uploadRes.text();
+      return NextResponse.json({ error: err }, { status: uploadRes.status });
     }
 
-    // Insert CV into resumes table
-    const resumeInsertRes = await query(
-      'INSERT INTO resumes (user_id, file_name, file_url, cloudinary_id) VALUES ($1, $2, $3, $4) RETURNING id, file_name, file_url, cloudinary_id, created_at',
-      [authUserId, fileName, fileUrl, cloudinaryId]
-    );
-    const newResume = resumeInsertRes.rows[0];
+    const newResume = await uploadRes.json();
+    const resumeId = String(newResume.id);
 
-    // Update users table default_resume_id to the new resume's ID
-    await query(
-      'UPDATE users SET default_resume_id = $1 WHERE id = $2',
-      [String(newResume.id), authUserId]
-    );
+    // 2. Set default resume on user profile
+    await forwardToBackend('/api/auth/profile', request, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ defaultResumeId: resumeId }),
+    });
 
     return NextResponse.json({
       success: true,
-      defaultResumeId: String(newResume.id),
+      defaultResumeId: resumeId,
       resume: newResume,
     });
-  } catch (errorVal) { const error = errorVal as Error;
+  } catch (errorVal) {
+    const error = errorVal as Error;
     console.error('[API Default Resume] Error:', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }

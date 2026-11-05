@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query } from '@/lib/db';
-import { customFetch } from '@/lib/customFetch';
+import { forwardToBackend } from '@/lib/backendClient';
 
 interface EvidenceItem {
   status: string;
@@ -12,7 +11,7 @@ interface EvidenceItem {
 interface ImprovementItem {
   criteria_name: string;
   actionable_advice?: string;
-  suggestion?: string;  // fallback / legacy
+  suggestion?: string;
   priority?: string;
 }
 
@@ -21,335 +20,54 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const sessionId = searchParams.get('sessionId');
     const forceRefresh = searchParams.get('forceRefresh') || 'false';
-    const resumeId = searchParams.get('resumeId');
-    const jdId = searchParams.get('jdId');
+    const fromSessionId = searchParams.get('fromSessionId') || '';
 
     if (!sessionId) {
       return NextResponse.json({ error: 'sessionId is required' }, { status: 400 });
     }
 
-    const isValidUuid = (val?: string | null) => 
-      !!val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+    const endpoint = `/api/v2/assess-resume?sessionId=${sessionId}&forceRefresh=${forceRefresh}${fromSessionId ? `&fromSessionId=${fromSessionId}` : ''}`;
+    console.log(`[API Proxy Assess] Forwarding assessment to Spring Boot backend: ${endpoint}`);
 
-    // Cache lookup: Check if we have an existing completed assessment for this sessionId or (resumeId & jdId)
-    if (forceRefresh !== 'true') {
-      const validResumeUuid = isValidUuid(resumeId) ? resumeId : null;
-      const validJdUuid = isValidUuid(jdId) ? jdId : null;
-
-      let cachedSessionRes;
-      if (validResumeUuid && validJdUuid) {
-        console.log(`[API Proxy Assess] Checking local DB cache for sessionId=${sessionId} OR (resumeId=${validResumeUuid}, jdId=${validJdUuid})`);
-        cachedSessionRes = await query(
-          `SELECT * FROM sessions 
-           WHERE (id = $1 OR (resume_id = $2::uuid AND jd_id = $3::uuid))
-             AND competency_fit_score IS NOT NULL 
-           ORDER BY (CASE WHEN id = $1 THEN 0 ELSE 1 END), date DESC LIMIT 1`,
-          [sessionId, validResumeUuid, validJdUuid]
-        );
-      } else {
-        console.log(`[API Proxy Assess] Checking local DB cache for sessionId=${sessionId}`);
-        cachedSessionRes = await query(
-          `SELECT * FROM sessions 
-           WHERE id = $1 AND competency_fit_score IS NOT NULL 
-           LIMIT 1`,
-          [sessionId]
-        );
-      }
-
-      if (cachedSessionRes.rows.length > 0) {
-        const cachedSession = cachedSessionRes.rows[0];
-        console.log(`[API Proxy Assess] Cache HIT for resumeId=${resumeId}, jdId=${jdId}. Reusing session assessment.`);
-
-        // Call the Java backend to register/clone the assessment for this sessionId
-        const backendUrl = process.env.MATCHING_SERVICE_URL || 'http://localhost:8081';
-        const targetUrl = `${backendUrl}/api/v2/assess-resume?sessionId=${sessionId}&forceRefresh=false&fromSessionId=${cachedSession.id}`;
-        console.log(`[API Proxy Assess] Triggering Java backend cache/clone at: ${targetUrl}`);
-        
-        try {
-          const authHeader = request.headers.get('Authorization');
-          const headers: Record<string, string> = {};
-          if (authHeader) {
-            headers['Authorization'] = authHeader;
-          }
-          await customFetch(targetUrl, { headers });
-          console.log(`[API Proxy Assess] Java backend cloned successfully for sessionId=${sessionId}`);
-        } catch (e) {
-          console.error(`[API Proxy Assess] Failed to trigger Java backend clone:`, e);
-        }
-
-        const parseJsonField = (val: unknown) => {
-          if (typeof val === 'string') {
-            try {
-              return JSON.parse(val);
-            } catch (e) {
-              console.error('[API Proxy Assess] Error parsing JSON field:', e);
-              return val;
-            }
-          }
-          return val;
-        };
-
-        return NextResponse.json({
-          id: cachedSession.id,
-          sessionId: sessionId, // Preserve the new sessionId requested by client
-          competencyFitScore: cachedSession.competency_fit_score,
-          technicalDepthScore: cachedSession.technical_depth_score,
-          matchLevel: cachedSession.match_level,
-          candidateLevel: cachedSession.candidate_level,
-          roleTypeDetected: cachedSession.role_type_detected,
-          yearsOfExperienceEstimate: cachedSession.years_of_experience_estimate,
-          strongAreas: parseJsonField(cachedSession.strong_areas) || [],
-          gapAreas: parseJsonField(cachedSession.gap_areas) || [],
-          criticalMissingSkills: parseJsonField(cachedSession.critical_missing_skills) || [],
-          sectionWiseFeedback: parseJsonField(cachedSession.section_wise_feedback) || {},
-          actionableImprovementSuggestions: parseJsonField(cachedSession.actionable_suggestions) || [],
-          quickWins: parseJsonField(cachedSession.quick_wins) || [],
-          skillGaps: parseJsonField(cachedSession.skill_gaps) || [],
-          cached: true,
-          createdAt: cachedSession.date || '',
-          gateEvidenceItems: parseJsonField(cachedSession.gate_evidence_items) || [],
-          mustHaveEvidenceItems: parseJsonField(cachedSession.must_have_evidence_items) || parseJsonField(cachedSession.evidence_items) || [],
-          preferToHaveEvidenceItems: parseJsonField(cachedSession.prefer_to_have_evidence_items) || parseJsonField(cachedSession.additional_evidence_items) || [],
-          evidenceItems: parseJsonField(cachedSession.must_have_evidence_items) || parseJsonField(cachedSession.evidence_items) || [],
-          additionalEvidenceItems: parseJsonField(cachedSession.prefer_to_have_evidence_items) || parseJsonField(cachedSession.additional_evidence_items) || [],
-          scoreBreakdown: parseJsonField(cachedSession.score_breakdown) || null,
-          topPriorityImprovements: parseJsonField(cachedSession.top_priority_improvements) || [],
-          eligibility: parseJsonField(cachedSession.eligibility) || null
-        });
-      }
-    }
-
-    const backendUrl = process.env.MATCHING_SERVICE_URL || 'http://localhost:8081';
-    const targetUrl = `${backendUrl}/api/v2/assess-resume?sessionId=${sessionId}&forceRefresh=${forceRefresh}`;
-
-    console.log(`[API Proxy Assess] Forwarding to backend: ${targetUrl}`);
-    const authHeader = request.headers.get('Authorization');
-    const headers: Record<string, string> = {};
-    if (authHeader) {
-      headers['Authorization'] = authHeader;
-    }
-    const backendRes = await customFetch(targetUrl, {
-      headers: headers
+    const backendRes = await forwardToBackend(endpoint, request, {
+      method: 'GET',
     });
 
     if (!backendRes.ok) {
       const errText = await backendRes.text();
-      console.error(`[API Proxy Assess] Backend error status ${backendRes.status}:`, errText);
-      let detail = errText;
-      try {
-        const parsed = JSON.parse(errText);
-        detail = parsed.message || parsed.error || errText;
-      } catch {
-        // use raw errText
-      }
-      const errorMessage = detail
-        ? `Backend error (${backendRes.status}): ${detail}`
-        : `Backend error: ${backendRes.status} ${backendRes.statusText}`.trim();
-      return NextResponse.json({ error: errorMessage }, { status: backendRes.status });
+      console.error(`[API Proxy Assess] Backend error: ${backendRes.status} ${errText}`);
+      return NextResponse.json({ error: errText }, { status: backendRes.status });
     }
 
     const data = await backendRes.json();
-    
-    // Map Java response structure to frontend AssessmentResponse interface
+
     const overallScore = data.overall_match_score ?? data.score_breakdown?.final_score ?? 0;
-    
-    // Compute match level
-    let matchLevel = 'Low (Cần cải thiện)';
-    if (overallScore >= 80) matchLevel = 'High (Rất tốt)';
-    else if (overallScore >= 60) matchLevel = 'Moderate (Khớp)';
+    const matchLevel = data.overall_match_level || (overallScore >= 80 ? 'High' : overallScore >= 60 ? 'Moderate' : 'Low');
+    const candidateLevel = data.seniority_level || 'N/A';
+    const roleTypeDetected = data.job_category || 'Software Engineer';
+    const yearsOfExperienceEstimate = data.years_of_experience_estimate || '';
 
-    // Candidate level mapping
-    const levelMap: Record<string, string> = {
-      INTERN: 'Thực tập sinh (Intern)',
-      FRESHER: 'Mới tốt nghiệp (Fresher)',
-      JUNIOR: 'Dưới 2 năm kinh nghiệm (Junior)',
-      MID: '2-5 năm kinh nghiệm (Mid-level)',
-      SENIOR: 'Trên 5 năm kinh nghiệm (Senior)',
-      LEAD: 'Trưởng nhóm kỹ thuật (Lead)'
-    };
-    const candidateLevel = levelMap[data.seniority_level] || data.seniority_level || 'N/A';
+    const strongAreas = data.strong_areas || [];
+    const gapAreas = data.gap_areas || [];
+    const criticalMissingSkills = data.critical_missing_skills || [];
+    const sectionWiseFeedback = data.section_wise_feedback || {};
 
-    // Role type mapping
-    const roleTypeDetected = data.job_category || 'N/A';
-
-    // Experience mapping
-    const expMap: Record<string, string> = {
-      INTERN: 'Thực tập sinh',
-      FRESHER: 'Dưới 1 năm',
-      JUNIOR: '1 - 2 năm',
-      MID: '2 - 5 năm',
-      SENIOR: 'Trên 5 năm',
-      LEAD: 'Dẫn dắt / Quản lý'
-    };
-    const yearsOfExperienceEstimate = expMap[data.seniority_level] || data.seniority_level || 'N/A';
-
-    // Map evidence items to strong / gap / missing categories
     const gateItems = data.gate_evidence_items || [];
     const mustHave = data.must_have_evidence_items || data.evidence_items || [];
     const preferToHave = data.prefer_to_have_evidence_items || data.additional_evidence_items || [];
-    const allEvidence = [...gateItems, ...mustHave, ...preferToHave];
-
-    const isMatched = (s?: string) => {
-      const st = (s || '').toLowerCase();
-      return st === 'matched' || st === 'pass' || st === 'passed';
-    };
-    const isWeak = (s?: string) => (s || '').toLowerCase() === 'weak';
-    const isMissing = (s?: string) => {
-      const st = (s || '').toLowerCase();
-      return st === 'missing' || st === 'fail' || st === 'failed';
-    };
-
-    const strongAreas = (allEvidence as EvidenceItem[])
-      .filter((item) => isMatched(item.status))
-      .map((item) => item.criteria_name);
-
-    const gapAreas = (allEvidence as EvidenceItem[])
-      .filter((item) => isWeak(item.status))
-      .map((item) => item.criteria_name);
-
-    const criticalMissingSkills = (allEvidence as EvidenceItem[])
-      .filter((item) => isMissing(item.status))
-      .map((item) => item.criteria_name);
-
-    // Group section-wise feedback
-    const sectionWiseFeedback: Record<string, string> = {};
-    if (data.section_wise_feedback && Object.keys(data.section_wise_feedback).length > 0) {
-      Object.assign(sectionWiseFeedback, data.section_wise_feedback);
-    } else if (allEvidence.length > 0) {
-      const matchedText = (allEvidence as EvidenceItem[])
-        .filter((item) => isMatched(item.status))
-        .map((item) => `${item.criteria_name}${item.cv_evidence ? ` (${item.cv_evidence})` : ''}`)
-        .join('; ');
-      const weakText = (allEvidence as EvidenceItem[])
-        .filter((item) => isWeak(item.status))
-        .map((item) => `${item.criteria_name}: Yêu cầu JD: ${item.jd_requirement || ''}. Minh chứng CV: ${item.cv_evidence || 'chưa rõ ràng'}.`)
-        .join(' | ');
-      const missingText = (allEvidence as EvidenceItem[])
-        .filter((item) => isMissing(item.status))
-        .map((item) => item.criteria_name)
-        .join(', ');
-
-      if (matchedText) {
-        sectionWiseFeedback['tech_stack_alignment'] = `Các điểm tương thích tốt: ${matchedText}.`;
-      }
-      if (weakText) {
-        sectionWiseFeedback['practical_experience'] = `Kinh nghiệm cần bổ sung hoặc làm rõ: ${weakText}.`;
-      }
-      if (missingText) {
-        sectionWiseFeedback['cs_fundamentals'] = `Yêu cầu quan trọng trong JD nhưng thiếu trong CV: ${missingText}.`;
-      }
-    }
-
-    // Quick wins & Skill gaps
     const quickWins = data.quick_wins || [];
     const skillGaps = data.skill_gaps || [];
-    const topImprovements = (data.top_priority_improvements as ImprovementItem[]) || [...quickWins, ...skillGaps];
 
-    let actionableImprovementSuggestions: string[] = [];
-    const allImprovements = [...quickWins, ...skillGaps];
-    if (allImprovements.length > 0) {
-      actionableImprovementSuggestions = allImprovements.map(
-        (item: ImprovementItem) => item.criteria_name 
-          ? `[${item.criteria_name}] ${item.actionable_advice || item.suggestion || ''}` 
-          : (item.actionable_advice || item.suggestion || String(item))
-      );
-    } else if (topImprovements.length > 0) {
-      actionableImprovementSuggestions = topImprovements.map(
-        (item) => `[${item.criteria_name}] ${item.actionable_advice || item.suggestion || ''}`
-      );
-    } else {
-      const nonMatchedItems = (allEvidence as EvidenceItem[]).filter((item) => !isMatched(item.status));
-      actionableImprovementSuggestions = nonMatchedItems.map((item) => {
-        const req = item.jd_requirement ? `Yêu cầu: ${item.jd_requirement}. ` : '';
-        const reas = (item as unknown as { reasoning?: string }).reasoning || 'Cần bổ sung minh chứng cho kỹ năng này trong CV.';
-        return `[${item.criteria_name}] ${req}${reas}`;
-      });
-    }
+    const topImprovements = (data.top_priority_improvements || []).map((item: ImprovementItem | string) => {
+      if (typeof item === 'string') return item;
+      return item.actionable_advice || item.suggestion || item.criteria_name || '';
+    }).filter(Boolean);
 
-    // Persist assessment result into Postgres sessions table so HR dashboard can load it immediately
-    try {
-      const upsertSessionSql = `
-        INSERT INTO sessions (
-          id, date, interview_type, role_title, cv_filename, jd_filename,
-          overall_score, status, competency_fit_score, technical_depth_score,
-          match_level, candidate_level, role_type_detected, years_of_experience_estimate,
-          strong_areas, gap_areas, critical_missing_skills, section_wise_feedback,
-          actionable_suggestions, resume_id, jd_id, evidence_items, additional_evidence_items,
-          score_breakdown, top_priority_improvements, eligibility, gate_evidence_items,
-          must_have_evidence_items, prefer_to_have_evidence_items, quick_wins, skill_gaps
-        ) VALUES (
-          $1, NOW(), 'Technical', $2, 'Uploaded_CV.pdf', 'Uploaded_JD.pdf',
-          $3, 'In progress', $3, $3,
-          $4, $5, $6, $7,
-          $8, $9, $10, $11,
-          $12, $13, $14, $15, $16,
-          $17, $18, $19, $20,
-          $21, $22, $23, $24
-        )
-        ON CONFLICT (id) DO UPDATE SET
-          overall_score = EXCLUDED.overall_score,
-          competency_fit_score = EXCLUDED.competency_fit_score,
-          technical_depth_score = EXCLUDED.technical_depth_score,
-          match_level = EXCLUDED.match_level,
-          candidate_level = EXCLUDED.candidate_level,
-          role_type_detected = EXCLUDED.role_type_detected,
-          years_of_experience_estimate = EXCLUDED.years_of_experience_estimate,
-          strong_areas = EXCLUDED.strong_areas,
-          gap_areas = EXCLUDED.gap_areas,
-          critical_missing_skills = EXCLUDED.critical_missing_skills,
-          section_wise_feedback = EXCLUDED.section_wise_feedback,
-          actionable_suggestions = EXCLUDED.actionable_suggestions,
-          resume_id = COALESCE(EXCLUDED.resume_id, sessions.resume_id),
-          jd_id = COALESCE(EXCLUDED.jd_id, sessions.jd_id),
-          evidence_items = EXCLUDED.evidence_items,
-          additional_evidence_items = EXCLUDED.additional_evidence_items,
-          score_breakdown = EXCLUDED.score_breakdown,
-          top_priority_improvements = EXCLUDED.top_priority_improvements,
-          eligibility = EXCLUDED.eligibility,
-          gate_evidence_items = EXCLUDED.gate_evidence_items,
-          must_have_evidence_items = EXCLUDED.must_have_evidence_items,
-          prefer_to_have_evidence_items = EXCLUDED.prefer_to_have_evidence_items,
-          quick_wins = EXCLUDED.quick_wins,
-          skill_gaps = EXCLUDED.skill_gaps;
-      `;
-
-      const validResumeUuid = isValidUuid(resumeId) ? resumeId : null;
-      const validJdUuid = isValidUuid(jdId) ? jdId : null;
-
-      await query(upsertSessionSql, [
-        data.session_id || sessionId,
-        roleTypeDetected || 'Software Engineer',
-        overallScore,
-        matchLevel,
-        candidateLevel,
-        roleTypeDetected,
-        yearsOfExperienceEstimate,
-        JSON.stringify(strongAreas),
-        JSON.stringify(gapAreas),
-        JSON.stringify(criticalMissingSkills),
-        JSON.stringify(sectionWiseFeedback),
-        JSON.stringify(actionableImprovementSuggestions),
-        validResumeUuid,
-        validJdUuid,
-        JSON.stringify(mustHave),
-        JSON.stringify(preferToHave),
-        JSON.stringify(data.score_breakdown || null),
-        JSON.stringify(topImprovements),
-        data.eligibility ? (typeof data.eligibility === 'string' ? data.eligibility : JSON.stringify(data.eligibility)) : null,
-        JSON.stringify(gateItems),
-        JSON.stringify(mustHave),
-        JSON.stringify(preferToHave),
-        JSON.stringify(quickWins),
-        JSON.stringify(skillGaps)
-      ]);
-      console.log(`[API Proxy Assess] Successfully persisted session assessment to Postgres DB for sessionId=${sessionId}`);
-    } catch (dbErr) {
-      console.error(`[API Proxy Assess] Warning: Failed to persist session assessment to DB:`, dbErr);
-    }
+    const actionableImprovementSuggestions = topImprovements.length > 0 ? topImprovements : (data.actionable_suggestions || []);
 
     return NextResponse.json({
       id: data.id,
-      sessionId: data.session_id,
+      sessionId: data.session_id || sessionId,
       competencyFitScore: overallScore,
       technicalDepthScore: overallScore,
       matchLevel,
@@ -372,9 +90,8 @@ export async function GET(request: NextRequest) {
       additionalEvidenceItems: preferToHave,
       scoreBreakdown: data.score_breakdown || null,
       topPriorityImprovements: topImprovements,
-      eligibility: data.eligibility || null
+      eligibility: data.eligibility || null,
     });
-
   } catch (error) {
     const err = error as Error;
     console.error('[API Proxy Assess] Error in proxy assessment:', err);

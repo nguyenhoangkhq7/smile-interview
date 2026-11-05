@@ -13,6 +13,7 @@ import { toast } from './Toast';
 import Modal from './Modal';
 import RuleDashboardSection from './rule-dashboard/RuleDashboardSection';
 import ActionIconButton from './rule-dashboard/ActionIconButton';
+import { formatCategoryLabel, CurvedTreeConnector } from './rule-dashboard/treeUtils';
 
 type SeniorityLevel = 'ALL' | 'INTERN' | 'FRESHER' | 'JUNIOR' | 'MID' | 'SENIOR' | 'LEAD';
 
@@ -67,54 +68,6 @@ const emptyEditorState: MappingEditorState = {
   weight_percentage: 10,
 };
 
-function formatCategoryLabel(text: string | null | undefined): string {
-  if (!text) return '';
-
-  return text
-    .replace(/_/g, ' ')
-    .toLowerCase()
-    .split(' ')
-    .filter(Boolean)
-    .map((word) => {
-      if (word === 'qa') return 'QA';
-      if (word === 'js') return 'JS';
-      if (word === 'id') return 'ID';
-      if (word === 'cv') return 'CV';
-      if (word === 'jd') return 'JD';
-      if (word === 'nestjs') return 'NestJS';
-      if (word === 'mongodb') return 'MongoDB';
-      if (word === 'mysql') return 'MySQL';
-      if (word === 'postgresql') return 'PostgreSQL';
-      if (word === 'api') return 'API';
-      return word.charAt(0).toUpperCase() + word.slice(1);
-    })
-    .join(' ');
-}
-
-// ─── YouTube Comment Thread Style Curved Connector Line ──────────────────────
-function CurvedTreeConnector({ isLast }: { isLast: boolean }) {
-  return (
-    <div className="absolute -left-6 top-0 bottom-0 w-6 pointer-events-none select-none">
-      {/* Continuous vertical line if NOT the last item */}
-      {!isLast && (
-        <div className="absolute left-[3px] top-0 bottom-0 w-[1.5px] bg-slate-700/60 transition-colors" />
-      )}
-      {/* Curved YouTube comment elbow connector */}
-      <svg
-        className="absolute left-[3px] top-0 w-6 h-7 text-slate-700/70 transition-colors"
-        fill="none"
-        viewBox="0 0 24 28"
-      >
-        <path
-          d="M 0 0 V 14 C 0 21, 6 27, 24 27"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-        />
-      </svg>
-    </div>
-  );
-}
 
 function buildCategoryTree(
   categories: JobCategoryDto[],

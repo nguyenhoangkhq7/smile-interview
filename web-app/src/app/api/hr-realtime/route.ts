@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query } from '@/lib/db';
+import { forwardToBackend } from '@/lib/backendClient';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -73,15 +73,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing stage parameter' }, { status: 400 });
     }
 
-    // Optional DB update if sessionId is passed
+    // Optional backend update if sessionId is passed
     if (sessionId) {
       try {
-        await query(
-          `UPDATE sessions SET current_stage = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
-          [stage, sessionId]
-        );
+        await forwardToBackend(`/api/v1/sessions/${sessionId}`, req, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: stage }),
+        });
       } catch (dbErr) {
-        console.warn('[HR Realtime] Error updating current_stage in DB:', dbErr);
+        console.warn('[HR Realtime] Error updating status in backend:', dbErr);
       }
     }
 

@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { io, Socket } from 'socket.io-client';
 import { historyService, SessionHistoryItem, QuestionFeedback } from '@/services/historyService';
 import { useSessionRecorder } from '@/hooks/useSessionRecorder';
+import { useMediaStream } from '@/hooks/useMediaStream';
 import { useAuthStore } from '@/store/authStore';
 
 interface SpeechRecognitionInstance {
@@ -71,11 +72,17 @@ export function useInterviewSession() {
   const [avatarAnalyser, setAvatarAnalyser] = useState<AudioAnalyserLike | null>(null);
 
   
-  const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
-  const [cameraEnabled, setCameraEnabled] = useState(true);
-  const [micEnabled, setMicEnabled] = useState(true);
-  const [permissionError, setPermissionError] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const {
+    mediaStream,
+    setMediaStream,
+    cameraEnabled,
+    micEnabled,
+    permissionError,
+    videoRef,
+    startMediaCapture,
+    toggleCamera,
+    toggleMic,
+  } = useMediaStream();
 
   
   const [timeLeft, setTimeLeft] = useState(900); 
@@ -648,22 +655,6 @@ export function useInterviewSession() {
     };
   }, [sessionState, recording, isRevealing, handleStartRecording, handleStopRecording]);
 
-  const startMediaCapture = async () => {
-    try {
-      setPermissionError(false);
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 640, height: 360 },
-        audio: true
-      });
-      setMediaStream(stream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-    } catch (err) {
-      console.error('Quyền truy cập Camera/Mic bị từ chối:', err);
-      setPermissionError(true);
-    }
-  };
 
   useEffect(() => {
     async function initSession() {
@@ -731,25 +722,6 @@ export function useInterviewSession() {
     }, 1000);
   }, [handleInterviewFinish]);
 
-  const toggleCamera = () => {
-    if (mediaStream) {
-      const videoTrack = mediaStream.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.enabled = !cameraEnabled;
-        setCameraEnabled(videoTrack.enabled);
-      }
-    }
-  };
-
-  const toggleMic = () => {
-    if (mediaStream) {
-      const audioTrack = mediaStream.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.enabled = !micEnabled;
-        setMicEnabled(audioTrack.enabled);
-      }
-    }
-  };
 
   const streamTranscriptRef = useRef(streamTranscript);
   const initAudioOnUserGestureRef = useRef(initAudioOnUserGesture);
