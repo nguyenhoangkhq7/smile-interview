@@ -1,0 +1,5 @@
+-- ============================================================
+-- V3: Reserved legacy migration.
+-- Document chunk embeddings are not used by the interview practice backend.
+-- Kept as a no-op so fresh installs use standard PostgreSQL without pgvector.
+-- ============================================================

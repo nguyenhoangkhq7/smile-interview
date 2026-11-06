@@ -1,10 +1,9 @@
 services:
   postgres:
-    image: pgvector/pgvector:pg17
-    container_name: postgres_db
+    image: postgres:17
     restart: always
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-smile_interview_db}
+      POSTGRES_DB: ${POSTGRES_DB:-interview_practice_db}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
@@ -22,13 +21,12 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: backend_api
     restart: always
     env_file:
       - .env
       - ./backend/.env
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-smile_interview_db}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-interview_practice_db}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       FASTAPI_AI_BASE_URL: http://ai-service:8000
