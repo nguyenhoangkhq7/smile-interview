@@ -1,10 +1,9 @@
 services:
   postgres:
-    image: pgvector/pgvector:pg17
-    container_name: postgres_db
+    image: postgres:17
     restart: always
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-smile_interview_db}
+      POSTGRES_DB: ${POSTGRES_DB:-interview_practice_db}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
@@ -18,152 +17,40 @@ services:
       retries: 5
       start_period: 10s
 
-  redis:
-    image: redis:7-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
-    container_name: redis_cache
-    restart: always
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama_local
-    restart: always
-    ports:
-      - "11434:11434"
-    environment:
-      - OLLAMA_MAX_LOADED_MODELS=2
-      - OLLAMA_NUM_PARALLEL=4
-    volumes:
-      - ollama_data:/root/.ollama
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    entrypoint: >
-      sh -c "
-      ollama serve &
-      sleep 5 &&
-      ollama pull bge-m3 &&
-      tail -f /dev/null
-      "
-    healthcheck:
-      test: ["CMD", "ollama", "list"]
-      interval: 15s
-      timeout: 10s
-      retries: 5
-
-  matching-service:
+  backend:
     build:
-      context: ./services/matching-service
+      context: ./backend
       dockerfile: Dockerfile
-    container_name: matching_service
     restart: always
-    # ── Global Root .env + Per-service .env overrides ───────────────────────
     env_file:
       - .env
-      - ./services/matching-service/.env
+      - ./backend/.env
     environment:
-      # Override local DB/Redis URLs with Docker service names
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/smile_interview_db
-      SPRING_DATA_REDIS_HOST: redis
-      SPRING_DATA_REDIS_PORT: 6379
-      OLLAMA_BASE_URL: http://ollama:11434
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-interview_practice_db}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      FASTAPI_AI_BASE_URL: http://ai-service:8000
     ports:
       - "8081:8081"
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_healthy
 
-  ai-inference-service:
+  ai-service:
     build:
-      context: ./services/ai-inference-service
+      context: ./ai-service
       dockerfile: Dockerfile
-    container_name: ai_inference_service
+    container_name: ai_service
     restart: always
-    # ── Global Root .env + Per-service .env overrides ───────────────────────
     env_file:
       - .env
-      - ./services/ai-inference-service/.env
-    ports:
-      - "9091:9091"
-
-  speaches:
-    # Speaches: OpenAI-compatible STT/TTS server powered by faster-whisper
-    # Docs: https://speaches.ai | Repo: https://github.com/fedirz/faster-whisper-server
-    image: ghcr.io/speaches-ai/speaches:latest-cpu
-    container_name: speaches
-    restart: always
+      - ./ai-service/.env
+    environment:
+      PORT: 8000
+      FASTAPI_AI_BASE_URL: http://localhost:8000
     ports:
       - "8000:8000"
-    environment:
-      # Force CPU execution (no GPU required)
-      WHISPER__INFERENCE_DEVICE: cpu
-      # int8 quantization — best latency/quality tradeoff on CPU
-      WHISPER__COMPUTE_TYPE: int8
-      WHISPER__ENABLE_VAD: "true"
-      WHISPER__CPU_THREADS: 4
-      SPEACHES__STT_MODEL_TTL: -1
-    command: >
-      bash -c "
-      (
-        sleep 5 &&
-        /home/ubuntu/speaches/.venv/bin/python -c \"
-        from speaches.executors.whisper.utils import model_registry as whisper;
-        from speaches.executors.piper.utils import model_registry as piper;
-        whisper.download_model_files_if_not_exist('Systran/faster-whisper-small');
-        piper.download_model_files_if_not_exist('speaches-ai/piper-vi_VN-vais1000-medium');
-        \"
-      ) &
-      /home/ubuntu/speaches/.venv/bin/uvicorn --factory speaches.main:create_app --host 0.0.0.0 --port 8000
-      "
-    volumes:
-      - whisper_models:/home/ubuntu/.cache/huggingface
-    healthcheck:
-      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
 
-  streaming-service:
-    build:
-      context: ./services/streaming-service
-      dockerfile: Dockerfile
-    container_name: streaming_service
-    restart: always
-    # ── Global Root .env + Per-service .env overrides ───────────────────────
-    env_file:
-      - .env
-      - ./services/streaming-service/.env
-    environment:
-      # Override local URLs with Docker service names
-      REDIS_URL: redis://redis:6379
-      TTS_API_URL: http://speaches:8000/v1/audio/speech
-      INFERENCE_GRPC_SERVER: ai-inference-service:9091
-    ports:
-      - "8001:8001"
-    depends_on:
-      redis:
-        condition: service_healthy
-      speaches:
-        condition: service_healthy
-
-  # ─────────────────────────────────────────────────────────────────
-  # Next.js Frontend — 3D Interviewer Avatar
-  # ─────────────────────────────────────────────────────────────────
   web-app:
     build:
       context: ./web-app
@@ -177,25 +64,12 @@ services:
       - "3000:3000"
     environment:
       NODE_ENV: production
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB:-smile_interview_db}
-      MATCHING_SERVICE_URL: http://matching-service:8081
-      # OpenRouter LLM for keyword matching BFF utility (matchKeywords.ts)
+      MATCHING_SERVICE_URL: http://backend:8081
       LLM_API_KEY: ${LLM_API_KEY}
       LLM_API_URL: ${LLM_API_URL}
       LLM_MODEL: ${LLM_MODEL}
     depends_on:
-      - streaming-service
-
-
+      - backend
 
 volumes:
   postgres_data:
-  redis_data:
-  ollama_data:
-  # Named volume for HuggingFace model cache — survives container restarts/rebuilds
-  whisper_models:
-

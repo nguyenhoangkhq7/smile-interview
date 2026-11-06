@@ -25,7 +25,6 @@ function formatScore(item: SessionHistoryItem): string {
       ? `${item.overallScore}/10`
       : `${item.overallScore}`;
   }
-  if (item.competencyFitScore != null) return `${item.competencyFitScore}% (CV Match)`;
   return 'N/A';
 }
 
@@ -53,15 +52,13 @@ export function HistoryItemCard({ item }: HistoryItemCardProps) {
 
         <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
           <span><span className="font-medium text-foreground">Điểm:</span> {formatScore(item)}</span>
-          <span><span className="font-medium text-foreground">Cấp độ:</span> {item.candidateLevel || 'N/A'}</span>
-          <span><span className="font-medium text-foreground">Ngành:</span> {item.roleTypeDetected || 'N/A'}</span>
           <span><span className="font-medium text-foreground">Ngày:</span> {formatDate(item.date)}</span>
         </div>
       </div>
 
       {/* Actions */}
       <div className="flex shrink-0 flex-wrap gap-2">
-        {!isCompleted && item.competencyFitScore !== undefined && (
+        {!isCompleted && item.skillGapResults && (
           <Link
             href={`/interview/new?sessionId=${item.id}`}
             className={cn(

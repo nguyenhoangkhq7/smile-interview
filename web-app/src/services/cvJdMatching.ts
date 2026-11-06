@@ -1,173 +1,242 @@
 import { useAuthStore } from '@/store/authStore';
-import type { SessionEligibility } from './historyService';
 
-export interface SkillEntry {
-  id: string;
-  keyword: string;
-  category: 'hard' | 'soft';
-  variants?: string[];
+export type SemanticAlignment = 'MATCH' | 'PARTIAL' | 'MISSING';
+export type QuestionStrategy = 'NONE' | 'COMPARE_SUBSTITUTE' | 'PROBE_DEPTH' | 'LEARNING_AGILITY';
+
+export interface SkillGapResult {
+  jd_skill_id: string;
+  semantic_alignment: SemanticAlignment;
+  matched_cv_skill_id?: string | null;
+  is_substituted: boolean;
+  gap_magnitude: number;
+  severity: number;
+  priority: number;
+  required_proficiency: number;
+  candidate_proficiency: number;
+  cv_evidence_spans: string[];
+  context_job?: string | null;
+  suggested_strategy: QuestionStrategy;
+  degraded?: boolean;
+  flags?: string[];
 }
 
-export interface KeywordMetadata {
-  matching_skills: SkillEntry[];
-  missing_skills: SkillEntry[];
+export interface StaticSkillAuditItem extends SkillGapResult {
+  soft_match: number;
+  substitution_factor: number;
+  importance_weight: number;
+  jd_reasoning: string;
+  effective_candidate_proficiency: number;
+  effective_months: number;
+  c_evidence: number;
+  recency_flag: boolean;
+  static_diagnosis: string;
+}
+
+export interface StaticGapAuditReport {
+  analysis_id: string;
+  total_jd_skills: number;
+  matched_count: number;
+  partial_count: number;
+  missing_count: number;
+  skills_requiring_probing: number;
+  degraded: boolean;
+  system_flags: string[];
+  items: StaticSkillAuditItem[];
+  markdown_summary: string;
+}
+
+export interface AnalyzeWithReportResponse {
+  analysis_id: string;
+  skills: SkillGapResult[];
+  report: StaticGapAuditReport;
+}
+
+export interface AbductiveReasoning {
+  surprising_fact_C: string;
+  hypothesis_A: string;
+}
+
+export interface StartInterviewResponse {
+  session_id: string;
+  turn: number;
+  active_skill_id?: string | null;
+  initial_belief: number[];
+  abductive_reasoning?: AbductiveReasoning | null;
+  question?: string | null;
+  is_finished: boolean;
+}
+
+export interface RespondInterviewResponse {
+  session_id: string;
+  turn: number;
+  evaluated_skill_id: string;
+  previous_belief: number[];
+  updated_belief: number[];
+  tv_delta: number;
+  metamorphic_tag: 'INVARIANT' | 'MINOR_SHIFT' | 'MODERATE_SHIFT' | 'DECISIVE_SHIFT' | string;
+  reflective_insight: string;
+  skill_verified: boolean;
+  active_skill_id?: string | null;
+  next_question?: string | null;
+  completion_rate: number;
+  is_finished: boolean;
+}
+
+export interface SkillAuditReportItem {
+  jd_skill_id: string;
+  matched_cv_skill_id?: string | null;
+  suggested_strategy: string;
+  initial_cv_proficiency: number;
+  verified_proficiency: number;
+  required_jd_proficiency: number;
+  verified_skill_gap: number;
+  map_rubric_level: 'Low' | 'Med' | 'High' | string;
+  is_verified: boolean;
+  verification_reason?: string | null;
+  local_turns_spent: number;
+  prior_belief: number[];
+  final_belief: number[];
+  belief_trajectory: number[][];
+  metamorphic_tags: string[];
+  judge_justifications: string[];
+  primary_slot_value?: string | null;
+  consolidated_finding?: string | null;
+}
+
+export interface TurnLogItem {
+  turn: number;
+  local_turn: number;
+  skill_id: string;
+  target_slot_id: string;
+  abductive_reasoning: AbductiveReasoning;
+  question: string;
+  candidate_response?: string | null;
+  extracted_slot_value?: string | null;
+  reflective_insight?: string | null;
+  metamorphic_tag?: string | null;
+  previous_belief: number[];
+  updated_belief?: number[] | null;
+  tv_delta?: number | null;
+  skill_verified_after_turn: boolean;
+  verification_reason?: string | null;
+}
+
+export interface HITLReportResponse {
+  session_id: string;
+  is_finished: boolean;
+  termination_reason?: string | null;
+  total_turns: number;
+  total_initial_primary_skills: number;
+  verified_primary_skills: number;
+  completion_rate: number;
+  evaluated_skills: SkillAuditReportItem[];
+  turn_audit_trail: TurnLogItem[];
+  markdown_summary: string;
 }
 
 export interface IngestResponse {
   sessionId: string;
-  totalChunksCount: number;
   success: boolean;
-  resumeId?: number;
-  jdId?: number;
-  /** Jobscan-style keyword match metadata from matchKeywords.ts */
-  keywordMetadata?: KeywordMetadata;
-  /** Pre-LLM raw text extracted from CV PDF */
+  cvMarkdown?: string;
+  jdMarkdown?: string;
   rawCvText?: string | null;
-  /** Pre-LLM raw text extracted from JD PDF */
   rawJdText?: string | null;
 }
 
-
-export interface ScoreBreakdown {
-  must_have_score?: number;
-  must_have_weight_ratio?: number;
-  prefer_to_have_score?: number;
-  prefer_to_have_weight_ratio?: number;
-  overall_match_score?: number;
-  raw_must_have_score?: number;
-  raw_prefer_to_have_score?: number;
-  final_score?: number;
-  mustHaveScore?: number;
-  mustHaveWeightRatio?: number;
-  preferToHaveScore?: number;
-  preferToHaveWeightRatio?: number;
-  overallMatchScore?: number;
+function getAuthHeaders(includeJsonContentType = false): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (includeJsonContentType) {
+    headers['Content-Type'] = 'application/json';
+  }
+  const token = useAuthStore.getState().token;
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
 }
-
-export interface ImprovementItem {
-  criteria_name?: string;
-  criteriaName?: string;
-  actionable_advice?: string;
-  actionableAdvice?: string;
-  suggestion?: string;
-  description?: string;
-  priority?: string | number;
-}
-
-export interface AssessmentResponse {
-  id: string;
-  sessionId: string;
-  competencyFitScore: number;
-  technicalDepthScore: number;
-  matchLevel: string;
-  candidateLevel: string;
-  roleTypeDetected: string;
-  yearsOfExperienceEstimate: string;
-  strongAreas: string[];
-  gapAreas: string[];
-  criticalMissingSkills: string[];
-  sectionWiseFeedback: Record<string, string>;
-  actionableImprovementSuggestions: string[];
-  quickWins?: ImprovementItem[];
-  skillGaps?: ImprovementItem[];
-  cached: boolean;
-  createdAt: string;
-  gateEvidenceItems?: unknown[];
-  mustHaveEvidenceItems?: unknown[];
-  preferToHaveEvidenceItems?: unknown[];
-  evidenceItems?: unknown[];
-  additionalEvidenceItems?: unknown[];
-  scoreBreakdown?: ScoreBreakdown | null;
-  topPriorityImprovements?: unknown[];
-  eligibility?: SessionEligibility | string | null;
-}
-
-
-const getBaseUrl = () => {
-  // Client-side call to Next.js API route
-  return '/api/matching';
-};
 
 export const cvJdMatchingService = {
-  /**
-   * Ingest CV (PDF) and JD (PDF or raw text) for a given session
-   */
   async ingestCvJd(
     sessionId: string,
     cvFile: File | null,
     jdFile: File | null,
     jdText: string | null,
-    resumeId?: number | null,
-    jdId?: number | null
+    resumeId?: string | null,
+    jdId?: string | null
   ): Promise<IngestResponse> {
     const formData = new FormData();
-    if (cvFile) {
-      formData.append('cvFile', cvFile);
-    }
-    if (jdFile) {
-      formData.append('jdFile', jdFile);
-    }
-    if (jdText) {
-      formData.append('jdText', jdText);
-    }
-    if (resumeId) {
-      formData.append('resumeId', String(resumeId));
-    }
-    if (jdId) {
-      formData.append('jdId', String(jdId));
-    }
+    if (cvFile) formData.append('cvFile', cvFile);
+    if (jdFile) formData.append('jdFile', jdFile);
+    if (jdText) formData.append('jdText', jdText);
+    if (resumeId) formData.append('resumeId', String(resumeId));
+    if (jdId) formData.append('jdId', String(jdId));
 
-    const headers: Record<string, string> = {};
-    const token = useAuthStore.getState().token;
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-
-    const res = await fetch(`${getBaseUrl()}/ingest/${sessionId}`, {
+    const res = await fetch(`/api/matching/ingest/${sessionId}`, {
       method: 'POST',
       body: formData,
-      headers: headers,
+      headers: getAuthHeaders(false),
     });
 
     if (!res.ok) {
-      throw new Error(`Ingest request failed: ${res.statusText}`);
+      const errText = await res.text();
+      throw new Error(`Ingest request failed: ${res.statusText} - ${errText}`);
     }
 
     return await res.json();
   },
 
-  /**
-   * Fetch matching assessment details
-   */
-  async getAssessment(
-    sessionId: string,
-    forceRefresh = false,
-    resumeId?: number | null,
-    jdId?: number | null
-  ): Promise<AssessmentResponse> {
-    let url = `${getBaseUrl()}/assess?sessionId=${sessionId}&forceRefresh=${forceRefresh}`;
-    if (resumeId) {
-      url += `&resumeId=${resumeId}`;
-    }
-    if (jdId) {
-      url += `&jdId=${jdId}`;
-    }
-    
-    const headers: Record<string, string> = {};
-    const token = useAuthStore.getState().token;
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-
-    const res = await fetch(url, {
-      headers: headers
-    });
-
+  async analyzeSkillGap(sessionId: string, forceRefresh = false): Promise<AnalyzeWithReportResponse> {
+    const res = await fetch(
+      `/api/sessions/${sessionId}/analyze-gap?forceRefresh=${forceRefresh}`,
+      {
+        method: 'POST',
+        headers: getAuthHeaders(false),
+      }
+    );
     if (!res.ok) {
-      const errorText = await res.text();
-      throw new Error(`Assessment request failed: ${res.statusText} - ${errorText}`);
+      const errText = await res.text();
+      throw new Error(`Skill-gap analysis failed: ${res.statusText} - ${errText}`);
     }
-
     return await res.json();
-  }
+  },
+
+  async startAdaptiveInterview(sessionId: string): Promise<StartInterviewResponse> {
+    const res = await fetch(`/api/sessions/${sessionId}/interview/start`, {
+      method: 'POST',
+      headers: getAuthHeaders(false),
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Failed to start adaptive interview: ${res.statusText} - ${errText}`);
+    }
+    return await res.json();
+  },
+
+  async respondAdaptiveInterview(
+    sessionId: string,
+    candidateResponse: string
+  ): Promise<RespondInterviewResponse> {
+    const res = await fetch(`/api/sessions/${sessionId}/interview/respond`, {
+      method: 'POST',
+      headers: getAuthHeaders(true),
+      body: JSON.stringify({ candidate_response: candidateResponse }),
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Failed to submit candidate response: ${res.statusText} - ${errText}`);
+    }
+    return await res.json();
+  },
+
+  async getInterviewReport(sessionId: string): Promise<HITLReportResponse> {
+    const res = await fetch(`/api/sessions/${sessionId}/interview/report`, {
+      method: 'GET',
+      headers: getAuthHeaders(false),
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Failed to fetch interview report: ${res.statusText} - ${errText}`);
+    }
+    return await res.json();
+  },
 };

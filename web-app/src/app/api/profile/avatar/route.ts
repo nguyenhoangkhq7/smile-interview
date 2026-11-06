@@ -1,62 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query } from '@/lib/db';
-import cloudinary from '@/lib/cloudinary';
+import { forwardToBackend } from '@/lib/backendClient';
 
 export async function POST(request: NextRequest) {
   try {
-    let authUserId: string | null = null;
-    const authHeader = request.headers.get('Authorization');
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      try {
-        const token = authHeader.substring(7);
-        const parts = token.split('.');
-        if (parts.length === 3) {
-          const payload = Buffer.from(parts[1], 'base64').toString('utf-8');
-          const claims = JSON.parse(payload);
-          authUserId = claims.id || null;
-        }
-      } catch (e) {
-        console.error('[API Avatar] Error decoding JWT:', e);
-      }
-    }
-
-    if (!authUserId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
     if (!file) {
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
     }
 
-    // Convert file to base64 for Cloudinary
-    let avatarUrl;
+    const backendFormData = new FormData();
+    backendFormData.append('file', file);
 
-    if (!process.env.CLOUDINARY_API_KEY) {
-      console.warn('[API Avatar] CLOUDINARY_API_KEY is not set, using mock avatar.');
-      avatarUrl = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150';
-    } else {
-      const buffer = Buffer.from(await file.arrayBuffer());
-      const base64Data = `data:${file.type};base64,${buffer.toString('base64')}`;
+    const backendRes = await forwardToBackend('/api/auth/avatar', request, {
+      method: 'POST',
+      body: backendFormData,
+    });
 
-      console.log(`[API Avatar] Uploading avatar to Cloudinary for user ${authUserId}...`);
-      const uploadRes = await cloudinary.uploader.upload(base64Data, {
-        folder: 'smile-interview/avatars',
-      });
-
-      avatarUrl = uploadRes.secure_url;
-      console.log(`[API Avatar] Cloudinary upload success. URL: ${avatarUrl}`);
+    if (!backendRes.ok) {
+      const err = await backendRes.text();
+      return NextResponse.json({ error: err }, { status: backendRes.status });
     }
 
-    // Update the database users table
-    await query(
-      'UPDATE users SET avatar_url = $1 WHERE id = $2',
-      [avatarUrl, authUserId]
-    );
-
-    return NextResponse.json({ avatarUrl });
-  } catch (errorVal) { const error = errorVal as Error;
+    const user = await backendRes.json();
+    return NextResponse.json({ avatarUrl: user.avatarUrl });
+  } catch (errorVal) {
+    const error = errorVal as Error;
     console.error('[API Avatar] Error uploading avatar:', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }

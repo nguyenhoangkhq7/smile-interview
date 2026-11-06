@@ -1,82 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query } from '@/lib/db';
-
-// ─── JWT helper ───────────────────────────────────────────────────────────────
-function extractUserId(request: NextRequest): string | null {
-  const authHeader = request.headers.get('Authorization');
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    try {
-      const token = authHeader.substring(7);
-      const parts = token.split('.');
-      if (parts.length === 3) {
-        const payload = Buffer.from(parts[1], 'base64').toString('utf-8');
-        const claims = JSON.parse(payload);
-        return claims.id || null;
-      }
-    } catch (e) {
-      console.error('[API Sessions] Error decoding JWT:', e);
-    }
-  }
-  return null;
-}
+import { forwardToBackend } from '@/lib/backendClient';
 
 // GET: List all sessions
 export async function GET(request: NextRequest) {
   try {
-    const authUserId = extractUserId(request);
-    let sessionsRes;
-    if (authUserId) {
-      sessionsRes = await query('SELECT * FROM sessions WHERE user_id = $1 OR user_id IS NULL ORDER BY date DESC', [authUserId]);
-    } else {
-      sessionsRes = await query('SELECT * FROM sessions ORDER BY date DESC');
+    const authHeader = request.headers.get('Authorization');
+    const endpoint = authHeader ? '/api/v1/sessions/user' : '/api/v1/sessions';
+    const backendRes = await forwardToBackend(endpoint, request, {
+      method: 'GET',
+    });
+
+    if (!backendRes.ok) {
+      const err = await backendRes.text();
+      return NextResponse.json({ error: err }, { status: backendRes.status });
     }
-    const sessions = sessionsRes.rows;
 
-    const fullSessions = await Promise.all(
-      sessions.map(async (sess) => {
-        const turnsRes = await query('SELECT * FROM session_turns WHERE session_id = $1 ORDER BY id ASC', [sess.id]);
-        return {
-          id: sess.id,
-          userId: sess.user_id,
-          date: sess.date,
-          interviewType: sess.interview_type,
-          roleTitle: sess.role_title,
-          cvFilename: sess.cv_filename,
-          jdFilename: sess.jd_filename,
-          resumeId: sess.resume_id,
-          jdId: sess.jd_id,
-          overallScore: sess.overall_score !== null ? sess.overall_score : undefined,
-          status: sess.status,
-          overallFeedback: sess.overall_feedback !== null ? sess.overall_feedback : undefined,
-          competencyFitScore: sess.competency_fit_score !== null ? sess.competency_fit_score : undefined,
-          technicalDepthScore: sess.technical_depth_score !== null ? sess.technical_depth_score : undefined,
-          matchLevel: sess.match_level ? sess.match_level : undefined,
-          candidateLevel: sess.candidate_level ? sess.candidate_level : undefined,
-          roleTypeDetected: sess.role_type_detected ? sess.role_type_detected : undefined,
-          yearsOfExperienceEstimate: sess.years_of_experience_estimate ? sess.years_of_experience_estimate : undefined,
-          strongAreas: sess.strong_areas ? sess.strong_areas : undefined,
-          gapAreas: sess.gap_areas ? sess.gap_areas : undefined,
-          criticalMissingSkills: sess.critical_missing_skills ? sess.critical_missing_skills : undefined,
-          sectionWiseFeedback: sess.section_wise_feedback ? sess.section_wise_feedback : undefined,
-          actionableSuggestions: sess.actionable_suggestions ? sess.actionable_suggestions : undefined,
-          questions: turnsRes.rows.map((t) => ({
-            question: t.question,
-            answer: t.answer,
-            score: t.score,
-            strengths: t.strengths,
-            improvements: t.improvements,
-            suggestedAnswer: t.suggested_answer,
-            topicTag: t.topic_tag,
-            isDeepDive: t.is_deep_dive
-          }))
-        };
-      })
-    );
-
-    return NextResponse.json(fullSessions);
-  } catch (errorVal) { const error = errorVal as Error;
-    console.error('[API Sessions] Error fetching sessions:', error);
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+    const data = await backendRes.json();
+    return NextResponse.json(data);
+  } catch (error) {
+    const err = error as Error;
+    console.error('[API Sessions] Error fetching sessions:', err);
+    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -84,105 +28,27 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await request.json();
-
     if (!session || !session.id) {
       return NextResponse.json({ error: 'Session details with id are required' }, { status: 400 });
     }
 
-    const authUserId = extractUserId(request);
-    const userIdToSave = authUserId || session.userId || null;
+    const backendRes = await forwardToBackend('/api/v1/sessions', request, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(session),
+    });
 
-    const upsertSessionSql = `
-      INSERT INTO sessions (
-        id, user_id, date, interview_type, role_title, cv_filename, jd_filename,
-        overall_score, status, overall_feedback, competency_fit_score,
-        technical_depth_score, match_level, candidate_level, role_type_detected,
-        years_of_experience_estimate, strong_areas, gap_areas, critical_missing_skills,
-        section_wise_feedback, actionable_suggestions, resume_id, jd_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
-      ON CONFLICT (id) DO UPDATE SET
-        user_id = COALESCE(EXCLUDED.user_id, sessions.user_id),
-        date = EXCLUDED.date,
-        interview_type = EXCLUDED.interview_type,
-        role_title = EXCLUDED.role_title,
-        cv_filename = EXCLUDED.cv_filename,
-        jd_filename = EXCLUDED.jd_filename,
-        overall_score = EXCLUDED.overall_score,
-        status = EXCLUDED.status,
-        overall_feedback = EXCLUDED.overall_feedback,
-        competency_fit_score = EXCLUDED.competency_fit_score,
-        technical_depth_score = EXCLUDED.technical_depth_score,
-        match_level = EXCLUDED.match_level,
-        candidate_level = EXCLUDED.candidate_level,
-        role_type_detected = EXCLUDED.role_type_detected,
-        years_of_experience_estimate = EXCLUDED.years_of_experience_estimate,
-        strong_areas = EXCLUDED.strong_areas,
-        gap_areas = EXCLUDED.gap_areas,
-        critical_missing_skills = EXCLUDED.critical_missing_skills,
-        section_wise_feedback = EXCLUDED.section_wise_feedback,
-        actionable_suggestions = EXCLUDED.actionable_suggestions,
-        resume_id = EXCLUDED.resume_id,
-        jd_id = EXCLUDED.jd_id
-    `;
-
-    const isValidUuid = (val?: string | null) => 
-      !!val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(val));
-
-    await query(upsertSessionSql, [
-      session.id,
-      isValidUuid(userIdToSave) ? userIdToSave : null,
-      session.date || new Date().toISOString(),
-      session.interviewType || 'Technical',
-      session.roleTitle || '',
-      session.cvFilename || '',
-      session.jdFilename || '',
-      session.overallScore !== undefined ? session.overallScore : null,
-      session.status || 'Not started',
-      session.overallFeedback !== undefined ? session.overallFeedback : null,
-      session.competencyFitScore !== undefined ? session.competencyFitScore : null,
-      session.technicalDepthScore !== undefined ? session.technicalDepthScore : null,
-      session.matchLevel ? session.matchLevel : null,
-      session.candidateLevel ? session.candidateLevel : null,
-      session.roleTypeDetected ? session.roleTypeDetected : null,
-      session.yearsOfExperienceEstimate ? session.yearsOfExperienceEstimate : null,
-      session.strongAreas ? JSON.stringify(session.strongAreas) : null,
-      session.gapAreas ? JSON.stringify(session.gapAreas) : null,
-      session.criticalMissingSkills ? JSON.stringify(session.criticalMissingSkills) : null,
-      session.sectionWiseFeedback ? JSON.stringify(session.sectionWiseFeedback) : null,
-      session.actionableSuggestions ? JSON.stringify(session.actionableSuggestions) : null,
-      isValidUuid(session.resumeId) ? session.resumeId : null,
-      isValidUuid(session.jdId) ? session.jdId : null,
-    ]);
-
-    if (session.replaceQuestions === true) {
-      await query('DELETE FROM session_turns WHERE session_id = $1', [session.id]);
-
-      if (session.questions && session.questions.length > 0) {
-        for (const t of session.questions) {
-          const insertTurnSql = `
-            INSERT INTO session_turns (
-              session_id, question, answer, score, strengths, improvements, suggested_answer, topic_tag, is_deep_dive
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-          `;
-          await query(insertTurnSql, [
-            session.id,
-            t.question,
-            t.answer,
-            t.score,
-            t.strengths,
-            t.improvements,
-            t.suggestedAnswer,
-            t.topicTag,
-            t.isDeepDive
-          ]);
-        }
-      }
+    if (!backendRes.ok) {
+      const err = await backendRes.text();
+      return NextResponse.json({ error: err }, { status: backendRes.status });
     }
 
-    return NextResponse.json({ success: true, session });
-  } catch (errorVal) { const error = errorVal as Error;
-    console.error('[API Sessions] Error saving session:', error);
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+    const data = await backendRes.json();
+    return NextResponse.json({ success: true, session: data });
+  } catch (error) {
+    const err = error as Error;
+    console.error('[API Sessions] Error saving session:', err);
+    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -191,15 +57,23 @@ export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-
     if (!id) {
       return NextResponse.json({ error: 'id is required' }, { status: 400 });
     }
 
-    await query('DELETE FROM sessions WHERE id = $1', [id]);
+    const backendRes = await forwardToBackend(`/api/v1/sessions/${id}`, request, {
+      method: 'DELETE',
+    });
+
+    if (!backendRes.ok) {
+      const err = await backendRes.text();
+      return NextResponse.json({ error: err }, { status: backendRes.status });
+    }
+
     return NextResponse.json({ success: true });
-  } catch (errorVal) { const error = errorVal as Error;
-    console.error('[API Sessions] Error deleting session:', error);
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+  } catch (error) {
+    const err = error as Error;
+    console.error('[API Sessions] Error deleting session:', err);
+    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
   }
 }

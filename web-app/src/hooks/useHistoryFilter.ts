@@ -10,7 +10,7 @@ function normalizeScore(item: SessionHistoryItem): number {
   if (item.overallScore !== undefined && item.overallScore !== null) {
     return item.overallScore <= 10 ? item.overallScore * 10 : item.overallScore;
   }
-  return item.competencyFitScore ?? 0;
+  return 0;
 }
 
 export function useHistoryFilter() {
@@ -33,9 +33,7 @@ export function useHistoryFilter() {
       const title = item.roleTitle || item.cvFilename || '';
       const matchSearch =
         !searchTerm ||
-        title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (item.candidateLevel || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (item.roleTypeDetected || '').toLowerCase().includes(searchTerm.toLowerCase());
+        title.toLowerCase().includes(searchTerm.toLowerCase());
       if (!matchSearch) return false;
 
       // Time

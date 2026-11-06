@@ -1,0 +1,28 @@
+# Cấu hình Chuẩn hóa Module Skill-Gap Detection (Clean Architecture & Parsimonious)
+
+thresholds:
+  identity_threshold: 0.85
+  floor_threshold: 0.40
+
+seniority_weights:
+  Intern: 0.8   # Nhóm Có hướng dẫn (Supervised)
+  Junior: 0.8   # Nhóm Có hướng dẫn (Supervised)
+  Mid: 1.0      # Nhóm Độc lập / Dẫn dắt (Autonomous)
+  Senior: 1.0   # Nhóm Độc lập / Dẫn dắt (Autonomous)
+  Lead: 1.0     # Nhóm Độc lập / Dẫn dắt (Autonomous)
+  Unknown: 1.0
+
+context_weights:
+  rich_context: 1.0
+  list_only: 0.3
+  ambiguous: 0.5
+
+milestones_months:
+  0: 1.0
+  6: 2.0
+  18: 3.0
+  36: 4.0
+  60: 5.0
+
+reference_date: "2024-06-01"
+recency_years_threshold: 3.0

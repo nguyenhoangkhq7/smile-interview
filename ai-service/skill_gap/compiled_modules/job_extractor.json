@@ -1,0 +1,122 @@
+{
+  "extract.predict": {
+    "traces": [],
+    "train": [],
+    "demos": [
+      {
+        "cv_text": "Lê Quốc Bảo - System Administrator\nCông ty InfraTech Vietnam:\n* Senior System Engineer (06/2018 - 01/2020)\n  - Tự động hóa cấu hình 100+ server Linux bằng Ansible và thiết kế hệ thống lưu trữ HA.\n* Junior Sysadmin (06/2016 - 05/2018)\n  - Hỗ trợ quản trị server Linux cơ bản, theo dõi cảnh báo Nagios và xử lý sự cố mạng nội bộ.",
+        "reasoning": "1. Ứng viên thăng tiến qua 2 vị trí khác nhau trong cùng Công ty InfraTech Vietnam với 2 mốc thời gian và mức độ tự chủ khác nhau ('Senior' tự chủ = 1.0 vs 'Junior' có giám sát = 0.8).\n2. Phải tách thành 2 JobBlock độc lập: job_1 ('Senior System Engineer', 2018-06 đến 2020-01, Senior) và job_2 ('Junior Sysadmin', 2016-06 đến 2018-05, Junior).\n3. Đảm bảo raw_quote trích xuất nguyên văn từng dòng tiêu đề vị trí trong CV.",
+        "job_blocks": [
+          {
+            "job_id": "job_1",
+            "title": "Senior System Engineer",
+            "seniority_level": "Senior",
+            "start_date": "2018-06",
+            "end_date": "2020-01",
+            "raw_text": "Tự động hóa cấu hình 100+ server Linux bằng Ansible và thiết kế hệ thống lưu trữ HA.",
+            "raw_start_date": "06/2018",
+            "raw_end_date": "01/2020",
+            "raw_quote": "* Senior System Engineer (06/2018 - 01/2020)"
+          },
+          {
+            "job_id": "job_2",
+            "title": "Junior Sysadmin",
+            "seniority_level": "Junior",
+            "start_date": "2016-06",
+            "end_date": "2018-05",
+            "raw_text": "Hỗ trợ quản trị server Linux cơ bản, theo dõi cảnh báo Nagios và xử lý sự cố mạng nội bộ.",
+            "raw_start_date": "06/2016",
+            "raw_end_date": "05/2018",
+            "raw_quote": "* Junior Sysadmin (06/2016 - 05/2018)"
+          }
+        ]
+      },
+      {
+        "cv_text": "Phạm Thu Hà - Sinh viên mới tốt nghiệp CNTT\nHọc vấn: Cử nhân Công nghệ Thông tin - ĐH Công Nghệ (2020 - 2024)\nChứng chỉ: AWS Certified Cloud Practitioner (2024)\nKỹ năng chuyên môn: Docker, K8s, Git, Python, Sử dụng Figma cho thiết kế giao diện.",
+        "reasoning": "1. Phân tích toàn bộ CV: chỉ có thông tin Học vấn đại học, Chứng chỉ và danh sách Kỹ năng chuyên môn.\n2. Hoàn toàn không có khối kinh nghiệm làm việc thực tế (employment hay internship tại doanh nghiệp).\n3. Theo quy tắc nghiêm ngặt 'Work Experience Only', không được biến mục Học vấn hay Kỹ năng thành JobBlock. Trả về danh sách rỗng job_blocks=[].",
+        "job_blocks": []
+      },
+      {
+        "cv_text": "Jane Smith - DevOps Engineer\nCông ty CloudNine (03/2024 - Hiện tại) - Vị trí: DevOps Lead\n- Thiết kế và vận hành hạ tầng Kubernetes cho 50+ microservices.\nCông ty StartupXYZ (06/2019 - 02/2024) - Vị trí: DevOps Engineer\n- Quản lý cluster Kubernetes quy mô nhỏ, khoảng 10 services.\n- Viết Terraform để provision hạ tầng AWS.",
+        "reasoning": "1. Quét văn bản CV và xác định có 2 khối công việc thực tế tại Công ty CloudNine và Công ty StartupXYZ.\n2. Khối 1 (job_1): Chức danh 'DevOps Lead' tương ứng mức độ tự chủ cao nhất -> seniority_level='Lead'. Giữ nguyên văn raw_quote='Công ty CloudNine (03/2024 - Hiện tại) - Vị trí: DevOps Lead', raw_start_date='03/2024' -> start_date='2024-03', raw_end_date='Hiện tại' (đang làm việc) -> end_date=None.\n3. Khối 2 (job_2): Chức danh 'DevOps Engineer' thực hiện độc lập quản lý cluster và viết Terraform -> seniority_level='Mid'. Giữ nguyên văn raw_quote='Công ty StartupXYZ (06/2019 - 02/2024) - Vị trí: DevOps Engineer', raw_start_date='06/2019' -> start_date='2019-06', raw_end_date='02/2024' -> end_date='2024-02'.",
+        "job_blocks": [
+          {
+            "job_id": "job_1",
+            "title": "DevOps Lead",
+            "seniority_level": "Lead",
+            "start_date": "2024-03",
+            "end_date": null,
+            "raw_text": "Thiết kế và vận hành hạ tầng Kubernetes cho 50+ microservices.",
+            "raw_start_date": "03/2024",
+            "raw_end_date": "Hiện tại",
+            "raw_quote": "Công ty CloudNine (03/2024 - Hiện tại) - Vị trí: DevOps Lead"
+          },
+          {
+            "job_id": "job_2",
+            "title": "DevOps Engineer",
+            "seniority_level": "Mid",
+            "start_date": "2019-06",
+            "end_date": "2024-02",
+            "raw_text": "Quản lý cluster Kubernetes quy mô nhỏ, khoảng 10 services. Viết Terraform để provision hạ tầng AWS.",
+            "raw_start_date": "06/2019",
+            "raw_end_date": "02/2024",
+            "raw_quote": "Công ty StartupXYZ (06/2019 - 02/2024) - Vị trí: DevOps Engineer"
+          }
+        ]
+      },
+      {
+        "cv_text": "NGUYỄN VĂN A - BACKEND ENGINEER\nHỌC VẤN:\nĐại học Bách Khoa (09/2017 - 06/2021) - Kỹ sư Khoa học Máy tính\n\nKINH NGHIỆM LÀM VIỆC:\n1. FinTech Corp (Jan 2022 - Dec 2023) | Senior Backend Developer\n- Xây dựng hệ thống thanh toán bằng Python FastAPI và PostgreSQL chịu tải 5,000 TPS.\n2. Global Retail Lab (06/2022 - 06/2023) | Part-time Backend Consultant\n- Tối ưu hóa truy vấn SQL và xây dựng ETL pipeline bằng Python.\n\nKỸ NĂNG KHÁC: Python, Golang, Docker, Redis, Git.",
+        "reasoning": "1. Bỏ qua mục 'HỌC VẤN' (Đại học Bách Khoa) và mục 'KỸ NĂNG KHÁC' vì không phải kinh nghiệm làm việc thực tế.\n2. Trích xuất 2 công việc có thời gian chồng lấp (FinTech Corp và Global Retail Lab) thành 2 JobBlock riêng biệt để thuật toán Interval Union xử lý ở bước sau.\n3. job_1: 'Senior Backend Developer' -> seniority_level='Senior', raw_start_date='Jan 2022' -> '2022-01', raw_end_date='Dec 2023' -> '2023-12', raw_quote nguyên văn từ CV.\n4. job_2: 'Part-time Backend Consultant' (tư vấn độc lập) -> seniority_level='Mid', raw_start_date='06/2022' -> '2022-06', raw_end_date='06/2023' -> '2023-06'.",
+        "job_blocks": [
+          {
+            "job_id": "job_1",
+            "title": "Senior Backend Developer",
+            "seniority_level": "Senior",
+            "start_date": "2022-01",
+            "end_date": "2023-12",
+            "raw_text": "Xây dựng hệ thống thanh toán bằng Python FastAPI và PostgreSQL chịu tải 5,000 TPS.",
+            "raw_start_date": "Jan 2022",
+            "raw_end_date": "Dec 2023",
+            "raw_quote": "1. FinTech Corp (Jan 2022 - Dec 2023) | Senior Backend Developer"
+          },
+          {
+            "job_id": "job_2",
+            "title": "Part-time Backend Consultant",
+            "seniority_level": "Mid",
+            "start_date": "2022-06",
+            "end_date": "2023-06",
+            "raw_text": "Tối ưu hóa truy vấn SQL và xây dựng ETL pipeline bằng Python.",
+            "raw_start_date": "06/2022",
+            "raw_end_date": "06/2023",
+            "raw_quote": "2. Global Retail Lab (06/2022 - 06/2023) | Part-time Backend Consultant"
+          }
+        ]
+      }
+    ],
+    "signature": {
+      "instructions": "You are an expert technical recruiter. Analyze the CV text and extract all actual work experience blocks into structured JobBlock items.\n\nStrict Extraction & Grounding Rules:\n1. Work Experience Only: Extract only real employment, internships, contract/freelance roles, or production work blocks. Do NOT extract university education, academic coursework, certifications, or standalone 'Skills / Kỹ năng' sections as JobBlocks (if the CV has no work experience, return an empty list []).\n2. Role Promotion Splitting: If a candidate held multiple distinct roles/titles with separate date ranges at the same company, extract each role as a separate JobBlock with a unique sequential job_id ('job_1', 'job_2', ...).\n3. ISO Date Normalization & Anti-Hallucination Year Grounding:\n   - `start_date`: Convert the start date in the CV to ISO 'YYYY-MM' (if only a 4-digit year like '2019' is given, use '2019-01'). Never invent a year that does not appear in `cv_text`.\n   - `end_date`: Convert the end date in the CV to ISO 'YYYY-MM'. If the job is ongoing ('Hiện tại', 'nay', 'present', 'current', 'now'), set `end_date` to null (None).\n4. Seniority Autonomy Calibration:\n   - Classify `seniority_level` into one of: 'Intern', 'Junior', 'Mid', 'Senior', 'Lead', 'Unknown'.\n   - Supervised roles ('Intern', 'Junior') represent guided/assisted execution; autonomous roles ('Mid', 'Senior', 'Lead') represent independent delivery, production ownership, or technical leadership.\n5. Verbatim Job Text (`raw_text`): Copy the responsibility sentences belonging to this job block from `cv_text`.",
+      "fields": [
+        {
+          "prefix": "Cv Text:",
+          "description": "Raw resume / CV text (Vietnamese, English, or bilingual) to segment into discrete work experience JobBlocks"
+        },
+        {
+          "prefix": "Reasoning:",
+          "description": "${reasoning}"
+        },
+        {
+          "prefix": "Job Blocks:",
+          "description": "List of extracted JobBlock objects with unique job_id, title, seniority_level, ISO YYYY-MM start_date/end_date, and raw_text"
+        }
+      ]
+    },
+    "lm": null
+  },
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.14",
+      "dspy": "3.4.1",
+      "cloudpickle": "3.1"
+    }
+  }
+}

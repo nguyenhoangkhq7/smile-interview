@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query } from '@/lib/db';
+import { forwardToBackend } from '@/lib/backendClient';
 
 export async function POST(
   request: NextRequest,
@@ -8,27 +8,28 @@ export async function POST(
   try {
     const { id: sessionId } = await params;
     const body = await request.json();
-    const { turnId, turnIndex, hrRating, hrFeedback } = body;
+    const { turnId, hrRating, hrFeedback } = body;
 
     if (!sessionId) {
       return NextResponse.json({ error: 'sessionId is required' }, { status: 400 });
     }
-
-    if (turnId) {
-      await query(
-        `UPDATE session_turns SET hr_rating = $1, hr_feedback = $2 WHERE id::text = $3 AND session_id = $4`,
-        [hrRating, hrFeedback || null, turnId, sessionId]
-      );
-    } else if (turnIndex !== undefined) {
-      await query(
-        `UPDATE session_turns SET hr_rating = $1, hr_feedback = $2 WHERE session_id = $3 AND turn_number = $4`,
-        [hrRating, hrFeedback || null, sessionId, turnIndex + 1]
-      );
-    } else {
-      return NextResponse.json({ error: 'turnId or turnIndex is required' }, { status: 400 });
+    if (!turnId) {
+      return NextResponse.json({ error: 'turnId is required' }, { status: 400 });
     }
 
-    return NextResponse.json({ success: true, message: 'Turn evaluation saved successfully' });
+    const backendRes = await forwardToBackend(`/api/v1/sessions/${sessionId}/turns/${turnId}/feedback`, request, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hrRating, hrFeedback }),
+    });
+
+    if (!backendRes.ok) {
+      const err = await backendRes.text();
+      return NextResponse.json({ error: err }, { status: backendRes.status });
+    }
+
+    const data = await backendRes.json();
+    return NextResponse.json(data);
   } catch (error) {
     const err = error as Error;
     console.error('[API Turn Feedback] Error:', err);

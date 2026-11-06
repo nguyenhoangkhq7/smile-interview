@@ -1,51 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query } from '@/lib/db';
+import { forwardToBackend } from '@/lib/backendClient';
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const resolvedParams = await params;
-    const oldSessionId = resolvedParams.id;
-    if (!oldSessionId) {
+    const { id } = await params;
+    if (!id) {
       return NextResponse.json({ error: 'Session ID is required' }, { status: 400 });
     }
 
-    // 1. Fetch the old session
-    const sessionRes = await query('SELECT * FROM sessions WHERE id = $1', [oldSessionId]);
-    if (sessionRes.rows.length === 0) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+    const backendRes = await forwardToBackend(`/api/v1/sessions/${id}/clone`, request, {
+      method: 'POST',
+    });
+
+    if (!backendRes.ok) {
+      const err = await backendRes.text();
+      return NextResponse.json({ error: err }, { status: backendRes.status });
     }
-    const oldSession = sessionRes.rows[0];
 
-    // 3. Create a new session ID
-    const newSessionId = 'session-' + Date.now();
-    const currentDate = new Date().toISOString();
-
-    // 4. Insert new session (only copying initial setup data and base questions)
-    const insertSessionSql = `
-      INSERT INTO sessions (
-        id, date, interview_type, role_title, cv_filename, jd_filename,
-        resume_id, jd_id, status, actionable_suggestions
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-    `;
-    await query(insertSessionSql, [
-      newSessionId,
-      currentDate,
-      oldSession.interview_type,
-      oldSession.role_title,
-      oldSession.cv_filename,
-      oldSession.jd_filename,
-      oldSession.resume_id,
-      oldSession.jd_id,
-      'In progress',
-      oldSession.actionable_suggestions 
-        ? (typeof oldSession.actionable_suggestions === 'string' ? oldSession.actionable_suggestions : JSON.stringify(oldSession.actionable_suggestions))
-        : null
-    ]);
-
-    return NextResponse.json({ success: true, newSessionId });
+    const data = await backendRes.json();
+    return NextResponse.json(data);
   } catch (error) {
     const err = error as Error;
     console.error('[API History Clone] Error:', err);
