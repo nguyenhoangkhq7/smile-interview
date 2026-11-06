@@ -2,25 +2,17 @@ import React from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { SessionHistoryItem, QuestionFeedback } from '@/services/historyService';
-import { HrSessionDetailClient, QuestionBankData } from '@/components/features/hr';
+import { HrSessionDetailClient } from '@/components/features/hr';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, FileCheck } from 'lucide-react';
 
 export const revalidate = 0;
 
-async function getQuestionBankData(sessionId: string): Promise<QuestionBankData | null> {
+function parseJson<T>(raw: unknown): T | null {
+  if (!raw) return null;
   try {
-    const backendUrl = process.env.MATCHING_SERVICE_URL || 'http://localhost:8081';
-    const targetUrl = `${backendUrl}/api/v1/question-bank/session/${sessionId}`;
-    console.log(`[HR Detail Page] Fetching question bank from: ${targetUrl}`);
-    const res = await fetch(targetUrl, { method: 'GET', headers: { 'Content-Type': 'application/json' }, cache: 'no-store' });
-    if (!res.ok) {
-      console.warn(`[HR Detail Page] Failed to fetch question bank (${res.status}): ${res.statusText}`);
-      return null;
-    }
-    return await res.json();
-  } catch (error) {
-    console.error('[HR Detail Page] Error fetching question bank:', error);
+    return (typeof raw === 'string' ? JSON.parse(raw) : raw) as T;
+  } catch {
     return null;
   }
 }
@@ -73,17 +65,10 @@ async function getSessionData(sessionId: string): Promise<SessionHistoryItem | n
       overallScore: sess.overallScore,
       status: sess.status || 'In progress',
       questions: questionsList,
-      competencyFitScore: sess.overallScore,
-      technicalDepthScore: sess.overallScore,
-      matchLevel: sess.overallScore >= 80 ? 'High' : (sess.overallScore >= 60 ? 'Moderate' : 'Low'),
-      candidateLevel: 'N/A',
-      roleTypeDetected: sess.roleTitle || 'N/A',
-      strongAreas: [],
-      gapAreas: [],
-      criticalMissingSkills: [],
-      hiringRecommendation: sess.overallScore >= 70 ? 'Hire' : 'No Hire',
-      scoreBreakdown: null,
-      eligibility: null,
+      overallFeedback: sess.overallFeedback,
+      skillGapResults: parseJson(sess.skillGapJson),
+      skillGapReport: parseJson(sess.gapReportJson),
+      interviewReport: parseJson(sess.interviewReportJson),
     };
   } catch (error) {
     console.error('[HR Detail Page] Error querying session data:', error);
@@ -102,10 +87,7 @@ export default async function HrSessionDetailPage({
     notFound();
   }
 
-  const [qbData, sessionData] = await Promise.all([
-    getQuestionBankData(sessionId),
-    getSessionData(sessionId),
-  ]);
+  const sessionData = await getSessionData(sessionId);
 
   return (
     <div className="container mx-auto max-w-5xl px-4 space-y-6">
@@ -124,7 +106,7 @@ export default async function HrSessionDetailPage({
                 ? (() => {
                     // Derive candidate name from cvFilename
                     let name = (sessionData.cvFilename || '').replace(/\.[^.]+$/, '').replace(/^cv_/i, '').replace(/[_\s]+(test|upload|final|v\d+|\d{4}|draft|new|copy)$/i, '').replace(/[_-]+/g, ' ').trim();
-                    const role = sessionData.roleTitle || sessionData.roleTypeDetected || 'Đang xác định vị trí';
+                    const role = sessionData.roleTitle || 'Đang xác định vị trí';
                     return name ? `${name} — ${role}` : role;
                   })()
                 : 'Chi Tiết Phỏng Vấn'}
@@ -138,7 +120,6 @@ export default async function HrSessionDetailPage({
       <HrSessionDetailClient
         sessionId={sessionId}
         sessionData={sessionData}
-        qbData={qbData}
       />
     </div>
   );

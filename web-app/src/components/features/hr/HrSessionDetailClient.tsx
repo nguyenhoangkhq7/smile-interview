@@ -3,10 +3,7 @@
 import React, { useState } from 'react';
 import { SessionHistoryItem } from '@/services/historyService';
 import {
-  AiContextBanner,
-  QuestionCardList,
   HrEvaluationForm,
-  QuestionBankData,
   CvJdMatchingView,
   InterviewTranscriptView,
 } from '@/components/features/hr';
@@ -32,13 +29,11 @@ import {
 interface HrSessionDetailClientProps {
   sessionId: string;
   sessionData: SessionHistoryItem | null;
-  qbData: QuestionBankData | null;
 }
 
 export const HrSessionDetailClient: React.FC<HrSessionDetailClientProps> = ({
   sessionId,
   sessionData,
-  qbData,
 }) => {
   const [activeTab, setActiveTab] = useState<'matching' | 'questions' | 'transcript'>('matching');
 
@@ -149,7 +144,7 @@ export const HrSessionDetailClient: React.FC<HrSessionDetailClientProps> = ({
               className="flex-1 min-w-0 flex items-center justify-center gap-1.5 text-xs font-bold py-2 px-2 rounded-lg data-[state=active]:bg-white data-[state=active]:text-brand-orange data-[state=active]:shadow-sm transition-all cursor-pointer whitespace-nowrap"
             >
               <HelpCircle className="size-3.5 text-brand-orange shrink-0" />
-              <span className="truncate">2. Ngân Hàng Câu Hỏi</span>
+              <span className="truncate">2. Báo Cáo Thích Ứng</span>
             </TabsTrigger>
             <TabsTrigger
               value="transcript"
@@ -177,21 +172,53 @@ export const HrSessionDetailClient: React.FC<HrSessionDetailClientProps> = ({
             </div>
           </TabsContent>
 
-          {/* Tab 2: Question Bank */}
+          {/* Tab 2: Adaptive interview report */}
           <TabsContent value="questions" className="space-y-6 focus:outline-none">
-            {qbData ? (
-              <>
-                <AiContextBanner metadata={qbData.metadata} />
-                <QuestionCardList questions={qbData.question_bank} />
-              </>
+            {sessionData?.interviewReport ? (
+              <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5">
+                <div className="flex flex-wrap gap-4 text-xs text-slate-600">
+                  <span>Số lượt: <strong>{sessionData.interviewReport.total_turns}</strong></span>
+                  <span>
+                    Kỹ năng xác thực:{' '}
+                    <strong>
+                      {sessionData.interviewReport.verified_primary_skills}/
+                      {sessionData.interviewReport.total_initial_primary_skills}
+                    </strong>
+                  </span>
+                  <span>Hoàn thành: <strong>{Math.round(sessionData.interviewReport.completion_rate * 100)}%</strong></span>
+                </div>
+                <pre className="whitespace-pre-wrap font-sans text-sm text-slate-700">
+                  {sessionData.interviewReport.markdown_summary}
+                </pre>
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-slate-500">
+                    <tr>
+                      <th className="p-2">Kỹ năng</th>
+                      <th className="p-2">Đã kiểm chứng</th>
+                      <th className="p-2">Yêu cầu</th>
+                      <th className="p-2">Gap</th>
+                      <th className="p-2">Mức</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sessionData.interviewReport.evaluated_skills.map((s) => (
+                      <tr key={s.jd_skill_id} className="border-t border-slate-100">
+                        <td className="p-2 font-semibold">{s.jd_skill_id}</td>
+                        <td className="p-2">{s.verified_proficiency.toFixed(2)}</td>
+                        <td className="p-2">{s.required_jd_proficiency.toFixed(2)}</td>
+                        <td className="p-2">{s.verified_skill_gap.toFixed(2)}</td>
+                        <td className="p-2">{s.map_rubric_level}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             ) : (
               <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-8 text-center space-y-3">
                 <ShieldAlert className="mx-auto size-10 text-amber-600" />
-                <h3 className="text-lg font-bold text-amber-900">
-                  Chưa Tìm Thấy Ngân Hàng Câu Hỏi AI Đã Sinh
-                </h3>
+                <h3 className="text-lg font-bold text-amber-900">Chưa có báo cáo phỏng vấn thích ứng</h3>
                 <p className="max-w-md mx-auto text-sm text-amber-800">
-                  Phiên phỏng vấn <strong>{sessionId}</strong> chưa được tạo ngân hàng câu hỏi AI thành công hoặc ứng viên mới dừng ở bước đánh giá So khớp CV-JD.
+                  Phiên <strong>{sessionId}</strong> chưa hoàn tất phỏng vấn nên chưa có báo cáo kiểm chứng kỹ năng.
                 </p>
               </div>
             )}

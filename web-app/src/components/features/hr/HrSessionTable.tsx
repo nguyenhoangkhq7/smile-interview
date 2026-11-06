@@ -83,7 +83,6 @@ export const HrSessionTable: React.FC<HrSessionTableProps> = ({ sessions: initia
           });
           const labels: Record<string, string> = {
             CV_JD_MATCHED: 'CV-JD Hoàn Tất',
-            QUESTION_BANK_READY: 'Bộ Câu Hỏi Đã Sinh',
             INTERVIEW_IN_PROGRESS: 'Đang Phỏng Vấn',
             COMPLETED: 'Phỏng Vấn Hoàn Tất',
           };
@@ -108,7 +107,7 @@ export const HrSessionTable: React.FC<HrSessionTableProps> = ({ sessions: initia
       list = list.filter((s) =>
         s.id.toLowerCase().includes(q) ||
         (s.roleTitle || '').toLowerCase().includes(q) ||
-        (s.roleTypeDetected || '').toLowerCase().includes(q)
+        false
       );
     }
     list.sort((a, b) => {
@@ -132,20 +131,18 @@ export const HrSessionTable: React.FC<HrSessionTableProps> = ({ sessions: initia
     }
   };
 
-  const getMatchBadge = (matchLevel?: string) => {
-    if (!matchLevel) return null;
-    const m = matchLevel.toLowerCase();
-    if (m.includes('high') || m.includes('cao') || m.includes('rất tốt'))
-      return <Badge className="bg-emerald-600 text-white font-medium text-[10px]">Cao</Badge>;
-    if (m.includes('moderate') || m.includes('khớp') || m.includes('vừa'))
-      return <Badge className="bg-blue-600 text-white font-medium text-[10px]">Vừa</Badge>;
-    return <Badge variant="destructive" className="text-[10px]">Thấp</Badge>;
+  const getReadinessBadge = (score?: number) => {
+    if (score === undefined || score === null) return null;
+    if (score >= 80)
+      return <Badge className="bg-emerald-600 text-white font-medium text-[10px]">{score}% · Cao</Badge>;
+    if (score >= 60)
+      return <Badge className="bg-blue-600 text-white font-medium text-[10px]">{score}% · Vừa</Badge>;
+    return <Badge variant="destructive" className="text-[10px]">{score}% · Thấp</Badge>;
   };
 
   const stageOptions: { value: StageFilter; label: string }[] = [
     { value: 'ALL', label: 'Tất cả giai đoạn' },
     { value: 'CV_JD_MATCHED', label: 'CV-JD Matched' },
-    { value: 'QUESTION_BANK_READY', label: 'Bank Ready' },
     { value: 'INTERVIEW_IN_PROGRESS', label: 'Đang phỏng vấn' },
     { value: 'COMPLETED', label: 'Hoàn tất' },
   ];
@@ -232,7 +229,7 @@ export const HrSessionTable: React.FC<HrSessionTableProps> = ({ sessions: initia
                   <th className="px-5 py-3">Mã Phiên / Ngày tạo</th>
                   <th className="px-5 py-3">Vị Trí</th>
                   <th className="px-5 py-3">Ứng Viên / Hồ Sơ</th>
-                  <th className="px-5 py-3">Cấp độ & Phù hợp</th>
+                  <th className="px-5 py-3">Mức sẵn sàng</th>
                   <th className="px-5 py-3">Trạng Thái</th>
                   <th className="px-5 py-3 text-right">Thao Tác</th>
                 </tr>
@@ -258,7 +255,7 @@ export const HrSessionTable: React.FC<HrSessionTableProps> = ({ sessions: initia
                       <div className="flex items-center space-x-2">
                         <Briefcase className="size-3.5 text-brand-orange shrink-0" />
                         <span className="font-semibold text-slate-900 text-xs max-w-[130px] truncate">
-                          {session.roleTitle || session.roleTypeDetected || 'Developer'}
+                          {session.roleTitle || 'Developer'}
                         </span>
                       </div>
                     </td>
@@ -277,12 +274,7 @@ export const HrSessionTable: React.FC<HrSessionTableProps> = ({ sessions: initia
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex flex-wrap items-center gap-1">
-                        {session.candidateLevel && (
-                          <Badge variant="outline" className="border-slate-300 text-[10px] px-1.5 py-0">
-                            {session.candidateLevel}
-                          </Badge>
-                        )}
-                        {getMatchBadge(session.matchLevel)}
+                        {getReadinessBadge(session.overallScore)}
                       </div>
                     </td>
                     <td className="px-5 py-4">

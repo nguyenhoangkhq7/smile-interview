@@ -29,6 +29,10 @@ public class SessionResponse {
     private String overallFeedback;
     private Integer userRating;
     private String userFeedbackText;
+    private String skillGapJson;
+    private String gapReportJson;
+    private String aiInterviewSessionId;
+    private String interviewReportJson;
     private LocalDateTime startedAt;
     private LocalDateTime endedAt;
     private java.util.List<SessionTurnDto> turns;
@@ -81,6 +85,10 @@ public class SessionResponse {
                 .overallFeedback(session.getOverallFeedback())
                 .userRating(session.getUserRating())
                 .userFeedbackText(session.getUserFeedbackText())
+                .skillGapJson(session.getSkillGapJson())
+                .gapReportJson(session.getGapReportJson())
+                .aiInterviewSessionId(session.getAiInterviewSessionId())
+                .interviewReportJson(session.getInterviewReportJson())
                 .startedAt(session.getStartedAt())
                 .endedAt(session.getEndedAt())
                 .turns(turns != null ? turns.stream().map(SessionTurnDto::from).toList() : null)

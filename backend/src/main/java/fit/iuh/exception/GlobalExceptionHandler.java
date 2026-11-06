@@ -86,20 +86,6 @@ public class GlobalExceptionHandler {
                         .build());
     }
 
-    @ExceptionHandler(IngestionException.class)
-    public ResponseEntity<ErrorResponse> handleIngestionException(
-            IngestionException ex, HttpServletRequest request) {
-
-        log.error("[INGESTION_ERROR] path={} | {}", request.getRequestURI(), ex.getMessage(), ex);
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ErrorResponse.builder()
-                        .status(HttpStatus.BAD_REQUEST.value())
-                        .errorCode("INGESTION_ERROR")
-                        .message("Ingestion pipeline failed.")
-                        .detail(ex.getMessage())
-                        .path(request.getRequestURI())
-                        .build());
-    }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ErrorResponse> handleMaxUploadSizeExceeded(
@@ -129,31 +115,16 @@ public class GlobalExceptionHandler {
                         .build());
     }
 
-    @ExceptionHandler(LlmApiException.class)
-    public ResponseEntity<ErrorResponse> handleLlmApiException(
-            LlmApiException ex, HttpServletRequest request) {
+    @ExceptionHandler(AiServiceException.class)
+    public ResponseEntity<ErrorResponse> handleAiServiceException(
+            AiServiceException ex, HttpServletRequest request) {
 
-        log.error("[LLM_API_ERROR] path={} | {}", request.getRequestURI(), ex.getMessage(), ex);
+        log.error("[AI_SERVICE_ERROR] path={} | {}", request.getRequestURI(), ex.getMessage(), ex);
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                 .body(ErrorResponse.builder()
                         .status(HttpStatus.BAD_GATEWAY.value())
-                        .errorCode("LLM_API_ERROR")
-                        .message("Failed to communicate with the LLM API. Please retry.")
-                        .detail(ex.getMessage())
-                        .path(request.getRequestURI())
-                        .build());
-    }
-
-    @ExceptionHandler(QuestionBankException.class)
-    public ResponseEntity<ErrorResponse> handleQuestionBankException(
-            QuestionBankException ex, HttpServletRequest request) {
-
-        log.error("[QUESTION_BANK_ERROR] path={} | {}", request.getRequestURI(), ex.getMessage(), ex);
-        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
-                .body(ErrorResponse.builder()
-                        .status(HttpStatus.UNPROCESSABLE_ENTITY.value())
-                        .errorCode("QUESTION_BANK_ERROR")
-                        .message("Failed to generate question bank. Please retry.")
+                        .errorCode("AI_SERVICE_ERROR")
+                        .message("Failed to communicate with the AI Service. Please retry.")
                         .detail(ex.getMessage())
                         .path(request.getRequestURI())
                         .build());

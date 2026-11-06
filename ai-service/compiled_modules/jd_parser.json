@@ -1,0 +1,125 @@
+{
+  "parse_jd.predict": {
+    "traces": [],
+    "train": [],
+    "demos": [
+      {
+        "jd_text": "Tuyển dụng: Junior Frontend Developer\n- Có từ 6 tháng đến 1 năm kinh nghiệm làm việc thực tế với ReactJS.\n- Có hiểu biết cơ bản về nguyên lý UI/UX Design và sử dụng Figma.\n- Biết sử dụng Git trong làm việc nhóm.",
+        "skills_context": "Skill ID: react\nEvidence Spans:\n  - Có từ 6 tháng đến 1 năm kinh nghiệm làm việc thực tế với ReactJS.\n\nSkill ID: ui_ux\nEvidence Spans:\n  - Có hiểu biết cơ bản về nguyên lý UI/UX Design và sử dụng Figma.\n\nSkill ID: git\nEvidence Spans:\n  - Biết sử dụng Git trong làm việc nhóm.",
+        "reasoning": "1. react: Quy tắc 1 (Explicit Years) — '6 tháng đến 1 năm kinh nghiệm' nằm trong khoảng 6-18 tháng (Junior / Working Knowledge) -> required_level = 2.0.\n2. ui_ux: Quy tắc 2 (Explicit Descriptors) — 'Có hiểu biết cơ bản' (Basic Awareness / Familiarity) -> required_level = 1.5.\n3. git: Quy tắc 2 & 3 — 'Biết sử dụng Git' cho vị trí Junior Frontend tương ứng mức Junior/Working Knowledge cơ bản -> required_level = 2.0.",
+        "requirements": [
+          {
+            "jd_skill_id": "react",
+            "required_level": 2.0,
+            "reasoning": "Quy tắc 1: Yêu cầu 6-12 tháng kinh nghiệm thực tế, khớp chính xác mốc Junior / Working Knowledge (2.0)."
+          },
+          {
+            "jd_skill_id": "ui_ux",
+            "required_level": 1.5,
+            "reasoning": "Quy tắc 2: Cụm từ 'có hiểu biết cơ bản' thuộc mức Basic Familiarity (1.5)."
+          },
+          {
+            "jd_skill_id": "git",
+            "required_level": 2.0,
+            "reasoning": "Quy tắc 2 & 3: Yêu cầu biết sử dụng Git trong làm việc nhóm ở cấp Junior tương ứng mức 2.0."
+          }
+        ]
+      },
+      {
+        "jd_text": "Tuyển dụng: Mid-level Backend & Data Engineer\n- Ít nhất 2 năm kinh nghiệm lập trình Python và xử lý dữ liệu SQL.\n- Nắm vững kỹ thuật đóng gói ứng dụng với Docker.\n- Có kiến thức làm việc với Linux server.",
+        "skills_context": "Skill ID: python\nEvidence Spans:\n  - Ít nhất 2 năm kinh nghiệm lập trình Python và xử lý dữ liệu SQL.\n\nSkill ID: docker\nEvidence Spans:\n  - Nắm vững kỹ thuật đóng gói ứng dụng với Docker.\n\nSkill ID: linux\nEvidence Spans:\n  - Có kiến thức làm việc với Linux server.",
+        "reasoning": "1. python: Quy tắc 1 (Explicit Years) — 'Ít nhất 2 năm kinh nghiệm' (24 tháng, nằm trong khoảng 18-36 tháng Mid-level) -> required_level = 3.0.\n2. docker: Quy tắc 2 (Explicit Descriptors) — 'Nắm vững' (solid practical experience) cho vị trí Mid-level -> required_level = 3.0.\n3. linux: Quy tắc 2 — 'Có kiến thức làm việc' (working knowledge) -> required_level = 2.5.",
+        "requirements": [
+          {
+            "jd_skill_id": "python",
+            "required_level": 3.0,
+            "reasoning": "Quy tắc 1: Yêu cầu 2 năm (24 tháng) kinh nghiệm lập trình Python tương ứng mức Mid-level (3.0)."
+          },
+          {
+            "jd_skill_id": "docker",
+            "required_level": 3.0,
+            "reasoning": "Quy tắc 2: Yêu cầu 'nắm vững' kỹ thuật đóng gói ứng dụng với Docker tương ứng mức Mid-level (3.0)."
+          },
+          {
+            "jd_skill_id": "linux",
+            "required_level": 2.5,
+            "reasoning": "Quy tắc 2: Yêu cầu 'có kiến thức làm việc' với Linux server tương ứng mức Junior-Mid (2.5)."
+          }
+        ]
+      },
+      {
+        "jd_text": "Tuyển dụng: DevOps Engineer\n- Tối thiểu 4 năm kinh nghiệm vận hành Kubernetes ở môi trường production (Must-have).\n- Thành thạo Terraform (Must-have).\n- Có kinh nghiệm với GCP là một lợi thế (Nice-to-have).",
+        "skills_context": "Skill ID: kubernetes\nEvidence Spans:\n  - Tối thiểu 4 năm kinh nghiệm vận hành Kubernetes ở môi trường production (Must-have).\n\nSkill ID: terraform\nEvidence Spans:\n  - Thành thạo Terraform (Must-have).\n\nSkill ID: gcp\nEvidence Spans:\n  - Có kinh nghiệm với GCP là một lợi thế (Nice-to-have).",
+        "reasoning": "1. kubernetes: Áp dụng Quy tắc ưu tiên 1 (Explicit Years) — JD ghi rõ 'Tối thiểu 4 năm kinh nghiệm vận hành ở môi trường production', thuộc mốc 3-5+ năm (Senior) -> required_level = 4.0.\n2. terraform: Không ghi số năm cụ thể, áp dụng Quy tắc 2 (Explicit Descriptors) — từ khóa 'Thành thạo' đi kèm '(Must-have)' cho vị trí DevOps Engineer tương ứng mức Mid-Senior độc lập -> required_level = 3.5.\n3. gcp: Áp dụng Quy tắc 2 — cụm từ 'là một lợi thế (Nice-to-have)' chỉ yêu cầu kiến thức làm việc cơ bản -> required_level = 2.0.",
+        "requirements": [
+          {
+            "jd_skill_id": "kubernetes",
+            "required_level": 4.0,
+            "reasoning": "Quy tắc 1 (Số năm tường minh): Yêu cầu tối thiểu 4 năm vận hành Kubernetes ở production tương ứng mức Senior (4.0)."
+          },
+          {
+            "jd_skill_id": "terraform",
+            "required_level": 3.5,
+            "reasoning": "Quy tắc 2 (Từ khóa mức độ): Yêu cầu thành thạo (proficient/solid) ở nhóm Must-have tương ứng mức Mid-Senior (3.5)."
+          },
+          {
+            "jd_skill_id": "gcp",
+            "required_level": 2.0,
+            "reasoning": "Quy tắc 2 (Nice-to-have): Là điểm cộng/lợi thế, chỉ yêu cầu mức biết sử dụng cơ bản (2.0)."
+          }
+        ]
+      },
+      {
+        "jd_text": "Position: Senior Backend Engineer (Java / Distributed Systems)\n- 3+ years of experience with RabbitMQ or similar message queue systems is required.\n- Mạnh về Java, có khả năng tối ưu hóa performance và xử lý hệ thống tải cao.\n- Kinh nghiệm deploy trên AWS là một điểm cộng lớn.",
+        "skills_context": "Skill ID: rabbitmq\nEvidence Spans:\n  - 3+ years of experience with RabbitMQ or similar message queue systems is required\n\nSkill ID: java\nEvidence Spans:\n  - Mạnh về Java, có khả năng tối ưu hóa performance và xử lý hệ thống tải cao\n\nSkill ID: aws\nEvidence Spans:\n  - Kinh nghiệm deploy trên AWS là một điểm cộng lớn",
+        "reasoning": "1. rabbitmq: Quy tắc 1 (Explicit Years) — '3+ years of experience ... is required' ánh xạ trực tiếp vào mốc 36+ tháng (Senior) -> required_level = 4.0.\n2. java: Quy tắc 2 (Explicit Descriptors) — 'Mạnh về Java, có khả năng tối ưu hóa performance và xử lý hệ thống tải cao' là mô tả chuyên sâu (system optimization) của cấp Senior -> required_level = 4.0.\n3. aws: Quy tắc 2 — 'là một điểm cộng lớn' (big plus / nice-to-have) -> required_level = 2.0.",
+        "requirements": [
+          {
+            "jd_skill_id": "rabbitmq",
+            "required_level": 4.0,
+            "reasoning": "Quy tắc 1: JD yêu cầu rõ 3+ năm kinh nghiệm với RabbitMQ, ánh xạ vào mức Senior (4.0)."
+          },
+          {
+            "jd_skill_id": "java",
+            "required_level": 4.0,
+            "reasoning": "Quy tắc 2: Yêu cầu mạnh về Java và tối ưu hóa hiệu năng hệ thống tải cao tương ứng mức Senior (4.0)."
+          },
+          {
+            "jd_skill_id": "aws",
+            "required_level": 2.0,
+            "reasoning": "Quy tắc 2: Kinh nghiệm AWS được nêu là điểm cộng (plus), tương ứng mức Working Knowledge (2.0)."
+          }
+        ]
+      }
+    ],
+    "signature": {
+      "instructions": "Determine the REQUIRED PROFICIENCY LEVEL (`required_level` P_JD on a standardized 1.0 to 5.0 scale) for each specified JD skill.\n\nNote on Scope:\nSkill importance weight (`w_j`) is computed externally by a Graph Neural Network (GNN). Your SOLE responsibility is to calibrate the required DEPTH OF MASTERY (`required_level` in [1.0, 5.0]) for each target skill ID.\n\nStandardized Proficiency Scale (1.0 - 5.0):\n- 1.0 - 1.5: Basic Awareness / Familiarity ('có hiểu biết', 'biết cơ bản', 'exposure to', entry/intern level, 0-6 months equivalent)\n- 2.0 - 2.5: Junior / Working Knowledge ('có kiến thức', 'nice-to-have / là một lợi thế / điểm cộng', 6-18 months equivalent, executes standard tasks with guidance)\n- 3.0 - 3.5: Mid-level / Solid Practical Experience ('nắm vững', 'thành thạo', 'solid / proficient experience', 18-36 months / 2-3 years equivalent, independent execution)\n- 4.0 - 4.5: Senior / Advanced Expertise ('chuyên sâu', 'deep knowledge', 'expert', 'tối ưu hóa hiệu năng / production scale', 3-5+ years equivalent, complex troubleshooting)\n- 5.0: Lead / Master / Principal ('architectural mastery', 'thiết kế kiến trúc tổng thể', >5 years equivalent, technical strategy & leadership)\n\nHierarchical Inference Priority Rules (Apply in strict order 1 -> 2 -> 3):\n1. Explicit Years of Experience (Highest Priority): If the evidence span or JD explicitly states required years for the skill (e.g., '<1 year' -> 1.5-2.0, '1-2 years' -> 2.5, '2-3 years' -> 3.0-3.5, '3-4+ years' -> 4.0, '5+ years' -> 4.5-5.0), map directly to the corresponding milestone.\n2. Explicit Proficiency Descriptors (Second Priority): If no exact years are given for the skill, map explicit depth modifiers ('điểm cộng / plus / familiar' -> 2.0, 'có kinh nghiệm / working knowledge' -> 2.5-3.0, 'thành thạo / nắm vững / solid' -> 3.5, 'chuyên sâu / mạnh về / tối ưu hóa / expert' -> 4.0-4.5).\n3. Role Seniority Inheritance (Fallback Priority): If the skill has neither explicit years nor depth modifiers, infer its required depth from the overall JD role seniority and whether the skill is core/must-have vs. secondary.",
+      "fields": [
+        {
+          "prefix": "Jd Text:",
+          "description": "Full Job Description (JD) text providing overall role seniority and context"
+        },
+        {
+          "prefix": "Skills Context:",
+          "description": "Target JD skill IDs and their verbatim extracted evidence spans from the JD"
+        },
+        {
+          "prefix": "Reasoning:",
+          "description": "${reasoning}"
+        },
+        {
+          "prefix": "Requirements:",
+          "description": "List of JDRequirement objects covering every target jd_skill_id, with required_level in [1.0, 5.0] and concise rule-grounded reasoning"
+        }
+      ]
+    },
+    "lm": null
+  },
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.14",
+      "dspy": "3.4.1",
+      "cloudpickle": "3.1"
+    }
+  }
+}

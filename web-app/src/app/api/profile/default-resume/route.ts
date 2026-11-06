@@ -27,11 +27,14 @@ export async function POST(request: NextRequest) {
     const resumeId = String(newResume.id);
 
     // 2. Set default resume on user profile
-    await forwardToBackend('/api/auth/profile', request, {
+    const profileRes = await forwardToBackend('/api/auth/profile', request, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ defaultResumeId: resumeId }),
     });
+    if (!profileRes.ok) {
+      return NextResponse.json({ error: await profileRes.text() }, { status: profileRes.status });
+    }
 
     return NextResponse.json({
       success: true,

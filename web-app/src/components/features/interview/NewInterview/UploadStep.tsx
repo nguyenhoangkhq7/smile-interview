@@ -8,17 +8,17 @@ import Link from 'next/link';
 import type { CvSource, JdSource } from '@/hooks/useNewInterview';
 import { cn } from '@/lib/utils';
 
-interface ComboboxOption { id: number; label: string; date: string; }
+interface ComboboxOption { id: string; label: string; date: string; }
 
 interface DatabaseResume {
-  id: number;
+  id: string;
   file_name: string;
   created_at: string;
   file_url?: string;
 }
 
 interface DatabaseJd {
-  id: number;
+  id: string;
   title: string;
   created_at: string;
 }
@@ -29,8 +29,8 @@ import { ChevronDown, Search, X } from 'lucide-react';
 
 interface ComboboxProps {
   options: ComboboxOption[];
-  selectedId: number | null;
-  onSelect: (id: number | null) => void;
+  selectedId: string | null;
+  onSelect: (id: string | null) => void;
   placeholder: string;
   searchPlaceholder: string;
   icon: React.ReactNode;
@@ -169,8 +169,8 @@ interface UploadStepProps {
   dragOverCv: boolean; dragOverJd: boolean;
   cvError: string | null; jdError: string | null;
   savedResumes: DatabaseResume[]; savedJds: DatabaseJd[];
-  selectedResumeId: number | null; setSelectedResumeId: (id: number | null) => void;
-  selectedJdId: number | null; setSelectedJdId: (id: number | null) => void;
+  selectedResumeId: string | null; setSelectedResumeId: (id: string | null) => void;
+  selectedJdId: string | null; setSelectedJdId: (id: string | null) => void;
   fileInputCvRef: RefObject<HTMLInputElement | null>;
   fileInputJdRef: RefObject<HTMLInputElement | null>;
 
@@ -210,7 +210,7 @@ export function UploadStep({
           <div className="flex gap-1.5">
             {(['upload', 'saved', ...(defaultResumeId ? ['default'] : [])] as CvSource[]).map((src) => (
               <button key={src} type="button"
-                onClick={() => setCvSource(src)}
+                onClick={() => { setCvSource(src); if (src === 'default') setSelectedResumeId(defaultResumeId); }}
                 className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${cvSource === src ? 'bg-brand-orange text-white' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}
               >
                 {src === 'upload' ? 'Tải CV mới' : src === 'saved' ? 'CV đã lưu' : 'CV mặc định'}
@@ -274,7 +274,7 @@ export function UploadStep({
 
           {jdSource === 'upload' && (
             <DropZone zone="jd" file={jdFile} dragActive={dragOverJd} error={jdError}
-              accept=".pdf,.docx,.doc" hint="PDF, DOCX, DOC • Tối đa 10MB"
+              accept=".pdf" hint="PDF • Tối đa 10MB"
               icon={<Briefcase size={36} />}
               inputRef={fileInputJdRef}
               onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}

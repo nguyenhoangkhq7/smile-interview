@@ -22,13 +22,27 @@ export async function GET(
 
     const sess = await backendRes.json();
 
+    let skillGapResults = null;
+    let skillGapReport = null;
+    let interviewReport = null;
+
+    try {
+      if (sess.skillGapJson) skillGapResults = JSON.parse(sess.skillGapJson);
+    } catch {}
+    try {
+      if (sess.gapReportJson) skillGapReport = JSON.parse(sess.gapReportJson);
+    } catch {}
+    try {
+      if (sess.interviewReportJson) interviewReport = JSON.parse(sess.interviewReportJson);
+    } catch {}
+
     const result = {
       id: sess.id,
       date: sess.startedAt || sess.date,
       interviewType: sess.interviewType,
       roleTitle: sess.roleTitle,
-      cvFilename: sess.cvFilename,
-      jdFilename: sess.jdFilename,
+      cvFilename: sess.resumeFileName || sess.cvFilename,
+      jdFilename: sess.jdTitle || sess.jdFilename,
       cvFileUrl: sess.cvFileUrl,
       jdFileUrl: sess.jdFileUrl,
       resumeId: sess.resumeId,
@@ -38,7 +52,12 @@ export async function GET(
       overallFeedback: sess.overallFeedback,
       userRating: sess.userRating,
       userFeedbackText: sess.userFeedbackText,
+      aiInterviewSessionId: sess.aiInterviewSessionId,
+      skillGapResults,
+      skillGapReport,
+      interviewReport,
       questions: (sess.turns || []).map((t: {
+        id?: number;
         question?: string;
         answer?: string;
         score?: number;
@@ -48,6 +67,7 @@ export async function GET(
         topicTag?: string;
         isDeepDive?: boolean;
       }) => ({
+        id: t.id ? String(t.id) : undefined,
         question: t.question,
         answer: t.answer,
         score: t.score,

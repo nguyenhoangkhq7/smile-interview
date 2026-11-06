@@ -1,0 +1,47 @@
+[
+  {
+    "jd_skill_id": "kubernetes",
+    "matched_cv_skill_id": "kubernetes",
+    "semantic_alignment": "MATCH",
+    "is_substituted": false,
+    "required_proficiency": 4.0,
+    "candidate_proficiency": 4.5,
+    "gap_magnitude": 0.0,
+    "priority": 0.0,
+    "suggested_strategy": "NONE",
+    "cv_evidence_spans": [
+      "Thiết kế và vận hành cụm Kubernetes multi-region trên EKS phục vụ 5 triệu người dùng."
+    ],
+    "context_job": "DevOps Lead (03/2024 - Hiện tại)"
+  },
+  {
+    "jd_skill_id": "terraform",
+    "matched_cv_skill_id": "cloudformation",
+    "semantic_alignment": "PARTIAL",
+    "is_substituted": true,
+    "required_proficiency": 4.0,
+    "candidate_proficiency": 2.4,
+    "gap_magnitude": 0.40,
+    "priority": 0.24,
+    "suggested_strategy": "COMPARE_SUBSTITUTE",
+    "cv_evidence_spans": [
+      "Tự động hóa cấp phát hạ tầng AWS bằng CloudFormation templates."
+    ],
+    "context_job": "Cloud Engineer (06/2021 - 02/2024)"
+  },
+  {
+    "jd_skill_id": "linux",
+    "matched_cv_skill_id": "linux",
+    "semantic_alignment": "MATCH",
+    "is_substituted": false,
+    "required_proficiency": 4.0,
+    "candidate_proficiency": 2.2,
+    "gap_magnitude": 0.45,
+    "priority": 0.09,
+    "suggested_strategy": "PROBE_DEPTH",
+    "cv_evidence_spans": [
+      "Hỗ trợ quản trị server Linux cơ bản."
+    ],
+    "context_job": "Junior Sysadmin (01/2017 - 05/2019)"
+  }
+]

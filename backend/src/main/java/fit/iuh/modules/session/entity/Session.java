@@ -56,6 +56,18 @@ public class Session {
     @Column(name = "user_feedback_text", columnDefinition = "text")
     private String userFeedbackText;
 
+    @Column(name = "skill_gap_json", columnDefinition = "text")
+    private String skillGapJson;
+
+    @Column(name = "gap_report_json", columnDefinition = "text")
+    private String gapReportJson;
+
+    @Column(name = "ai_interview_session_id", length = 128)
+    private String aiInterviewSessionId;
+
+    @Column(name = "interview_report_json", columnDefinition = "text")
+    private String interviewReportJson;
+
     @Column(name = "started_at", updatable = false)
     private LocalDateTime startedAt;
 

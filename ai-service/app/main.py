@@ -1,42 +1,66 @@
+from pathlib import Path
+from typing import Dict
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 from app.config import settings
-from app.routers import cv_jd, interview, questions
+from module1_matcher.router import router as module1_router
+from src.api.routes import router as skill_gap_router
+from adaptive_questioning.api.routes import router as interview_router
 
-app = FastAPI(
-    title=settings.APP_NAME,
-    description="Python FastAPI Service for Semantic CV-JD Matching, GNN Skill-gap Detection, and AI Interview Evaluation",
-    version="1.0.0",
-)
+_ROOT_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(_ROOT_DIR.parent / ".env")
+load_dotenv(_ROOT_DIR / ".env", override=True)
 
-# CORS setup
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
-# Include Routers
-app.include_router(cv_jd.router)
-app.include_router(interview.router)
-app.include_router(questions.router)
+def create_app() -> FastAPI:
+    application = FastAPI(
+        title="Smile Interview NCKH AI Service",
+        description=(
+            "Unified Scientific Research Pipeline: "
+            "Module 1 (SBERT+GNN Skill Matcher) -> "
+            "Module 2 (Skill-Gap Detection V2.0) -> "
+            "Module 3 (Adaptive Questioning V2.2)"
+        ),
+        version="2.2.0",
+    )
 
-@app.get("/health")
-async def health_check():
-    return {
-        "status": "healthy",
-        "service": settings.APP_NAME,
-        "version": "1.0.0"
-    }
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
-@app.get("/")
-async def root():
-    return {
-        "message": "Welcome to Smile Interview AI Service. See /docs for Swagger UI documentation."
-    }
+    application.state.report_store = {}
+    application.state.session_store = {}
+
+    application.include_router(module1_router)
+    application.include_router(skill_gap_router)
+    application.include_router(interview_router)
+
+    @application.get("/health", tags=["Health"])
+    async def health_check() -> Dict[str, str]:
+        return {
+            "status": "ok",
+            "service": settings.APP_NAME,
+            "version": "2.2.0",
+        }
+
+    @application.get("/", tags=["Health"])
+    async def root() -> Dict[str, str]:
+        return {
+            "message": "Smile Interview NCKH AI Service (Module 1 -> Module 2 -> Module 3). See /docs for OpenAPI."
+        }
+
+    return application
+
+
+app = create_app()
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run("app.main:app", host=settings.HOST, port=settings.PORT, reload=settings.DEBUG)

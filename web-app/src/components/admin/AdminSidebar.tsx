@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
-import { LayoutDashboard, Home, LogOut, ChevronLeft, User, ClipboardCheck } from 'lucide-react';
+import { Home, LogOut, ChevronLeft, User, ClipboardCheck } from 'lucide-react';
 
 interface AdminSidebarProps {
   collapsed: boolean;
@@ -11,11 +11,6 @@ interface AdminSidebarProps {
 }
 
 const navItems = [
-  {
-    href: '/admin/rules',
-    label: 'Rule Engine',
-    icon: <LayoutDashboard size={18} />,
-  },
   {
     href: '/admin/evaluations',
     label: 'Đánh Giá HR',
@@ -39,7 +34,6 @@ function AdminSidebar({ collapsed, onToggle }: AdminSidebarProps) {
         collapsed ? 'w-[76px]' : 'w-[260px]'
       } flex-shrink-0 z-20`}
     >
-      {/* Brand Header */}
       <div className="flex min-h-[72px] items-center justify-between border-b border-white/5 px-4 py-4">
         {!collapsed ? (
           <div className="flex items-center gap-2">
@@ -58,7 +52,6 @@ function AdminSidebar({ collapsed, onToggle }: AdminSidebarProps) {
           </div>
         )}
 
-        {/* Collapse button inside header */}
         {!collapsed && (
           <button
             onClick={onToggle}
@@ -70,7 +63,6 @@ function AdminSidebar({ collapsed, onToggle }: AdminSidebarProps) {
         )}
       </div>
 
-      {/* Navigation List */}
       <nav className="flex-1 space-y-2 px-3 py-6 overflow-y-auto">
         {navItems.map((item) => {
           const isActive = pathname.startsWith(item.href);
@@ -94,10 +86,9 @@ function AdminSidebar({ collapsed, onToggle }: AdminSidebarProps) {
         })}
       </nav>
 
-      {/* Footer Profile & Logout */}
       <div className="border-t border-white/5 p-4 space-y-3 bg-slate-950/40">
         {!collapsed && user && (
-          <div className="flex items-center gap-3 rounded-2xl border border-white/5 bg-white/[0.02] p-3 shadow-[inset_0_1px_1px_rgba(255,255,255,0.02)]">
+          <div className="flex items-center gap-3 rounded-2xl border border-white/5 bg-white/[0.02] p-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500/25 to-orange-600/20 text-orange-400 border border-orange-500/25">
               <User size={16} />
             </div>

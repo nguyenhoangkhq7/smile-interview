@@ -109,7 +109,7 @@ public class SessionServiceImpl implements SessionService {
         }
         return sessionRepository.findByUserIdOrderByStartedAtDesc(userId)
                 .stream()
-                .map(SessionResponse::from)
+                .map(session -> SessionResponse.from(session, sessionTurnRepository.findBySessionIdOrderByIdAsc(session.getId())))
                 .toList();
     }
 

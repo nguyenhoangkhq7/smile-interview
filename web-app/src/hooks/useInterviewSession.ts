@@ -231,8 +231,8 @@ export function useInterviewSession() {
         if (token) {
           headers['Authorization'] = `Bearer ${token}`;
         }
-        fetch(`/api/sessions/${id}/evaluate`, { 
-          method: 'POST',
+        fetch(`/api/sessions/${id}/interview/report`, { 
+          method: 'GET',
           headers
         }).catch((evalErr) => {
           console.error('[Session Finish] Background evaluation trigger failed:', evalErr);
@@ -938,7 +938,7 @@ export function useInterviewSession() {
     startTimer();
 
     if (socketRef.current?.connected) {
-      let initialQuestions = [];
+      let initialQuestions: { question: string; good_answer_signals?: string[]; topic?: string }[] = [];
       try {
         if (session?.questions && session.questions.length > 0) {
           initialQuestions = session.questions.map((q: any) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -946,10 +946,6 @@ export function useInterviewSession() {
             good_answer_signals: q.goodAnswerSignals || [],
             topic: q.topicTag || ''
           }));
-        } else if (session?.actionableSuggestions) {
-          initialQuestions = typeof session.actionableSuggestions === 'string' 
-            ? JSON.parse(session.actionableSuggestions) 
-            : session.actionableSuggestions;
         }
       } catch (e) {
         console.error('Failed to parse initialQuestions', e);
@@ -968,8 +964,8 @@ export function useInterviewSession() {
         baseQuestionIndex,
         interviewDomain: session?.interviewType || 'IT',
         targetJobTitle: session?.roleTitle || (detectedLang === 'en' ? 'Software Engineer' : 'Kỹ sư Phần mềm'),
-        resumeText: session?.cvExtractedText || '',
-        jdText: session?.jdExtractedText || '',
+        resumeText: '',
+        jdText: '',
         language: detectedLang,
       });
     }

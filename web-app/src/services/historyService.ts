@@ -1,4 +1,8 @@
-import type { ImprovementItem } from './cvJdMatching';
+import type {
+  SkillGapResult,
+  StaticGapAuditReport,
+  HITLReportResponse,
+} from './cvJdMatching';
 import { useAuthStore } from '@/store/authStore';
 
 export interface QuestionFeedback {
@@ -25,56 +29,17 @@ export interface SessionHistoryItem {
   jdFilename: string;
   cvFileUrl?: string;
   jdFileUrl?: string;
-  cvExtractedText?: string;
-  jdExtractedText?: string;
   overallScore?: number;
   status: 'Completed' | 'In progress' | 'Not started';
   questions: QuestionFeedback[];
   overallFeedback?: string;
-  competencyFitScore?: number;
-  skillsAnalysis?: {
-    analysis?: string;
-    criticalMissingSkills?: string[];
-  };
-  experienceEvaluation?: string;
-  projectEvaluation?: string;
-  technicalDepthScore?: number;
-  matchLevel?: string;
-  candidateLevel?: string;
-  roleTypeDetected?: string;
-  yearsOfExperienceEstimate?: string;
-  strongAreas?: string[];
-  gapAreas?: string[];
-  criticalMissingSkills?: string[];
-  sectionWiseFeedback?: Record<string, string>;
-  actionableSuggestions?: string[];
-  resumeId?: number;
-  jdId?: number;
-  gateEvidenceItems?: unknown[];
-  mustHaveEvidenceItems?: unknown[];
-  preferToHaveEvidenceItems?: unknown[];
-  evidenceItems?: unknown[];
-  additionalEvidenceItems?: unknown[];
-  scoreBreakdown?: unknown;
-  topPriorityImprovements?: unknown[];
-  quickWins?: ImprovementItem[];
-  skillGaps?: ImprovementItem[];
-  hiringRecommendation?: string;
-  eligibility?: SessionEligibility | string | null;
-  currentStage?: 'CV_JD_MATCHED' | 'QUESTION_BANK_READY' | 'INTERVIEW_IN_PROGRESS' | 'COMPLETED' | string;
-}
-
-export interface SessionEligibility {
-  status?: string;
-  gate_checks?: {
-    criteria_name?: string;
-    status?: string;
-    required_value?: string;
-    actual_value?: string;
-    passed?: boolean;
-    description?: string;
-    criterion?: string;
-  }[];
+  resumeId?: string;
+  jdId?: string;
+  aiInterviewSessionId?: string | null;
+  currentStage?: string;
+  skillGapResults?: SkillGapResult[] | null;
+  skillGapReport?: StaticGapAuditReport | null;
+  interviewReport?: HITLReportResponse | null;
 }
 
 export interface SessionSavePayload extends SessionHistoryItem {
@@ -92,7 +57,7 @@ function getFetchUrl(path: string): string {
 
 function getAuthHeaders(): Record<string, string> {
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
   };
   if (typeof window !== 'undefined') {
     const token = useAuthStore.getState().token;
@@ -104,9 +69,6 @@ function getAuthHeaders(): Record<string, string> {
 }
 
 export const historyService = {
-  /**
-   * Fetch all past practice sessions
-   */
   async getHistory(): Promise<SessionHistoryItem[]> {
     try {
       const res = await fetch(getFetchUrl('/api/history'), {
@@ -118,14 +80,11 @@ export const historyService = {
       }
       return await res.json();
     } catch (err) {
-      console.error('[historyService] Error loading history, falling back to empty list:', err);
+      console.error('[historyService] Error loading history:', err);
       return [];
     }
   },
 
-  /**
-   * Fetch details of a specific session by ID
-   */
   async getSessionById(id: string): Promise<SessionHistoryItem | null> {
     try {
       const res = await fetch(getFetchUrl(`/api/history/${id}`), {
@@ -143,15 +102,12 @@ export const historyService = {
     }
   },
 
-  /**
-   * Save or update an interview session in history
-   */
   async saveSession(session: SessionSavePayload): Promise<SessionHistoryItem> {
     try {
       const res = await fetch('/api/history', {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify(session)
+        body: JSON.stringify(session),
       });
 
       if (!res.ok) {
@@ -162,13 +118,10 @@ export const historyService = {
       return data.session;
     } catch (err) {
       console.error(`[historyService] Error saving session ${session.id}:`, err);
-      return session;
+      throw err;
     }
   },
 
-  /**
-   * Create an initial blank session
-   */
   async createSession(
     id: string,
     roleTitle: string,
@@ -185,15 +138,12 @@ export const historyService = {
       jdFilename,
       status,
       questions: [],
-      replaceQuestions: false
+      replaceQuestions: false,
     };
 
     return this.saveSession(newSession);
   },
 
-  /**
-   * Clone a session to restart interview
-   */
   async cloneSession(sessionId: string): Promise<string> {
     const res = await fetch(`/api/history/${sessionId}/clone`, {
       method: 'POST',
@@ -204,5 +154,5 @@ export const historyService = {
     }
     const data = await res.json();
     return data.newSessionId;
-  }
+  },
 };

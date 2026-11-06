@@ -1,64 +1,65 @@
 # Smile Interview — AI Research Service (Python FastAPI)
 
-Dịch vụ AI độc lập phục vụ bài báo nghiên cứu khoa học:
+Dịch vụ AI phục vụ bài báo nghiên cứu khoa học:
 > **"An Automated AI Interview Framework via Dynamic Knowledge-Gap Question Generation and Semantic CV-JD Matching"**  
 > *(Khung phỏng vấn AI tự động dựa trên việc sinh câu hỏi khoảng trống kiến thức động và khớp nối ngữ nghĩa CV-JD)*
 
 ---
 
-## 1. Kiến trúc phân tách (Clean Architecture + Anti-Corruption Layer)
+## 1. Kiến trúc Pipeline 3 Module (NCKH Architecture)
 
 ```
-ai-service/app/
-├── research/                       # PHÒNG THÍ NGHIỆM KHOA HỌC (Độc lập với hệ thống Web)
-│   ├── models.py                   # Data classes khoa học (SkillNode, DependencyEdge, SkillGapResult...)
-│   ├── sbert_gnn_matcher.py        # [Đóng góp 1]: Sentence-BERT + GNN Skill Dependency Graph
-│   ├── skill_gap_detector.py       # [Đóng góp 2]: Thuật toán phát hiện Khoảng trống năng lực (Skill-Gap)
-│   └── adaptive_question_chain.py  # [Đóng góp 3]: Cơ chế Prompt-Chaining sinh câu hỏi thích ứng
-├── adapters/                       # TẦNG CHUYỂN ĐỔI (Anti-Corruption Layer)
-│   └── system_dto_adapter.py       # Dịch Output nghiên cứu <-> DTO chuẩn của Spring Boot & Next.js
-├── schemas/                        # Hợp đồng dữ liệu JSON (Pydantic Schemas)
-│   ├── cv_jd_schema.py
-│   └── question_schema.py
-└── routers/                        # REST API Endpoints
-    ├── cv_jd.py                    # POST /api/ai/cv-jd/match
-    ├── questions.py                # POST /api/ai/questions/generate & /regenerate-single
-    └── interview.py                # POST /api/ai/interview/evaluate
+ai-service/
+├── module1_matcher/                    # [Module 1]: SBERT + GNN Adapter (Trích xuất & So khớp kỹ năng)
+│   ├── schemas.py                      # ExtractedCVSkill, ExtractedJDSkill, MatchResult
+│   ├── extractor.py                    # Pluggable Extractor & Semantic Matcher
+│   └── router.py                       # POST /api/v1/match & POST /api/v1/pipeline/analyze
+│
+├── src/                                # [Module 2]: Skill-Gap Detection (Xác định khoảng trống năng lực)
+│   ├── domain/                         # SkillNode, StaticGapAuditReport, SkillGapResult
+│   ├── pipeline/                       # SkillGapPipeline
+│   └── services/                       # GraphEngine, DependencyResolver
+│
+├── adaptive_questioning/               # [Module 3]: Bayesian Adaptive Interviewing (Phỏng vấn thích ứng)
+│   ├── api/routes.py                   # POST /interview/start, POST /interview/respond, GET /interview/report/{session_id}
+│   ├── core/engine.py                  # State machine & Bayesian Belief Update (Blow, Bmed, Bhigh)
+│   └── graph/state.py                  # AuditableHITLReport, ReflectiveInsight
+│
+├── app/
+│   ├── config.py                       # Cấu hình môi trường & Settings
+│   └── main.py                         # FastAPI App Factory & Route Mounting
+│
+├── tests_skill_gap/                    # Test suite kiểm thử Module 1 & Module 2
+├── tests_adaptive_questioning/         # Test suite kiểm thử Module 3
+└── main.py                             # Entrypoint khởi chạy uvicorn
 ```
 
 ---
 
-## 2. Hướng dẫn thay thế thuật toán nghiên cứu
+## 2. API Endpoints Chính
 
-Bạn chỉ cần làm việc trong thư mục `app/research/` mà không cần lo lắng về cấu trúc Database hay Frontend:
-
-1. **Đóng góp 1 (`app/research/sbert_gnn_matcher.py`)**:
-   - Thay hàm `_compute_sbert_node_similarities()` bằng mô hình `SentenceTransformer` của bạn.
-   - Thay hàm `_propagate_gnn_scores()` bằng mạng `GCNConv` / `GATConv` (PyTorch Geometric).
-2. **Đóng góp 2 (`app/research/skill_gap_detector.py`)**:
-   - Tùy biến thuật toán `detect_gaps()` trên đồ thị phụ thuộc kỹ năng.
-3. **Đóng góp 3 (`app/research/adaptive_question_chain.py`)**:
-   - Tùy biến 3 bước Prompt-Chaining (`_step1_analyze_gap_focus`, `_step2_generate_grounded_question`, `_step3_calibrate_rubric`).
+| Phương thức | Endpoint | Mô tả |
+| :--- | :--- | :--- |
+| `POST` | `/api/v1/match` | Module 1: So khớp ngữ nghĩa kỹ năng CV và JD |
+| `POST` | `/api/v1/pipeline/analyze` | Module 2: Nhận CV + JD và trả về kết quả phân tích khoảng trống năng lực (Skill-Gap) |
+| `POST` | `/api/v1/interview/start` | Module 3: Khởi tạo buổi phỏng vấn thích ứng dựa trên output Skill-Gap |
+| `POST` | `/api/v1/interview/respond` | Module 3: Nhận câu trả lời của ứng viên, cập nhật Bayesian và trả về câu hỏi tiếp theo |
+| `GET` | `/api/v1/interview/report/{id}` | Module 3: Trả về Báo cáo Thẩm định Năng lực HITL hoàn chỉnh |
 
 ---
 
-## 3. Khởi chạy và Kết nối với Spring Boot
+## 3. Khởi chạy & Kiểm thử
 
-### Khởi chạy AI Service:
+### Khởi chạy dịch vụ:
 ```bash
 cd ai-service
-python -m venv .venv
-.venv\Scripts\activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+python main.py
 ```
+Dịch vụ sẽ lắng nghe tại `http://localhost:8000`. Swagger UI có tại `http://localhost:8000/docs`.
 
-### Kích hoạt ở Spring Boot Backend:
-Đặt biến môi trường `AI_PROVIDER=fastapi` hoặc trong `backend/src/main/resources/application.yaml`:
-```yaml
-app:
-  ai:
-    provider: ${AI_PROVIDER:fastapi}
-    fastapi:
-      base-url: ${FASTAPI_AI_BASE_URL:http://localhost:8000}
+### Chạy kiểm thử tự động (Unit & Integration Tests):
+```bash
+pytest tests_skill_gap tests_adaptive_questioning -q
 ```
+*(Hiện tại 132/132 tests đều pass)*

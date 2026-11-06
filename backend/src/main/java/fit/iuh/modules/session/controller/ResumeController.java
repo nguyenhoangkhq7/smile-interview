@@ -13,6 +13,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -62,6 +65,14 @@ public class ResumeController {
         UUID userId = (currentUser != null) ? currentUser.getId() : null;
         String fileName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "cv.pdf";
         String fileUrl = null;
+
+        if ((parsedContent == null || parsedContent.isBlank()) && fileName.toLowerCase().endsWith(".pdf")) {
+            try (PDDocument document = Loader.loadPDF(file.getBytes())) {
+                parsedContent = new PDFTextStripper().getText(document).trim();
+            } catch (Exception e) {
+                log.warn("[ResumeController] Could not extract text from {}: {}", fileName, e.getMessage());
+            }
+        }
 
         try {
             String s3Key = "resumes/" + (userId != null ? userId : "guest") + "/" + System.currentTimeMillis() + "_" + fileName;

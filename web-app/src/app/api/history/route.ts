@@ -15,7 +15,15 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await backendRes.json();
-    return NextResponse.json(data);
+    return NextResponse.json(data.map((session: Record<string, unknown>) => ({
+      ...session,
+      date: session.startedAt,
+      cvFilename: session.resumeFileName,
+      jdFilename: session.jdTitle,
+      questions: session.turns || [],
+      skillGapResults: session.skillGapJson ? JSON.parse(String(session.skillGapJson)) : null,
+      skillGapReport: session.gapReportJson ? JSON.parse(String(session.gapReportJson)) : null,
+    })));
   } catch (error) {
     const err = error as Error;
     console.error('[API History] Error fetching history:', err);

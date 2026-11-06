@@ -1,0 +1,80 @@
+{
+  "generate.predict": {
+    "traces": [],
+    "train": [],
+    "demos": [
+      {
+        "reference_layer_context": "- Kỹ năng mục tiêu (Primary Skill d*): `system_design` (Matched CV Skill: `system_design`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.50 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.80 / 5.0\n- Phân phối niềm tin hiện tại P_{t-1}: [0.2810, 0.4855, 0.2335]\n- Bằng chứng nguyên văn từ CV: \"Tham gia thiết kế kiến trúc các dịch vụ backend phục vụ người dùng.\"\n- Ngữ cảnh công việc: Senior Backend (01/2023 - Hiện tại)\n- Context Anchors bắc cầu (A_ctx): 1. [INITIAL_NONE] Skill: redis | s_cv=4.00\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng system_design tại local turn k=1)",
+        "main_layer_directives": "- Persona: Principal Architect.\n- Chiến lược phỏng vấn: Đào sâu chuyên môn (PROBE_DEPTH).\n- Hiệu chỉnh độ khó: Mức 4.50/5.0.\n- Ràng buộc: One-Question-One-Answer, Show Don't Tell.",
+        "surprising_fact_C": "Ứng viên tham gia thiết kế backend nhưng CV chưa có bằng chứng giải quyết các bài toán bảo vệ hệ thống trước lưu lượng đột biến ở quy mô lớn.",
+        "hypothesis_A": "Ứng viên có thể chưa từng trực tiếp thiết kế giải pháp Rate Limiting phân tán bằng thuật toán Token Bucket hoặc Sliding Window Log.",
+        "new_sub_slot": null,
+        "target_slot_id": "system_design:primary",
+        "question": "Để bảo vệ cụm microservices khỏi nguy cơ quá tải khi gặp các đợt lưu lượng truy cập đột biến (traffic spike), anh/chị thiết kế cơ chế Rate Limiting phân tán sử dụng Redis với thuật toán cụ thể nào để đảm bảo tính công bằng và chính xác?"
+      },
+      {
+        "reference_layer_context": "- Kỹ năng mục tiêu (Primary Skill d*): `graphql` (Matched CV Skill: `rest_api`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.40 / 5.0\n- Phân phối niềm tin hiện tại P_{t-1}: [0.3689, 0.4286, 0.2024]\n- Bằng chứng nguyên văn từ CV: \"Xây dựng hệ thống REST API theo chuẩn OpenAPI.\"\n- Ngữ cảnh công việc: Backend Developer (03/2022 - 08/2023)\n- Context Anchors bắc cầu (A_ctx): Hệ thống API dịch vụ\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng graphql tại local turn k=1)",
+        "main_layer_directives": "- Persona: Lead API Architect.\n- Chiến lược phỏng vấn: So sánh kỹ năng thay thế (COMPARE_SUBSTITUTE).\n- Hiệu chỉnh độ khó: Mức 4.00/5.0.\n- Ràng buộc: One-Question-One-Answer, Show Don't Tell.",
+        "surprising_fact_C": "Ứng viên chỉ thuần thục REST API nhưng JD yêu cầu kiến trúc GraphQL giải quyết bài toán over-fetching và under-fetching.",
+        "hypothesis_A": "Ứng viên chuyển từ tư duy REST sang GraphQL dễ mắc bẫy N+1 query trong các resolver lồng nhau nếu chưa nắm cơ chế DataLoader.",
+        "new_sub_slot": null,
+        "target_slot_id": "graphql:primary",
+        "question": "Khi xây dựng API bằng GraphQL, làm thế nào anh/chị áp dụng cơ chế Batching và Caching của thư viện DataLoader trong các resolver lồng nhau để giải quyết triệt để vấn đề N+1 query xuống cơ sở dữ liệu?"
+      },
+      {
+        "reference_layer_context": "- Kỹ năng mục tiêu (Primary Skill d*): `terraform` (Matched CV Skill: `cloudformation`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.40 / 5.0\n- Phân phối niềm tin hiện tại P_{t-1}: [0.3689, 0.4286, 0.2024]\n- Bằng chứng nguyên văn từ CV: \"Tự động hóa cấp phát hạ tầng AWS bằng CloudFormation templates.\"\n- Ngữ cảnh công việc: Cloud Engineer (06/2021 - 02/2024)\n- Context Anchors bắc cầu (A_ctx):\n  1. [INITIAL_NONE] Skill: kubernetes | s_cv=4.50 | Job: DevOps Lead (03/2024 - Hiện tại)\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng terraform tại local turn k=1)",
+        "main_layer_directives": "- Persona: Senior Technical Interviewer / Principal Engineer phỏng vấn bằng tiếng Việt chuyên nghiệp.\n- Chiến lược phỏng vấn: So sánh kỹ năng thay thế (COMPARE_SUBSTITUTE) giữa CloudFormation và Terraform.\n- Hiệu chỉnh độ khó (r_target): Đo lường đúng ngưỡng 4.00/5.0.\n- Ràng buộc: One-Question-One-Answer, Show Don't Tell, kết nối tự nhiên với Context Anchor kubernetes.",
+        "surprising_fact_C": "Ứng viên đạt năng lực chuyên gia về Kubernetes (s_cv=4.50) nhưng về IaC lại chỉ có kinh nghiệm với CloudFormation (s_cv=2.40) thay vì công cụ Terraform theo yêu cầu của JD.",
+        "hypothesis_A": "Ứng viên đã quen với tư duy hạ tầng dạng mã nguồn (IaC) trên AWS thông qua CloudFormation, nhưng có thể chưa va chạm với các bài toán đặc thù của Terraform như State Locking từ xa, quản lý Drift, hoặc thiết kế Modular hạ tầng đa môi trường.",
+        "new_sub_slot": null,
+        "target_slot_id": "terraform:primary",
+        "question": "Từ kinh nghiệm tự động hóa hạ tầng bằng CloudFormation trước đây và quản lý cụm Kubernetes hiện tại, khi chuyển sang dùng Terraform cho nhiều thành viên cùng thao tác, anh/chị thiết kế cơ chế Remote Backend kết hợp State Locking như thế nào để ngăn chặn xung đột trạng thái hạ tầng?"
+      }
+    ],
+    "signature": {
+      "instructions": "3-Layer Adaptive Question Generator with Abductive Chain-of-Thought (C -> A).\nEnforces Relevance Theory & Domain-Agnostic Rubric constraints:\n1. One-Question-One-Answer: Ask exactly ONE clear, concrete question in Vietnamese.\n2. Show, Don't Tell: Ask for concrete real-world execution, troubleshooting steps, or domain trade-offs.\n3. Contextual Bridging: Connect naturally to Context Anchors A_ctx or previous utterance (Zero Topic Drift).\n4. Difficulty Calibration: Calibrate difficulty strictly according to the Target Rubric Anchor (Low/Med/High).",
+      "fields": [
+        {
+          "prefix": "Reference Layer Context:",
+          "description": "Layer 1 Reference Context: skill metadata, CV evidence spans, context_job, Context Anchors A_ctx, dialogue history, and active slot state"
+        },
+        {
+          "prefix": "Main Layer Directives:",
+          "description": "Layer 2 Main Directives: Dynamic Persona, suggested_strategy, target difficulty rubric anchor r_target = s_jd, and Abductive CoT (C -> A) instructions"
+        },
+        {
+          "prefix": "Reasoning:",
+          "description": "${reasoning}"
+        },
+        {
+          "prefix": "Surprising Fact C:",
+          "description": "Observed Surprising Fact C_0 (at k=1) or C_{t-1} (at k>=2) from CV/dialogue discrepancy"
+        },
+        {
+          "prefix": "Hypothesis A:",
+          "description": "Inferred Abductive Hypothesis A_0 or A_{t-1} explaining the hidden cause of C"
+        },
+        {
+          "prefix": "New Sub Slot:",
+          "description": "Optional temporary Probing Sub-slot (None at k=1; at most 1 at k in {2,3} if active sub-slots < 2)"
+        },
+        {
+          "prefix": "Target Slot Id:",
+          "description": "ID of the active primary slot or sub-slot targeted by this question"
+        },
+        {
+          "prefix": "Question:",
+          "description": "Single concrete Vietnamese question adhering to One-Question-One-Answer, Show-Don't-Tell, and Difficulty Anchor"
+        }
+      ]
+    },
+    "lm": null
+  },
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.14",
+      "dspy": "3.4.1",
+      "cloudpickle": "3.1"
+    }
+  }
+}

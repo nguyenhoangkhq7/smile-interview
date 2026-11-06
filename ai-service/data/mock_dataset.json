@@ -1,0 +1,326 @@
+[
+  {
+    "pair_id": "pair_devops_001",
+    "cv_text": "Jane Smith - DevOps Engineer\n    Công ty CloudNine (03/2024 - Hiện tại) - Vị trí: DevOps Lead\n    - Thiết kế và vận hành hạ tầng Kubernetes cho 50+ microservices.\n    - Triển khai CI/CD pipeline trên AWS, tối ưu chi phí giảm 30%.\n    Công ty StartupXYZ (06/2019 - 02/2024) - Vị trí: DevOps Engineer\n    - Quản lý cluster Kubernetes quy mô nhỏ, khoảng 10 services.\n    - Viết Terraform để provision hạ tầng AWS.\n    Công ty FreelanceGigs (01/2017 - 05/2019) - Vị trí: Junior Sysadmin\n    - Hỗ trợ quản trị server Linux cơ bản.\n    Kỹ năng khác: Python, Bash, Ansible, GCP, Photoshop.\n    ",
+    "jd_text": "Tuyển dụng: DevOps Engineer\n    Yêu cầu:\n    - Tối thiểu 4 năm kinh nghiệm vận hành Kubernetes ở môi trường production (Must-have).\n    - Thành thạo Terraform (Must-have).\n    - Vững vàng quản trị hệ thống Linux (Must-have).\n    - Có kinh nghiệm với GCP là một lợi thế (Nice-to-have).\n    - Có kỹ năng thiết kế UI/UX cơ bản (Nice-to-have).\n    ",
+    "cv_skills": [
+      {
+        "skill_id": "kubernetes",
+        "type": "explicit",
+        "confidence": 0.98,
+        "evidence_spans": [
+          "Thiết kế và vận hành hạ tầng Kubernetes cho 50+ microservices.",
+          "Quản lý cluster Kubernetes quy mô nhỏ, khoảng 10 services."
+        ]
+      },
+      {
+        "skill_id": "terraform",
+        "type": "explicit",
+        "confidence": 0.95,
+        "evidence_spans": [
+          "Viết Terraform để provision hạ tầng AWS."
+        ]
+      },
+      {
+        "skill_id": "linux",
+        "type": "explicit",
+        "confidence": 0.85,
+        "evidence_spans": [
+          "Hỗ trợ quản trị server Linux cơ bản."
+        ]
+      },
+      {
+        "skill_id": "gcp",
+        "type": "explicit",
+        "confidence": 0.7,
+        "evidence_spans": [
+          "Kỹ năng khác: Python, Bash, Ansible, GCP, Photoshop."
+        ]
+      },
+      {
+        "skill_id": "photoshop",
+        "type": "explicit",
+        "confidence": 0.75,
+        "evidence_spans": [
+          "Kỹ năng khác: Python, Bash, Ansible, GCP, Photoshop."
+        ]
+      }
+    ],
+    "jd_skills": [
+      {
+        "skill_id": "kubernetes",
+        "type": "explicit",
+        "confidence": 0.99,
+        "evidence_spans": [
+          "Tối thiểu 4 năm kinh nghiệm vận hành Kubernetes ở môi trường production (Must-have)."
+        ]
+      },
+      {
+        "skill_id": "terraform",
+        "type": "explicit",
+        "confidence": 0.95,
+        "evidence_spans": [
+          "Thành thạo Terraform (Must-have)."
+        ]
+      },
+      {
+        "skill_id": "linux",
+        "type": "explicit",
+        "confidence": 0.95,
+        "evidence_spans": [
+          "Vững vàng quản trị hệ thống Linux (Must-have)."
+        ]
+      },
+      {
+        "skill_id": "gcp",
+        "type": "explicit",
+        "confidence": 0.85,
+        "evidence_spans": [
+          "Có kinh nghiệm với GCP là một lợi thế (Nice-to-have)."
+        ]
+      },
+      {
+        "skill_id": "ui_ux",
+        "type": "explicit",
+        "confidence": 0.8,
+        "evidence_spans": [
+          "Có kỹ năng thiết kế UI/UX cơ bản (Nice-to-have)."
+        ]
+      }
+    ],
+    "match_results": [
+      {
+        "jd_skill_id": "kubernetes",
+        "w_j": 0.3,
+        "matched_cv_skill_id": "kubernetes",
+        "soft_match": 1.0
+      },
+      {
+        "jd_skill_id": "terraform",
+        "w_j": 0.25,
+        "matched_cv_skill_id": "terraform",
+        "soft_match": 1.0
+      },
+      {
+        "jd_skill_id": "linux",
+        "w_j": 0.25,
+        "matched_cv_skill_id": "linux",
+        "soft_match": 1.0
+      },
+      {
+        "jd_skill_id": "gcp",
+        "w_j": 0.1,
+        "matched_cv_skill_id": "gcp",
+        "soft_match": 1.0
+      },
+      {
+        "jd_skill_id": "ui_ux",
+        "w_j": 0.1,
+        "matched_cv_skill_id": "photoshop",
+        "soft_match": 0.25
+      }
+    ],
+    "metadata": {
+      "role": "DevOps Engineer",
+      "level": "Senior"
+    }
+  },
+  {
+    "pair_id": "pair_backend_002",
+    "cv_text": "John Doe - Backend Developer\n    Acme Corp (01/2021 - Hiện tại) - Senior Backend Developer\n    - Phát triển hệ thống microservices sử dụng Python và Django.\n    - Thiết kế kiến trúc cơ sở dữ liệu PostgreSQL cho 1 triệu người dùng.\n    - Tối ưu hóa caching sử dụng Redis.\n    - Đóng gói ứng dụng với Docker.\n    ",
+    "jd_text": "Tuyển dụng: Senior Python Backend Developer\n    Yêu cầu:\n    - 3+ năm kinh nghiệm Python và Django (Must-have).\n    - Tối ưu hóa cơ sở dữ liệu PostgreSQL (Must-have).\n    - Thành thạo Docker (Must-have).\n    - Kinh nghiệm với Redis (Nice-to-have).\n    ",
+    "cv_skills": [
+      {
+        "skill_id": "python",
+        "type": "explicit",
+        "confidence": 0.98,
+        "evidence_spans": [
+          "Phát triển hệ thống microservices sử dụng Python và Django."
+        ]
+      },
+      {
+        "skill_id": "postgresql",
+        "type": "explicit",
+        "confidence": 0.95,
+        "evidence_spans": [
+          "Thiết kế kiến trúc cơ sở dữ liệu PostgreSQL cho 1 triệu người dùng."
+        ]
+      },
+      {
+        "skill_id": "docker",
+        "type": "explicit",
+        "confidence": 0.9,
+        "evidence_spans": [
+          "Đóng gói ứng dụng với Docker."
+        ]
+      },
+      {
+        "skill_id": "redis",
+        "type": "explicit",
+        "confidence": 0.88,
+        "evidence_spans": [
+          "Tối ưu hóa caching sử dụng Redis."
+        ]
+      }
+    ],
+    "jd_skills": [
+      {
+        "skill_id": "python",
+        "type": "explicit",
+        "confidence": 0.99,
+        "evidence_spans": [
+          "3+ năm kinh nghiệm Python và Django (Must-have)."
+        ]
+      },
+      {
+        "skill_id": "postgresql",
+        "type": "explicit",
+        "confidence": 0.95,
+        "evidence_spans": [
+          "Tối ưu hóa cơ sở dữ liệu PostgreSQL (Must-have)."
+        ]
+      },
+      {
+        "skill_id": "docker",
+        "type": "explicit",
+        "confidence": 0.9,
+        "evidence_spans": [
+          "Thành thạo Docker (Must-have)."
+        ]
+      },
+      {
+        "skill_id": "redis",
+        "type": "explicit",
+        "confidence": 0.85,
+        "evidence_spans": [
+          "Kinh nghiệm với Redis (Nice-to-have)."
+        ]
+      }
+    ],
+    "match_results": [
+      {
+        "jd_skill_id": "python",
+        "w_j": 0.4,
+        "matched_cv_skill_id": "python",
+        "soft_match": 1.0
+      },
+      {
+        "jd_skill_id": "postgresql",
+        "w_j": 0.3,
+        "matched_cv_skill_id": "postgresql",
+        "soft_match": 1.0
+      },
+      {
+        "jd_skill_id": "docker",
+        "w_j": 0.2,
+        "matched_cv_skill_id": "docker",
+        "soft_match": 1.0
+      },
+      {
+        "jd_skill_id": "redis",
+        "w_j": 0.1,
+        "matched_cv_skill_id": "redis",
+        "soft_match": 1.0
+      }
+    ],
+    "metadata": {
+      "role": "Backend Developer",
+      "level": "Senior"
+    }
+  },
+  {
+    "pair_id": "pair_data_003",
+    "cv_text": "Alice Wong - Data Engineer\n    BigData Solutions (06/2022 - Hiện tại) - Data Engineer\n    - Xây dựng pipeline xử lý dữ liệu lớn với Apache Spark.\n    - Viết câu lệnh SQL phức tạp trên BigQuery và Snowflake.\n    - Quản lý workflow tự động hóa với Apache Airflow.\n    ",
+    "jd_text": "Tuyển dụng: Data Engineer\n    Yêu cầu:\n    - Có kinh nghiệm với Apache Spark (Must-have).\n    - Thành thạo SQL nâng cao (Must-have).\n    - Kinh nghiệm sử dụng Apache Airflow (Must-have).\n    - Hiểu biết về Kafka streaming (Nice-to-have).\n    ",
+    "cv_skills": [
+      {
+        "skill_id": "spark",
+        "type": "explicit",
+        "confidence": 0.95,
+        "evidence_spans": [
+          "Xây dựng pipeline xử lý dữ liệu lớn với Apache Spark."
+        ]
+      },
+      {
+        "skill_id": "sql",
+        "type": "explicit",
+        "confidence": 0.95,
+        "evidence_spans": [
+          "Viết câu lệnh SQL phức tạp trên BigQuery và Snowflake."
+        ]
+      },
+      {
+        "skill_id": "airflow",
+        "type": "explicit",
+        "confidence": 0.9,
+        "evidence_spans": [
+          "Quản lý workflow tự động hóa với Apache Airflow."
+        ]
+      }
+    ],
+    "jd_skills": [
+      {
+        "skill_id": "spark",
+        "type": "explicit",
+        "confidence": 0.95,
+        "evidence_spans": [
+          "Có kinh nghiệm với Apache Spark (Must-have)."
+        ]
+      },
+      {
+        "skill_id": "sql",
+        "type": "explicit",
+        "confidence": 0.95,
+        "evidence_spans": [
+          "Thành thạo SQL nâng cao (Must-have)."
+        ]
+      },
+      {
+        "skill_id": "airflow",
+        "type": "explicit",
+        "confidence": 0.9,
+        "evidence_spans": [
+          "Kinh nghiệm sử dụng Apache Airflow (Must-have)."
+        ]
+      },
+      {
+        "skill_id": "kafka",
+        "type": "explicit",
+        "confidence": 0.85,
+        "evidence_spans": [
+          "Hiểu biết về Kafka streaming (Nice-to-have)."
+        ]
+      }
+    ],
+    "match_results": [
+      {
+        "jd_skill_id": "spark",
+        "w_j": 0.35,
+        "matched_cv_skill_id": "spark",
+        "soft_match": 1.0
+      },
+      {
+        "jd_skill_id": "sql",
+        "w_j": 0.35,
+        "matched_cv_skill_id": "sql",
+        "soft_match": 1.0
+      },
+      {
+        "jd_skill_id": "airflow",
+        "w_j": 0.2,
+        "matched_cv_skill_id": "airflow",
+        "soft_match": 1.0
+      },
+      {
+        "jd_skill_id": "kafka",
+        "w_j": 0.1,
+        "matched_cv_skill_id": "spark",
+        "soft_match": 0.3
+      }
+    ],
+    "metadata": {
+      "role": "Data Engineer",
+      "level": "Mid-Senior"
+    }
+  }
+]

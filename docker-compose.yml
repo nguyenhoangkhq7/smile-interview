@@ -18,23 +18,6 @@ services:
       retries: 5
       start_period: 10s
 
-  redis:
-    image: redis:7-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
-    container_name: redis_cache
-    restart: always
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # ─────────────────────────────────────────────────────────────────
-  # Backend API — Java 21 Spring Boot Modular Monolith
-  # ─────────────────────────────────────────────────────────────────
   backend:
     build:
       context: ./backend
@@ -48,20 +31,13 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-smile_interview_db}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
-      SPRING_DATA_REDIS_HOST: redis
-      SPRING_DATA_REDIS_PORT: 6379
       FASTAPI_AI_BASE_URL: http://ai-service:8000
     ports:
       - "8081:8081"
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_healthy
 
-  # ─────────────────────────────────────────────────────────────────
-  # AI Service — Python FastAPI (CV-JD Matching, GNN, Evaluation)
-  # ─────────────────────────────────────────────────────────────────
   ai-service:
     build:
       context: ./ai-service
@@ -77,9 +53,6 @@ services:
     ports:
       - "8000:8000"
 
-  # ─────────────────────────────────────────────────────────────────
-  # Next.js Frontend — Web Application (Pure UI Presentation Layer)
-  # ─────────────────────────────────────────────────────────────────
   web-app:
     build:
       context: ./web-app
@@ -102,4 +75,3 @@ services:
 
 volumes:
   postgres_data:
-  redis_data:
