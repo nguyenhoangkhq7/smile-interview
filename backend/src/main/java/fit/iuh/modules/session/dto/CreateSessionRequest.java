@@ -19,7 +19,6 @@ public class CreateSessionRequest {
     private String status;
     private UUID resumeId;
     private UUID jdId;
-    private UUID assessmentId;
     private String cvFilename;
     private String jdFilename;
 }

@@ -12,9 +12,9 @@ import java.util.UUID;
 
 /**
  * JPA entity representing a single HR evaluator's rating
- * of an AI-generated question bank for an interview session.
+ * of matching analysis and adaptive questions for an interview session.
  *
- * <p>Mapped to the {@code hr_evaluations} table created by {@code V7}.
+ * <p>Mapped to the {@code hr_evaluations} table created by {@code V1}.
  */
 @Entity
 @Table(

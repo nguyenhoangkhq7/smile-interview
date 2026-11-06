@@ -8,8 +8,8 @@ import uuid
 from typing import Optional
 from fastapi import APIRouter, Request, File, Form, UploadFile, status, HTTPException
 
-from src.api.routes import _get_orchestrator, _get_report_store
-from src.api.schemas import AnalyzeWithReportResponse
+from skill_gap.api.routes import _get_orchestrator, _get_report_store
+from skill_gap.api.schemas import AnalyzeWithReportResponse
 from .schemas import MatchPipelineRequest, Module1Output
 from .extractor import DefaultModule1Extractor, Module1MatcherProtocol
 from .pdf_helper import extract_document_text

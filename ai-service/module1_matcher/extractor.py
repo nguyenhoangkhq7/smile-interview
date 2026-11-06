@@ -8,9 +8,9 @@ import re
 from typing import Dict, List, Optional, Protocol, Tuple
 from pydantic import BaseModel, Field
 
-from src.adapters.llm_client import LLMClient
-from src.domain.enums import SkillType
-from src.domain.models import ExtractedCVSkill, ExtractedJDSkill, MatchResult
+from skill_gap.adapters.llm_client import LLMClient
+from skill_gap.domain.enums import SkillType
+from skill_gap.domain.models import ExtractedCVSkill, ExtractedJDSkill, MatchResult
 from .schemas import Module1Output
 
 

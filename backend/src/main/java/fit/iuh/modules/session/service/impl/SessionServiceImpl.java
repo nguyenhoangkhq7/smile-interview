@@ -61,9 +61,6 @@ public class SessionServiceImpl implements SessionService {
         if (request.getStatus() != null) {
             session.setStatus(request.getStatus());
         }
-        if (request.getAssessmentId() != null) {
-            session.setAssessmentId(request.getAssessmentId());
-        }
 
         if (request.getResumeId() != null) {
             Resume resume = resumeRepository.findById(request.getResumeId()).orElse(null);
@@ -208,7 +205,7 @@ public class SessionServiceImpl implements SessionService {
             var resumeOpt = resumeRepository.findById(resumeId);
             if (resumeOpt.isPresent()) {
                 var r = resumeOpt.get();
-                rawCvText = r.getRawText() != null ? r.getRawText() : r.getParsedContent();
+                rawCvText = r.getRawText();
                 cvFilename = r.getFileName();
             }
         }
@@ -219,7 +216,7 @@ public class SessionServiceImpl implements SessionService {
             var jdOpt = jobDescriptionRepository.findById(jdId);
             if (jdOpt.isPresent()) {
                 var j = jdOpt.get();
-                rawJdText = j.getRawText() != null ? j.getRawText() : j.getParsedContent();
+                rawJdText = j.getRawText();
                 jdFilename = j.getTitle();
             }
         }

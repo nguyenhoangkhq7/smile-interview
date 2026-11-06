@@ -21,7 +21,6 @@ public class SessionResponse {
     private String resumeFileName;
     private UUID jdId;
     private String jdTitle;
-    private UUID assessmentId;
     private String status;
     private String interviewType;
     private String roleTitle;
@@ -77,7 +76,6 @@ public class SessionResponse {
                 .resumeFileName(session.getResume() != null ? session.getResume().getFileName() : null)
                 .jdId(session.getJobDescription() != null ? session.getJobDescription().getId() : null)
                 .jdTitle(session.getJobDescription() != null ? session.getJobDescription().getTitle() : null)
-                .assessmentId(session.getAssessmentId())
                 .status(session.getStatus())
                 .interviewType(session.getInterviewType())
                 .roleTitle(session.getRoleTitle())

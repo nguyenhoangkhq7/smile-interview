@@ -1,8 +1,8 @@
 import pytest
-from src.domain.enums import SemanticAlignment, QuestionStrategy
-from src.domain.models import JDRequirement, ProficiencyResult, MatchResult
-from src.adapters.config import AppConfig
-from src.services.gap_detector import GapDetector
+from skill_gap.domain.enums import SemanticAlignment, QuestionStrategy
+from skill_gap.domain.models import JDRequirement, ProficiencyResult, MatchResult
+from skill_gap.adapters.config import AppConfig
+from skill_gap.services.gap_detector import GapDetector
 
 class MockLLMClient:
     def complete(self, prompt: str, schema):

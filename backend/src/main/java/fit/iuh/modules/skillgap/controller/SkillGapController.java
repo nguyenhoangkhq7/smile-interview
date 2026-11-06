@@ -55,10 +55,10 @@ public class SkillGapController {
         }
 
         String cvText = session.getResume() != null
-                ? (session.getResume().getParsedContent() != null ? session.getResume().getParsedContent() : session.getResume().getRawText())
+                ? session.getResume().getRawText()
                 : "";
         String jdText = session.getJobDescription() != null
-                ? (session.getJobDescription().getParsedContent() != null ? session.getJobDescription().getParsedContent() : session.getJobDescription().getRawText())
+                ? session.getJobDescription().getRawText()
                 : "";
 
         AnalyzeWithReportResponseDto response = skillGapClient.analyzeGap(sessionId, cvText, jdText);

@@ -14,16 +14,16 @@ import dspy
 import pytest
 
 from main import create_app
-from src.adapters.config import AppConfig
-from src.adapters.llm_client import DSPyLLMClient, LLMClient
-from src.domain.enums import (
+from skill_gap.adapters.config import AppConfig
+from skill_gap.adapters.llm_client import DSPyLLMClient, LLMClient
+from skill_gap.domain.enums import (
     QuestionStrategy,
     RichnessLabel,
     SemanticAlignment,
     SeniorityLevel,
     SkillType,
 )
-from src.domain.models import (
+from skill_gap.domain.models import (
     ExtractedCVSkill,
     ExtractedJDSkill,
     JDParserOutput,
@@ -33,26 +33,26 @@ from src.domain.models import (
     SpanMapping,
     SpanRichness,
 )
-from src.dspy_modules.compiler import (
+from skill_gap.dspy_modules.compiler import (
     seed_default_compiled_artifacts,
     verify_gold_dataset_self_consistency,
 )
-from src.dspy_modules.dataset import (
+from skill_gap.dspy_modules.dataset import (
     get_dspy_trainset_and_valset,
     get_gold_jd_requirement_examples,
     get_gold_job_extraction_examples,
     get_gold_span_mapping_examples,
     get_gold_span_richness_examples,
 )
-from src.dspy_modules.metrics import (
+from skill_gap.dspy_modules.metrics import (
     jd_requirement_metric,
     job_extraction_metric,
     span_mapping_metric,
     span_richness_metric,
 )
-from src.pipeline.orchestrator import SkillGapOrchestrator
-from src.services.proficiency_estimator import SpanAnalysisList
-from src.services.resume_segmenter import JobBlockExtraction, SpanMappingExtraction
+from skill_gap.pipeline.orchestrator import SkillGapOrchestrator
+from skill_gap.services.proficiency_estimator import SpanAnalysisList
+from skill_gap.services.resume_segmenter import JobBlockExtraction, SpanMappingExtraction
 
 
 class SimulatedLatencyMockLLM(LLMClient):
@@ -427,9 +427,9 @@ def test_three_llm_optimizations_fastpath_batch_and_schema():
     3. `ProficiencyEstimator.estimate_batch()` deduplicates shared spans across N skills
        into a single LLM call (`call_count == 1` instead of N).
     """
-    from src.services.gap_detector import GapDetector
-    from src.services.proficiency_estimator import ProficiencyEstimator
-    from src.services.resume_segmenter import ResumeSegmenter
+    from skill_gap.services.gap_detector import GapDetector
+    from skill_gap.services.proficiency_estimator import ProficiencyEstimator
+    from skill_gap.services.resume_segmenter import ResumeSegmenter
 
     # Optimization 1: Schema strips dead modifier_score & GapDetector needs no llm_client
     richness_schema = SpanRichness.model_json_schema()
@@ -512,10 +512,10 @@ def test_six_pipeline_optimizations_end_to_end():
     6. `date_parser.merge_date_intervals` uses inclusive calendar-month set union matching `ProficiencyEstimator`.
     """
     import datetime
-    from src.domain.models import ProficiencyResult
-    from src.services.date_parser import merge_date_intervals
-    from src.services.gap_detector import GapDetector
-    from src.services.proficiency_estimator import ProficiencyEstimator
+    from skill_gap.domain.models import ProficiencyResult
+    from skill_gap.services.date_parser import merge_date_intervals
+    from skill_gap.services.gap_detector import GapDetector
+    from skill_gap.services.proficiency_estimator import ProficiencyEstimator
 
     config = AppConfig(reference_date="2024-06-01")
 
@@ -611,7 +611,7 @@ def test_six_pipeline_optimizations_end_to_end():
     for legacy_field in ("raw_start_date", "raw_end_date", "raw_quote"):
         assert legacy_field not in jb_schema.get("properties", {})
 
-    from src.services.resume_segmenter import ResumeSegmenter
+    from skill_gap.services.resume_segmenter import ResumeSegmenter
 
     class NaturalDateLLM(LLMClient):
         def complete(self, prompt, schema):

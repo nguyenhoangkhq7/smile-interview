@@ -46,7 +46,7 @@ public class JobDescriptionController {
     public ResponseEntity<Map<String, String>> getJobDescriptionRaw(@PathVariable UUID id) {
         JobDescription jd = jobDescriptionRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Job description not found with id: " + id));
-        String rawText = jd.getRawText() != null ? jd.getRawText() : jd.getParsedContent();
+        String rawText = jd.getRawText();
         return ResponseEntity.ok(Map.of(
                 "title", jd.getTitle(),
                 "rawText", rawText != null ? rawText : ""
@@ -76,7 +76,7 @@ public class JobDescriptionController {
                 .userId(userId)
                 .title(title)
                 .fileUrl(fileUrl)
-                .parsedContent(parsedContent)
+                .rawText(parsedContent)
                 .createdAt(LocalDateTime.now())
                 .build();
 
@@ -93,6 +93,7 @@ public class JobDescriptionController {
         String title = (String) body.getOrDefault("title", body.getOrDefault("file_name", "JD_" + System.currentTimeMillis()));
         String parsedContent = (String) body.getOrDefault("parsed_content", body.get("extracted_text"));
         String rawText = (String) body.get("raw_text");
+        if (rawText == null || rawText.isBlank()) rawText = parsedContent;
         String fileUrl = (String) body.get("file_url");
 
         JobDescription jd = JobDescription.builder()
@@ -100,7 +101,6 @@ public class JobDescriptionController {
                 .userId(userId)
                 .title(title)
                 .fileUrl(fileUrl)
-                .parsedContent(parsedContent)
                 .rawText(rawText)
                 .createdAt(LocalDateTime.now())
                 .build();

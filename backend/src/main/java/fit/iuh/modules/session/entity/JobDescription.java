@@ -27,23 +27,11 @@ public class JobDescription {
     @Column(name = "title", nullable = false)
     private String title;
 
-    @Column(name = "parsed_content", columnDefinition = "text")
-    private String parsedContent;
-
     @Column(name = "raw_text", columnDefinition = "text")
     private String rawText;
 
-    @Column(name = "file_url")
+    @Column(name = "file_url", length = 500)
     private String fileUrl;
-
-    @Column(name = "cloudinary_id")
-    private String cloudinaryId;
-
-    @Column(name = "job_category")
-    private String jobCategory;
-
-    @Column(name = "accepted_levels")
-    private String acceptedLevels;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

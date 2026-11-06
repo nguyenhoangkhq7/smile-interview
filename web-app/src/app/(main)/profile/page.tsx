@@ -221,15 +221,13 @@ export default function ProfilePage() {
 
   // ── Default CV state ─────────────────────────────────────────────
   interface Resume {
-    id: number;
-    file_name: string;
-    created_at: string;
-    file_url: string;
+    id: string;
+    fileName: string;
+    createdAt: string;
+    fileUrl: string;
   }
   const [dbResumes, setDbResumes] = useState<Resume[]>([]);
-  const [selectedResumeId, setSelectedResumeId] = useState<number>(
-    user?.defaultResumeId ? Number(user.defaultResumeId) : 0
-  );
+  const [selectedResumeId, setSelectedResumeId] = useState<string>(user?.defaultResumeId ?? '');
   const [cvLoading, setCvLoading] = useState(false);
   const [cvToast, setCvToast] = useState<ToastState>(null);
   const fileInputCvRef = useRef<HTMLInputElement>(null);
@@ -262,7 +260,7 @@ export default function ProfilePage() {
   // Update selectedResumeId when user defaultResumeId is loaded or changes
   useEffect(() => {
     if (user?.defaultResumeId) {
-      setSelectedResumeId(Number(user.defaultResumeId));
+      setSelectedResumeId(user.defaultResumeId);
     }
   }, [user?.defaultResumeId]);
 
@@ -561,23 +559,23 @@ export default function ProfilePage() {
                             <FileText size={24} style={{ color: '#ea580c', flexShrink: 0 }} />
                             <div style={{ minWidth: 0, flex: 1 }}>
                               <p style={{ margin: 0, fontWeight: 600, fontSize: '0.85rem', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {defResume?.file_name || 'Đang tải thông tin CV...'}
+                                {defResume?.fileName || 'Đang tải thông tin CV...'}
                               </p>
                               {defResume && (
                                 <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b' }}>
-                                  Ngày lưu: {new Date(defResume.created_at).toLocaleDateString('vi-VN')}
+                                  Ngày lưu: {new Date(defResume.createdAt).toLocaleDateString('vi-VN')}
                                 </p>
                               )}
                             </div>
                           </div>
 
                           <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            {defResume?.file_url && (
+                            {defResume?.fileUrl && (
                               <button 
                                 className={styles.btnSecondary} 
                                 onClick={() => {
-                                  setViewerUrl(defResume.file_url);
-                                  setViewerTitle(`CV mặc định: ${defResume.file_name}`);
+                                  setViewerUrl(defResume.fileUrl);
+                                  setViewerTitle(`CV mặc định: ${defResume.fileName}`);
                                   setViewerOpen(true);
                                 }}
                                 style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', padding: '0.5rem 0.85rem' }}
@@ -622,12 +620,12 @@ export default function ProfilePage() {
                         <div className={styles.selectWrap} style={{ flex: 1 }}>
                           <select
                             value={selectedResumeId || ''}
-                            onChange={(e) => setSelectedResumeId(e.target.value ? parseInt(e.target.value, 10) : 0)}
+                            onChange={(e) => setSelectedResumeId(e.target.value)}
                             className={styles.select}
                           >
                             <option value="">-- Chọn CV trong danh sách --</option>
                             {dbResumes.map((r) => (
-                              <option key={r.id} value={r.id}>{r.file_name}</option>
+                              <option key={r.id} value={r.id}>{r.fileName}</option>
                             ))}
                           </select>
                           <div className={styles.selectIcon}>

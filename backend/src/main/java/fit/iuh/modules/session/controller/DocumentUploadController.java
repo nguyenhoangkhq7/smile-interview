@@ -90,11 +90,11 @@ public class DocumentUploadController {
         Resume resume = session.getResume();
         boolean hasNewCv = (cvFile != null && !cvFile.isEmpty()) || (cvText != null && !cvText.isBlank());
         boolean hasNewJd = (jdFile != null && !jdFile.isEmpty()) || (jdText != null && !jdText.isBlank());
-        if (!hasNewCv && (resume == null || ((resume.getRawText() == null || resume.getRawText().isBlank()) && (resume.getParsedContent() == null || resume.getParsedContent().isBlank())))) {
+        if (!hasNewCv && (resume == null || (resume.getRawText() == null || resume.getRawText().isBlank()))) {
             throw new IllegalArgumentException("CV chưa có nội dung trích xuất. Vui lòng tải lại CV.");
         }
         JobDescription existingJd = session.getJobDescription();
-        if (!hasNewJd && (existingJd == null || ((existingJd.getRawText() == null || existingJd.getRawText().isBlank()) && (existingJd.getParsedContent() == null || existingJd.getParsedContent().isBlank())))) {
+        if (!hasNewJd && (existingJd == null || (existingJd.getRawText() == null || existingJd.getRawText().isBlank()))) {
             throw new IllegalArgumentException("JD chưa có nội dung trích xuất. Vui lòng tải lại JD.");
         }
         if (hasNewCv && resolvedCvText.isBlank()) throw new IllegalArgumentException("Không thể trích xuất nội dung CV.");
@@ -104,13 +104,11 @@ public class DocumentUploadController {
                     .userId(userId)
                     .fileName(cvFileName)
                     .rawText(resolvedCvText)
-                    .parsedContent(resolvedCvText)
                     .createdAt(LocalDateTime.now())
                     .build();
         } else if (hasNewCv) {
             resume.setFileName(cvFileName);
             resume.setRawText(resolvedCvText);
-            resume.setParsedContent(resolvedCvText);
         }
         resume = resumeRepository.save(resume);
         session.setResume(resume);
@@ -134,7 +132,6 @@ public class DocumentUploadController {
                     .userId(userId)
                     .title(roleTitle != null && !roleTitle.isBlank() ? roleTitle : jdFileName)
                     .rawText(resolvedJdText)
-                    .parsedContent(resolvedJdText)
                     .createdAt(LocalDateTime.now())
                     .build();
         } else if (hasNewJd) {
@@ -142,7 +139,6 @@ public class DocumentUploadController {
                 jd.setTitle(roleTitle);
             }
             jd.setRawText(resolvedJdText);
-            jd.setParsedContent(resolvedJdText);
         }
         jd = jobDescriptionRepository.save(jd);
         session.setJobDescription(jd);

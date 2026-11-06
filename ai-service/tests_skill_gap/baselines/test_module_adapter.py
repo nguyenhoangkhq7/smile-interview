@@ -1,19 +1,19 @@
 from typing import List
 from unittest.mock import MagicMock
 
-from src.domain.enums import QuestionStrategy, SemanticAlignment, SkillType
-from src.domain.models import (
+from skill_gap.domain.enums import QuestionStrategy, SemanticAlignment, SkillType
+from skill_gap.domain.models import (
     ExtractedCVSkill,
     ExtractedJDSkill,
     MatchResult,
     SkillGapResult,
 )
-from src.baselines.base import (
+from skill_gap.baselines.base import (
     BaselineInput,
     BaselineOutputField,
     BaselineSkillResult,
 )
-from src.baselines.module_adapter import (
+from skill_gap.baselines.module_adapter import (
     ProposedModuleBaseline,
     SkillGapModuleAdapter,
 )

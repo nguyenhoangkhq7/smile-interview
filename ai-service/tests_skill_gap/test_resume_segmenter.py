@@ -1,7 +1,7 @@
 import pytest
-from src.domain.enums import SeniorityLevel, SkillType
-from src.domain.models import JobBlock, SpanMapping, ExtractedCVSkill, UNASSIGNED_JOB_ID
-from src.services.resume_segmenter import ResumeSegmenter, JobBlockExtraction, SpanMappingExtraction
+from skill_gap.domain.enums import SeniorityLevel, SkillType
+from skill_gap.domain.models import JobBlock, SpanMapping, ExtractedCVSkill, UNASSIGNED_JOB_ID
+from skill_gap.services.resume_segmenter import ResumeSegmenter, JobBlockExtraction, SpanMappingExtraction
 
 class MockLLMClient:
     def __init__(self, expected_job_blocks, expected_span_mappings):

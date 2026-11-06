@@ -32,9 +32,6 @@ public class Session {
     @JoinColumn(name = "jd_id")
     private JobDescription jobDescription;
 
-    @Column(name = "assessment_id")
-    private UUID assessmentId;
-
     @Column(name = "status", length = 50)
     private String status;
 

@@ -5,7 +5,7 @@ Pydantic v2 Contracts for Module 1 (SBERT + GNN Semantic Skill Matching) and End
 from typing import List, Optional
 from pydantic import BaseModel, Field
 
-from src.domain.models import ExtractedCVSkill, ExtractedJDSkill, MatchResult
+from skill_gap.domain.models import ExtractedCVSkill, ExtractedJDSkill, MatchResult
 
 
 class MatchPipelineRequest(BaseModel):

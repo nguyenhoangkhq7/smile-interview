@@ -1,13 +1,13 @@
 from typing import List
 import pytest
 
-from src.baselines.base import (
+from skill_gap.baselines.base import (
     BaselineInput,
     BaselineMethod,
     BaselineOutputField,
     BaselineSkillResult,
 )
-from src.baselines.registry import BaselineRegistry
+from skill_gap.baselines.registry import BaselineRegistry
 
 
 class DummyBaseline(BaselineMethod):

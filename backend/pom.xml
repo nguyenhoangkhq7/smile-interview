@@ -93,9 +93,8 @@
         <!-- ===== Database Migration ===== -->
         <!-- Flyway: version-controlled schema migrations (replaces Hibernate DDL auto) -->
         <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-core</artifactId>
-            <!-- Version managed by Spring Boot parent BOM -->
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
         </dependency>
         <!-- Flyway Database support for PostgreSQL 17+ -->
         <dependency>

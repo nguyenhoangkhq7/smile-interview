@@ -38,7 +38,7 @@ public class SessionTurn {
     @Column(name = "suggested_answer", columnDefinition = "TEXT")
     private String suggestedAnswer;
 
-    @Column(name = "topic_tag")
+    @Column(name = "topic_tag", length = 100)
     private String topicTag;
 
     @Column(name = "is_deep_dive")

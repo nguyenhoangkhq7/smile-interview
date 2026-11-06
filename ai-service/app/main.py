@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from module1_matcher.router import router as module1_router
-from src.api.routes import router as skill_gap_router
+from skill_gap.api.routes import router as skill_gap_router
 from adaptive_questioning.api.routes import router as interview_router
 
 _ROOT_DIR = Path(__file__).resolve().parent.parent

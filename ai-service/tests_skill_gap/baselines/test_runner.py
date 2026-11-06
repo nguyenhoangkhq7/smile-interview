@@ -6,27 +6,27 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Type
 import pytest
 
-from src.adapters.config import AppConfig
-from src.adapters.llm_client import LLMClient
-from src.baselines.base import (
+from skill_gap.adapters.config import AppConfig
+from skill_gap.adapters.llm_client import LLMClient
+from skill_gap.baselines.base import (
     BaselineInput,
     BaselineMethod,
     BaselineOutputField,
     BaselineSkillResult,
 )
-from src.baselines.dataset import (
+from skill_gap.baselines.dataset import (
     DatasetPair,
     InMemoryDatasetSource,
     JSONDatasetSource,
     save_dataset_json,
     save_dataset_jsonl,
 )
-from src.baselines.llm.schemas import LLMSkillAssessment, LLMZeroShotResponse
-from src.baselines.registry import BaselineRegistry
-from src.baselines.registrations import register_standard_factories
-from src.baselines.runner import BaselineRunner, main, parse_args
-from src.domain.enums import SemanticAlignment, SkillType
-from src.domain.models import ExtractedCVSkill, ExtractedJDSkill, MatchResult
+from skill_gap.baselines.llm.schemas import LLMSkillAssessment, LLMZeroShotResponse
+from skill_gap.baselines.registry import BaselineRegistry
+from skill_gap.baselines.registrations import register_standard_factories
+from skill_gap.baselines.runner import BaselineRunner, main, parse_args
+from skill_gap.domain.enums import SemanticAlignment, SkillType
+from skill_gap.domain.models import ExtractedCVSkill, ExtractedJDSkill, MatchResult
 
 
 # ==============================================================================
@@ -201,7 +201,7 @@ def test_dry_run_makes_zero_llm_calls_and_no_file_writes(mock_dataset_pairs: Lis
         source = InMemoryDatasetSource(mock_dataset_pairs)
 
         registry = BaselineRegistry()
-        from src.baselines.heuristics.sim_gap import SimGapBaseline
+        from skill_gap.baselines.heuristics.sim_gap import SimGapBaseline
         registry.register(SimGapBaseline())
         register_standard_factories(registry)
 
@@ -249,7 +249,7 @@ def test_runner_executes_and_validates_jsonl_and_manifest(mock_dataset_pairs: Li
         source = InMemoryDatasetSource(mock_dataset_pairs)
 
         registry = BaselineRegistry()
-        from src.baselines.heuristics.sim_gap import SimGapBaseline
+        from skill_gap.baselines.heuristics.sim_gap import SimGapBaseline
         registry.register(SimGapBaseline())
         register_standard_factories(registry)
 
@@ -338,7 +338,7 @@ def test_runner_resumability_skips_completed_evaluations(mock_dataset_pairs: Lis
     with tempfile.TemporaryDirectory() as tmp_dir:
         source = InMemoryDatasetSource(mock_dataset_pairs)
         registry = BaselineRegistry()
-        from src.baselines.heuristics.sim_gap import SimGapBaseline
+        from skill_gap.baselines.heuristics.sim_gap import SimGapBaseline
         registry.register(SimGapBaseline())
 
         runner = BaselineRunner(
@@ -380,7 +380,7 @@ def test_runner_error_isolation_and_continues_on_failure(mock_dataset_pairs: Lis
     with tempfile.TemporaryDirectory() as tmp_dir:
         source = InMemoryDatasetSource(mock_dataset_pairs)
         registry = BaselineRegistry()
-        from src.baselines.heuristics.sim_gap import SimGapBaseline
+        from skill_gap.baselines.heuristics.sim_gap import SimGapBaseline
         registry.register(SimGapBaseline())
         registry.register(FaultyBaseline())
 

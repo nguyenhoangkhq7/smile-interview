@@ -168,7 +168,8 @@ public class AuthService {
             user.setAvatarUrl(request.avatarUrl());
         }
         if (request.defaultResumeId() != null) {
-            user.setDefaultResumeId(request.defaultResumeId());
+            user.setDefaultResumeId(request.defaultResumeId().isBlank()
+                    ? null : java.util.UUID.fromString(request.defaultResumeId()));
         }
 
         User updated = userRepository.save(user);
@@ -218,7 +219,7 @@ public class AuthService {
                 user.getRole() != null ? user.getRole().name() : "USER",
                 user.getPhoneNumber(),
                 user.getAvatarUrl(),
-                user.getDefaultResumeId()
+                user.getDefaultResumeId() != null ? user.getDefaultResumeId().toString() : null
         );
     }
 }

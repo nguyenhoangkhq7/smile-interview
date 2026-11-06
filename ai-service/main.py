@@ -7,9 +7,9 @@ from pathlib import Path
 from typing import Optional
 from fastapi import FastAPI
 from app.main import create_app as _create_unified_app
-from src.adapters.config import AppConfig, load_config
-from src.adapters.llm_client import DSPyLLMClient, LLMClient
-from src.pipeline.orchestrator import SkillGapOrchestrator
+from skill_gap.adapters.config import AppConfig, load_config
+from skill_gap.adapters.llm_client import DSPyLLMClient, LLMClient
+from skill_gap.pipeline.orchestrator import SkillGapOrchestrator
 
 _PACKAGE_DIR = Path(__file__).resolve().parent
 
@@ -20,7 +20,9 @@ def create_app(
 ) -> FastAPI:
     application = _create_unified_app()
     if llm_client is not None or config is not None:
-        app_config = config or load_config(str(_PACKAGE_DIR / "config" / "settings.yaml"))
+        app_config = config or load_config(
+            str(_PACKAGE_DIR / "skill_gap" / "config" / "settings.yaml")
+        )
         model_name = os.environ.get("OPENROUTER_MODEL", app_config.llm.model)
         active_llm = llm_client or DSPyLLMClient(model=model_name)
         application.state.config = app_config

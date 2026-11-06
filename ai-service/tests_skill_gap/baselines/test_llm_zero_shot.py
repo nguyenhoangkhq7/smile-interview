@@ -4,18 +4,18 @@ import tempfile
 from typing import List, Optional, Type
 import pytest
 
-from src.domain.enums import SemanticAlignment, SkillType
-from src.domain.models import ExtractedCVSkill, ExtractedJDSkill, MatchResult
-from src.adapters.config import AppConfig
-from src.adapters.llm_client import LLMClient
-from src.baselines.base import BaselineInput, BaselineOutputField
-from src.baselines.llm.parser import validate_quote_in_text
-from src.baselines.llm.prompts import build_augmented_prompt, build_text_only_prompt
-from src.baselines.llm.schemas import (
+from skill_gap.domain.enums import SemanticAlignment, SkillType
+from skill_gap.domain.models import ExtractedCVSkill, ExtractedJDSkill, MatchResult
+from skill_gap.adapters.config import AppConfig
+from skill_gap.adapters.llm_client import LLMClient
+from skill_gap.baselines.base import BaselineInput, BaselineOutputField
+from skill_gap.baselines.llm.parser import validate_quote_in_text
+from skill_gap.baselines.llm.prompts import build_augmented_prompt, build_text_only_prompt
+from skill_gap.baselines.llm.schemas import (
     LLMSkillAssessment,
     LLMZeroShotResponse,
 )
-from src.baselines.llm.zero_shot import (
+from skill_gap.baselines.llm.zero_shot import (
     LLMAugmentedBaseline,
     LLMTextOnlyBaseline,
 )

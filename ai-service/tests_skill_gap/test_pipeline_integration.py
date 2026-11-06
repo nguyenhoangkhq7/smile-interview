@@ -5,15 +5,15 @@ Mock data Module 1 được định nghĩa trực tiếp trong file này (không
 vì module 1 thực sẽ thay thế khi tích hợp thật.
 """
 import pytest
-from src.domain.enums import SemanticAlignment, SeniorityLevel, RichnessLabel
-from src.domain.models import (
+from skill_gap.domain.enums import SemanticAlignment, SeniorityLevel, RichnessLabel
+from skill_gap.domain.models import (
     JDRequirement, JDParserOutput, JobBlock, SpanMapping, SpanRichness,
     ExtractedCVSkill, ExtractedJDSkill, MatchResult,
 )
-from src.adapters.config import AppConfig
-from src.pipeline.orchestrator import SkillGapOrchestrator
-from src.services.resume_segmenter import JobBlockExtraction, SpanMappingExtraction
-from src.services.proficiency_estimator import SpanAnalysisList
+from skill_gap.adapters.config import AppConfig
+from skill_gap.pipeline.orchestrator import SkillGapOrchestrator
+from skill_gap.services.resume_segmenter import JobBlockExtraction, SpanMappingExtraction
+from skill_gap.services.proficiency_estimator import SpanAnalysisList
 
 # ---------------------------------------------------------------------------
 # Mock Module 1 output (inline — phản ánh format thực của SBERT + GNN output)

@@ -1,8 +1,8 @@
 import pytest
 from typing import List
 
-from src.domain.enums import RichnessLabel, SemanticAlignment, SeniorityLevel, SkillType
-from src.domain.models import (
+from skill_gap.domain.enums import RichnessLabel, SemanticAlignment, SeniorityLevel, SkillType
+from skill_gap.domain.models import (
     ExtractedCVSkill,
     ExtractedJDSkill,
     JobBlock,
@@ -12,18 +12,18 @@ from src.domain.models import (
     JDRequirement,
     JDParserOutput,
 )
-from src.adapters.config import AppConfig
-from src.services.proficiency_estimator import (
+from skill_gap.adapters.config import AppConfig
+from skill_gap.services.proficiency_estimator import (
     ProficiencyEstimator,
     SpanAnalysisList,
 )
-from src.services.resume_segmenter import (
+from skill_gap.services.resume_segmenter import (
     JobBlockExtraction,
     SpanMappingExtraction,
 )
-from src.pipeline.orchestrator import SkillGapOrchestrator
-from src.baselines.base import BaselineInput, BaselineOutputField
-from src.baselines.proficiency.raw_duration import (
+from skill_gap.pipeline.orchestrator import SkillGapOrchestrator
+from skill_gap.baselines.base import BaselineInput, BaselineOutputField
+from skill_gap.baselines.proficiency.raw_duration import (
     RawDurationBaseline,
     RawDurationEstimator,
 )
@@ -399,7 +399,7 @@ def test_raw_duration_baseline_wrapper() -> None:
 
 def test_raw_duration_baseline_registry_integration() -> None:
     """Kiểm tra RawDurationBaseline đăng ký và tra cứu thành công trong BaselineRegistry."""
-    from src.baselines.registry import BaselineRegistry
+    from skill_gap.baselines.registry import BaselineRegistry
     registry = BaselineRegistry()
     baseline = RawDurationBaseline(llm_client=MockFixedLLM(), name="B-RawDuration")
     registry.register(baseline)

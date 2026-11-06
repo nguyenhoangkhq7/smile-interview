@@ -15,7 +15,7 @@ ai-service/
 │   ├── extractor.py                    # Pluggable Extractor & Semantic Matcher
 │   └── router.py                       # POST /api/v1/match & POST /api/v1/pipeline/analyze
 │
-├── src/                                # [Module 2]: Skill-Gap Detection (Xác định khoảng trống năng lực)
+├── skill_gap/                                # [Module 2]: Skill-Gap Detection (Xác định khoảng trống năng lực)
 │   ├── domain/                         # SkillNode, StaticGapAuditReport, SkillGapResult
 │   ├── pipeline/                       # SkillGapPipeline
 │   └── services/                       # GraphEngine, DependencyResolver

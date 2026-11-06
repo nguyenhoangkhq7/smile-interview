@@ -10,14 +10,14 @@ Verifies the final parsimonious scientific architecture:
 """
 import pytest
 import datetime
-from src.domain.enums import SkillType, SeniorityLevel, RichnessLabel, SemanticAlignment, QuestionStrategy
-from src.domain.models import (
+from skill_gap.domain.enums import SkillType, SeniorityLevel, RichnessLabel, SemanticAlignment, QuestionStrategy
+from skill_gap.domain.models import (
     ExtractedCVSkill, SpanMapping, JobBlock, SpanRichness,
     JDRequirement, ProficiencyResult, MatchResult, UNASSIGNED_JOB_ID
 )
-from src.adapters.config import AppConfig
-from src.services.proficiency_estimator import ProficiencyEstimator, SpanAnalysisList
-from src.services.gap_detector import GapDetector
+from skill_gap.adapters.config import AppConfig
+from skill_gap.services.proficiency_estimator import ProficiencyEstimator, SpanAnalysisList
+from skill_gap.services.gap_detector import GapDetector
 
 class MockLLM:
     def complete(self, prompt: str, schema):

@@ -47,7 +47,7 @@ public class User implements UserDetails {
     @Column(name = "role", nullable = false)
     private Role role;
 
-    @Column(name = "phone_number")
+    @Column(name = "phone_number", length = 50)
     private String phoneNumber;
 
     @Column(name = "avatar_url")
@@ -55,10 +55,10 @@ public class User implements UserDetails {
 
     /**
      * Reference to the user's default resume (FK to resumes table).
-     * Stored as a plain String — no JPA join to avoid cross-module coupling.
+     * Stored as a UUID — no JPA join to avoid cross-module coupling.
      */
     @Column(name = "default_resume_id")
-    private String defaultResumeId;
+    private UUID defaultResumeId;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

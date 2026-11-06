@@ -1,8 +1,8 @@
 import pytest
-from src.domain.enums import SkillType, SeniorityLevel, RichnessLabel
-from src.domain.models import ExtractedCVSkill, SpanMapping, JobBlock, SpanRichness, UNASSIGNED_JOB_ID
-from src.adapters.config import AppConfig
-from src.services.proficiency_estimator import ProficiencyEstimator, SpanAnalysisList
+from skill_gap.domain.enums import SkillType, SeniorityLevel, RichnessLabel
+from skill_gap.domain.models import ExtractedCVSkill, SpanMapping, JobBlock, SpanRichness, UNASSIGNED_JOB_ID
+from skill_gap.adapters.config import AppConfig
+from skill_gap.services.proficiency_estimator import ProficiencyEstimator, SpanAnalysisList
 
 class MockLLMClient:
     def __init__(self, expected_output: SpanAnalysisList):

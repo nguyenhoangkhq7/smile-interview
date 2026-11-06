@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from main import create_app
 from module1_matcher.extractor import DefaultModule1Extractor
 from tests_skill_gap.test_upgraded_architecture import SimulatedLatencyMockLLM
-from src.adapters.config import AppConfig
+from skill_gap.adapters.config import AppConfig
 
 
 def test_module1_to_module2_pipeline_endpoint():

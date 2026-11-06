@@ -1,7 +1,7 @@
 import pytest
-from src.domain.enums import SkillType
-from src.domain.models import ExtractedJDSkill, JDRequirement, JDParserOutput
-from src.services.jd_requirement_parser import JDRequirementParser
+from skill_gap.domain.enums import SkillType
+from skill_gap.domain.models import ExtractedJDSkill, JDRequirement, JDParserOutput
+from skill_gap.services.jd_requirement_parser import JDRequirementParser
 
 class MockLLMClient:
     def __init__(self, expected_output: JDParserOutput):

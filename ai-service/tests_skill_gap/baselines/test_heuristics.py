@@ -2,23 +2,23 @@ import math
 from typing import List
 import pytest
 
-from src.domain.enums import SemanticAlignment, SkillType
-from src.domain.models import (
+from skill_gap.domain.enums import SemanticAlignment, SkillType
+from skill_gap.domain.models import (
     ExtractedCVSkill,
     ExtractedJDSkill,
     MatchResult,
 )
-from src.adapters.config import AppConfig
-from src.services.gap_detector import GapDetector
-from src.baselines.base import (
+from skill_gap.adapters.config import AppConfig
+from skill_gap.services.gap_detector import GapDetector
+from skill_gap.baselines.base import (
     BaselineInput,
     BaselineOutputField,
 )
-from src.baselines.heuristics.binary_exact import BinaryExactBaseline
-from src.baselines.heuristics.jdw import JDWBaseline
-from src.baselines.heuristics.random_baseline import RandomBaseline
-from src.baselines.heuristics.sim_gap import SimGapBaseline
-from src.baselines.registry import baseline_registry
+from skill_gap.baselines.heuristics.binary_exact import BinaryExactBaseline
+from skill_gap.baselines.heuristics.jdw import JDWBaseline
+from skill_gap.baselines.heuristics.random_baseline import RandomBaseline
+from skill_gap.baselines.heuristics.sim_gap import SimGapBaseline
+from skill_gap.baselines.registry import baseline_registry
 
 
 class MockLLMClient:

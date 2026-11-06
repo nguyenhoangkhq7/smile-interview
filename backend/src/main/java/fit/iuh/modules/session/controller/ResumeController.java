@@ -49,7 +49,7 @@ public class ResumeController {
     public ResponseEntity<Map<String, String>> getResumeRaw(@PathVariable UUID id) {
         Resume resume = resumeRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Resume not found with id: " + id));
-        String rawText = resume.getRawText() != null ? resume.getRawText() : resume.getParsedContent();
+        String rawText = resume.getRawText();
         return ResponseEntity.ok(Map.of(
                 "fileName", resume.getFileName(),
                 "rawText", rawText != null ? rawText : ""
@@ -87,7 +87,7 @@ public class ResumeController {
                 .userId(userId)
                 .fileName(fileName)
                 .fileUrl(fileUrl)
-                .parsedContent(parsedContent)
+                .rawText(parsedContent)
                 .createdAt(LocalDateTime.now())
                 .build();
 
@@ -104,6 +104,7 @@ public class ResumeController {
         String fileName = (String) body.getOrDefault("file_name", "CV.pdf");
         String parsedContent = (String) body.getOrDefault("parsed_content", body.get("extracted_text"));
         String rawText = (String) body.get("raw_text");
+        if (rawText == null || rawText.isBlank()) rawText = parsedContent;
         String fileUrl = (String) body.get("file_url");
 
         Resume resume = Resume.builder()
@@ -111,7 +112,6 @@ public class ResumeController {
                 .userId(userId)
                 .fileName(fileName)
                 .fileUrl(fileUrl)
-                .parsedContent(parsedContent)
                 .rawText(rawText)
                 .createdAt(LocalDateTime.now())
                 .build();

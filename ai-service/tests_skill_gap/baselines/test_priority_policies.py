@@ -1,6 +1,6 @@
 import pytest
 
-from src.baselines.priority_policies import (
+from skill_gap.baselines.priority_policies import (
     DepthScaledPriorityPolicy,
     WeightTimesGapPolicy,
 )

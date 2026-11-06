@@ -27,10 +27,9 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
-    baseline-on-migrate: true
-    baseline-version: 0
-    validate-on-migrate: false
-    clean-disabled: false
+    baseline-on-migrate: false
+    validate-on-migrate: true
+    clean-disabled: true
 
   # ============================================================
   # Multipart File Upload (PDF files)
