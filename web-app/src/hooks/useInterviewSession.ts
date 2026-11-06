@@ -74,7 +74,6 @@ export function useInterviewSession() {
   
   const {
     mediaStream,
-    setMediaStream,
     cameraEnabled,
     micEnabled,
     permissionError,

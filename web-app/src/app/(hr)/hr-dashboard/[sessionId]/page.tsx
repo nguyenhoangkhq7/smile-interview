@@ -105,7 +105,7 @@ export default async function HrSessionDetailPage({
               {sessionData
                 ? (() => {
                     // Derive candidate name from cvFilename
-                    let name = (sessionData.cvFilename || '').replace(/\.[^.]+$/, '').replace(/^cv_/i, '').replace(/[_\s]+(test|upload|final|v\d+|\d{4}|draft|new|copy)$/i, '').replace(/[_-]+/g, ' ').trim();
+                    const name = (sessionData.cvFilename || '').replace(/\.[^.]+$/, '').replace(/^cv_/i, '').replace(/[_\s]+(test|upload|final|v\d+|\d{4}|draft|new|copy)$/i, '').replace(/[_-]+/g, ' ').trim();
                     const role = sessionData.roleTitle || 'Đang xác định vị trí';
                     return name ? `${name} — ${role}` : role;
                   })()
