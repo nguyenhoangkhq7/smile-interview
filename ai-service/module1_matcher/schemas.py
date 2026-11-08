@@ -24,6 +24,7 @@ class Module1Output(BaseModel):
     input contract for Module 2 (`skill_gap`).
     """
 
+    matcher_source: str = "EXTERNAL"
     cv_skills: List[ExtractedCVSkill] = Field(
         default_factory=list, description="Extracted CV skills with verbatim evidence spans"
     )

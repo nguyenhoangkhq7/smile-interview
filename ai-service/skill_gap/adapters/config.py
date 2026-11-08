@@ -1,4 +1,5 @@
 import os
+from datetime import date
 from pathlib import Path
 import yaml
 from typing import Dict, Optional
@@ -60,7 +61,7 @@ class LLMConfig(BaseModel):
 
 class AppConfig(BaseModel):
     reference_date: str = Field(
-        default="2024-06-01",
+        default_factory=lambda: date.today().isoformat(),
         description="Ngày tham chiếu cố định (ISO YYYY-MM-DD) đảm bảo tính tái lập 100%"
     )
     recency_years_threshold: float = Field(

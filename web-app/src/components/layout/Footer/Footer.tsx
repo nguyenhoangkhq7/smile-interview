@@ -1,8 +1,15 @@
+'use client';
+
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import Image from 'next/image';
 import styles from './footer.module.css';
 
 export default function Footer() {
+  const pathname = usePathname();
+  if (pathname === '/applications' || pathname.startsWith('/applications/')) {
+    return <footer className="border-t bg-card"><div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-5 text-xs text-muted-foreground sm:px-6"><Link href="/" className="font-semibold text-foreground">Smile Interview</Link><span>Luyện phỏng vấn theo yêu cầu công việc</span></div></footer>;
+  }
   return (
     <footer className={styles.footer}>
       <div className={styles.inner}>

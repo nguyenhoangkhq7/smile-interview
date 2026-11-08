@@ -198,6 +198,9 @@ class SkillGapWorkflow:
             upstream_degraded=upstream_degraded,
             upstream_flags=upstream_flags,
         )
+        jd_spans = {skill.skill_id: skill.evidence_spans for skill in state.get("jd_skills", [])}
+        for result in gap_results:
+            result.jd_evidence_spans = list(jd_spans.get(result.jd_skill_id, []))
         return {"gap_results": gap_results}
 
     def _node_build_audit_report(self, state: SkillGapGraphState) -> SkillGapGraphState:

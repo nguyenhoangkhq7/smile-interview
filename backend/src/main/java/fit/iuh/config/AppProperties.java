@@ -24,6 +24,8 @@ public class AppProperties {
         @Data
         public static class Fastapi {
             private String baseUrl = "http://localhost:8000";
+            private int connectTimeoutSeconds = 15;
+            private int readTimeoutSeconds = 180;
         }
     }
 

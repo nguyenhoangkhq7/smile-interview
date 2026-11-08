@@ -61,22 +61,29 @@ class JDRequirementSignature(dspy.Signature):
     """
     Determine the REQUIRED PROFICIENCY LEVEL (`required_level` P_JD on a standardized 1.0 to 5.0 scale) for each specified JD skill.
 
+    Extract concrete job tasks for each skill into requirements[].tasks. Include exact
+    JD evidence_spans, required_level, requirement_kind and level_basis for each task.
+    Never infer proficiency from optional/nice-to-have wording. Task complexity and
+    explicit expectations override years; seniority is only a fallback. If only a skill
+    name is supplied, return tasks=[] rather than inventing responsibilities.
+
     Note on Scope:
     Skill importance weight (`w_j`) is computed externally by a Graph Neural Network (GNN). Your SOLE responsibility is to calibrate the required DEPTH OF MASTERY (`required_level` in [1.0, 5.0]) for each target skill ID.
 
     Standardized Proficiency Scale (1.0 - 5.0):
     - 1.0 - 1.5: Basic Awareness / Familiarity ('có hiểu biết', 'biết cơ bản', 'exposure to', entry/intern level, 0-6 months equivalent)
-    - 2.0 - 2.5: Junior / Working Knowledge ('có kiến thức', 'nice-to-have / là một lợi thế / điểm cộng', 6-18 months equivalent, executes standard tasks with guidance)
+    - 2.0 - 2.5: Junior / Working Knowledge ('có kiến thức', 6-18 months equivalent, executes standard tasks with guidance)
     - 3.0 - 3.5: Mid-level / Solid Practical Experience ('nắm vững', 'thành thạo', 'solid / proficient experience', 18-36 months / 2-3 years equivalent, independent execution)
     - 4.0 - 4.5: Senior / Advanced Expertise ('chuyên sâu', 'deep knowledge', 'expert', 'tối ưu hóa hiệu năng / production scale', 3-5+ years equivalent, complex troubleshooting)
     - 5.0: Lead / Master / Principal ('architectural mastery', 'thiết kế kiến trúc tổng thể', >5 years equivalent, technical strategy & leadership)
 
     Hierarchical Inference Priority Rules (Apply in strict order 1 -> 2 -> 3):
-    1. Explicit Years of Experience (Highest Priority): If the evidence span or JD explicitly states required years for the skill (e.g., '<1 year' -> 1.5-2.0, '1-2 years' -> 2.5, '2-3 years' -> 3.0-3.5, '3-4+ years' -> 4.0, '5+ years' -> 4.5-5.0), map directly to the corresponding milestone.
-    2. Explicit Proficiency Descriptors (Second Priority): If no exact years are given for the skill, map explicit depth modifiers ('điểm cộng / plus / familiar' -> 2.0, 'có kinh nghiệm / working knowledge' -> 2.5-3.0, 'thành thạo / nắm vững / solid' -> 3.5, 'chuyên sâu / mạnh về / tối ưu hóa / expert' -> 4.0-4.5).
-    3. Role Seniority Inheritance (Fallback Priority): If the skill has neither explicit years nor depth modifiers, infer its required depth from the overall JD role seniority and whether the skill is core/must-have vs. secondary.
+    1. Explicit Task Complexity and Proficiency: Calibrate observable responsibilities, autonomy and explicit depth expectations first. Simple query writing is not architectural mastery even in a senior role.
+    2. Skill-specific Years (Fallback): When task/depth evidence is absent, use required experience as a proxy and mark level_basis INFERRED. Years are not direct evidence of mastery.
+    3. Role Seniority (Last Fallback): Use overall role seniority only when neither task expectations nor skill-specific experience are available. Optional/required and core/secondary status never lower or raise proficiency by themselves.
     """
 
+    # V2 task grounding is also enforced by JDRequirementParser after the LLM call.
     jd_text: str = dspy.InputField(
         desc="Full Job Description (JD) text providing overall role seniority and context"
     )

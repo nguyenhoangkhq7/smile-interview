@@ -4,6 +4,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { IconClock } from '@/components/ui/icons';
 import type { SessionHistoryItem } from '@/services/historyService';
 import { cn } from '@/lib/utils';
+import { attemptLabels } from '@/services/applicationProfiles';
 
 interface HistoryItemCardProps {
   item: SessionHistoryItem;
@@ -29,7 +30,7 @@ function formatScore(item: SessionHistoryItem): string {
 }
 
 export function HistoryItemCard({ item }: HistoryItemCardProps) {
-  const isCompleted = item.status === 'Completed';
+  const isCompleted = ['Completed', 'Stopped early', 'Cancelled'].includes(item.status);
   const actionLink  = isCompleted
     ? `/interview/session/${item.id}/result`
     : `/interview/session/${item.id}`;
@@ -46,9 +47,11 @@ export function HistoryItemCard({ item }: HistoryItemCardProps) {
             ? 'bg-brand-green/15 text-brand-green hover:bg-brand-green/25'
             : 'bg-brand-orange/10 text-brand-orange hover:bg-brand-orange/20'
           }>
-            {isCompleted ? 'Đã hoàn thành' : 'Đang phỏng vấn'}
+            {attemptLabels[item.status]}
           </Badge>
         </div>
+
+        {item.applicationProfileId && <Link className="text-sm text-brand-orange" href={`/applications/${item.applicationProfileId}`}>{item.applicationProfileTitle} · Lượt {item.attemptNumber}</Link>}
 
         <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
           <span><span className="font-medium text-foreground">Điểm:</span> {formatScore(item)}</span>

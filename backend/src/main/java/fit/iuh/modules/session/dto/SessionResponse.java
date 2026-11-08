@@ -1,12 +1,14 @@
 package fit.iuh.modules.session.dto;
 
 import fit.iuh.modules.session.entity.Session;
+import fit.iuh.modules.session.entity.SessionTurn;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -16,11 +18,16 @@ import java.util.UUID;
 public class SessionResponse {
 
     private String id;
+    private UUID applicationProfileId;
+    private String applicationProfileTitle;
+    private Integer attemptNumber;
     private UUID userId;
     private UUID resumeId;
     private String resumeFileName;
+    private String cvFileUrl;
     private UUID jdId;
     private String jdTitle;
+    private String jdFileUrl;
     private String status;
     private String interviewType;
     private String roleTitle;
@@ -34,7 +41,7 @@ public class SessionResponse {
     private String interviewReportJson;
     private LocalDateTime startedAt;
     private LocalDateTime endedAt;
-    private java.util.List<SessionTurnDto> turns;
+    private List<SessionTurnDto> turns;
 
     public record SessionTurnDto(
             Long id,
@@ -45,9 +52,11 @@ public class SessionResponse {
             String improvements,
             String suggestedAnswer,
             String topicTag,
-            Boolean isDeepDive
+            Boolean isDeepDive,
+            Integer hrRating,
+            String hrFeedback
     ) {
-        public static SessionTurnDto from(fit.iuh.modules.session.entity.SessionTurn t) {
+        public static SessionTurnDto from(SessionTurn t) {
             if (t == null) return null;
             return new SessionTurnDto(
                     t.getId(),
@@ -58,7 +67,9 @@ public class SessionResponse {
                     t.getImprovements(),
                     t.getSuggestedAnswer(),
                     t.getTopicTag(),
-                    t.getIsDeepDive()
+                    t.getIsDeepDive(),
+                    t.getHrRating(),
+                    t.getHrFeedback()
             );
         }
     }
@@ -67,15 +78,20 @@ public class SessionResponse {
         return from(session, null);
     }
 
-    public static SessionResponse from(Session session, java.util.List<fit.iuh.modules.session.entity.SessionTurn> turns) {
+    public static SessionResponse from(Session session, List<SessionTurn> turns) {
         if (session == null) return null;
         return SessionResponse.builder()
                 .id(session.getId())
+                .applicationProfileId(session.getApplicationProfile() != null ? session.getApplicationProfile().getId() : null)
+                .applicationProfileTitle(session.getApplicationProfile() != null ? session.getApplicationProfile().getTitle() : null)
+                .attemptNumber(session.getAttemptNumber())
                 .userId(session.getUserId())
                 .resumeId(session.getResume() != null ? session.getResume().getId() : null)
                 .resumeFileName(session.getResume() != null ? session.getResume().getFileName() : null)
+                .cvFileUrl(session.getResume() != null ? session.getResume().getFileUrl() : null)
                 .jdId(session.getJobDescription() != null ? session.getJobDescription().getId() : null)
                 .jdTitle(session.getJobDescription() != null ? session.getJobDescription().getTitle() : null)
+                .jdFileUrl(session.getJobDescription() != null ? session.getJobDescription().getFileUrl() : null)
                 .status(session.getStatus())
                 .interviewType(session.getInterviewType())
                 .roleTitle(session.getRoleTitle())

@@ -1,4 +1,5 @@
 'use client';
+import { MarkdownContent } from '@/components/common/MarkdownContent';
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -8,8 +9,10 @@ import { historyService, SessionHistoryItem } from '@/services/historyService';
 import { cvJdMatchingService, HITLReportResponse } from '@/services/cvJdMatching';
 import { exportQuestionBankToCSV } from '@/lib/exportUtils';
 import styles from './result.module.css';
+import { useEvidenceInterview } from '@/hooks/useEvidenceInterview';
+import { InterviewOutcome } from '@/components/features/interview/InterviewOutcome';
 
-export default function InterviewResultPage() {
+function LegacyInterviewResultPage() {
   const params = useParams();
   const id = (params?.id as string) || '';
 
@@ -105,7 +108,7 @@ export default function InterviewResultPage() {
             </div>
             <div className={styles.scoreText}>
               <h2 style={{ margin: 0 }}>Tổng kết</h2>
-              <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: '0.9rem', color: '#334155' }}>{summary}</pre>
+              <MarkdownContent content={summary} />
               <div style={{ fontSize: '0.8rem', color: '#64748b', display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
                 <span>Vị trí: <strong>{session.roleTitle || 'N/A'}</strong></span>
                 <span>Ngày: <strong>{formatDate(session.date)}</strong></span>
@@ -269,4 +272,13 @@ export default function InterviewResultPage() {
       </main>
     </div>
   );
+}
+
+export default function InterviewResultPage() {
+  const { id } = useParams<{ id: string }>();
+  const result = useEvidenceInterview(id, true);
+  if (result.loading) return <p className="p-8">Đang tải kết quả…</p>;
+  if (result.error) return <div role="alert" className="p-8">{result.error}<button onClick={() => void result.reload()}>Thử lại</button></div>;
+  if (!result.session) return <LegacyInterviewResultPage />;
+  return <main className="mx-auto max-w-4xl space-y-5 p-6">{result.metadata?.applicationProfileTitle && <h2 className="text-xl font-semibold">{result.metadata.applicationProfileTitle} · Lượt {result.metadata.attemptNumber}</h2>}<InterviewOutcome session={result.session} metadata={result.metadata} /></main>;
 }

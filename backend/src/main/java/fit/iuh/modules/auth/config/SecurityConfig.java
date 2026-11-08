@@ -1,7 +1,7 @@
 package fit.iuh.modules.auth.config;
 
-import fit.iuh.modules.auth.repository.UserRepository;
 import fit.iuh.modules.auth.security.JwtAuthenticationFilter;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -15,7 +15,6 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -46,18 +45,10 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final UserDetailsService userDetailsService;
 
-    // ----------------------------------------------------------------
-    // PasswordEncoder
-    // ----------------------------------------------------------------
-
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
-
-    // ----------------------------------------------------------------
-    // AuthenticationProvider
-    // ----------------------------------------------------------------
 
     @Bean
     public AuthenticationProvider authenticationProvider() {
@@ -66,32 +57,20 @@ public class SecurityConfig {
         return provider;
     }
 
-    // ----------------------------------------------------------------
-    // AuthenticationManager
-    // ----------------------------------------------------------------
-
     @Bean
     public AuthenticationManager authenticationManager(
             AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
     }
 
-    // ----------------------------------------------------------------
-    // CORS
-    // ----------------------------------------------------------------
-
     /**
-     * CORS policy: allow the Next.js dev server (port 3000) to call all
-     * API endpoints with any header and the standard HTTP verbs.
+     * CORS policy: allow Web and Mobile clients to call all API endpoints.
      */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of(
-                "http://localhost:3000",
-                "http://localhost"
-        ));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedOriginPatterns(List.of("*"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
 
@@ -100,38 +79,28 @@ public class SecurityConfig {
         return source;
     }
 
-    // ----------------------------------------------------------------
-    // SecurityFilterChain
-    // ----------------------------------------------------------------
-
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            // Enable CORS with our custom configuration
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-
-            // Disable CSRF — not needed for stateless JWT APIs
             .csrf(AbstractHttpConfigurer::disable)
-
-            // Stateless session — no HttpSession will be created
             .sessionManagement(session ->
                     session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-
-            // Authorization rules
+            .exceptionHandling(exceptions -> exceptions
+                    .authenticationEntryPoint((request, response, exception) ->
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED)))
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers("/api/auth/**").permitAll()
+                    .requestMatchers("/uploads/**").permitAll()
                     .requestMatchers("/ws/**").permitAll()
                     .requestMatchers("/actuator/health").permitAll()
+                    .requestMatchers("/api/v1/hr-realtime/**").permitAll()
                     .requestMatchers("/api/admin/**", "/api/v1/admin/**").hasRole("ADMIN")
                     .requestMatchers("/api/hr/**").hasAnyRole("HR", "ADMIN")
                     .requestMatchers("/api/v1/**", "/api/v2/**").authenticated()
                     .anyRequest().authenticated()
             )
-
-            // Wire in our DaoAuthenticationProvider
             .authenticationProvider(authenticationProvider())
-
-            // Place JWT filter before the default username/password filter
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

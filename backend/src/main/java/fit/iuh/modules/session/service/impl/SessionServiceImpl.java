@@ -3,13 +3,16 @@ package fit.iuh.modules.session.service.impl;
 import fit.iuh.exception.ResourceNotFoundException;
 import fit.iuh.modules.session.dto.CreateSessionRequest;
 import fit.iuh.modules.session.dto.SessionResponse;
+import fit.iuh.modules.session.dto.SessionResponse.SessionTurnDto;
 import fit.iuh.modules.session.dto.UpdateSessionRequest;
 import fit.iuh.modules.session.entity.JobDescription;
 import fit.iuh.modules.session.entity.Resume;
 import fit.iuh.modules.session.entity.Session;
+import fit.iuh.modules.session.entity.SessionTurn;
 import fit.iuh.modules.session.repository.JobDescriptionRepository;
 import fit.iuh.modules.session.repository.ResumeRepository;
 import fit.iuh.modules.session.repository.SessionRepository;
+import fit.iuh.modules.session.repository.SessionTurnRepository;
 import fit.iuh.modules.session.service.SessionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Slf4j
@@ -28,7 +32,8 @@ public class SessionServiceImpl implements SessionService {
     private final SessionRepository sessionRepository;
     private final ResumeRepository resumeRepository;
     private final JobDescriptionRepository jobDescriptionRepository;
-    private final fit.iuh.modules.session.repository.SessionTurnRepository sessionTurnRepository;
+    private final SessionTurnRepository sessionTurnRepository;
+    private final fit.iuh.modules.evidence.InterviewRunRepository evidenceRuns;
 
     @Override
     @Transactional
@@ -39,7 +44,8 @@ public class SessionServiceImpl implements SessionService {
 
         log.info("[SessionService] Creating/Upserting session: id={}, userId={}, roleTitle={}", sessionId, userId, request.getRoleTitle());
 
-        Session session = sessionRepository.findById(sessionId).orElse(null);
+        Session session = sessionRepository.lockById(sessionId).orElse(null);
+        requireLegacyWrite(sessionId);
         if (session == null) {
             session = Session.builder()
                     .id(sessionId)
@@ -60,6 +66,21 @@ public class SessionServiceImpl implements SessionService {
         }
         if (request.getStatus() != null) {
             session.setStatus(request.getStatus());
+            if ("Completed".equalsIgnoreCase(request.getStatus()) && session.getEndedAt() == null) {
+                session.setEndedAt(LocalDateTime.now());
+            }
+        }
+        if (request.getOverallScore() != null) {
+            session.setOverallScore(request.getOverallScore());
+        }
+        if (request.getOverallFeedback() != null) {
+            session.setOverallFeedback(request.getOverallFeedback());
+        }
+        if (request.getUserRating() != null) {
+            session.setUserRating(request.getUserRating());
+        }
+        if (request.getUserFeedbackText() != null) {
+            session.setUserFeedbackText(request.getUserFeedbackText());
         }
 
         if (request.getResumeId() != null) {
@@ -85,6 +106,27 @@ public class SessionServiceImpl implements SessionService {
         }
 
         session = sessionRepository.save(session);
+
+        if (Boolean.TRUE.equals(request.getReplaceQuestions()) && request.getQuestions() != null) {
+            sessionTurnRepository.deleteBySessionId(sessionId);
+            for (SessionTurnDto q : request.getQuestions()) {
+                SessionTurn turn = SessionTurn.builder()
+                        .sessionId(sessionId)
+                        .question(q.question())
+                        .answer(q.answer())
+                        .score(q.score())
+                        .strengths(q.strengths())
+                        .improvements(q.improvements())
+                        .suggestedAnswer(q.suggestedAnswer())
+                        .topicTag(q.topicTag())
+                        .isDeepDive(q.isDeepDive())
+                        .hrRating(q.hrRating())
+                        .hrFeedback(q.hrFeedback())
+                        .build();
+                sessionTurnRepository.save(turn);
+            }
+        }
+
         var turns = sessionTurnRepository.findBySessionIdOrderByIdAsc(sessionId);
         return SessionResponse.from(session, turns);
     }
@@ -115,15 +157,19 @@ public class SessionServiceImpl implements SessionService {
     public List<SessionResponse> getAllSessions() {
         return sessionRepository.findAllByOrderByStartedAtDesc()
                 .stream()
-                .map(SessionResponse::from)
+                .map(session -> SessionResponse.from(session, sessionTurnRepository.findBySessionIdOrderByIdAsc(session.getId())))
                 .toList();
     }
 
     @Override
     @Transactional
     public SessionResponse updateSession(String sessionId, UpdateSessionRequest request) {
-        Session session = sessionRepository.findById(sessionId)
+        Session session = sessionRepository.lockById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found with id: " + sessionId));
+        if (request.getRoleTitle() != null || request.getInterviewType() != null || request.getStatus() != null
+                || request.getOverallScore() != null || request.getOverallFeedback() != null || request.getEndedAt() != null) {
+            requireLegacyWrite(sessionId);
+        }
 
         if (request.getRoleTitle() != null) session.setRoleTitle(request.getRoleTitle());
         if (request.getInterviewType() != null) session.setInterviewType(request.getInterviewType());
@@ -146,6 +192,10 @@ public class SessionServiceImpl implements SessionService {
     @Override
     @Transactional
     public void deleteSession(String sessionId) {
+        if (sessionRepository.findById(sessionId).map(s -> s.getApplicationProfile() != null).orElse(false)) {
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT,
+                    "Application profile attempts are retained as interview history");
+        }
         if (!sessionRepository.existsById(sessionId)) {
             throw new ResourceNotFoundException("Session not found with id: " + sessionId);
         }
@@ -155,14 +205,25 @@ public class SessionServiceImpl implements SessionService {
 
     @Override
     @Transactional
-    public fit.iuh.modules.session.entity.SessionTurn addTurn(String sessionId, fit.iuh.modules.session.entity.SessionTurn turn) {
+    public SessionTurn addTurn(String sessionId, SessionTurn turn) {
+        sessionRepository.lockById(sessionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + sessionId));
+        requireLegacyWrite(sessionId);
         turn.setSessionId(sessionId);
         return sessionTurnRepository.save(turn);
     }
 
+    private void requireLegacyWrite(String sessionId) {
+        if (evidenceRuns.existsById(sessionId) || sessionRepository.findById(sessionId)
+                .map(s -> s.getApplicationProfile() != null).orElse(false)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.CONFLICT, "V2 interview state must be updated through its interview API");
+        }
+    }
+
     @Override
     @Transactional(readOnly = true)
-    public List<fit.iuh.modules.session.entity.SessionTurn> getSessionTurns(String sessionId) {
+    public List<SessionTurn> getSessionTurns(String sessionId) {
         return sessionTurnRepository.findBySessionIdOrderByIdAsc(sessionId);
     }
 
@@ -171,6 +232,10 @@ public class SessionServiceImpl implements SessionService {
     public String cloneSession(String sessionId) {
         Session original = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + sessionId));
+        if (original.getApplicationProfile() != null) {
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT,
+                    "Create a new attempt from the application profile");
+        }
         String newSessionId = "session-" + System.currentTimeMillis();
         Session cloned = Session.builder()
                 .id(newSessionId)
@@ -189,7 +254,7 @@ public class SessionServiceImpl implements SessionService {
     @Override
     @Transactional
     public void updateTurnFeedback(String sessionId, Long turnId, Integer hrRating, String hrFeedback) {
-        fit.iuh.modules.session.entity.SessionTurn turn = sessionTurnRepository.findById(turnId)
+        SessionTurn turn = sessionTurnRepository.findById(turnId)
                 .orElseThrow(() -> new ResourceNotFoundException("Turn not found with id: " + turnId));
         if (hrRating != null) turn.setHrRating(hrRating);
         if (hrFeedback != null) turn.setHrFeedback(hrFeedback);
@@ -198,7 +263,7 @@ public class SessionServiceImpl implements SessionService {
 
     @Override
     @Transactional(readOnly = true)
-    public java.util.Map<String, Object> getRawTexts(UUID resumeId, UUID jdId) {
+    public Map<String, Object> getRawTexts(UUID resumeId, UUID jdId) {
         String rawCvText = null;
         String cvFilename = null;
         if (resumeId != null) {
@@ -221,7 +286,7 @@ public class SessionServiceImpl implements SessionService {
             }
         }
 
-        return java.util.Map.of(
+        return Map.of(
                 "rawCvText", rawCvText != null ? rawCvText : "",
                 "rawJdText", rawJdText != null ? rawJdText : "",
                 "cvFilename", cvFilename != null ? cvFilename : "",

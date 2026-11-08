@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import axiosClient from '@/lib/axiosClient';
 import { QuestionFeedback } from '@/services/historyService';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -49,30 +50,31 @@ const TurnCardItem: React.FC<{
       toast.error('Lỗi: Không tìm thấy mã phiên phỏng vấn.');
       return;
     }
+    if (!q.id) {
+      toast.error('Lỗi: Không tìm thấy mã lượt câu hỏi (Turn ID).');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
-      const res = await fetch(`/api/sessions/${sessionId}/turn-feedback`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          turnId: q.id,
-          turnIndex: idx,
+      await axiosClient.post(
+        `/api/v1/sessions/${encodeURIComponent(sessionId)}/turns/${encodeURIComponent(q.id)}/feedback`,
+        {
           hrRating: rating,
           hrFeedback: feedback.trim() || undefined,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Lỗi khi lưu đánh giá lượt');
-      }
+        }
+      );
 
       setIsSaved(true);
       toast.success(`Đã lưu đánh giá & nhận xét cho lượt câu hỏi #${idx + 1}!`);
     } catch (err) {
-      const error = err as Error;
-      toast.error(error.message || 'Lỗi khi kết nối server');
+      const axiosErr = err as { response?: { data?: { error?: string; message?: string } }; message?: string };
+      toast.error(
+        axiosErr?.response?.data?.error ||
+          axiosErr?.response?.data?.message ||
+          axiosErr?.message ||
+          'Lỗi khi kết nối server'
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -196,7 +198,6 @@ const TurnCardItem: React.FC<{
                       <p className="leading-relaxed break-words">{q.improvements}</p>
                     </>
                   )}
-                  {/* Suggested answer — compact inline, folded into this card */}
                   {q.suggestedAnswer && (
                     <p className="text-[11px] text-amber-800 border-t border-amber-200 pt-1.5 leading-relaxed break-words">
                       <Lightbulb className="size-3 text-amber-600 inline mr-1 shrink-0" />
@@ -298,7 +299,6 @@ export const InterviewTranscriptView: React.FC<InterviewTranscriptViewProps> = (
     );
   }
 
-  // The first unreviewed turn opens by default
   const firstUnreviewedIdx = questions.findIndex((q) => !q.hrRating && !q.hrFeedback);
 
   return (

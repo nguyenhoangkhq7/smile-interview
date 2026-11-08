@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { io, Socket } from 'socket.io-client';
+import axiosClient from '@/lib/axiosClient';
 import { historyService, SessionHistoryItem, QuestionFeedback } from '@/services/historyService';
 import { useSessionRecorder } from '@/hooks/useSessionRecorder';
 import { useMediaStream } from '@/hooks/useMediaStream';
@@ -225,22 +226,10 @@ export function useInterviewSession() {
           replaceQuestions: true
         });
 
-        const token = useAuthStore.getState().token;
-        const headers: Record<string, string> = {};
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-        fetch(`/api/sessions/${id}/interview/report`, { 
-          method: 'GET',
-          headers
-        }).catch((evalErr) => {
+        axiosClient.get(`/api/v1/sessions/${id}/interview/report`).catch((evalErr) => {
           console.error('[Session Finish] Background evaluation trigger failed:', evalErr);
         });
-        fetch('/api/hr-realtime', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId: id, stage: 'COMPLETED' }),
-        }).catch(() => {});
+        axiosClient.post('/api/v1/hr-realtime', { sessionId: id, stage: 'COMPLETED' }).catch(() => {});
       }
     } catch (err) {
       console.error('Error completing session:', err);

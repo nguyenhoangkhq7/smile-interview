@@ -28,7 +28,14 @@ public final class SkillGapDtos {
             @JsonProperty("context_job") String contextJob,
             @JsonProperty("suggested_strategy") String suggestedStrategy,
             @JsonProperty("degraded") boolean degraded,
-            @JsonProperty("flags") List<String> flags
+            @JsonProperty("flags") List<String> flags,
+            @JsonProperty("importance_weight") double importanceWeight,
+            @JsonProperty("jd_reasoning") String jdReasoning,
+            @JsonProperty("jd_evidence_spans") List<String> jdEvidenceSpans,
+            // Keep HTTP DTOs independent of Jackson 2/3 tree implementations.
+            @JsonProperty("job_tasks") List<Map<String, Object>> jobTasks,
+            @JsonProperty("c_evidence") double cEvidence,
+            @JsonProperty("recency_flag") boolean recencyFlag
     ) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)

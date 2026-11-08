@@ -39,14 +39,16 @@ public class AdaptiveInterviewController {
     private final AdaptiveInterviewClient adaptiveClient;
     private final SkillGapClient skillGapClient;
     private final ObjectMapper objectMapper;
+    private final fit.iuh.modules.evidence.InterviewRunRepository evidenceRuns;
 
     @PostMapping(value = "/start", produces = MediaType.APPLICATION_JSON_VALUE)
     @Transactional
     public ResponseEntity<StartInterviewResponseDto> startAdaptiveInterview(@PathVariable String sessionId) {
         log.info("[AdaptiveInterviewController] Starting adaptive interview for sessionId={}", sessionId);
 
-        Session session = sessionRepository.findById(sessionId)
+        Session session = sessionRepository.lockById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + sessionId));
+        requireLegacy(sessionId);
 
         if (session.getSkillGapJson() == null || session.getSkillGapJson().isBlank()) {
             String cvText = session.getResume() != null ? session.getResume().getRawText() : "";
@@ -70,6 +72,9 @@ public class AdaptiveInterviewController {
 
         StartInterviewResponseDto startRes = adaptiveClient.startInterview(skills);
 
+        session.setInterviewReportJson(null);
+        session.setOverallFeedback(null);
+        session.setEndedAt(startRes.isFinished() ? LocalDateTime.now() : null);
         session.setAiInterviewSessionId(startRes.sessionId());
         session.setStatus(startRes.isFinished() ? "Completed" : "In progress");
         sessionRepository.save(session);
@@ -106,6 +111,7 @@ public class AdaptiveInterviewController {
             @PathVariable String sessionId,
             @RequestBody RespondInterviewRequestDto request) {
 
+        requireLegacy(sessionId);
         log.info("[AdaptiveInterviewController] Received response for sessionId={}", sessionId);
 
         Session session = sessionRepository.findById(sessionId)
@@ -144,6 +150,8 @@ public class AdaptiveInterviewController {
                 currentTurn.setScore((int) Math.round((sHat / 5.0) * 100.0));
             }
             sessionTurnRepository.save(currentTurn);
+            session.setInterviewReportJson(null);
+            sessionRepository.save(session);
         }
 
         if (!resp.isFinished() && resp.nextQuestion() != null && !resp.nextQuestion().isBlank()) {
@@ -180,6 +188,7 @@ public class AdaptiveInterviewController {
     @GetMapping(value = "/report", produces = MediaType.APPLICATION_JSON_VALUE)
     @Transactional
     public ResponseEntity<Map<String, Object>> getInterviewReport(@PathVariable String sessionId) {
+        requireLegacy(sessionId);
         log.info("[AdaptiveInterviewController] Fetching report for sessionId={}", sessionId);
 
         Session session = sessionRepository.findById(sessionId)
@@ -205,5 +214,12 @@ public class AdaptiveInterviewController {
         }
 
         throw new ResourceNotFoundException("No interview report available for session " + sessionId);
+    }
+    private void requireLegacy(String sessionId) {
+        if (evidenceRuns.existsById(sessionId) || sessionRepository.findById(sessionId)
+                .map(s -> s.getApplicationProfile() != null).orElse(false)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.CONFLICT, "Use the V2 endpoint for this interview");
+        }
     }
 }

@@ -1,3 +1,5 @@
+import axios from 'axios';
+import axiosClient, { API_BASE_URL } from '@/lib/axiosClient';
 import type {
   SkillGapResult,
   StaticGapAuditReport,
@@ -21,6 +23,9 @@ export interface QuestionFeedback {
 
 export interface SessionHistoryItem {
   id: string;
+  applicationProfileId?: string;
+  applicationProfileTitle?: string;
+  attemptNumber?: number;
   userId?: string;
   date: string;
   interviewType: 'Technical' | 'Behavioural' | 'Live Coding' | 'Case Study' | 'System Design';
@@ -30,9 +35,11 @@ export interface SessionHistoryItem {
   cvFileUrl?: string;
   jdFileUrl?: string;
   overallScore?: number;
-  status: 'Completed' | 'In progress' | 'Not started';
+  status: import('./applicationProfiles').AttemptStatus;
   questions: QuestionFeedback[];
   overallFeedback?: string;
+  userRating?: number;
+  userFeedbackText?: string;
   resumeId?: string;
   jdId?: string;
   aiInterviewSessionId?: string | null;
@@ -46,39 +53,116 @@ export interface SessionSavePayload extends SessionHistoryItem {
   replaceQuestions?: boolean;
 }
 
-function getFetchUrl(path: string): string {
-  if (typeof window !== 'undefined') {
-    return path;
-  }
-  const port = process.env.PORT || 3000;
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `http://localhost:${port}`;
-  return `${baseUrl}${path}`;
+interface BackendSessionTurnDto {
+  id?: number | string;
+  question?: string;
+  answer?: string;
+  score?: number;
+  strengths?: string;
+  improvements?: string;
+  suggestedAnswer?: string;
+  topicTag?: string;
+  isDeepDive?: boolean;
+  hrRating?: number;
+  hrFeedback?: string;
 }
 
-function getAuthHeaders(): Record<string, string> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  if (typeof window !== 'undefined') {
-    const token = useAuthStore.getState().token;
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
+interface BackendSessionResponse {
+  id: string;
+  applicationProfileId?: string;
+  applicationProfileTitle?: string;
+  attemptNumber?: number;
+  userId?: string;
+  resumeId?: string;
+  resumeFileName?: string;
+  cvFilename?: string;
+  cvFileUrl?: string;
+  jdId?: string;
+  jdTitle?: string;
+  jdFilename?: string;
+  jdFileUrl?: string;
+  status?: SessionHistoryItem['status'];
+  interviewType?: SessionHistoryItem['interviewType'];
+  roleTitle?: string;
+  overallScore?: number;
+  overallFeedback?: string;
+  userRating?: number;
+  userFeedbackText?: string;
+  skillGapJson?: string | null;
+  gapReportJson?: string | null;
+  aiInterviewSessionId?: string | null;
+  interviewReportJson?: string | null;
+  startedAt?: string;
+  date?: string;
+  turns?: BackendSessionTurnDto[];
+}
+
+function parseJsonSafe<T>(raw?: string | null): T | null {
+  if (!raw) return null;
+  try {
+    return (typeof raw === 'string' ? JSON.parse(raw) : raw) as T;
+  } catch {
+    return null;
   }
-  return headers;
+}
+
+export function mapBackendSessionToHistoryItem(sess: BackendSessionResponse): SessionHistoryItem {
+  const questions: QuestionFeedback[] = (sess.turns || []).map((t) => ({
+    id: t.id != null ? String(t.id) : undefined,
+    question: t.question || '',
+    answer: t.answer || '',
+    score: t.score != null ? Number(t.score) : 0,
+    strengths: t.strengths || '',
+    improvements: t.improvements || '',
+    suggestedAnswer: t.suggestedAnswer || '',
+    topicTag: t.topicTag || '',
+    isDeepDive: Boolean(t.isDeepDive),
+    hrRating: t.hrRating != null ? Number(t.hrRating) : undefined,
+    hrFeedback: t.hrFeedback || undefined,
+  }));
+
+  return {
+    id: sess.id,
+    applicationProfileId: sess.applicationProfileId,
+    applicationProfileTitle: sess.applicationProfileTitle,
+    attemptNumber: sess.attemptNumber,
+    userId: sess.userId,
+    date: sess.startedAt || sess.date || new Date().toISOString(),
+    interviewType: sess.interviewType || 'Technical',
+    roleTitle: sess.roleTitle || 'Software Engineer',
+    cvFilename: sess.resumeFileName || sess.cvFilename || 'CV.pdf',
+    jdFilename: sess.jdTitle || sess.jdFilename || 'JD.pdf',
+    cvFileUrl: sess.cvFileUrl,
+    jdFileUrl: sess.jdFileUrl,
+    resumeId: sess.resumeId ? String(sess.resumeId) : undefined,
+    jdId: sess.jdId ? String(sess.jdId) : undefined,
+    overallScore: sess.overallScore,
+    status: sess.status || 'In progress',
+    overallFeedback: sess.overallFeedback,
+    userRating: sess.userRating,
+    userFeedbackText: sess.userFeedbackText,
+    aiInterviewSessionId: sess.aiInterviewSessionId,
+    skillGapResults: parseJsonSafe<SkillGapResult[]>(sess.skillGapJson),
+    skillGapReport: parseJsonSafe<StaticGapAuditReport>(sess.gapReportJson),
+    interviewReport: parseJsonSafe<HITLReportResponse>(sess.interviewReportJson),
+    questions,
+  };
+}
+
+function getToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return useAuthStore.getState().token;
 }
 
 export const historyService = {
-  async getHistory(): Promise<SessionHistoryItem[]> {
+  async getHistory(allUsers = false): Promise<SessionHistoryItem[]> {
     try {
-      const res = await fetch(getFetchUrl('/api/history'), {
-        headers: getAuthHeaders(),
-        cache: 'no-store',
+      const token = getToken();
+      const endpoint = !allUsers && token ? '/api/v1/sessions/user' : '/api/v1/sessions';
+      const { data } = await axiosClient.get<BackendSessionResponse[]>(endpoint, {
+        baseURL: API_BASE_URL,
       });
-      if (!res.ok) {
-        throw new Error(`Failed to fetch history: ${res.statusText}`);
-      }
-      return await res.json();
+      return (data || []).map(mapBackendSessionToHistoryItem);
     } catch (err) {
       console.error('[historyService] Error loading history:', err);
       return [];
@@ -87,16 +171,15 @@ export const historyService = {
 
   async getSessionById(id: string): Promise<SessionHistoryItem | null> {
     try {
-      const res = await fetch(getFetchUrl(`/api/history/${id}`), {
-        headers: getAuthHeaders(),
-        cache: 'no-store',
-      });
-      if (!res.ok) {
-        if (res.status === 404) return null;
-        throw new Error(`Failed to fetch session: ${res.statusText}`);
-      }
-      return await res.json();
+      const { data } = await axiosClient.get<BackendSessionResponse>(
+        `/api/v1/sessions/${encodeURIComponent(id)}`,
+        { baseURL: API_BASE_URL }
+      );
+      return mapBackendSessionToHistoryItem(data);
     } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 404) {
+        return null;
+      }
       console.error(`[historyService] Error loading session ${id}:`, err);
       return null;
     }
@@ -104,18 +187,12 @@ export const historyService = {
 
   async saveSession(session: SessionSavePayload): Promise<SessionHistoryItem> {
     try {
-      const res = await fetch('/api/history', {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify(session),
-      });
-
-      if (!res.ok) {
-        throw new Error(`Failed to save session: ${res.statusText}`);
-      }
-
-      const data = await res.json();
-      return data.session;
+      const { data } = await axiosClient.post<BackendSessionResponse>(
+        '/api/v1/sessions',
+        session,
+        { baseURL: API_BASE_URL }
+      );
+      return mapBackendSessionToHistoryItem(data);
     } catch (err) {
       console.error(`[historyService] Error saving session ${session.id}:`, err);
       throw err;
@@ -145,14 +222,11 @@ export const historyService = {
   },
 
   async cloneSession(sessionId: string): Promise<string> {
-    const res = await fetch(`/api/history/${sessionId}/clone`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-    });
-    if (!res.ok) {
-      throw new Error(`Failed to clone session: ${res.statusText}`);
-    }
-    const data = await res.json();
+    const { data } = await axiosClient.post<{ newSessionId: string }>(
+      `/api/v1/sessions/${encodeURIComponent(sessionId)}/clone`,
+      null,
+      { baseURL: API_BASE_URL }
+    );
     return data.newSessionId;
   },
 };

@@ -227,7 +227,13 @@ class GapDetector:
                 context_job=context_job_str,
                 suggested_strategy=strategy,
                 degraded=degraded,
-                flags=flags
+                flags=flags,
+                importance_weight=match.w_j,
+                jd_reasoning=req.reasoning,
+                job_tasks=req.tasks,
+                jd_evidence_spans=list(dict.fromkeys(span for task in req.tasks for span in task.evidence_spans)),
+                c_evidence=prof.c_evidence if prof else 0.0,
+                recency_flag=prof.recency_flag if prof else False,
             ))
 
         return results

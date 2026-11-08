@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { MarkdownContent } from '@/components/common/MarkdownContent';
 import type { AnalyzeWithReportResponse, SkillGapResult } from '@/services/cvJdMatching';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -266,9 +267,7 @@ export function SkillGapResultPanel({
             <FileText size={16} className="text-brand-orange" />
             <span>Xem Báo cáo Kiểm toán Chẩn đoán Tĩnh đầy đủ (Markdown)</span>
           </summary>
-          <pre className="mt-4 whitespace-pre-wrap text-xs font-mono bg-background p-4 rounded-lg border border-border overflow-x-auto leading-relaxed">
-            {report.markdown_summary}
-          </pre>
+          <MarkdownContent className="mt-4 rounded-lg border bg-background p-4" content={report.markdown_summary} />
         </details>
       )}
 
@@ -284,7 +283,7 @@ export function SkillGapResultPanel({
           className="bg-brand-orange hover:bg-brand-orange-hover text-white font-bold gap-2 w-full sm:w-auto"
         >
           <Play size={16} />
-          {startingInterview ? 'Đang chuẩn bị phỏng vấn...' : 'Bắt đầu phỏng vấn'}
+          {startingInterview ? 'Đang lưu hồ sơ…' : 'Lưu hồ sơ ứng tuyển'}
         </Button>
       </div>
     </div>

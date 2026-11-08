@@ -1,80 +1,11 @@
 import React from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { SessionHistoryItem, QuestionFeedback } from '@/services/historyService';
 import { HrSessionDetailClient } from '@/components/features/hr';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, FileCheck } from 'lucide-react';
 
 export const revalidate = 0;
-
-function parseJson<T>(raw: unknown): T | null {
-  if (!raw) return null;
-  try {
-    return (typeof raw === 'string' ? JSON.parse(raw) : raw) as T;
-  } catch {
-    return null;
-  }
-}
-
-async function getSessionData(sessionId: string): Promise<SessionHistoryItem | null> {
-  try {
-    const backendUrl = process.env.MATCHING_SERVICE_URL || 'http://localhost:8081';
-    const targetUrl = `${backendUrl}/api/v1/sessions/${sessionId}`;
-    const res = await fetch(targetUrl, { cache: 'no-store' });
-    if (!res.ok) {
-      return null;
-    }
-    const sess = await res.json();
-
-    const questionsList: QuestionFeedback[] = (sess.turns || []).map((t: {
-      id?: string | number;
-      question?: string;
-      answer?: string;
-      score?: number;
-      strengths?: string;
-      improvements?: string;
-      suggestedAnswer?: string;
-      topicTag?: string;
-      isDeepDive?: boolean;
-      hrRating?: number;
-      hrFeedback?: string;
-    }) => ({
-      id: t.id ? String(t.id) : undefined,
-      question: t.question || '',
-      answer: t.answer || '',
-      score: t.score !== null && t.score !== undefined ? Number(t.score) : 0,
-      strengths: t.strengths || '',
-      improvements: t.improvements || '',
-      suggestedAnswer: t.suggestedAnswer || '',
-      topicTag: t.topicTag || '',
-      isDeepDive: Boolean(t.isDeepDive),
-      hrRating: t.hrRating !== null && t.hrRating !== undefined ? Number(t.hrRating) : undefined,
-      hrFeedback: t.hrFeedback || undefined,
-    }));
-
-    return {
-      id: sess.id,
-      date: sess.startedAt || sess.date || new Date().toISOString(),
-      interviewType: sess.interviewType || 'Technical',
-      roleTitle: sess.roleTitle || 'Candidate',
-      cvFilename: sess.cvFilename || 'CV.pdf',
-      jdFilename: sess.jdFilename || 'JD.pdf',
-      cvFileUrl: sess.cvFileUrl,
-      jdFileUrl: sess.jdFileUrl,
-      overallScore: sess.overallScore,
-      status: sess.status || 'In progress',
-      questions: questionsList,
-      overallFeedback: sess.overallFeedback,
-      skillGapResults: parseJson(sess.skillGapJson),
-      skillGapReport: parseJson(sess.gapReportJson),
-      interviewReport: parseJson(sess.interviewReportJson),
-    };
-  } catch (error) {
-    console.error('[HR Detail Page] Error querying session data:', error);
-    return null;
-  }
-}
 
 export default async function HrSessionDetailPage({
   params,
@@ -86,8 +17,6 @@ export default async function HrSessionDetailPage({
   if (!sessionId) {
     notFound();
   }
-
-  const sessionData = await getSessionData(sessionId);
 
   return (
     <div className="container mx-auto max-w-5xl px-4 space-y-6">
@@ -102,24 +31,17 @@ export default async function HrSessionDetailPage({
           <div>
             <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
               <FileCheck className="size-5 text-brand-orange" />
-              {sessionData
-                ? (() => {
-                    // Derive candidate name from cvFilename
-                    const name = (sessionData.cvFilename || '').replace(/\.[^.]+$/, '').replace(/^cv_/i, '').replace(/[_\s]+(test|upload|final|v\d+|\d{4}|draft|new|copy)$/i, '').replace(/[_-]+/g, ' ').trim();
-                    const role = sessionData.roleTitle || 'Đang xác định vị trí';
-                    return name ? `${name} — ${role}` : role;
-                  })()
-                : 'Chi Tiết Phỏng Vấn'}
+              Chi Tiết Phỏng Vấn
             </h1>
             <p className="text-[11px] text-slate-400 font-mono mt-0.5">Session ID: {sessionId}</p>
           </div>
         </div>
       </div>
 
-      {/* Client wrapper handles tabs + form */}
+      {/* Client wrapper handles fetching authenticated session data, tabs + form */}
       <HrSessionDetailClient
         sessionId={sessionId}
-        sessionData={sessionData}
+        sessionData={null}
       />
     </div>
   );

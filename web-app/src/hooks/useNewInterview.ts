@@ -2,8 +2,11 @@
 
 import { useState, useEffect, useRef, useCallback, type ChangeEvent, type DragEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import axiosClient from '@/lib/axiosClient';
 import { cvJdMatchingService, type AnalyzeWithReportResponse } from '@/services/cvJdMatching';
 import { historyService } from '@/services/historyService';
+import { applicationProfiles } from '@/services/applicationProfiles';
+import { interviewError } from '@/services/evidenceInterview';
 import { type ActiveSession, type SessionStage } from '@/components/features/interview/NewInterview/ActiveSessionsPanel';
 import { useAuthStore } from '@/store/authStore';
 
@@ -30,6 +33,7 @@ export function useNewInterview() {
   const [cvFile, setCvFile] = useState<File | null>(null);
   const [jdFile, setJdFile] = useState<File | null>(null);
   const [jdText, setJdText] = useState('');
+  const [jdTitle, setJdTitle] = useState('');
   const [cvSource, setCvSource] = useState<CvSource>('upload');
   const [jdSource, setJdSource] = useState<JdSource>('upload');
   const [savedResumes, setSavedResumes] = useState<DatabaseResume[]>([]);
@@ -51,6 +55,8 @@ export function useNewInterview() {
 
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [roleTitle, setRoleTitle] = useState('Software Engineer');
+  const [profileTitle, setProfileTitle] = useState('');
+  const [company, setCompany] = useState('');
   const [ingested, setIngested] = useState(false);
   const [analysis, setAnalysis] = useState<AnalyzeWithReportResponse | null>(null);
   const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
@@ -70,7 +76,7 @@ export function useNewInterview() {
         if (!mounted) return;
         setActiveSessions(
           sessions
-            .filter((s) => s.status !== 'Completed')
+            .filter((s) => ['Not started', 'In progress'].includes(s.status))
             .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
             .map((s) => {
               const hasAssessment = Boolean(s.skillGapResults && s.skillGapReport);
@@ -107,10 +113,27 @@ export function useNewInterview() {
       }
 
       try {
-        const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
-        const [rRes, jRes] = await Promise.all([fetch('/api/resumes', { headers }), fetch('/api/jds', { headers })]);
-        if (rRes.ok && mounted) setSavedResumes((await rRes.json()).map((r: { id: string; fileName: string; createdAt: string; fileUrl?: string }) => ({ id: r.id, file_name: r.fileName, created_at: r.createdAt, file_url: r.fileUrl })));
-        if (jRes.ok && mounted) setSavedJds((await jRes.json()).map((j: { id: string; title: string; createdAt: string }) => ({ id: j.id, title: j.title, created_at: j.createdAt })));
+        const [rRes, jRes] = await Promise.all([
+          axiosClient.get<Array<{ id: string; fileName: string; createdAt: string; fileUrl?: string }>>('/api/v1/resumes'),
+          axiosClient.get<Array<{ id: string; title: string; createdAt: string }>>('/api/v1/job-descriptions'),
+        ]);
+        if (mounted) {
+          setSavedResumes(
+            (rRes.data || []).map((r) => ({
+              id: r.id,
+              file_name: r.fileName,
+              created_at: r.createdAt,
+              file_url: r.fileUrl,
+            }))
+          );
+          setSavedJds(
+            (jRes.data || []).map((j) => ({
+              id: j.id,
+              title: j.title,
+              created_at: j.createdAt,
+            }))
+          );
+        }
       } catch (e) {
         console.error('[useNewInterview] entities', e);
       }
@@ -241,6 +264,10 @@ export function useNewInterview() {
       try {
         const session = await historyService.getSessionById(id);
         if (session) {
+          if (session.applicationProfileId) {
+            router.push(`/applications/${session.applicationProfileId}`);
+            return;
+          }
           const hasQ = session.questions && session.questions.length > 0;
           if (!hasQ) {
             await handleViewAssessment(id);
@@ -261,6 +288,11 @@ export function useNewInterview() {
     async (id: string) => {
       setIsCloning(id);
       try {
+        const session = await historyService.getSessionById(id);
+        if (session?.applicationProfileId) {
+          router.push(`/applications/${session.applicationProfileId}`);
+          return;
+        }
         const newId = await historyService.cloneSession(id);
         router.push(`/interview/session/${newId}`);
       } catch (e) {
@@ -277,12 +309,15 @@ export function useNewInterview() {
     setCvFile(null);
     setJdFile(null);
     setJdText('');
+    setJdTitle('');
     setSelectedResumeId(null);
     setSelectedJdId(null);
     setUploadProgress(0);
     setApiError(null);
     setIngested(false);
     setSessionId(null);
+    setProfileTitle('');
+    setCompany('');
     if (typeof window !== 'undefined') {
       const url = new URL(window.location.href);
       url.searchParams.delete('sessionId');
@@ -296,18 +331,11 @@ export function useNewInterview() {
     setGenerating(true);
     setApiError(null);
     try {
-      await cvJdMatchingService.startAdaptiveInterview(targetSessionId);
-      router.push(`/interview/session/${targetSessionId}`);
-    } catch (err) {
-      console.error('[useNewInterview] startAdaptiveInterview error:', err);
-      const errorMsg =
-        err instanceof Error
-          ? err.message
-        : 'Không thể bắt đầu phỏng vấn. Vui lòng thử lại.';
-      setApiError(errorMsg);
-      setGenerating(false);
-    }
-  }, [analysis?.analysis_id, router, sessionId]);
+      const profile = await applicationProfiles.create(targetSessionId, profileTitle.trim() || roleTitle, company.trim());
+      router.push(`/applications/${profile.id}`);
+    } catch (cause) { setApiError(interviewError(cause)); }
+    finally { setGenerating(false); }
+  }, [analysis?.analysis_id, router, sessionId, profileTitle, company, roleTitle]);
 
   const handleUploadAndIngest = useCallback(async () => {
     if (cvSource === 'upload' && !cvFile) return;
@@ -319,24 +347,24 @@ export function useNewInterview() {
     setUploading(true);
     setApiError(null);
 
-
-
+    const trimmedJdTitle = jdTitle.trim();
     const displayCvName =
       cvSource === 'upload' && cvFile
         ? cvFile.name
         : savedResumes.find((r) => r.id === selectedResumeId)?.file_name || 'Saved_CV.pdf';
     const displayJdName =
       jdSource === 'upload' && jdFile
-        ? jdFile.name
+        ? (trimmedJdTitle ? `${trimmedJdTitle}.pdf` : jdFile.name)
         : jdSource === 'text'
-        ? 'JD_Pasted_Text.txt'
+        ? (trimmedJdTitle ? `${trimmedJdTitle}.txt` : 'JD_Pasted_Text.txt')
         : savedJds.find((j) => j.id === selectedJdId)?.title || 'Saved_JD.pdf';
     const initialRole =
-      jdSource === 'saved' && selectedJdId
+      trimmedJdTitle ||
+      (jdSource === 'saved' && selectedJdId
         ? savedJds.find((j) => j.id === selectedJdId)?.title || 'Software Engineer'
         : jdSource === 'upload' && jdFile
         ? jdFile.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ')
-        : 'Software Engineer';
+        : 'Software Engineer');
 
     const newSessionId = `session-${Date.now()}`;
     setRoleTitle(initialRole);
@@ -365,7 +393,8 @@ export function useNewInterview() {
         jdSource === 'upload' ? jdFile : null,
         jdSource === 'text' ? jdText : null,
         cvSource !== 'upload' ? selectedResumeId : null,
-        jdSource === 'saved' ? selectedJdId : null
+        jdSource === 'saved' ? selectedJdId : null,
+        initialRole
       );
 
       setSessionId(newSessionId);
@@ -379,7 +408,6 @@ export function useNewInterview() {
       setUploading(false);
     } finally {
       setAnalyzing(false);
-
     }
   }, [
     cvFile,
@@ -387,6 +415,7 @@ export function useNewInterview() {
     jdFile,
     jdSource,
     jdText,
+    jdTitle,
     savedJds,
     savedResumes,
     selectedJdId,
@@ -402,6 +431,8 @@ export function useNewInterview() {
     setJdFile,
     jdText,
     setJdText,
+    jdTitle,
+    setJdTitle,
     cvSource,
     setCvSource,
     jdSource,
@@ -430,6 +461,10 @@ export function useNewInterview() {
     apiError,
     sessionId,
     roleTitle,
+    profileTitle,
+    setProfileTitle,
+    company,
+    setCompany,
     ingested,
     analysis,
     activeSessions,

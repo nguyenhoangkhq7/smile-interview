@@ -41,6 +41,14 @@ public class SkillGapController {
 
         Session session = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + sessionId));
+        if (session.getApplicationProfile() != null) {
+            if (forceRefresh) throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.CONFLICT, "Application profile analysis is fixed; prepare a new profile for changed documents");
+            var profile = session.getApplicationProfile();
+            return ResponseEntity.ok(new AnalyzeWithReportResponseDto(sessionId,
+                    objectMapper.convertValue(readJson(profile.getSkillGapJson()), new TypeReference<List<SkillGapResultDto>>() {}),
+                    objectMapper.convertValue(readJson(profile.getGapReportJson()), new TypeReference<Map<String, Object>>() {})));
+        }
 
         if (!forceRefresh && session.getSkillGapJson() != null && session.getGapReportJson() != null) {
             try {
@@ -81,5 +89,10 @@ public class SkillGapController {
         }
 
         return ResponseEntity.ok(response);
+    }
+
+    private com.fasterxml.jackson.databind.JsonNode readJson(String value) {
+        try { return objectMapper.readTree(value); }
+        catch (com.fasterxml.jackson.core.JsonProcessingException ex) { throw new IllegalStateException("Invalid stored analysis", ex); }
     }
 }

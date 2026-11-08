@@ -47,7 +47,6 @@ services:
       - ./ai-service/.env
     environment:
       PORT: 8000
-      FASTAPI_AI_BASE_URL: http://localhost:8000
     ports:
       - "8000:8000"
 
@@ -64,10 +63,7 @@ services:
       - "3000:3000"
     environment:
       NODE_ENV: production
-      MATCHING_SERVICE_URL: http://backend:8081
-      LLM_API_KEY: ${LLM_API_KEY}
-      LLM_API_URL: ${LLM_API_URL}
-      LLM_MODEL: ${LLM_MODEL}
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8081
     depends_on:
       - backend
 

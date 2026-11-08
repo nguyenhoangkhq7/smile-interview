@@ -1,5 +1,6 @@
 package fit.iuh.modules.skillgap.client;
 
+import fit.iuh.config.AiClientConfig;
 import fit.iuh.config.AppProperties;
 import fit.iuh.exception.AiServiceException;
 import fit.iuh.modules.skillgap.dto.SkillGapDtos.AnalyzeWithReportResponseDto;
@@ -20,12 +21,7 @@ public class SkillGapClient {
     private final RestClient restClient;
 
     public SkillGapClient(AppProperties appProperties) {
-        String baseUrl = appProperties.getAi() != null && appProperties.getAi().getFastapi() != null
-                ? appProperties.getAi().getFastapi().getBaseUrl()
-                : "http://localhost:8000";
-        this.restClient = RestClient.builder()
-                .baseUrl(baseUrl)
-                .build();
+        this.restClient = AiClientConfig.createAiRestClient(appProperties);
     }
 
     public AnalyzeWithReportResponseDto analyzeGap(String sessionId, String cvText, String jdText) {

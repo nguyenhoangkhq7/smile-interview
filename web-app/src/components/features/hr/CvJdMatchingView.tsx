@@ -1,4 +1,5 @@
 'use client';
+import { MarkdownContent } from '@/components/common/MarkdownContent';
 
 import React from 'react';
 import { SessionHistoryItem } from '@/services/historyService';
@@ -108,7 +109,7 @@ export const CvJdMatchingView: React.FC<CvJdMatchingViewProps> = ({ session }) =
           </div>
         </div>
         {report?.markdown_summary && (
-          <pre className="mt-3 whitespace-pre-wrap text-xs text-slate-700 font-sans">{report.markdown_summary}</pre>
+          <MarkdownContent className="mt-3" content={report.markdown_summary} />
         )}
       </Card>
 

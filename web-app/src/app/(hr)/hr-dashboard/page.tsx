@@ -1,18 +1,9 @@
 import React from 'react';
-import { historyService, SessionHistoryItem } from '@/services/historyService';
 import { HrSessionTable } from '@/components/features/hr';
 
-export const revalidate = 0; // Always fetch fresh history data
+export const revalidate = 0;
 
-export default async function HrDashboardPage() {
-  let sessions: SessionHistoryItem[] = [];
-
-  try {
-    sessions = await historyService.getHistory();
-  } catch (error) {
-    console.error('[HrDashboardPage] Failed to load interview history:', error);
-  }
-
+export default function HrDashboardPage() {
   return (
     <div className="container mx-auto max-w-7xl px-4 space-y-6">
       {/* Page Header */}
@@ -26,7 +17,7 @@ export default async function HrDashboardPage() {
       </div>
 
       {/* Main Sessions Table */}
-      <HrSessionTable sessions={sessions} />
+      <HrSessionTable sessions={[]} />
     </div>
   );
 }

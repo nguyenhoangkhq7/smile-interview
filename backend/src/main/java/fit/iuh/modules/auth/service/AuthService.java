@@ -1,5 +1,6 @@
 package fit.iuh.modules.auth.service;
 
+import fit.iuh.common.service.S3StorageService;
 import fit.iuh.modules.auth.dto.AuthResponse;
 import fit.iuh.modules.auth.dto.ChangePasswordRequest;
 import fit.iuh.modules.auth.dto.CreateHrUserRequest;
@@ -11,8 +12,13 @@ import fit.iuh.modules.auth.entity.Role;
 import fit.iuh.modules.auth.entity.User;
 import fit.iuh.modules.auth.repository.UserRepository;
 import fit.iuh.modules.auth.security.JwtService;
+import fit.iuh.modules.session.entity.Resume;
+import fit.iuh.modules.session.repository.ResumeRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -27,6 +33,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.time.LocalDateTime;
+import java.util.UUID;
 
 /**
  * Business logic for user registration, authentication, and profile management.
@@ -37,22 +45,12 @@ import java.nio.file.StandardCopyOption;
 public class AuthService {
 
     private final UserRepository userRepository;
+    private final ResumeRepository resumeRepository;
+    private final S3StorageService s3StorageService;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
 
-    // ----------------------------------------------------------------
-    // Register
-    // ----------------------------------------------------------------
-
-    /**
-     * Registers a new user.
-     * The role is forced to {@code Role.USER} / {@code Role.CANDIDATE}.
-     *
-     * @param request the registration payload
-     * @return {@link AuthResponse} with a JWT and user details
-     * @throws IllegalArgumentException if the email is already taken
-     */
     @Transactional
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.existsByEmail(request.email())) {
@@ -74,12 +72,6 @@ public class AuthService {
         return toAuthResponse(token, saved);
     }
 
-    /**
-     * Creates a new HR user account (Admin only).
-     *
-     * @param request the HR account creation payload
-     * @return {@link CreateHrUserResponse} with account creation confirmation
-     */
     @Transactional
     public CreateHrUserResponse createHrUser(CreateHrUserRequest request) {
         String targetEmail = (request.getEmail() != null && !request.getEmail().isBlank())
@@ -115,16 +107,6 @@ public class AuthService {
                 .build();
     }
 
-    // ----------------------------------------------------------------
-    // Login
-    // ----------------------------------------------------------------
-
-    /**
-     * Authenticates an existing user via email + password.
-     *
-     * @param request the login payload
-     * @return {@link AuthResponse} with a fresh JWT
-     */
     public AuthResponse login(LoginRequest request) {
         Authentication auth = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.email(), request.password())
@@ -137,10 +119,6 @@ public class AuthService {
         return toAuthResponse(token, user);
     }
 
-    // ----------------------------------------------------------------
-    // Change Password
-    // ----------------------------------------------------------------
-
     @Transactional
     public void changePassword(User user, ChangePasswordRequest request) {
         if (!passwordEncoder.matches(request.currentPassword(), user.getPassword())) {
@@ -151,10 +129,6 @@ public class AuthService {
         userRepository.save(user);
         log.info("Password changed successfully for user: {}", user.getEmail());
     }
-
-    // ----------------------------------------------------------------
-    // Update Profile
-    // ----------------------------------------------------------------
 
     @Transactional
     public User updateProfile(User user, UpdateProfileRequest request) {
@@ -169,17 +143,13 @@ public class AuthService {
         }
         if (request.defaultResumeId() != null) {
             user.setDefaultResumeId(request.defaultResumeId().isBlank()
-                    ? null : java.util.UUID.fromString(request.defaultResumeId()));
+                    ? null : UUID.fromString(request.defaultResumeId()));
         }
 
         User updated = userRepository.save(user);
         log.info("Profile updated for user: {}", user.getEmail());
         return updated;
     }
-
-    // ----------------------------------------------------------------
-    // Upload Avatar
-    // ----------------------------------------------------------------
 
     @Transactional
     public User uploadAvatar(User user, MultipartFile file) {
@@ -206,9 +176,47 @@ public class AuthService {
         }
     }
 
-    // ----------------------------------------------------------------
-    // Helper
-    // ----------------------------------------------------------------
+    @Transactional
+    public Resume uploadAndSetDefaultResume(User user, MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("Resume file is empty");
+        }
+
+        String fileName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "cv.pdf";
+        String parsedContent = null;
+        if (fileName.toLowerCase().endsWith(".pdf")) {
+            try (PDDocument document = Loader.loadPDF(file.getBytes())) {
+                parsedContent = new PDFTextStripper().getText(document).trim();
+            } catch (Exception e) {
+                log.warn("[AuthService] Could not extract text from {}: {}", fileName, e.getMessage());
+            }
+        }
+
+        String fileUrl;
+        try {
+            String s3Key = "resumes/" + user.getId() + "/" + System.currentTimeMillis() + "_" + fileName;
+            fileUrl = s3StorageService.uploadFile(s3Key, file.getBytes(), file.getContentType());
+        } catch (Exception e) {
+            log.warn("[AuthService] S3 upload skipped or failed: {}", e.getMessage());
+            fileUrl = "/uploads/resumes/" + fileName;
+        }
+
+        Resume resume = Resume.builder()
+                .id(UUID.randomUUID())
+                .userId(user.getId())
+                .fileName(fileName)
+                .fileUrl(fileUrl)
+                .rawText(parsedContent)
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        Resume saved = resumeRepository.save(resume);
+        user.setDefaultResumeId(saved.getId());
+        userRepository.save(user);
+
+        log.info("Default resume uploaded and set for user {}: resumeId={}", user.getEmail(), saved.getId());
+        return saved;
+    }
 
     public AuthResponse toAuthResponse(String token, User user) {
         return new AuthResponse(

@@ -12,7 +12,6 @@ import styles from './profile.module.css';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { useAuthStore } from '@/store/authStore';
 import axiosClient from '@/lib/axiosClient';
-import axios from 'axios';
 import dynamic from 'next/dynamic';
 const PdfViewerModal = dynamic(() => import('@/components/common/PdfViewerModal'), { ssr: false });
 
@@ -183,11 +182,9 @@ export default function ProfilePage() {
     formData.append('file', file);
 
     try {
-      const token = useAuthStore.getState().token;
-      const { data } = await axios.post('/api/profile/avatar', formData, {
+      const { data } = await axiosClient.post('/api/auth/avatar', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
-          'Authorization': `Bearer ${token}`
         },
       });
 
@@ -240,16 +237,8 @@ export default function ProfilePage() {
   useEffect(() => {
     async function loadResumes() {
       try {
-        const token = useAuthStore.getState().token;
-        const res = await fetch('/api/resumes', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setDbResumes(data);
-        }
+        const { data } = await axiosClient.get<Resume[]>('/api/v1/resumes');
+        setDbResumes(data || []);
       } catch (err) {
         console.error('Error loading resumes:', err);
       }
@@ -288,11 +277,9 @@ export default function ProfilePage() {
     formData.append('file', file);
 
     try {
-      const token = useAuthStore.getState().token;
-      const { data } = await axios.post('/api/profile/default-resume', formData, {
+      const { data } = await axiosClient.post('/api/auth/default-resume', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
-          'Authorization': `Bearer ${token}`
         },
       });
 
@@ -638,21 +625,11 @@ export default function ProfilePage() {
                             if (!selectedResumeId) return;
                             setCvLoading(true);
                             try {
-                              const token = useAuthStore.getState().token;
-                              const res = await fetch('/api/profile/default-resume/set', {
-                                method: 'POST',
-                                headers: {
-                                  'Content-Type': 'application/json',
-                                  'Authorization': `Bearer ${token}`
-                                },
-                                body: JSON.stringify({ resumeId: selectedResumeId })
+                              await axiosClient.put('/api/auth/profile', {
+                                defaultResumeId: String(selectedResumeId),
                               });
-                              if (res.ok) {
-                                updateUser({ defaultResumeId: String(selectedResumeId) });
-                                setCvToast({ type: 'success', message: 'Đặt làm CV mặc định thành công!' });
-                              } else {
-                                setCvToast({ type: 'error', message: 'Lỗi đặt CV mặc định.' });
-                              }
+                              updateUser({ defaultResumeId: String(selectedResumeId) });
+                              setCvToast({ type: 'success', message: 'Đặt làm CV mặc định thành công!' });
                             } catch {
                               setCvToast({ type: 'error', message: 'Lỗi đặt CV mặc định.' });
                             } finally {

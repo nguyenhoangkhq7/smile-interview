@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import { API_BASE_URL } from '@/lib/axiosClient';
 import { historyService, SessionHistoryItem } from '@/services/historyService';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -17,18 +18,11 @@ import {
 type SortOrder = 'newest' | 'oldest';
 type StageFilter = 'ALL' | 'CV_JD_MATCHED' | 'QUESTION_BANK_READY' | 'INTERVIEW_IN_PROGRESS' | 'COMPLETED';
 
-/** Derive a readable candidate name from a CV filename.
- *  e.g. "CV_CaoThanhDong_Test.pdf" → "Cao Thanh Dong"
- */
 function parseCandidateName(cvFilename?: string): string {
   if (!cvFilename) return 'Ứng viên';
-  // Strip extension
   let name = cvFilename.replace(/\.[^.]+$/, '');
-  // Strip leading CV_ or cv_ prefix
   name = name.replace(/^cv_/i, '');
-  // Strip trailing noise tokens (_Test, _Upload, _Final, _v2, _2024 etc.)
   name = name.replace(/[_\s]+(test|upload|final|v\d+|\d{4}|draft|new|copy)$/i, '');
-  // Replace remaining underscores/hyphens with spaces
   name = name.replace(/[_-]+/g, ' ').trim();
   return name || 'Ứng viên';
 }
@@ -45,7 +39,7 @@ export const HrSessionTable: React.FC<HrSessionTableProps> = ({ sessions: initia
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
-    historyService.getHistory().then((data) => {
+    historyService.getHistory(true).then((data) => {
       if (data && data.length > 0) setSessionList(data);
     });
   }, []);
@@ -56,14 +50,14 @@ export const HrSessionTable: React.FC<HrSessionTableProps> = ({ sessions: initia
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    const data = await historyService.getHistory();
+    const data = await historyService.getHistory(true);
     if (data && data.length > 0) setSessionList(data);
     setIsRefreshing(false);
   };
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const es = new EventSource('/api/hr-realtime');
+    const es = new EventSource(`${API_BASE_URL}/api/v1/hr-realtime`);
     es.addEventListener('SESSION_STAGE_UPDATED', (e: MessageEvent) => {
       try {
         const data = JSON.parse(e.data);
@@ -76,7 +70,7 @@ export const HrSessionTable: React.FC<HrSessionTableProps> = ({ sessions: initia
               updated[idx] = { ...updated[idx], currentStage: stage };
               return updated;
             }
-            historyService.getHistory().then((fresh) => {
+            historyService.getHistory(true).then((fresh) => {
               if (fresh && fresh.length > 0) setSessionList(fresh);
             });
             return prev;

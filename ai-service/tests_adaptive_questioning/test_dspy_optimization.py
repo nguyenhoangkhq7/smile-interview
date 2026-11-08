@@ -122,10 +122,10 @@ class TestDSPyOptimization:
             loaded_j.load(str(j_path))
             assert len(loaded_j.dump_state()["evaluate.predict"].get("demos", [])) == 2
 
-    def test_openai_engine_auto_detects_compiled_artifacts(self):
+    def test_openai_engine_auto_detects_compiled_artifacts(self, tmp_path):
         # When default artifacts are seeded, OpenAILLMEngine automatically loads them
-        seed_default_compiled_artifacts()
-        engine = OpenAILLMEngine(api_key="test_fake_key")
+        seed_default_compiled_artifacts(target_dir=tmp_path)
+        engine = OpenAILLMEngine(api_key="test_fake_key", compiled_dir=tmp_path)
         assert engine.is_compiled is True
 
     def test_expanded_gold_dataset_splits_and_tags(self):

@@ -493,21 +493,23 @@ def test_dataset_loader_json_and_jsonl(mock_dataset_pairs: List[DatasetPair]) ->
 # ==============================================================================
 
 
-def test_cli_safety_checks_and_argument_parsing() -> None:
+def test_cli_safety_checks_and_argument_parsing(tmp_path, mock_dataset_pairs) -> None:
     """
     Kiểm thử CLI:
     - Báo lỗi và dừng lại khi chọn LLM baseline mà không truyền --enable-llm.
     - Báo lỗi khi baseline không tồn tại.
     - Dry-run mode trả về exit code 0.
     """
+    dataset = tmp_path / "mock_dataset.json"
+    save_dataset_json(mock_dataset_pairs, dataset)
     # 1. Chạy LLM baseline không có --enable-llm -> Exit code 1
-    code_llm_block = main(["--dataset", "data/mock_dataset.json", "--baselines", "B-LLM-Augmented"])
+    code_llm_block = main(["--dataset", str(dataset), "--baselines", "B-LLM-Augmented"])
     assert code_llm_block == 1
 
     # 2. Chạy baseline không tồn tại -> Exit code 1
-    code_invalid = main(["--dataset", "data/mock_dataset.json", "--baselines", "NonexistentBaseline"])
+    code_invalid = main(["--dataset", str(dataset), "--baselines", "NonexistentBaseline"])
     assert code_invalid == 1
 
     # 3. Dry-run mode -> Exit code 0
-    code_dry = main(["--dataset", "data/mock_dataset.json", "--dry-run"])
+    code_dry = main(["--dataset", str(dataset), "--dry-run"])
     assert code_dry == 0

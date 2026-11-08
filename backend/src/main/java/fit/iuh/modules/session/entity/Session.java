@@ -17,6 +17,13 @@ import java.util.UUID;
 @AllArgsConstructor
 public class Session {
 
+    @ManyToOne
+    @JoinColumn(name = "application_profile_id")
+    private fit.iuh.modules.application.ApplicationProfile applicationProfile;
+
+    @Column(name = "attempt_number")
+    private Integer attemptNumber;
+
     @Id
     @Column(name = "id", updatable = false, nullable = false, length = 128)
     private String id;
