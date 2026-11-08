@@ -8,6 +8,7 @@ import java.util.List;
 
 @Repository
 public interface SessionTurnRepository extends JpaRepository<SessionTurn, Long> {
+    java.util.Optional<SessionTurn> findBySessionIdAndExternalTurnId(String sessionId, String externalTurnId);
     List<SessionTurn> findBySessionIdOrderByIdAsc(String sessionId);
     void deleteBySessionId(String sessionId);
 }

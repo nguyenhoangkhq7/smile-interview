@@ -1,9 +1,11 @@
 import type { Metadata } from 'next';
 import { Geist } from 'next/font/google';
 import '../globals.css';
+import 'katex/dist/katex.min.css';
 import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
+import AuthSessionMonitor from '@/components/auth/AuthSessionMonitor';
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
@@ -25,6 +27,7 @@ export default function RootLayout({
     <html lang="vi" className={cn("font-sans", geist.variable)}>
       <body className="flex min-h-screen flex-col font-sans bg-background">
         <TooltipProvider>
+          <AuthSessionMonitor />
           {children}
           <Toaster position="top-center" richColors />
         </TooltipProvider>

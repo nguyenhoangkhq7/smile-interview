@@ -166,6 +166,7 @@ interface UploadStepProps {
   jdSource: JdSource; setJdSource: (v: JdSource) => void;
   cvFile: File | null; jdFile: File | null;
   jdText: string; setJdText: (v: string) => void;
+  jdTitle: string; setJdTitle: (v: string) => void;
   dragOverCv: boolean; dragOverJd: boolean;
   cvError: string | null; jdError: string | null;
   savedResumes: DatabaseResume[]; savedJds: DatabaseJd[];
@@ -190,7 +191,7 @@ interface UploadStepProps {
 // ── Main Export ────────────────────────────────────────────────────────────────
 export function UploadStep({
   cvSource, setCvSource, jdSource, setJdSource,
-  cvFile, jdFile, jdText, setJdText,
+  cvFile, jdFile, jdText, setJdText, jdTitle, setJdTitle,
   dragOverCv, dragOverJd, cvError, jdError,
   savedResumes, savedJds,
   selectedResumeId, setSelectedResumeId,
@@ -283,11 +284,31 @@ export function UploadStep({
           )}
 
           {jdSource === 'text' && (
-            <Textarea
-              value={jdText} onChange={(e) => setJdText(e.target.value)}
-              placeholder="Dán toàn bộ nội dung bản mô tả công việc (JD) vào đây..."
-              className="min-h-[180px] resize-none"
-            />
+            <div className="space-y-3">
+              <div>
+                <label htmlFor="jd-title-input" className="block text-xs font-medium text-foreground mb-1">
+                  Tên gợi nhớ JD / Vị trí &amp; Công ty <span className="text-muted-foreground font-normal">(Tùy chọn)</span>
+                </label>
+                <input
+                  id="jd-title-input"
+                  type="text"
+                  value={jdTitle}
+                  onChange={(e) => setJdTitle(e.target.value)}
+                  placeholder="Ví dụ: Backend Java - FPT Software, Frontend React - VNG..."
+                  className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground transition-all focus:border-brand-orange focus:outline-none focus:ring-1 focus:ring-brand-orange"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">
+                  Nội dung chi tiết JD <span className="text-destructive">*</span>
+                </label>
+                <Textarea
+                  value={jdText} onChange={(e) => setJdText(e.target.value)}
+                  placeholder="Dán toàn bộ nội dung bản mô tả công việc (JD) vào đây..."
+                  className="min-h-[160px] resize-none"
+                />
+              </div>
+            </div>
           )}
 
           {jdSource === 'saved' && (

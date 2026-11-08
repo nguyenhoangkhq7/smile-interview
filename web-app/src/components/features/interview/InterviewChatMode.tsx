@@ -1,4 +1,5 @@
 'use client';
+import { MarkdownContent } from '@/components/common/MarkdownContent';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -361,7 +362,7 @@ export function InterviewChatMode() {
                       )}
                       <span>• {msg.time}</span>
                     </div>
-                    <div className="whitespace-pre-wrap">{msg.text}</div>
+                    {isAi ? <MarkdownContent content={msg.text} /> : <div className="whitespace-pre-wrap">{msg.text}</div>}
                   </div>
                 </div>
 
@@ -384,9 +385,7 @@ export function InterviewChatMode() {
                         )}
                       </div>
                     </div>
-                    <p className="text-muted-foreground leading-relaxed">
-                      {msg.judgeFeedback.reflectiveInsight}
-                    </p>
+                    <MarkdownContent className="text-muted-foreground" content={msg.judgeFeedback.reflectiveInsight} />
                     {msg.judgeFeedback.updatedBelief &&
                       msg.judgeFeedback.updatedBelief.length === 3 && (
                         <div className="text-[11px] font-mono text-muted-foreground pt-1">

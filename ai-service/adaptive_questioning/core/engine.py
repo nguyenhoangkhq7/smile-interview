@@ -369,30 +369,16 @@ class OpenAILLMEngine(BaseLLMEngine):
         model: Optional[str] = None,
         compiled_dir: Optional[Union[str, Path]] = None,
     ) -> None:
-        openai_key = api_key or os.environ.get("OPENAI_API_KEY")
-        openrouter_key = os.environ.get("OPENROUTER_API_KEY")
+        openrouter_key = api_key or os.environ.get("OPENROUTER_API_KEY")
 
-        if openai_key:
-            self.api_key = openai_key
-            self.base_url = base_url or os.environ.get("OPENAI_BASE_URL")
-            self.model = model or os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
-            dspy_model_name = (
-                self.model if "/" in self.model else f"openai/{self.model}"
-            )
-        elif openrouter_key:
-            self.api_key = openrouter_key
-            self.base_url = base_url or "https://openrouter.ai/api/v1"
-            self.model = model or os.environ.get("OPENROUTER_MODEL", "qwen/qwen3.7-flash")
-            dspy_model_name = (
-                self.model
-                if self.model.startswith("openrouter/")
-                else f"openrouter/{self.model}"
-            )
-        else:
-            self.api_key = None
-            self.base_url = base_url
-            self.model = model or "gpt-4o-mini"
-            dspy_model_name = f"openai/{self.model}"
+        self.api_key = openrouter_key or None
+        self.base_url = base_url or "https://openrouter.ai/api/v1"
+        self.model = model or os.environ.get("OPENROUTER_MODEL", "qwen/qwen3.7-flash")
+        dspy_model_name = (
+            self.model
+            if self.model.startswith("openrouter/")
+            else f"openrouter/{self.model}"
+        )
 
         self.dspy_question_module = DSPyQuestionGeneratorModule()
         self.dspy_judge_module = DSPyReflectiveJudgeModule()
@@ -444,7 +430,7 @@ class OpenAILLMEngine(BaseLLMEngine):
     def _ensure_configured(self) -> None:
         if not self.api_key or self.dspy_lm is None:
             raise RuntimeError(
-                "Missing LLM API Key. Please configure OPENROUTER_API_KEY or OPENAI_API_KEY in your .env file."
+                "Missing LLM API Key. Please configure OPENROUTER_API_KEY in your .env file."
             )
 
     def generate_question(

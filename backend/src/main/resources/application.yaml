@@ -61,6 +61,8 @@ app:
   ai:
     fastapi:
       base-url: ${FASTAPI_AI_BASE_URL:http://localhost:8000}
+      connect-timeout-seconds: ${FASTAPI_AI_CONNECT_TIMEOUT:15}
+      read-timeout-seconds: ${FASTAPI_AI_READ_TIMEOUT:180}
 
 logging:
   level:

@@ -18,8 +18,8 @@ const navLinks = [
     )
   },
   { 
-    href: '/interview/new', 
-    label: 'Matching JD',
+    href: '/applications',
+    label: 'Hồ sơ ứng tuyển',
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="10" />
@@ -112,6 +112,9 @@ export default function Navbar() {
                       Hồ sơ cá nhân
                     </Link>
 
+                    <Link href="/applications" className={styles.dropdownItem}>
+                      Hồ sơ ứng tuyển
+                    </Link>
                     <Link href="/history" className={styles.dropdownItem}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={styles.dropdownItemGreen}>
                         <circle cx="12" cy="12" r="10" />

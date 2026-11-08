@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Literal
 from .enums import SkillType, SemanticAlignment, SeniorityLevel, RichnessLabel, QuestionStrategy
 
 UNASSIGNED_JOB_ID = "UNASSIGNED"
@@ -59,10 +59,20 @@ class SegmenterOutput(BaseModel):
 
 # --- Step B Models (JD Requirement Parser) ---
 
+class JobTask(BaseModel):
+    task_id: str = ""
+    description: str
+    evidence_spans: List[str] = Field(default_factory=list)
+    required_level: float = Field(ge=1.0, le=5.0)
+    requirement_kind: Literal["REQUIRED", "OPTIONAL", "UNSPECIFIED"] = "UNSPECIFIED"
+    level_basis: Literal["EXPLICIT", "INFERRED", "FALLBACK"] = "INFERRED"
+
+
 class JDRequirement(BaseModel):
     jd_skill_id: str
     required_level: float = Field(ge=1.0, le=5.0, description="Độ sâu năng lực yêu cầu P_JD trên thang chuẩn hóa 1.0 - 5.0")
     reasoning: str
+    tasks: List[JobTask] = Field(default_factory=list)
 
 class JDParserOutput(BaseModel):
     requirements: List[JDRequirement]
@@ -117,3 +127,9 @@ class SkillGapResult(BaseModel):
 
     degraded: bool = Field(default=False)
     flags: List[str] = Field(default_factory=list)
+    importance_weight: float = Field(default=0.0, ge=0.0, le=1.0)
+    jd_reasoning: str = ""
+    jd_evidence_spans: List[str] = Field(default_factory=list)
+    job_tasks: List[JobTask] = Field(default_factory=list)
+    c_evidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    recency_flag: bool = False

@@ -8,6 +8,8 @@ from app.config import settings
 from module1_matcher.router import router as module1_router
 from skill_gap.api.routes import router as skill_gap_router
 from adaptive_questioning.api.routes import router as interview_router
+from adaptive_questioning.evidence.routes import router as evidence_router
+from voice.routes import router as voice_router
 
 _ROOT_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(_ROOT_DIR.parent / ".env")
@@ -40,6 +42,8 @@ def create_app() -> FastAPI:
     application.include_router(module1_router)
     application.include_router(skill_gap_router)
     application.include_router(interview_router)
+    application.include_router(evidence_router)
+    application.include_router(voice_router)
 
     @application.get("/health", tags=["Health"])
     async def health_check() -> Dict[str, str]:

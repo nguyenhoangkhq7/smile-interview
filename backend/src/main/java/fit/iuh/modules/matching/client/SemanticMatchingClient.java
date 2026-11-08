@@ -1,5 +1,6 @@
 package fit.iuh.modules.matching.client;
 
+import fit.iuh.config.AiClientConfig;
 import fit.iuh.config.AppProperties;
 import fit.iuh.exception.AiServiceException;
 import fit.iuh.modules.matching.dto.MatchingDtos.Module1OutputDto;
@@ -20,12 +21,7 @@ public class SemanticMatchingClient {
     private final RestClient restClient;
 
     public SemanticMatchingClient(AppProperties appProperties) {
-        String baseUrl = appProperties.getAi() != null && appProperties.getAi().getFastapi() != null
-                ? appProperties.getAi().getFastapi().getBaseUrl()
-                : "http://localhost:8000";
-        this.restClient = RestClient.builder()
-                .baseUrl(baseUrl)
-                .build();
+        this.restClient = AiClientConfig.createAiRestClient(appProperties);
     }
 
     public Module1OutputDto match(String cvText, String jdText) {

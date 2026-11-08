@@ -21,6 +21,9 @@ public class SessionTurn {
     @Column(name = "session_id", nullable = false, length = 128)
     private String sessionId;
 
+    @Column(name = "external_turn_id", length = 128)
+    private String externalTurnId;
+
     @Column(columnDefinition = "TEXT")
     private String question;
 

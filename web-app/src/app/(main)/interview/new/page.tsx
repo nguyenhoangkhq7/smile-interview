@@ -24,6 +24,8 @@ export default function NewInterviewPage() {
     setJdFile,
     jdText,
     setJdText,
+    jdTitle,
+    setJdTitle,
     cvSource,
     setCvSource,
     jdSource,
@@ -50,6 +52,10 @@ export default function NewInterviewPage() {
     generating,
     apiError,
     roleTitle,
+    profileTitle,
+    setProfileTitle,
+    company,
+    setCompany,
     ingested,
     analysis,
     activeSessions,
@@ -80,10 +86,10 @@ export default function NewInterviewPage() {
           {/* Header */}
           <div className="mb-8 text-center space-y-2">
             <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl text-foreground">
-              Khởi tạo phỏng vấn NCKH
+              Tạo hồ sơ ứng tuyển
             </h1>
             <p className="text-sm text-muted-foreground max-w-xl mx-auto">
-              Chọn CV và mô tả công việc để phân tích kỹ năng và bắt đầu phỏng vấn.
+              Phân tích CV và JD một lần, sau đó phỏng vấn nhiều lượt trong cùng hồ sơ.
             </p>
           </div>
 
@@ -136,6 +142,8 @@ export default function NewInterviewPage() {
                 jdFile={jdFile}
                 jdText={jdText}
                 setJdText={setJdText}
+                jdTitle={jdTitle}
+                setJdTitle={setJdTitle}
                 dragOverCv={dragOverCv}
                 dragOverJd={dragOverJd}
                 cvError={cvError}
@@ -222,6 +230,11 @@ export default function NewInterviewPage() {
             </div>
           )}
 
+          {analysis && <section className="mb-6 space-y-4 rounded-2xl border bg-card p-6">
+            <h2 className="text-lg font-semibold">Đặt tên hồ sơ ứng tuyển</h2>
+            <div className="grid gap-4 sm:grid-cols-2"><label className="space-y-2 text-sm font-medium">Tên hồ sơ<input maxLength={200} className="w-full rounded-lg border bg-background p-3" placeholder={roleTitle} value={profileTitle} onChange={e => setProfileTitle(e.target.value)} /></label><label className="space-y-2 text-sm font-medium">Công ty (không bắt buộc)<input maxLength={200} className="w-full rounded-lg border bg-background p-3" placeholder="Ví dụ: Công ty A" value={company} onChange={e => setCompany(e.target.value)} /></label></div>
+            <p className="text-sm text-muted-foreground">CV/JD và bản phân tích này sẽ được giữ làm mốc chung cho các lượt phỏng vấn.</p>
+          </section>}
           {analysis && (
             <div className="bg-card border border-border rounded-2xl p-6 md:p-8 shadow-xl animate-fade-up">
               <SkillGapResultPanel
@@ -241,10 +254,10 @@ export default function NewInterviewPage() {
               <div className="bg-card border border-border rounded-2xl p-8 max-w-sm w-full text-center space-y-4 shadow-2xl">
                 <div className="size-10 rounded-full border-4 border-t-amber-500 border-muted animate-spin mx-auto" />
                 <h3 className="text-lg font-bold text-foreground">
-                  Đang chuẩn bị phỏng vấn...
+                  Đang lưu hồ sơ ứng tuyển…
                 </h3>
                 <p className="text-xs text-muted-foreground">
-                  Khởi tạo phân phối niềm tin Prior Belief và sinh câu hỏi Abductive CoT mở đầu
+                  Lưu bản phân tích để bạn có thể phỏng vấn nhiều lượt với cùng CV/JD.
                 </p>
               </div>
             </div>

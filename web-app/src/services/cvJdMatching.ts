@@ -1,3 +1,4 @@
+import axiosClient from '@/lib/axiosClient';
 import { useAuthStore } from '@/store/authStore';
 
 export type SemanticAlignment = 'MATCH' | 'PARTIAL' | 'MISSING';
@@ -137,6 +138,10 @@ export interface HITLReportResponse {
 export interface IngestResponse {
   sessionId: string;
   success: boolean;
+  cvFilename?: string;
+  jdFilename?: string;
+  cvTextLength?: number;
+  jdTextLength?: number;
   cvMarkdown?: string;
   jdMarkdown?: string;
   rawCvText?: string | null;
@@ -162,7 +167,8 @@ export const cvJdMatchingService = {
     jdFile: File | null,
     jdText: string | null,
     resumeId?: string | null,
-    jdId?: string | null
+    jdId?: string | null,
+    roleTitle?: string | null
   ): Promise<IngestResponse> {
     const formData = new FormData();
     if (cvFile) formData.append('cvFile', cvFile);
@@ -170,73 +176,56 @@ export const cvJdMatchingService = {
     if (jdText) formData.append('jdText', jdText);
     if (resumeId) formData.append('resumeId', String(resumeId));
     if (jdId) formData.append('jdId', String(jdId));
+    if (roleTitle) formData.append('roleTitle', roleTitle);
 
-    const res = await fetch(`/api/matching/ingest/${sessionId}`, {
-      method: 'POST',
-      body: formData,
-      headers: getAuthHeaders(false),
-    });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`Ingest request failed: ${res.statusText} - ${errText}`);
-    }
-
-    return await res.json();
+    const { data } = await axiosClient.post<IngestResponse>(
+      `/api/v1/sessions/${encodeURIComponent(sessionId)}/documents`,
+      formData,
+      {
+        headers: {
+          ...getAuthHeaders(false),
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+    return data;
   },
 
   async analyzeSkillGap(sessionId: string, forceRefresh = false): Promise<AnalyzeWithReportResponse> {
-    const res = await fetch(
-      `/api/sessions/${sessionId}/analyze-gap?forceRefresh=${forceRefresh}`,
-      {
-        method: 'POST',
-        headers: getAuthHeaders(false),
-      }
+    const { data } = await axiosClient.post<AnalyzeWithReportResponse>(
+      `/api/v1/sessions/${encodeURIComponent(sessionId)}/analyze-gap?forceRefresh=${forceRefresh}`,
+      null,
+      { headers: getAuthHeaders(false) }
     );
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`Skill-gap analysis failed: ${res.statusText} - ${errText}`);
-    }
-    return await res.json();
+    return data;
   },
 
   async startAdaptiveInterview(sessionId: string): Promise<StartInterviewResponse> {
-    const res = await fetch(`/api/sessions/${sessionId}/interview/start`, {
-      method: 'POST',
-      headers: getAuthHeaders(false),
-    });
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`Failed to start adaptive interview: ${res.statusText} - ${errText}`);
-    }
-    return await res.json();
+    const { data } = await axiosClient.post<StartInterviewResponse>(
+      `/api/v1/sessions/${encodeURIComponent(sessionId)}/interview/start`,
+      null,
+      { headers: getAuthHeaders(false) }
+    );
+    return data;
   },
 
   async respondAdaptiveInterview(
     sessionId: string,
     candidateResponse: string
   ): Promise<RespondInterviewResponse> {
-    const res = await fetch(`/api/sessions/${sessionId}/interview/respond`, {
-      method: 'POST',
-      headers: getAuthHeaders(true),
-      body: JSON.stringify({ candidate_response: candidateResponse }),
-    });
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`Failed to submit candidate response: ${res.statusText} - ${errText}`);
-    }
-    return await res.json();
+    const { data } = await axiosClient.post<RespondInterviewResponse>(
+      `/api/v1/sessions/${encodeURIComponent(sessionId)}/interview/respond`,
+      { candidate_response: candidateResponse },
+      { headers: getAuthHeaders(true) }
+    );
+    return data;
   },
 
   async getInterviewReport(sessionId: string): Promise<HITLReportResponse> {
-    const res = await fetch(`/api/sessions/${sessionId}/interview/report`, {
-      method: 'GET',
-      headers: getAuthHeaders(false),
-    });
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`Failed to fetch interview report: ${res.statusText} - ${errText}`);
-    }
-    return await res.json();
+    const { data } = await axiosClient.get<HITLReportResponse>(
+      `/api/v1/sessions/${encodeURIComponent(sessionId)}/interview/report`,
+      { headers: getAuthHeaders(false) }
+    );
+    return data;
   },
 };

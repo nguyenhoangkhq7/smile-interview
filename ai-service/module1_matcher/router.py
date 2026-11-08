@@ -151,6 +151,8 @@ async def run_full_static_pipeline(request: Request) -> AnalyzeWithReportRespons
         match_results=m1_out.match_results,
         analysis_id=final_analysis_id,
     )
+    for result in gap_results:
+        result.flags.append(f"matcher_source:{m1_out.matcher_source}")
     store[report.analysis_id] = report
 
     return AnalyzeWithReportResponse(
@@ -201,6 +203,8 @@ async def run_full_static_pipeline_upload(
         match_results=m1_out.match_results,
         analysis_id=final_analysis_id,
     )
+    for result in gap_results:
+        result.flags.append(f"matcher_source:{m1_out.matcher_source}")
     store[report.analysis_id] = report
 
     return AnalyzeWithReportResponse(

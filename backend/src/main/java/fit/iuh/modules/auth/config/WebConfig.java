@@ -15,11 +15,13 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        // Map public /api/auth/avatars/** requests to the physical uploads/avatars/ directory
-        Path uploadDir = Paths.get("uploads/avatars");
+        Path uploadDir = Paths.get("uploads");
         String uploadPath = uploadDir.toFile().getAbsolutePath();
-        
-        registry.addResourceHandler("/api/auth/avatars/**")
+
+        registry.addResourceHandler("/uploads/**")
                 .addResourceLocations("file:" + uploadPath + "/");
+
+        registry.addResourceHandler("/api/auth/avatars/**")
+                .addResourceLocations("file:" + uploadPath + "/avatars/");
     }
 }

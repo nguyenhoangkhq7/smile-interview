@@ -40,13 +40,14 @@ class ProficiencyEstimator:
         self.config = config or AppConfig()
         self._span_cache: Dict[str, SpanRichness] = {}
         self._cache_lock = threading.Lock()
+        self._degraded_spans: set[str] = set()
 
     def _get_reference_date(self) -> datetime.date:
         ref_str = self.config.get_reference_date()
         try:
             return datetime.datetime.strptime(ref_str, "%Y-%m-%d").date()
-        except ValueError:
-            return datetime.date(2024, 6, 1)
+        except ValueError as exc:
+            raise ValueError("reference_date must use YYYY-MM-DD") from exc
 
     def _parse_date(self, date_str: Optional[str], ref_date: datetime.date, flags: List[str]) -> datetime.date:
         if not date_str:
@@ -94,20 +95,28 @@ Spans:
 """
         try:
             llm_result = self.llm_client.complete(prompt, SpanAnalysisList)
-            with self._cache_lock:
-                for a in llm_result.analyses:
-                    self._span_cache[a.span] = a
-                matched_for_skill = [self._span_cache[s] for s in uncached_spans if s in self._span_cache]
-            if matched_for_skill:
-                return pre_analyzed + cached_analyses + matched_for_skill
-            return pre_analyzed + cached_analyses + llm_result.analyses
+            matched = self._cache_analyses(uncached_spans, llm_result.analyses)
+            return pre_analyzed + cached_analyses + matched
         except Exception:
+            with self._cache_lock:
+                self._degraded_spans.update(uncached_spans)
             # Fallback to LIST_ONLY on LLM failure
             fallback = [
                 SpanRichness(span=s, richness_label=RichnessLabel.LIST_ONLY, modifier_score=None)
                 for s in uncached_spans
             ]
             return pre_analyzed + cached_analyses + fallback
+
+    def _cache_analyses(self, spans: List[str], analyses: List[SpanRichness]) -> List[SpanRichness]:
+        by_span = {analysis.span: analysis for analysis in analyses}
+        with self._cache_lock:
+            for span in spans:
+                if span in by_span:
+                    self._span_cache[span] = by_span[span]
+                else:
+                    self._degraded_spans.add(span)
+                    self._span_cache[span] = SpanRichness(span=span, richness_label=RichnessLabel.LIST_ONLY)
+            return [self._span_cache[span] for span in spans]
 
     def estimate_batch(
         self,
@@ -148,16 +157,10 @@ Spans:
 """
             try:
                 llm_result = self.llm_client.complete(prompt, SpanAnalysisList)
-                with self._cache_lock:
-                    for a in llm_result.analyses:
-                        self._span_cache[a.span] = a
-                    for sp in unique_uncached_spans:
-                        if sp not in self._span_cache:
-                            self._span_cache[sp] = SpanRichness(
-                                span=sp, richness_label=RichnessLabel.LIST_ONLY, modifier_score=None
-                            )
+                self._cache_analyses(unique_uncached_spans, llm_result.analyses)
             except Exception:
                 with self._cache_lock:
+                    self._degraded_spans.update(unique_uncached_spans)
                     for sp in unique_uncached_spans:
                         self._span_cache[sp] = SpanRichness(
                             span=sp, richness_label=RichnessLabel.LIST_ONLY, modifier_score=None
@@ -252,6 +255,10 @@ Spans:
 
         skill_mappings = [m for m in mappings if m.span in skill.evidence_spans]
         span_analyses = self._analyze_span_richness(skill, skill_mappings)
+
+        with self._cache_lock:
+            if any(span in self._degraded_spans for span in skill.evidence_spans):
+                flags.append("richness_analysis_fallback")
 
         # 1. Calculate effective cumulative experience
         effective_months, latest_end_date = self._calculate_effective_months(

@@ -1,7 +1,9 @@
 'use client';
+import { MarkdownContent } from '@/components/common/MarkdownContent';
 
-import React, { useState } from 'react';
-import { SessionHistoryItem } from '@/services/historyService';
+import React, { useState, useEffect } from 'react';
+import axiosClient from '@/lib/axiosClient';
+import { historyService, SessionHistoryItem } from '@/services/historyService';
 import {
   HrEvaluationForm,
   CvJdMatchingView,
@@ -33,9 +35,24 @@ interface HrSessionDetailClientProps {
 
 export const HrSessionDetailClient: React.FC<HrSessionDetailClientProps> = ({
   sessionId,
-  sessionData,
+  sessionData: initialSessionData,
 }) => {
+  const [sessionData, setSessionData] = useState<SessionHistoryItem | null>(initialSessionData);
   const [activeTab, setActiveTab] = useState<'matching' | 'questions' | 'transcript'>('matching');
+
+  useEffect(() => {
+    if (!sessionId) return;
+    historyService
+      .getSessionById(sessionId)
+      .then((data) => {
+        if (data) {
+          setSessionData(data);
+        }
+      })
+      .catch((err) => {
+        console.error('[HrSessionDetailClient] Error loading session:', err);
+      });
+  }, [sessionId]);
 
   // ── Shared evaluation state (persists across tab switches) ─────────────────
   const [ratingMatchingAccuracy, setRatingMatchingAccuracy] = useState<number>(5);
@@ -49,7 +66,7 @@ export const HrSessionDetailClient: React.FC<HrSessionDetailClientProps> = ({
   const [footerExpanded, setFooterExpanded] = useState(false);
 
   // Auto-fill evaluator from auth
-  const { user, token } = useAuthStore();
+  const { user } = useAuthStore();
   const evaluatorName = user?.username || 'HR Specialist';
 
   // Track which criteria have been deliberately touched (moved off default)
@@ -84,9 +101,6 @@ export const HrSessionDetailClient: React.FC<HrSessionDetailClientProps> = ({
 
     setIsSubmitting(true);
     try {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
       const payload = {
         session_id: sessionId,
         evaluator_name: evaluatorName,
@@ -96,21 +110,20 @@ export const HrSessionDetailClient: React.FC<HrSessionDetailClientProps> = ({
         feedback_notes: feedbackNotes.trim() || undefined,
       };
 
-      const res = await fetch('/api/hr-evaluations', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || data.message || 'Gửi đánh giá thất bại');
+      await axiosClient.post('/api/v1/hr-evaluations', payload);
 
       setIsSubmitted(true);
       setFooterExpanded(false);
       toast.success('Đã gửi đánh giá HR thành công!');
     } catch (err) {
-      const error = err as Error;
-      toast.error(error.message || 'Đã có lỗi xảy ra khi gửi đánh giá');
+      const axiosErr = err as { response?: { data?: { error?: string; message?: string; detail?: string } }; message?: string };
+      const msg =
+        axiosErr?.response?.data?.error ||
+        axiosErr?.response?.data?.message ||
+        axiosErr?.response?.data?.detail ||
+        axiosErr?.message ||
+        'Đã có lỗi xảy ra khi gửi đánh giá';
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -118,12 +131,6 @@ export const HrSessionDetailClient: React.FC<HrSessionDetailClientProps> = ({
 
   return (
     <>
-      {/*
-       * Main scrollable content.
-       * pb-[72px] reserves space for the fixed bottom bar (collapsed ~56px + 16px gap).
-       * When bar is expanded we add more space via pb-[220px] — both values are safe
-       * because content simply scrolls above the bar, never hidden behind it.
-       */}
       <div className={`space-y-6 transition-[padding] duration-300 ${footerExpanded ? 'pb-[220px]' : 'pb-[72px]'}`}>
         <Tabs
           value={activeTab}
@@ -187,9 +194,7 @@ export const HrSessionDetailClient: React.FC<HrSessionDetailClientProps> = ({
                   </span>
                   <span>Hoàn thành: <strong>{Math.round(sessionData.interviewReport.completion_rate * 100)}%</strong></span>
                 </div>
-                <pre className="whitespace-pre-wrap font-sans text-sm text-slate-700">
-                  {sessionData.interviewReport.markdown_summary}
-                </pre>
+                <MarkdownContent content={sessionData.interviewReport.markdown_summary} />
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 text-slate-500">
                     <tr>
@@ -243,12 +248,8 @@ export const HrSessionDetailClient: React.FC<HrSessionDetailClientProps> = ({
         </Tabs>
       </div>
 
-      {/* ── Fixed bottom evaluation bar ────────────────────────────────────────
-          Docked to viewport bottom. Never overlaps content — content has pb to
-          compensate. Collapsed by default (~56px); expand to show notes + detail.
-      ─────────────────────────────────────────────────────────────────────── */}
+      {/* ── Fixed bottom evaluation bar ── */}
       <div className="fixed bottom-0 left-0 right-0 z-50">
-        {/* Submitted state — slim green confirmation bar */}
         {isSubmitted ? (
           <div className="mx-auto max-w-5xl px-4">
             <div className="border border-emerald-200 bg-emerald-50 shadow-lg rounded-t-xl flex items-center justify-between px-4 h-14 gap-3">
@@ -269,7 +270,6 @@ export const HrSessionDetailClient: React.FC<HrSessionDetailClientProps> = ({
 
               {/* ── Collapsed bar (always visible) ── */}
               <div className="flex items-center justify-between px-4 h-14 gap-3">
-                {/* Left: evaluator + progress summary */}
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <div className="flex items-center gap-1.5 text-xs text-slate-600 shrink-0">
                     <User className="size-3.5 text-slate-400" />
@@ -289,7 +289,6 @@ export const HrSessionDetailClient: React.FC<HrSessionDetailClientProps> = ({
                   </div>
                 </div>
 
-                {/* Right: submit + expand toggle */}
                 <div className="flex items-center gap-2 shrink-0">
                   <form onSubmit={handleSubmitAll}>
                     <Button
@@ -323,7 +322,6 @@ export const HrSessionDetailClient: React.FC<HrSessionDetailClientProps> = ({
                 </div>
               </div>
 
-              {/* ── Expanded panel (notes textarea + criterion detail) ── */}
               {footerExpanded && (
                 <div className="border-t border-slate-100 px-4 pb-4 pt-3 space-y-3 bg-slate-50/60">
                   <p className="text-[11px] text-slate-500">

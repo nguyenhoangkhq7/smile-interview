@@ -1,4 +1,5 @@
 from typing import List, Optional
+from uuid import NAMESPACE_URL, uuid5
 from skill_gap.domain.models import ExtractedJDSkill, JDRequirement, JDParserOutput
 from skill_gap.adapters.config import AppConfig
 from skill_gap.adapters.llm_client import LLMClient
@@ -31,7 +32,8 @@ Your task is to determine the REQUIRED PROFICIENCY LEVEL (P_JD on a standardized
 
 NOTE ON SCOPE:
 Skill importance (how critical the skill is to the role, w_j) is handled externally by a Graph Neural Network (GNN).
-Your SOLE responsibility is to evaluate the DEPTH OF MASTERY (how proficient the candidate needs to be in this specific skill).
+Extract concrete tasks with verbatim JD quotes into tasks. Optional/required describes importance, never proficiency. Prefer explicit task complexity over years; use seniority only as fallback. Do not invent tasks when the JD only names a skill.
+Your responsibility is to evaluate the DEPTH OF MASTERY (how proficient the candidate needs to be in this specific skill).
 
 Standardized Proficiency Scale (1.0 - 5.0):
 - 1.0 - 1.5: Basic Awareness / Familiarity ("có hiểu biết", "biết cơ bản", entry/intern level, 0-6 months)
@@ -41,9 +43,9 @@ Standardized Proficiency Scale (1.0 - 5.0):
 - 5.0: Lead / Master / Principal ("architectural experience", > 5 years, design, strategic leadership)
 
 Hierarchical Inference Priority Rules:
-1. Explicit Years of Experience: If an evidence span or the JD specifies required years (e.g. "3+ years with Kubernetes"), map directly to the scale (3 years -> 4.0).
-2. Explicit Proficiency Descriptors: Look for depth modifiers in the evidence spans (e.g. "thành thạo / expert" -> 4.0, "có kinh nghiệm / solid" -> 3.0, "có hiểu biết / familiar" -> 2.0).
-3. Role Seniority Inheritance: If a skill has neither years nor explicit modifiers, infer its required depth from the overall seniority of the role (e.g. A "DevOps Lead" role requires higher depth in primary skills than a "Junior DevOps" role).
+1. Explicit Task Complexity and Proficiency: Use observable responsibilities, autonomy and explicit expectations first.
+2. Skill-specific Years: Use experience only if task/depth evidence is absent; mark the level INFERRED.
+3. Role Seniority: Last fallback only. Optional/required and core/secondary status do not determine proficiency.
 
 JD Text:
 {jd_text}
@@ -54,7 +56,8 @@ Skills to analyze:
 Return the required proficiency level and a concise reasoning for ALL provided Skill IDs exactly as requested in the schema.
 """
         try:
-            return self.llm_client.complete(prompt, JDParserOutput)
+            output = self.llm_client.complete(prompt, JDParserOutput)
+            return self._validate_tasks(output, jd_text, jd_skills)
         except Exception as e:
             # Graceful degradation on LLM failure
             fallback_reqs = [
@@ -71,3 +74,18 @@ Return the required proficiency level and a concise reasoning for ALL provided S
                 flags=[f"llm_jd_parser_failed:{str(e)}"]
             )
 
+
+    @staticmethod
+    def _validate_tasks(output, jd_text, jd_skills):
+        expected = {skill.skill_id: skill for skill in jd_skills}
+        if {req.jd_skill_id for req in output.requirements} != set(expected):
+            raise ValueError("JD parser must cover every requested skill exactly once")
+        if len(output.requirements) != len(expected):
+            raise ValueError("Duplicate JD skill requirements")
+        for req in output.requirements:
+            for task in req.tasks:
+                if not task.description.strip() or not task.evidence_spans or any(not span.strip() or span not in jd_text for span in task.evidence_spans):
+                    raise ValueError("Task evidence must be grounded in the JD")
+                key = f"{req.jd_skill_id}:{task.description}:{task.evidence_spans}"
+                task.task_id = str(uuid5(NAMESPACE_URL, key))
+        return output

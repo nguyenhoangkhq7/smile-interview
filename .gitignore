@@ -41,3 +41,8 @@ node_modules/
 dist/
 .npm
 npm-debug.log*
+
+# Python runtime artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/

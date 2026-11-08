@@ -103,11 +103,14 @@ class DefaultModule1Extractor:
             try:
                 output = self._extract_via_llm(cv_text, jd_text)
                 if output.jd_skills and output.match_results:
+                    output.matcher_source = "MOCK_LLM"
                     return output
             except Exception as exc:
                 print(f"[Module1Extractor] LLM extraction fallback triggered: {exc}")
 
-        return self._extract_deterministic(cv_text, jd_text)
+        output = self._extract_deterministic(cv_text, jd_text)
+        output.matcher_source = "MOCK_HEURISTIC"
+        return output
 
     def _extract_via_llm(self, cv_text: str, jd_text: str) -> Module1Output:
         prompt = (

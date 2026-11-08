@@ -1,5 +1,6 @@
 package fit.iuh.modules.adaptive.client;
 
+import fit.iuh.config.AiClientConfig;
 import fit.iuh.config.AppProperties;
 import fit.iuh.exception.AiServiceException;
 import fit.iuh.modules.adaptive.dto.AdaptiveDtos.RespondInterviewResponseDto;
@@ -24,12 +25,7 @@ public class AdaptiveInterviewClient {
     private final RestClient restClient;
 
     public AdaptiveInterviewClient(AppProperties appProperties) {
-        String baseUrl = appProperties.getAi() != null && appProperties.getAi().getFastapi() != null
-                ? appProperties.getAi().getFastapi().getBaseUrl()
-                : "http://localhost:8000";
-        this.restClient = RestClient.builder()
-                .baseUrl(baseUrl)
-                .build();
+        this.restClient = AiClientConfig.createAiRestClient(appProperties);
     }
 
     public StartInterviewResponseDto startInterview(List<SkillGapResultDto> skills) {

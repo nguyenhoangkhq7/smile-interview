@@ -253,7 +253,7 @@ def test_langgraph_parallel_speedup_and_static_report():
     assert "`LEARNING_AGILITY`" in report.markdown_summary
 
 
-def test_dspy_compilation_and_metrics():
+def test_dspy_compilation_and_metrics(tmp_path):
     """
     Verifies that DSPy LabeledFewShot compilation seeds all 4 module JSON artifacts
     with 4 Chain-of-Thought demonstrations each, and that all 21 gold examples
@@ -261,7 +261,7 @@ def test_dspy_compilation_and_metrics():
     """
     import json
 
-    paths = seed_default_compiled_artifacts(k=4)
+    paths = seed_default_compiled_artifacts(k=4, target_dir=tmp_path)
     assert len(paths) == 4
     for p in paths.values():
         assert Path(p).exists()

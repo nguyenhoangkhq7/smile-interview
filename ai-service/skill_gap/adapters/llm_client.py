@@ -140,15 +140,9 @@ class DSPyLLMClient(LLMClient):
             DSPySpanRichnessAnalyzerModule,
         )
 
-        openai_key = api_key or os.environ.get("OPENAI_API_KEY")
-        openrouter_key = os.environ.get("OPENROUTER_API_KEY")
+        openrouter_key = api_key or os.environ.get("OPENROUTER_API_KEY")
 
-        if openai_key:
-            self.api_key = openai_key
-            self.base_url = base_url or os.environ.get("OPENAI_BASE_URL")
-            self.model = model or os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
-            dspy_model_name = self.model if "/" in self.model else f"openai/{self.model}"
-        elif openrouter_key:
+        if openrouter_key:
             self.api_key = openrouter_key
             self.base_url = base_url or "https://openrouter.ai/api/v1"
             self.model = model or os.environ.get("OPENROUTER_MODEL", "qwen/qwen3.7-flash")

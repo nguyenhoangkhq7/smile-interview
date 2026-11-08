@@ -1,5 +1,6 @@
 package fit.iuh.modules.session.controller;
 
+import fit.iuh.common.service.S3StorageService;
 import fit.iuh.modules.auth.entity.User;
 import fit.iuh.modules.session.entity.JobDescription;
 import fit.iuh.modules.session.entity.Resume;
@@ -37,6 +38,7 @@ public class DocumentUploadController {
     private final SessionRepository sessionRepository;
     private final ResumeRepository resumeRepository;
     private final JobDescriptionRepository jobDescriptionRepository;
+    private final S3StorageService s3StorageService;
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @Transactional
@@ -46,6 +48,8 @@ public class DocumentUploadController {
             @RequestPart(value = "jdFile", required = false) MultipartFile jdFile,
             @RequestPart(value = "cvText", required = false) String cvText,
             @RequestPart(value = "jdText", required = false) String jdText,
+            @RequestParam(value = "resumeId", required = false) UUID resumeId,
+            @RequestParam(value = "jdId", required = false) UUID jdId,
             @RequestParam(value = "roleTitle", required = false) String roleTitle,
             @RequestParam(value = "interviewType", required = false) String interviewType,
             @AuthenticationPrincipal User currentUser) {
@@ -66,6 +70,10 @@ public class DocumentUploadController {
                     return sessionRepository.save(newSession);
                 });
 
+        if (session.getApplicationProfile() != null) {
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT,
+                    "Application profile documents are fixed; prepare a new profile to change CV/JD");
+        }
         if (roleTitle != null && !roleTitle.isBlank()) {
             session.setRoleTitle(roleTitle);
         }
@@ -76,14 +84,29 @@ public class DocumentUploadController {
             session.setUserId(userId);
         }
 
+        if (resumeId != null && session.getResume() == null) {
+            resumeRepository.findById(resumeId).ifPresent(session::setResume);
+        }
+        if (jdId != null && session.getJobDescription() == null) {
+            jobDescriptionRepository.findById(jdId).ifPresent(session::setJobDescription);
+        }
+
         // Process CV
         String resolvedCvText = cvText != null ? cvText : "";
-        String cvFileName = "cv_text.txt";
+        String cvFileName = session.getResume() != null ? session.getResume().getFileName() : "cv_text.txt";
+        String cvFileUrl = null;
         if (cvFile != null && !cvFile.isEmpty()) {
             cvFileName = cvFile.getOriginalFilename() != null ? cvFile.getOriginalFilename() : "uploaded_cv.pdf";
             String extracted = extractTextFromFile(cvFile);
             if (!extracted.isBlank()) {
                 resolvedCvText = extracted;
+            }
+            try {
+                String s3Key = "resumes/" + (userId != null ? userId : "guest") + "/" + System.currentTimeMillis() + "_" + cvFileName;
+                cvFileUrl = s3StorageService.uploadFile(s3Key, cvFile.getBytes(), cvFile.getContentType());
+            } catch (Exception e) {
+                log.warn("[DocumentUpload] S3 upload for CV skipped or failed: {}", e.getMessage());
+                cvFileUrl = "/uploads/resumes/" + cvFileName;
             }
         }
 
@@ -103,24 +126,39 @@ public class DocumentUploadController {
                     .id(UUID.randomUUID())
                     .userId(userId)
                     .fileName(cvFileName)
+                    .fileUrl(cvFileUrl)
                     .rawText(resolvedCvText)
                     .createdAt(LocalDateTime.now())
                     .build();
         } else if (hasNewCv) {
             resume.setFileName(cvFileName);
+            if (cvFileUrl != null) {
+                resume.setFileUrl(cvFileUrl);
+            }
             resume.setRawText(resolvedCvText);
+        } else {
+            resolvedCvText = resume.getRawText() != null ? resume.getRawText() : "";
+            cvFileName = resume.getFileName();
         }
         resume = resumeRepository.save(resume);
         session.setResume(resume);
 
         // Process JD
         String resolvedJdText = jdText != null ? jdText : "";
-        String jdFileName = "jd_text.txt";
+        String jdFileName = session.getJobDescription() != null ? session.getJobDescription().getTitle() : "jd_text.txt";
+        String jdFileUrl = null;
         if (jdFile != null && !jdFile.isEmpty()) {
             jdFileName = jdFile.getOriginalFilename() != null ? jdFile.getOriginalFilename() : "uploaded_jd.pdf";
             String extracted = extractTextFromFile(jdFile);
             if (!extracted.isBlank()) {
                 resolvedJdText = extracted;
+            }
+            try {
+                String s3Key = "jds/" + (userId != null ? userId : "guest") + "/" + System.currentTimeMillis() + "_" + jdFileName;
+                jdFileUrl = s3StorageService.uploadFile(s3Key, jdFile.getBytes(), jdFile.getContentType());
+            } catch (Exception e) {
+                log.warn("[DocumentUpload] S3 upload for JD skipped or failed: {}", e.getMessage());
+                jdFileUrl = "/uploads/jds/" + jdFileName;
             }
         }
 
@@ -131,6 +169,7 @@ public class DocumentUploadController {
                     .id(UUID.randomUUID())
                     .userId(userId)
                     .title(roleTitle != null && !roleTitle.isBlank() ? roleTitle : jdFileName)
+                    .fileUrl(jdFileUrl)
                     .rawText(resolvedJdText)
                     .createdAt(LocalDateTime.now())
                     .build();
@@ -138,7 +177,13 @@ public class DocumentUploadController {
             if (roleTitle != null && !roleTitle.isBlank()) {
                 jd.setTitle(roleTitle);
             }
+            if (jdFileUrl != null) {
+                jd.setFileUrl(jdFileUrl);
+            }
             jd.setRawText(resolvedJdText);
+        } else {
+            resolvedJdText = jd.getRawText() != null ? jd.getRawText() : "";
+            jdFileName = jd.getTitle();
         }
         jd = jobDescriptionRepository.save(jd);
         session.setJobDescription(jd);
