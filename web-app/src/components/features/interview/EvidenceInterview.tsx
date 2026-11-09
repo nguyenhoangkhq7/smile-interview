@@ -15,8 +15,6 @@ import { History } from 'lucide-react';
 
 const VoiceInterview = dynamic(() => import('./EvidenceVoiceInterview').then(module => module.EvidenceVoiceInterview),
   { ssr: false, loading: () => <p className="p-6 text-sm">Đang chuẩn bị phòng phỏng vấn giọng nói…</p> });
-const LegacyInterview = dynamic(() => import('./InterviewChatMode').then(module => module.InterviewChatMode),
-  { ssr: false, loading: () => <p className="p-6 text-sm">Đang tải phiên phỏng vấn…</p> });
 
 function Transcript({ turns }: { turns: EvidenceTurn[] }) {
   return <div className="space-y-3">{[...turns].reverse().map((turn, index) => <details className="rounded-xl border bg-card p-4" key={turn.turn_id} open={index === 0}>
@@ -38,7 +36,12 @@ export function EvidenceInterview() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const { session, busy, error } = interview;
   if (interview.loading) return <p className="p-8">Đang tải phiên phỏng vấn…</p>;
-  if (interview.legacy) return <LegacyInterview />;
+  if (interview.legacy) return <main className="mx-auto max-w-3xl space-y-4 p-8">
+    <h1 className="text-xl font-semibold">Phiên phỏng vấn cũ</h1>
+    <p>Phiên này chỉ hỗ trợ xem lại. Hãy tạo lượt phỏng vấn mới để tiếp tục luyện tập.</p>
+    <div className="flex gap-4"><Link className="text-brand-orange" href={`/interview/session/${id}/result`}>Xem kết quả đã lưu</Link>
+      <Link className="text-brand-orange" href="/interview/new">Tạo lượt phỏng vấn mới</Link></div>
+  </main>;
   return <main className="mx-auto w-full max-w-6xl space-y-4 px-4 py-5 sm:px-6">
     {interview.metadata?.applicationProfileId && <header className="space-y-2 border-b pb-5"><Link className="text-sm text-brand-orange" href={`/applications/${interview.metadata.applicationProfileId}`}>← Về hồ sơ ứng tuyển</Link><h2 className="text-xl font-semibold">{interview.metadata.applicationProfileTitle} · Lượt {interview.metadata.attemptNumber}</h2></header>}
     {error && <div role="alert" className="rounded border border-red-300 p-4"><p>{error}</p><Button variant="outline" onClick={() => void interview.reload()}>Tải lại phiên</Button></div>}

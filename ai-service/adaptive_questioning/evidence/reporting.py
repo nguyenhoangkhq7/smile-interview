@@ -1,4 +1,4 @@
-"""Pure report projection; internal rubric and belief never leak through pending turns."""
+"""Pure report projection; internal rubric never leaks through pending turns."""
 from .models import Assessment, CriterionProgress, CriterionReport, ObjectiveReport, PublicSession, PublicTurn, Report, Snapshot
 from .assessment import criterion_resolved
 from .policy_config import InterviewPolicy

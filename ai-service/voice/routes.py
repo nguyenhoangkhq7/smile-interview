@@ -6,13 +6,30 @@ import logging
 import os
 import re
 import wave
+from contextlib import asynccontextmanager
+from typing import Literal
 
 import httpx
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+from .recognition import transcribe_audio
 
-router = APIRouter(prefix="/api/v2/voice", tags=["Interview voice"])
+_stt_client: httpx.AsyncClient | None = None
+
+
+@asynccontextmanager
+async def voice_lifespan(app):
+    global _stt_client
+    try:
+        yield
+    finally:
+        if _stt_client is not None:
+            await _stt_client.aclose()
+            _stt_client = None
+
+
+router = APIRouter(prefix="/api/v2/voice", tags=["Interview voice"], lifespan=voice_lifespan)
 log = logging.getLogger(__name__)
 OPENROUTER = "https://openrouter.ai/api/v1"
 MAX_AUDIO_BYTES = 1_500_000  # 45 seconds of 16 kHz, mono, signed 16-bit WAV
@@ -20,6 +37,9 @@ MAX_AUDIO_BYTES = 1_500_000  # 45 seconds of 16 kHz, mono, signed 16-bit WAV
 
 class Transcription(BaseModel):
     audio: str = Field(min_length=60, max_length=2_000_000)
+    phase: Literal["preview", "final"] = "final"
+    terms: list[str] = Field(default_factory=list, max_length=80)
+    topic: str = Field(default="", max_length=2000)
 
 
 class Speech(BaseModel):
@@ -36,7 +56,7 @@ def settings() -> dict:
     return {
         "enabled": bool(os.getenv("OPENROUTER_API_KEY"))
         and os.getenv("INTERVIEW_VOICE_ENABLED", "true").lower() == "true",
-        "stt_model": os.getenv("OPENROUTER_STT_MODEL", "qwen/qwen3-asr-1.7b"),
+        "stt_model": os.getenv("OPENROUTER_STT_MODEL", "openai/gpt-transcribe"),
         "tts_model": tts_model,
         "voice": os.getenv("OPENROUTER_TTS_VOICE", "nadine" if heygen else "Kore"),
         "format": os.getenv("OPENROUTER_TTS_FORMAT", "pcm"),
@@ -106,6 +126,7 @@ async def avatar_session(payload: AvatarSession):
 
 @router.post("/transcribe")
 async def transcribe(payload: Transcription):
+    global _stt_client
     auth = headers()
     try:
         audio = base64.b64decode(payload.audio, validate=True)
@@ -120,16 +141,14 @@ async def transcribe(payload: Transcription):
         raise HTTPException(422, "Âm thanh phải là WAV mono 16 kHz, 16 bit, tối đa 45 giây.") from None
     cfg = settings()
     try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(45, connect=10)) as client:
-            response = await client.post(f"{OPENROUTER}/audio/transcriptions", headers=auth,
-                json={"model": cfg["stt_model"], "input_audio": {"data": payload.audio, "format": "wav"},
-                      "language": "vi", "response_format": "json"})
-        check_provider(response)
-        result = response.json()
-        if not isinstance(result, dict) or not isinstance(result.get("text"), str):
-            raise ValueError("Missing transcript")
-        log.info("Voice transcription: model=%s audio_seconds=%.2f", cfg["stt_model"], duration)
-        return {"text": result["text"].strip()}
+        if _stt_client is None:
+            _stt_client = httpx.AsyncClient(timeout=httpx.Timeout(45, connect=10),
+                limits=httpx.Limits(max_connections=20, max_keepalive_connections=10, keepalive_expiry=60))
+        result = await transcribe_audio(_stt_client, f"{OPENROUTER}/audio/transcriptions", auth,
+                                       cfg, payload, check_provider)
+        log.info("Voice transcription: model=%s audio_seconds=%.2f phase=%s verification=%s",
+                 cfg["stt_model"], duration, payload.phase, result["verification"])
+        return result
     except httpx.TimeoutException:
         raise HTTPException(504, "Nhận diện giọng nói quá thời gian. Bản ghi vẫn được giữ để thử lại.") from None
     except httpx.HTTPError:

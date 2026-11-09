@@ -1,197 +1,208 @@
-"""
-Unit tests for DSPy Teleprompter Optimization, Metrics, and Compiled Module Seeding.
-Verifies compliance with Khattab et al. (2023) declarative programming and few-shot compilation.
-"""
+"""Recovered corpus, evidence-only metrics and usable DSPy compile/load paths."""
+import hashlib
+import json
 
-from pathlib import Path
-import tempfile
 import dspy
 import pytest
 
-from adaptive_questioning.core.engine import (
-    DSPyQuestionGeneratorModule,
-    DSPyReflectiveJudgeModule,
-    OpenAILLMEngine,
-)
-from adaptive_questioning.optimization.compiler import (
-    compile_with_labeled_few_shot,
-    save_compiled_modules,
-    seed_default_compiled_artifacts,
-)
+from adaptive_questioning.evidence.assessment import validate_judgment
+from adaptive_questioning.evidence.models import Judgment, Turn
+from adaptive_questioning.evidence.provider import DSPyAssessmentProvider
+from adaptive_questioning.evidence.question_validation import question_errors
+from adaptive_questioning.optimization import compiler
 from adaptive_questioning.optimization.dataset import (
-    get_gold_judge_examples,
-    get_gold_question_examples,
+    CORPUS_PATH, corpus_records, get_gold_judge_examples, get_gold_question_examples,
 )
 from adaptive_questioning.optimization.metrics import (
-    judge_evaluation_metric,
-    question_generation_metric,
+    judge_evaluation_metric, question_generation_metric, set_judge_lm,
 )
-from adaptive_questioning.schemas.state import MetamorphicTag
 
 
-class TestDSPyOptimization:
-    """Test suite for DSPy Dataset, Metrics, and Compilation."""
+@pytest.fixture(autouse=True)
+def clear_teacher():
+    set_judge_lm(None)
+    yield
+    set_judge_lm(None)
 
-    def test_gold_dataset_integrity(self):
-        q_examples = get_gold_question_examples()
-        assert len(q_examples) >= 3
-        for ex in q_examples:
-            assert isinstance(ex, dspy.Example)
-            assert "reference_layer_context" in ex
-            assert "main_layer_directives" in ex
-            assert ex.question.endswith("?")
 
-        j_examples = get_gold_judge_examples()
-        assert len(j_examples) >= 3
-        for ex in j_examples:
-            assert isinstance(ex, dspy.Example)
-            assert "reference_layer_rubric" in ex
-            assert "candidate_response" in ex
-            assert len(ex.raw_posterior_probs) == 3
+@pytest.mark.parametrize("kind, getter", [
+    ("questions", get_gold_question_examples), ("judgments", get_gold_judge_examples),
+])
+def test_all_cases_and_original_split_survive(kind, getter):
+    records = corpus_records(kind)
+    assert len(records) == len(getter()) == 20
+    train, dev = getter("train"), getter("dev")
+    assert len(train) == 14 and len(dev) == 6
+    assert [ex.context for ex in getter("val")] == [ex.context for ex in dev]
+    assert not {ex.context for ex in train}.intersection(ex.context for ex in dev)
+    assert all(list(ex.inputs().keys()) == ["context"] for ex in getter())
+    assert all(set(ex.labels().keys()) == ({"question"} if kind == "questions" else {"judgment"})
+               for ex in getter())
+    with pytest.raises(ValueError):
+        getter("invalid")
 
-    def test_question_generation_metric(self):
-        gold = dspy.Example(
-            question="Anh/chị giải quyết sự cố này như thế nào?",
-            surprising_fact_C="Discrepancy observed in CV",
-            hypothesis_A="Underlying lack of experience",
-            target_slot_id="java_spring:primary",
-        )
-        pred_good = dspy.Prediction(
-            question="Trong dự án thực tế, anh/chị đã xử lý vấn đề transaction rollback như thế nào?",
-            surprising_fact_C="CV ghi CRUD cơ bản nhưng JD yêu cầu chuyên sâu",
-            hypothesis_A="Ứng viên chưa nắm vững Transaction Propagation",
-            target_slot_id="java_spring:primary",
-        )
-        score_good = question_generation_metric(gold, pred_good)
-        assert score_good == 1.0
 
-        pred_bad = dspy.Prediction(
-            question="Bạn biết gì về Java???",  # Multiple question marks, too short
-            surprising_fact_C="",
-            hypothesis_A="",
-            target_slot_id="invalid_slot",
-        )
-        score_bad = question_generation_metric(gold, pred_bad)
-        assert score_bad == 0.0
+def test_original_source_texts_are_preserved():
+    questions = corpus_records("questions")
+    judgments = corpus_records("judgments")
+    # Digests of the 20 original questions / 20 original candidate responses from
+    # the pre-removal corpus; guards against silently replacing it with new data.
+    q_digest = hashlib.sha256(json.dumps([r["source_question"] for r in questions], ensure_ascii=False).encode()).hexdigest()
+    j_digest = hashlib.sha256(json.dumps([r["source_response"] for r in judgments], ensure_ascii=False).encode()).hexdigest()
+    assert q_digest == "62a4e6e704dc134aa6c16c7ba1b1ee0bbfacd8dbec4fbcbda4f3830a1529cda5"
+    assert j_digest == "6409aef479458a2aa148ab745b725397df60221af91d46678273f1741f0350b3"
+    for record in judgments:
+        assert record["context"]["turn"]["answer"] == record["source_response"]
 
-    def test_judge_evaluation_metric(self):
-        gold = dspy.Example(
-            metamorphic_tag=MetamorphicTag.DECISIVE_SHIFT,
-            raw_posterior_probs=[0.85, 0.10, 0.05],
-            reflective_insight="Ứng viên thừa nhận rõ ràng thiếu kinh nghiệm trong production.",
-        )
-        pred_good = dspy.Prediction(
-            metamorphic_tag=MetamorphicTag.DECISIVE_SHIFT,
-            raw_posterior_probs=[0.80, 0.15, 0.05],
-            reflective_insight="Ứng viên thừa nhận chưa từng làm việc với production transactions.",
-        )
-        score_good = judge_evaluation_metric(gold, pred_good)
-        assert score_good == 1.0
 
-        pred_wrong_tag = dspy.Prediction(
-            metamorphic_tag=MetamorphicTag.INVARIANT,
-            raw_posterior_probs=[0.33, 0.33, 0.34],
-            reflective_insight="Đánh giá không khớp.",
-        )
-        score_wrong = judge_evaluation_metric(gold, pred_wrong_tag)
-        assert score_wrong < 0.50
+def test_current_training_data_has_no_probability_contracts():
+    payload = CORPUS_PATH.read_text(encoding="utf-8")
+    for getter in (get_gold_question_examples, get_gold_judge_examples):
+        for example in getter():
+            payload += example.context + str(example.labels())
+    for retired in ("raw_belief", "raw_posterior_probs", "metamorphic_tag", "Phân phối niềm tin", "P_{t-1}",
+                    "MINOR_SHIFT", "MODERATE_SHIFT", "DECISIVE_SHIFT", "INVARIANT"):
+        assert retired not in payload
 
-    def test_labeled_few_shot_compilation(self):
-        comp_q, comp_j = compile_with_labeled_few_shot(k_question=2, k_judge=2)
-        assert isinstance(comp_q, DSPyQuestionGeneratorModule)
-        assert isinstance(comp_j, DSPyReflectiveJudgeModule)
 
-        q_state = comp_q.dump_state()
-        assert len(q_state["generate.predict"].get("demos", [])) == 2
+def test_gold_cases_meet_runtime_contracts():
+    for example in get_gold_question_examples():
+        context = json.loads(example.context)
+        assert not question_errors(example.question, context, context["target_criteria"])
+        assert len(example.question.text.split()) <= 55
+        assert question_generation_metric(example, dspy.Prediction(question=example.question)) == 0.7
+    for example in get_gold_judge_examples():
+        validate_judgment(example.judgment, Turn.model_validate(json.loads(example.context)["turn"]))
+        assert judge_evaluation_metric(example, dspy.Prediction(judgment=example.judgment)) == 1
 
-        j_state = comp_j.dump_state()
-        assert len(j_state["evaluate.predict"].get("demos", [])) == 2
 
-    def test_compiled_modules_save_and_load(self):
-        comp_q, comp_j = compile_with_labeled_few_shot(k_question=2, k_judge=2)
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            q_path, j_path = save_compiled_modules(comp_q, comp_j, target_dir=tmp_dir)
-            assert q_path.exists()
-            assert j_path.exists()
+@pytest.mark.parametrize("change", ["criterion", "depth", "mode", "bundled", "off_topic", "long"])
+def test_question_metric_rejects_invalid_or_unfocused_questions(change):
+    example = get_gold_question_examples()[0]
+    question = example.question.model_copy(deep=True)
+    if change == "criterion": question.criterion_ids = ["other:c1"]
+    elif change == "depth": question.depth = 1
+    elif change == "mode": question.mode = "DESIGN"
+    elif change == "bundled": question.text += " Bạn cấu hình logging thế nào?"
+    elif change == "off_topic": question.text = "Bạn thích ăn món gì vào buổi tối?"
+    elif change == "long": question.text = "Hệ thống đang chạy. " * 40 + question.text
+    assert question_generation_metric(example, dspy.Prediction(question=question)) == 0
 
-            loaded_q = DSPyQuestionGeneratorModule()
-            loaded_q.load(str(q_path))
-            assert len(loaded_q.dump_state()["generate.predict"].get("demos", [])) == 2
 
-            loaded_j = DSPyReflectiveJudgeModule()
-            loaded_j.load(str(j_path))
-            assert len(loaded_j.dump_state()["evaluate.predict"].get("demos", [])) == 2
+@pytest.mark.parametrize("change", ["quote", "criterion", "performance", "gap", "hint"])
+def test_judge_metric_rejects_ungrounded_or_incorrect_assessment(change):
+    example = get_gold_judge_examples()[1]  # a substantive Terraform answer
+    judgment = example.judgment.model_copy(deep=True)
+    item = judgment.observations[0]
+    if change == "quote": item.response_excerpt = "Ứng viên đã kiểm thử thành công mọi tình huống."
+    elif change == "criterion": item.criterion_id = "wrong:c1"
+    elif change == "performance": item.performance = "BELOW"
+    elif change == "gap": item.unresolved_aspects = ["thiếu bằng chứng"]
+    elif change == "hint": judgment.feedback_contains_hint = True
+    assert judge_evaluation_metric(example, dspy.Prediction(judgment=judgment)) == 0
 
-    def test_openai_engine_auto_detects_compiled_artifacts(self, tmp_path):
-        # When default artifacts are seeded, OpenAILLMEngine automatically loads them
-        seed_default_compiled_artifacts(target_dir=tmp_path)
-        engine = OpenAILLMEngine(api_key="test_fake_key", compiled_dir=tmp_path)
-        assert engine.is_compiled is True
 
-    def test_expanded_gold_dataset_splits_and_tags(self):
-        train_q = get_gold_question_examples(split="train")
-        dev_q = get_gold_question_examples(split="dev")
-        all_q = get_gold_question_examples(split="all")
+def test_partial_answer_cannot_be_promoted_to_pass():
+    example = get_gold_judge_examples()[8]
+    judgment = example.judgment.model_copy(deep=True)
+    item = judgment.observations[0]
+    item.observation, item.performance = "SUPPORTS", "AT_TARGET"
+    item.unresolved_aspects = []
+    item.response_excerpt = json.loads(example.context)["turn"]["answer"]
+    assert judge_evaluation_metric(example, dspy.Prediction(judgment=judgment)) == 0
 
-        assert len(train_q) == 14
-        assert len(dev_q) == 6
-        assert len(all_q) == 20
 
-        # Check that k=2 sub-slot probing exists in the dataset
-        sub_slot_examples = [ex for ex in all_q if getattr(ex, "new_sub_slot", None) is not None]
-        assert len(sub_slot_examples) >= 4
+def test_labeled_compilation_saves_loads_and_runs_through_v2_provider(tmp_path):
+    q_module, j_module = compiler.compile_with_labeled_few_shot(2, 2)
+    assert len(q_module.demos) == len(j_module.demos) == 2
+    compiler.save_compiled_modules(q_module, j_module, tmp_path)
+    question, judgment = get_gold_question_examples()[0], get_gold_judge_examples()[1]
+    lm = dspy.utils.DummyLM([
+        {"question": question.question.model_dump(mode="json")},
+        {"judgment": judgment.judgment.model_dump(mode="json")},
+    ])
+    provider = DSPyAssessmentProvider(lm=lm, compiled_dir=str(tmp_path))
+    assert len(provider.question_module.demos) == len(provider.judge_module.demos) == 2
+    assert provider.question(question.context) == question.question
+    assert provider.judge(judgment.context) == judgment.judgment
 
-        train_j = get_gold_judge_examples(split="train")
-        dev_j = get_gold_judge_examples(split="dev")
-        all_j = get_gold_judge_examples(split="all")
 
-        assert len(train_j) == 14
-        assert len(dev_j) == 6
-        assert len(all_j) == 20
+@pytest.mark.parametrize("tamper", ["version", "contract", "file"])
+def test_incompatible_artifacts_cannot_load(tmp_path, tamper):
+    compiler.seed_default_compiled_artifacts(tmp_path)
+    manifest_path = tmp_path / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    if tamper == "version": manifest["version"] = "legacy"
+    elif tamper == "contract": manifest["contract_fingerprint"] = "old-schema"
+    else: (tmp_path / "question_generator.json").write_text("{}")
+    manifest_path.write_text(json.dumps(manifest))
+    with pytest.raises(ValueError):
+        compiler.load_compiled_modules(tmp_path)
 
-        # Verify all 4 Metamorphic tags are covered
-        tags = {ex.metamorphic_tag for ex in all_j}
-        assert MetamorphicTag.INVARIANT in tags
-        assert MetamorphicTag.MINOR_SHIFT in tags
-        assert MetamorphicTag.MODERATE_SHIFT in tags
-        assert MetamorphicTag.DECISIVE_SHIFT in tags
 
-        # Check probability simplex sum for all judge examples
-        for ex in all_j:
-            assert abs(sum(ex.raw_posterior_probs) - 1.0) < 1e-4
+def test_artifact_formatting_changes_across_platforms_remain_loadable(tmp_path):
+    compiler.seed_default_compiled_artifacts(tmp_path)
+    for filename in ("question_generator.json", "reflective_judge.json"):
+        path = tmp_path / filename
+        content = json.dumps(json.loads(path.read_text()), ensure_ascii=False, indent=4)
+        path.write_bytes(content.replace("\n", "\r\n").encode("utf-8"))
+    assert len(compiler.load_compiled_modules(tmp_path)[0].demos) == 3
 
-    def test_off_topic_penalty_and_single_intent_metric(self):
-        gold = get_gold_question_examples()[0]
 
-        # Valid on-topic question
-        pred_valid = dspy.Prediction(
-            question="Trong Spring Boot, khi cấu hình rollback cho transaction, anh/chị xử lý propagation thế nào?",
-            surprising_fact_C="CV ghi CRUD cơ bản nhưng JD yêu cầu chuyên sâu",
-            hypothesis_A="Ứng viên chưa nắm vững Transaction Propagation",
-            target_slot_id="java_spring:primary",
-        )
-        score_valid = question_generation_metric(gold, pred_valid)
-        assert score_valid >= 0.85
+def test_bootstrap_keeps_train_split_threshold_and_explicit_teacher(monkeypatch):
+    calls = []
+    teacher = dspy.utils.DummyLM([])
+    student = dspy.utils.DummyLM([])
+    class FakeBootstrap:
+        def __init__(self, **kwargs): self.options = kwargs
+        def compile(self, module, trainset):
+            calls.append((self.options, trainset))
+            return module
+    monkeypatch.setattr(dspy, "BootstrapFewShot", FakeBootstrap)
+    compiler.compile_with_bootstrap_few_shot(student, judge_lm=teacher)
+    assert len(calls) == 2
+    assert all(options["metric_threshold"] == 0.8 and len(trainset) == 14 for options, trainset in calls)
+    seen = []
+    def capture(*args, lm=None): seen.append(lm); return 1.0
+    monkeypatch.setattr(compiler, "question_generation_metric", capture)
+    monkeypatch.setattr(compiler, "judge_evaluation_metric", capture)
+    for options, trainset in calls:
+        assert options["metric"](trainset[0], object()) == 1.0
+    assert seen == [teacher, teacher]
+    with pytest.raises(ValueError): compiler.compile_with_bootstrap_few_shot(student, train_split="dev")
+    with pytest.raises(ValueError): compiler.compile_with_bootstrap_few_shot(student, metric_threshold=0.5)
 
-        # Off-topic question (culinary / daily life)
-        pred_off_topic = dspy.Prediction(
-            question="Anh/chị thích ăn phở bò tái lăn hay phở gà vào buổi sáng hơn?",
-            surprising_fact_C="Ứng viên có nhiều sở thích ẩm thực",
-            hypothesis_A="Ứng viên thích đồ ăn truyền thống",
-            target_slot_id="java_spring:primary",
-        )
-        score_off_topic = question_generation_metric(gold, pred_off_topic)
-        # Off-topic receives ZERO semantic score (score <= 0.40), strictly failing the 0.75 threshold
-        assert score_off_topic <= 0.40
 
-        # Compound question with multiple markers
-        pred_compound = dspy.Prediction(
-            question="Anh/chị xử lý rollback thế nào, đồng thời giải thích cơ chế propagation trong Spring?",
-            surprising_fact_C="CV ghi CRUD cơ bản nhưng JD yêu cầu chuyên sâu",
-            hypothesis_A="Ứng viên chưa nắm vững Transaction Propagation",
-            target_slot_id="java_spring:primary",
-        )
-        score_compound = question_generation_metric(gold, pred_compound)
-        # Loses single-intent points
-        assert score_compound < score_valid
+@pytest.mark.parametrize("depth_ok, expected", [(True, 1.0), (False, 0.0)])
+def test_semantic_teacher_can_reject_shallow_questions(depth_ok, expected):
+    example = get_gold_question_examples()[0]
+    teacher = dspy.utils.DummyLM([{"is_on_topic": True, "is_single_intent": True,
+                                  "is_depth_appropriate": depth_ok, "rationale": "Task depth checked"}])
+    assert question_generation_metric(example, dspy.Prediction(question=example.question), lm=teacher) == expected
 
+
+def test_semantic_teacher_catches_unreported_solution_hints():
+    example = get_gold_judge_examples()[1]
+    teacher = dspy.utils.DummyLM([{"supported": True, "safe_feedback": False,
+                                  "rationale": "Feedback reveals the solution"}])
+    assert judge_evaluation_metric(example, dspy.Prediction(judgment=example.judgment), lm=teacher) == 0
+
+
+def test_checked_in_artifacts_are_current_and_contain_only_training_demos():
+    question, judge = compiler.load_compiled_modules(compiler.DEFAULT_COMPILED_DIR)
+    for module, getter in ((question, get_gold_question_examples), (judge, get_gold_judge_examples)):
+        train = {example.context for example in getter("train")}
+        assert len(module.demos) == 3
+        assert all(demo["context"] in train for demo in module.demos)
+
+
+def test_dev_evaluation_is_held_out_and_reports_failures():
+    class Echo:
+        def __init__(self, examples, field): self.values = {e.context: e[field] for e in examples}; self.field = field
+        def __call__(self, context): return dspy.Prediction(**{self.field: self.values[context]})
+    result = compiler.evaluate_modules_on_dev(Echo(get_gold_question_examples("dev"), "question"),
+        Echo(get_gold_judge_examples("dev"), "judgment"))
+    assert result["question_examples_count"] == result["judge_examples_count"] == 6
+    assert result["evaluation_errors"] == 0
+    assert result["question_semantic_evaluator"] == "lexical_heuristic"
+    with pytest.raises(ValueError): compiler.evaluate_modules_on_dev(None, None, split="train")

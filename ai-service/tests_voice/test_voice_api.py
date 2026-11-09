@@ -25,6 +25,7 @@ def recording():
 def client(monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "private-test-key")
     monkeypatch.setenv("INTERVIEW_VOICE_ENABLED", "true")
+    monkeypatch.setenv("OPENROUTER_STT_MODEL", "microsoft/mai-transcribe-2")
     monkeypatch.setenv("OPENROUTER_TTS_MODEL", "google/gemini-3.8-flash-lite-tts")
     monkeypatch.setenv("OPENROUTER_TTS_VOICE", "Kore")
     monkeypatch.setenv("OPENROUTER_TTS_FORMAT", "pcm")
@@ -64,9 +65,10 @@ def test_transcription_uses_dedicated_openrouter_endpoint(client, monkeypatch):
         return httpx.Response(200, json={"text": " Em dùng transaction. "})
     monkeypatch.setenv("OPENROUTER_STT_MODEL", "qwen/qwen3-asr-1.7b")
     provider(monkeypatch, handle)
-    response = client.post("/api/v2/voice/transcribe", json={"audio": recording()})
+    response = client.post("/api/v2/voice/transcribe", json={"audio": recording(), "phase": "preview"})
     assert response.status_code == 200
-    assert response.json() == {"text": "Em dùng transaction."}
+    assert response.json()["text"] == "Em dùng transaction."
+    assert response.json()["phase"] == "preview"
 
 
 def test_rejects_invalid_audio_before_charging_provider(client, monkeypatch):

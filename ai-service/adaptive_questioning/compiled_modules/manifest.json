@@ -1,0 +1,10 @@
+{
+  "version": "evidence-dspy-1",
+  "contract_fingerprint": "f0f7b6fb96135cd255abf7bc9e4fae7b5b55fea6ddfa220880c967cef38c4f0b",
+  "train_split": "train",
+  "digest_format": "canonical-json-sha256",
+  "files": {
+    "question_generator.json": "1222597fdba59d46bd420fa0a4017761df8e4436cbc01bee9a4ee6235e518df9",
+    "reflective_judge.json": "248454098d21bf8fb0b395f1238f5c82653208d114e1b125991c724ba8bd09a0"
+  }
+}

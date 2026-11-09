@@ -9,16 +9,24 @@ export interface VoiceConfig {
   avatar: { provider: 'simli'; configured: boolean; sample_rate: 16000 };
 }
 export interface VoiceTurn { turn_id: string; expected_state_version: number }
+export interface RecognitionResult {
+  text: string; phase: 'preview' | 'final'; alternative_text?: string;
+  review_required: boolean; verification: 'not_requested' | 'agreed' | 'disagreed' | 'unavailable';
+}
 const path = (id: string) => `/api/v2/sessions/${encodeURIComponent(id)}/interview/voice`;
 
 export const interviewVoice = {
   async config(id: string): Promise<VoiceConfig> {
     return (await axiosClient.get<VoiceConfig>(`${path(id)}/config`)).data;
   },
-  async transcribe(id: string, turn: VoiceTurn, audio: string, signal: AbortSignal): Promise<string> {
-    const { data } = await axiosClient.post<{ text: string }>(`${path(id)}/transcribe`,
-      { ...turn, audio }, { signal, timeout: 60000 });
-    return data.text;
+  async transcribe(id: string, turn: VoiceTurn, audio: string, signal: AbortSignal,
+    phase: 'preview' | 'final' = 'final'): Promise<RecognitionResult> {
+    const { data } = await axiosClient.post<RecognitionResult>(`${path(id)}/transcribe`,
+      { ...turn, audio, phase }, { signal, timeout: 115000 });
+    if (typeof data.text !== 'string' || data.phase !== phase || typeof data.review_required !== 'boolean') {
+      throw new Error('Máy chủ trả về bản nhận diện không hợp lệ. Hãy cập nhật dịch vụ giọng nói.');
+    }
+    return data;
   },
   async avatarSession(id: string, turn: VoiceTurn, signal: AbortSignal): Promise<string> {
     const { data } = await axiosClient.post<{ session_token: string }>(`${path(id)}/avatar-session`, turn,

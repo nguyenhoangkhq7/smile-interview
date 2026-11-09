@@ -23,7 +23,7 @@ def create_app() -> FastAPI:
             "Unified Scientific Research Pipeline: "
             "Module 1 (SBERT+GNN Skill Matcher) -> "
             "Module 2 (Skill-Gap Detection V2.0) -> "
-            "Module 3 (Adaptive Questioning V2.2)"
+            "Module 3 (Evidence-based Adaptive Interviewing)"
         ),
         version="2.2.0",
     )
@@ -37,7 +37,6 @@ def create_app() -> FastAPI:
     )
 
     application.state.report_store = {}
-    application.state.session_store = {}
 
     application.include_router(module1_router)
     application.include_router(skill_gap_router)

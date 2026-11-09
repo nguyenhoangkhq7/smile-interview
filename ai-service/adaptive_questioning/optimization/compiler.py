@@ -1,327 +1,163 @@
-"""
-Compiler and Teleprompter utilities for Adaptive Questioning DSPy Modules.
-Supports both offline LabeledFewShot seeding and online BootstrapFewShot optimization.
-"""
-
-import os
+"""Offline labeled demos and opt-in online DSPy optimization for evidence V2."""
+import argparse
+import hashlib
+import json
 from pathlib import Path
-from typing import Optional, Union
+
 import dspy
 
-from adaptive_questioning.core.engine import (
-    DSPyQuestionGeneratorModule,
-    DSPyReflectiveJudgeModule,
-)
-from adaptive_questioning.optimization.dataset import (
-    get_gold_judge_examples,
-    get_gold_question_examples,
-)
-from adaptive_questioning.optimization.metrics import (
-    get_judge_lm,
-    judge_evaluation_metric,
-    question_generation_metric,
-    set_judge_lm,
-)
+from adaptive_questioning.evidence.models import Judgment, Question
+from adaptive_questioning.evidence.provider import JudgeSignature, QuestionSignature
+from .dataset import get_gold_judge_examples, get_gold_question_examples
+from .metrics import get_judge_lm, judge_evaluation_metric, question_generation_metric
 
 DEFAULT_COMPILED_DIR = Path(__file__).resolve().parent.parent / "compiled_modules"
+ARTIFACT_VERSION = "evidence-dspy-1"
 
 
-def compile_with_labeled_few_shot(
-    k_question: int = 3,
-    k_judge: int = 3,
-) -> tuple[DSPyQuestionGeneratorModule, DSPyReflectiveJudgeModule]:
-    """
-    Fast, deterministic offline compilation via `dspy.LabeledFewShot`.
-    Seeds modules with gold few-shot demonstrations without requiring LLM calls.
-    """
-    q_module = DSPyQuestionGeneratorModule()
-    q_examples = get_gold_question_examples()
-    q_teleprompter = dspy.LabeledFewShot(k=min(k_question, len(q_examples)))
-    compiled_q = q_teleprompter.compile(q_module, trainset=q_examples)
-
-    j_module = DSPyReflectiveJudgeModule()
-    j_examples = get_gold_judge_examples()
-    j_teleprompter = dspy.LabeledFewShot(k=min(k_judge, len(j_examples)))
-    compiled_j = j_teleprompter.compile(j_module, trainset=j_examples)
-
-    return compiled_q, compiled_j
+def _fingerprint() -> str:
+    contract = {"question_instructions": QuestionSignature.instructions,
+                "judge_instructions": JudgeSignature.instructions,
+                "question_schema": Question.model_json_schema(), "judgment_schema": Judgment.model_json_schema()}
+    return hashlib.sha256(json.dumps(contract, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
 
 
-def compile_with_bootstrap_few_shot(
-    lm: dspy.LM,
-    judge_lm: Optional[dspy.LM] = None,
-    max_bootstrapped_demos: int = 2,
-    max_labeled_demos: int = 2,
-    metric_threshold: float = 0.75,
-    train_split: str = "train",
-) -> tuple[DSPyQuestionGeneratorModule, DSPyReflectiveJudgeModule]:
-    """
-    Full scientific optimization via `dspy.BootstrapFewShot` (Khattab et al., 2023).
-    Supports an independent `judge_lm` (Teacher) evaluating the `lm` (Student).
-    Requires an active `dspy.LM` connection.
+def _new_modules() -> tuple[dspy.Predict, dspy.Predict]:
+    return dspy.Predict(QuestionSignature), dspy.Predict(JudgeSignature)
 
-    NOTE: `metric_threshold` is mandatory for float-valued metrics. Without it, DSPy
-    accepts any truthy score (e.g. 0.25) as a "successful" trace and injects it as a demo.
-    """
-    if judge_lm is not None:
-        set_judge_lm(judge_lm)
 
+def _artifact_digest(path: Path) -> str:
+    # Git may convert JSON formatting from LF to CRLF on Windows. Hash the
+    # parsed content so equivalent checkouts remain loadable on Linux/Windows.
+    value = json.loads(path.read_text(encoding="utf-8"))
+    canonical = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+def compile_with_labeled_few_shot(k_question: int = 3, k_judge: int = 3) -> tuple[dspy.Predict, dspy.Predict]:
+    """Seed demonstrations using only the train split; no model/API calls."""
+    if k_question < 0 or k_judge < 0:
+        raise ValueError("Demonstration counts must be nonnegative")
+    question, judge = _new_modules()
+    train_q, train_j = get_gold_question_examples("train"), get_gold_judge_examples("train")
+    return (dspy.LabeledFewShot(k=min(k_question, len(train_q))).compile(question, trainset=train_q),
+            dspy.LabeledFewShot(k=min(k_judge, len(train_j))).compile(judge, trainset=train_j))
+
+
+def compile_with_bootstrap_few_shot(lm: dspy.LM, judge_lm: dspy.LM | None = None,
+                                    max_bootstrapped_demos: int = 2, max_labeled_demos: int = 2,
+                                    metric_threshold: float = 0.8, train_split: str = "train"):
+    """Explicit online operation; an optional separate teacher scores semantics."""
+    if train_split != "train":
+        raise ValueError("Bootstrap may only train on the train split")
+    if not 0.7 < metric_threshold <= 1:
+        raise ValueError("Threshold must exceed the offline heuristic ceiling (0.7) and be <= 1")
+    teacher = judge_lm if judge_lm is not None else lm
+
+    def question_metric(gold, prediction, trace=None):
+        return question_generation_metric(gold, prediction, trace, lm=teacher)
+
+    def judgment_metric(gold, prediction, trace=None):
+        return judge_evaluation_metric(gold, prediction, trace, lm=teacher)
+
+    question, judge = _new_modules()
     with dspy.context(lm=lm):
-        q_module = DSPyQuestionGeneratorModule()
-        q_teleprompter = dspy.BootstrapFewShot(
-            metric=question_generation_metric,
-            metric_threshold=metric_threshold,
-            max_bootstrapped_demos=max_bootstrapped_demos,
-            max_labeled_demos=max_labeled_demos,
-        )
-        compiled_q = q_teleprompter.compile(
-            q_module, trainset=get_gold_question_examples(split=train_split)
-        )
-
-        j_module = DSPyReflectiveJudgeModule()
-        j_teleprompter = dspy.BootstrapFewShot(
-            metric=judge_evaluation_metric,
-            metric_threshold=metric_threshold,
-            max_bootstrapped_demos=max_bootstrapped_demos,
-            max_labeled_demos=max_labeled_demos,
-        )
-        compiled_j = j_teleprompter.compile(
-            j_module, trainset=get_gold_judge_examples(split=train_split)
-        )
-
+        compiled_q = dspy.BootstrapFewShot(metric=question_metric, metric_threshold=metric_threshold,
+            max_bootstrapped_demos=max_bootstrapped_demos, max_labeled_demos=max_labeled_demos).compile(
+                question, trainset=get_gold_question_examples("train"))
+        compiled_j = dspy.BootstrapFewShot(metric=judgment_metric, metric_threshold=metric_threshold,
+            max_bootstrapped_demos=max_bootstrapped_demos, max_labeled_demos=max_labeled_demos).compile(
+                judge, trainset=get_gold_judge_examples("train"))
     return compiled_q, compiled_j
 
 
-def evaluate_modules_on_dev(
-    q_module: DSPyQuestionGeneratorModule,
-    j_module: DSPyReflectiveJudgeModule,
-    lm: Optional[dspy.LM] = None,
-    split: str = "dev",
-) -> dict:
-    """
-    Evaluate compiled modules on held-out devset to quantify optimization quality.
-    """
-    dev_q = get_gold_question_examples(split=split)
-    dev_j = get_gold_judge_examples(split=split)
-
-    active_ctx = dspy.context(lm=lm) if lm is not None else dspy.context()
-    q_scores = []
-    j_scores = []
-
-    with active_ctx:
-        for ex in dev_q:
-            try:
-                pred = q_module(
-                    reference_layer_context=ex.reference_layer_context,
-                    main_layer_directives=ex.main_layer_directives,
-                )
-                score = question_generation_metric(ex, pred, lm=lm)
-                q_scores.append(score)
-            except Exception:
-                q_scores.append(0.0)
-
-        for ex in dev_j:
-            try:
-                pred = j_module(
-                    reference_layer_rubric=ex.reference_layer_rubric,
-                    question_and_slot=ex.question_and_slot,
-                    candidate_response=ex.candidate_response,
-                )
-                score = judge_evaluation_metric(ex, pred)
-                j_scores.append(score)
-            except Exception:
-                j_scores.append(0.0)
-
-    avg_q = float(sum(q_scores) / len(q_scores)) if q_scores else 0.0
-    avg_j = float(sum(j_scores) / len(j_scores)) if j_scores else 0.0
-
-    return {
-        "dev_split": split,
-        "question_examples_count": len(dev_q),
-        "judge_examples_count": len(dev_j),
-        "question_generator_avg_score": round(avg_q, 4),
-        "reflective_judge_avg_score": round(avg_j, 4),
-    }
-
-
-def save_compiled_modules(
-    compiled_q: DSPyQuestionGeneratorModule,
-    compiled_j: DSPyReflectiveJudgeModule,
-    target_dir: Optional[Union[str, Path]] = None,
-) -> tuple[Path, Path]:
-    """Save compiled module artifacts as JSON files."""
-    out_dir = Path(target_dir or DEFAULT_COMPILED_DIR)
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    q_path = out_dir / "question_generator.json"
-    j_path = out_dir / "reflective_judge.json"
-
+def save_compiled_modules(compiled_q: dspy.Predict, compiled_j: dspy.Predict,
+                          target_dir: str | Path | None = None) -> tuple[Path, Path]:
+    for module, field, model in ((compiled_q, "question", Question), (compiled_j, "judgment", Judgment)):
+        signature = module.signature
+        if (set(signature.input_fields) != {"context"} or set(signature.output_fields) != {field}
+                or signature.output_fields[field].annotation is not model):
+            raise ValueError("Only current typed evidence modules can be saved")
+    directory = Path(target_dir or DEFAULT_COMPILED_DIR)
+    directory.mkdir(parents=True, exist_ok=True)
+    q_path, j_path = directory / "question_generator.json", directory / "reflective_judge.json"
     compiled_q.save(str(q_path))
     compiled_j.save(str(j_path))
+    manifest = {"version": ARTIFACT_VERSION, "contract_fingerprint": _fingerprint(), "train_split": "train",
+                "digest_format": "canonical-json-sha256", "files": {p.name: _artifact_digest(p) for p in (q_path, j_path)}}
+    (directory / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     return q_path, j_path
 
 
-def seed_default_compiled_artifacts(target_dir: Optional[Union[str, Path]] = None) -> tuple[Path, Path]:
-    """Seed default production artifacts in `adaptive_questioning/compiled_modules`."""
-    compiled_q, compiled_j = compile_with_labeled_few_shot()
-    return save_compiled_modules(compiled_q, compiled_j, target_dir=target_dir)
+def load_compiled_modules(directory: str | Path) -> tuple[dspy.Predict, dspy.Predict]:
+    """Load only JSON artifacts matching current contracts and manifest hashes."""
+    directory = Path(directory)
+    manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
+    if (manifest.get("version") != ARTIFACT_VERSION or manifest.get("contract_fingerprint") != _fingerprint()
+            or manifest.get("digest_format") != "canonical-json-sha256"):
+        raise ValueError("Incompatible compiled artifacts; recompile for the current evidence contracts")
+    modules = _new_modules()
+    for module, filename in zip(modules, ("question_generator.json", "reflective_judge.json")):
+        path = directory / filename
+        if _artifact_digest(path) != manifest.get("files", {}).get(filename):
+            raise ValueError("Compiled artifact checksum mismatch")
+        module.load(str(path))
+    return modules
+
+
+def seed_default_compiled_artifacts(target_dir: str | Path | None = None) -> tuple[Path, Path]:
+    return save_compiled_modules(*compile_with_labeled_few_shot(), target_dir=target_dir)
+
+
+def evaluate_modules_on_dev(q_module, j_module, lm: dspy.LM | None = None, split: str = "dev",
+                            judge_lm: dspy.LM | None = None) -> dict:
+    if split not in {"dev", "val"}:
+        raise ValueError("Held-out evaluation requires dev or val")
+    questions, judgments = get_gold_question_examples(split), get_gold_judge_examples(split)
+    q_scores, j_scores, errors = [], [], 0
+    teacher = judge_lm if judge_lm is not None else get_judge_lm()
+    with dspy.context(lm=lm) if lm is not None else dspy.context():
+        for module, examples, metric, scores in (
+            (q_module, questions, question_generation_metric, q_scores),
+            (j_module, judgments, judge_evaluation_metric, j_scores),
+        ):
+            for example in examples:
+                try:
+                    scores.append(metric(example, module(context=example.context), lm=teacher))
+                except Exception:
+                    errors += 1
+                    scores.append(0.0)
+    return {"dev_split": split, "question_examples_count": len(questions), "judge_examples_count": len(judgments),
+            "question_generator_avg_score": sum(q_scores) / len(q_scores),
+            "reflective_judge_avg_score": sum(j_scores) / len(j_scores), "evaluation_errors": errors,
+            "question_semantic_evaluator": "independent_lm" if teacher is not None else "lexical_heuristic"}
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Compile evidence V2 DSPy modules from recovered examples")
+    parser.add_argument("--bootstrap", action="store_true", help="Online optimization; invokes the configured LM")
+    parser.add_argument("--evaluate", action="store_true", help="Online evaluation on the held-out dev split")
+    parser.add_argument("--out-dir", type=Path, default=DEFAULT_COMPILED_DIR)
+    parser.add_argument("--metric-threshold", type=float, default=0.8)
+    parser.add_argument("--max-bootstrapped", type=int, default=2)
+    parser.add_argument("--max-labeled", type=int, default=2)
+    args = parser.parse_args()
+    lm = None
+    if args.bootstrap or args.evaluate:
+        from dotenv import load_dotenv
+        from adaptive_questioning.evidence.provider import configured_lm
+        root = Path(__file__).resolve().parents[2]
+        load_dotenv(root.parent / ".env")
+        load_dotenv(root / ".env", override=True)
+        lm = configured_lm()
+    modules = (compile_with_bootstrap_few_shot(lm, metric_threshold=args.metric_threshold,
+                  max_bootstrapped_demos=args.max_bootstrapped, max_labeled_demos=args.max_labeled)
+               if args.bootstrap else compile_with_labeled_few_shot())
+    paths = save_compiled_modules(*modules, target_dir=args.out_dir)
+    print("Saved:", *paths)
+    if args.evaluate:
+        print(json.dumps(evaluate_modules_on_dev(*modules, lm=lm, judge_lm=lm), indent=2))
 
 
 if __name__ == "__main__":
-    import argparse
-    import sys
-    from dotenv import load_dotenv
-
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-
-    # Load environment variables
-    _env_root = Path(__file__).resolve().parent.parent.parent / ".env"
-    _env_pkg = Path(__file__).resolve().parent.parent / ".env"
-    load_dotenv(_env_root)
-    load_dotenv(_env_pkg, override=True)
-
-    parser = argparse.ArgumentParser(
-        description="DSPy Prompt Compiler for Adaptive Questioning (Step 2A & Step 2B)"
-    )
-    parser.add_argument(
-        "--bootstrap",
-        action="store_true",
-        help="Use BootstrapFewShot with LLM execution to dynamically discover optimal prompt traces.",
-    )
-    parser.add_argument(
-        "--max-bootstrapped",
-        type=int,
-        default=2,
-        help="Maximum bootstrapped demonstrations to discover (default: 2).",
-    )
-    parser.add_argument(
-        "--max-labeled",
-        type=int,
-        default=2,
-        help="Maximum gold labeled demonstrations to include (default: 2).",
-    )
-    parser.add_argument(
-        "--out-dir",
-        type=str,
-        default=str(DEFAULT_COMPILED_DIR),
-        help="Target output directory for compiled JSON artifacts.",
-    )
-    parser.add_argument(
-        "--model",
-        type=str,
-        default=None,
-        help="Model to use for the interview module being optimized (defaults to runtime engine model).",
-    )
-    parser.add_argument(
-        "--judge-model",
-        type=str,
-        default=None,
-        help="Independent Model for Judge 1 (Topic Drift & Single-Intent Evaluator). Can also be set via AQ_JUDGE_MODEL in .env.",
-    )
-    parser.add_argument(
-        "--judge-api-key",
-        type=str,
-        default=None,
-        help="Optional separate API key for the Judge 1 model.",
-    )
-    parser.add_argument(
-        "--judge-base-url",
-        type=str,
-        default=None,
-        help="Optional separate base URL for the Judge 1 model.",
-    )
-    parser.add_argument(
-        "--metric-threshold",
-        type=float,
-        default=0.75,
-        help="Minimum metric score for a bootstrapped trace to be accepted as a demo (default: 0.75).",
-    )
-    parser.add_argument(
-        "--evaluate",
-        action="store_true",
-        help="Evaluate compiled modules on held-out devset after compilation.",
-    )
-    args = parser.parse_args()
-
-    if args.bootstrap:
-        # Setup Interview Generator LM (Student)
-        from adaptive_questioning.core.engine import OpenAILLMEngine
-
-        runtime_engine = OpenAILLMEngine(model=args.model)
-        if runtime_engine.dspy_lm is None:
-            raise RuntimeError(
-                "Bootstrap optimization requires OPENAI_API_KEY or OPENROUTER_API_KEY set in .env."
-            )
-        generator_lm = runtime_engine.dspy_lm
-
-        # Setup Independent Judge 1 LM (Teacher / Evaluator)
-        judge_model_name = (
-            args.judge_model
-            or os.getenv("AQ_JUDGE_MODEL")
-            or os.getenv("JUDGE_MODEL")
-        )
-        judge_lm: Optional[dspy.LM] = None
-        if judge_model_name:
-            j_api_key = (
-                args.judge_api_key
-                or os.getenv("AQ_JUDGE_API_KEY")
-                or os.getenv("JUDGE_API_KEY")
-                or runtime_engine.api_key
-            )
-            j_base_url = (
-                args.judge_base_url
-                or os.getenv("AQ_JUDGE_BASE_URL")
-                or os.getenv("JUDGE_BASE_URL")
-                or runtime_engine.base_url
-            )
-            is_openrouter = j_base_url and ("openrouter.ai" in j_base_url)
-            if is_openrouter:
-                dspy_judge_name = (
-                    judge_model_name
-                    if judge_model_name.startswith("openrouter/")
-                    else f"openrouter/{judge_model_name}"
-                )
-            else:
-                dspy_judge_name = (
-                    judge_model_name
-                    if "/" in judge_model_name
-                    else f"openai/{judge_model_name}"
-                )
-            print(f"[*] Initializing Independent Judge 1 LM: '{dspy_judge_name}'")
-            judge_lm = dspy.LM(
-                dspy_judge_name,
-                api_key=j_api_key,
-                api_base=j_base_url,
-                temperature=0.0,
-            )
-            set_judge_lm(judge_lm)
-        else:
-            print(f"[*] No separate Judge 1 model specified; using compiler LM as fallback.")
-
-        print(f"[*] Interview Generator Model (Student): '{runtime_engine.model}'")
-        print("[*] Running BootstrapFewShot optimization to discover optimal prompts...")
-        comp_q, comp_j = compile_with_bootstrap_few_shot(
-            lm=generator_lm,
-            judge_lm=judge_lm,
-            max_bootstrapped_demos=args.max_bootstrapped,
-            max_labeled_demos=args.max_labeled,
-            metric_threshold=args.metric_threshold,
-        )
-    else:
-        print("[*] Compiling with fast deterministic LabeledFewShot from gold dataset...")
-        comp_q, comp_j = compile_with_labeled_few_shot()
-
-    q_file, j_file = save_compiled_modules(comp_q, comp_j, target_dir=args.out_dir)
-    print(f"[+] Successfully compiled and saved optimal prompt artifacts:")
-    print(f"    - Question Generator : {q_file}")
-    print(f"    - Reflective Judge   : {j_file}")
-
-    if args.evaluate:
-        import json
-        print("[*] Evaluating compiled modules on held-out dev split...")
-        lm_for_eval = generator_lm if args.bootstrap else None
-        eval_results = evaluate_modules_on_dev(comp_q, comp_j, lm=lm_for_eval, split="dev")
-        print(f"[+] Dev Evaluation Results: {json.dumps(eval_results, indent=2, ensure_ascii=False)}")
-
-
+    main()

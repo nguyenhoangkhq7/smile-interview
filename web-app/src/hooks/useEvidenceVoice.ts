@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { EvidenceSession, interviewError } from '@/services/evidenceInterview';
-import { interviewVoice, VoiceTurn } from '@/services/interviewVoice';
+import { interviewVoice, VoiceTurn, type RecognitionResult } from '@/services/interviewVoice';
 import { encodeWav, VoiceDetector } from '@/lib/voiceAudio';
 import { SimliAvatar } from '@/lib/simliAvatar';
 
@@ -16,10 +16,14 @@ interface VoiceState {
   enabled: boolean; paused: boolean; listening: boolean; speaking: boolean;
   loadingSpeech: boolean; transcribing: boolean; countdown: boolean; retryAvailable: boolean;
   error: string; avatarReady: boolean;
+  captions: string; review: Review | null;
 }
+interface Review { segment: number; audio: string; text: string; alternative?: string; unavailable: boolean }
 const initial: VoiceState = { enabled: false, paused: false, listening: false, speaking: false,
-  loadingSpeech: false, transcribing: false, countdown: false, retryAvailable: false, error: '', avatarReady: false };
-type Recording = { audio: string; turn: VoiceTurn; generation: number };
+  loadingSpeech: false, transcribing: false, countdown: false, retryAvailable: false, error: '', avatarReady: false,
+  captions: '', review: null };
+type Recording = { audio: string; turn: VoiceTurn; generation: number; segment: number; phase: 'preview' | 'final' };
+type Segment = { preview: string; text: string; resolved: boolean; review: Review | null };
 
 /** One lifecycle for capture, recognition, playback and turn cancellation. No independent LLM state. */
 class VoiceConversation {
@@ -47,6 +51,11 @@ class VoiceConversation {
   private auto = true;
   private submitting = false;
   private draft = '';
+  private baseDraft = '';
+  private segments: Segment[] = [];
+  private contextFrames: Float32Array[] = [];
+  private contextMs = 0;
+  private segment = 0;
   private silence = 1200;
 
   constructor(private current: () => Options, private update: (state: Partial<VoiceState>) => void) {}
@@ -55,7 +64,9 @@ class VoiceConversation {
 
   async start() {
     if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) throw new Error('Micro cần HTTPS hoặc localhost và trình duyệt hỗ trợ ghi âm.');
-    this.context = new AudioContext();
+    // Let the browser resample the microphone with its native audio converter.
+    // This avoids relying on the simple WAV fallback downsampler for 48 kHz input.
+    this.context = new AudioContext({ sampleRate: 16000 });
     await this.context.resume();
     const cfg = await interviewVoice.config(this.current().id);
     if (this.closed) return;
@@ -111,12 +122,13 @@ class VoiceConversation {
     if (this.turn?.turn_id !== next.turn_id || this.turn.expected_state_version !== next.expected_state_version) {
       this.generation++; this.cancelTimer(); this.cancelSpeech(); this.recognitionAbort?.abort();
       this.queue = []; this.failed = null; this.detector.reset(); this.submitting = false;
+      this.segments = []; this.contextFrames = []; this.contextMs = 0; this.segment = 0; this.baseDraft = options.answer;
       this.turn = next;
       this.announcedTurn = '';
-      this.emit({ retryAvailable: false, error: '', listening: false });
+      this.emit({ retryAvailable: false, error: '', listening: false, captions: '', review: null });
     }
     if (options.suspended || options.busy) {
-      this.cancelTimer(); this.detector.reset(); this.emit({ listening: false });
+      this.cancelTimer(); this.flushRecording(); this.emit({ listening: false });
       if (options.suspended) this.cancelSpeech();
     } else if (!this.paused && this.announcedTurn !== next.turn_id && !this.detector.active) {
       void this.speak();
@@ -126,7 +138,7 @@ class VoiceConversation {
   setAuto(auto: boolean) { this.auto = auto; if (!auto) this.cancelTimer(); }
   setSilence(ms: number) { this.silence = ms; }
   pause(value: boolean) {
-    this.paused = value; this.cancelTimer(); this.detector.reset();
+    this.paused = value; this.cancelTimer(); this.flushRecording();
     this.microphone?.getAudioTracks().forEach(track => { track.enabled = !value; });
     if (value) this.cancelSpeech();
     this.emit({ paused: value, listening: false });
@@ -150,7 +162,7 @@ class VoiceConversation {
   async speak() {
     if (!this.player || !this.ready || !this.turn || this.closed || this.paused || this.current().suspended || this.current().busy) return;
     this.announcedTurn = this.turn.turn_id;
-    this.cancelTimer(); this.cancelSpeech(); this.detector.reset();
+    this.cancelTimer(); this.cancelSpeech(); this.flushRecording();
     const abort = new AbortController(); this.speechAbort = abort;
     this.emit({ loadingSpeech: true, error: '' });
     try {
@@ -174,16 +186,73 @@ class VoiceConversation {
       this.cancelTimer(); this.cancelSpeech(); this.emit({ listening: true });
     }
     if (result.ended) this.emit({ listening: false });
-    if (result.frames) {
-      const recording = { audio: encodeWav(result.frames, this.context!.sampleRate), turn: this.turn, generation: this.generation };
-      this.queue.push(recording);
-      if (this.failed || this.queue.length >= 3) {
-        this.pause(true);
-        this.emit({ error: 'Nhận diện chưa theo kịp. Hãy xử lý bản ghi đang chờ trước khi tiếp tục.' });
-      }
-      void this.drain();
-    } else if (result.ended && !this.processing && !this.queue.length && !this.failed) this.scheduleSubmit();
+    if (result.frames) this.collect(result.frames, result.ended);
+    else if (result.ended) { this.finishContext(); void this.drain(); }
+    if (!this.paused && (this.failed || this.queue.filter(item => item.phase === 'final').length >= 4)) {
+      this.pause(true);
+      this.emit({ error: 'Nhận diện chưa theo kịp. Bản ghi đã được giữ; hãy chờ xử lý rồi tiếp tục nghe.' });
+    }
   }
+
+  private collect(frames: Float32Array[], ended: boolean) {
+    if (!this.turn || !this.context) return;
+    if (!this.segments[this.segment]) this.segments[this.segment] = { preview: '', text: '', resolved: false, review: null };
+    this.contextFrames.push(...frames);
+    this.contextMs += frames.reduce((sum, frame) => sum + frame.length, 0) / this.context.sampleRate * 1000;
+    if (ended || this.contextMs >= 24000) this.finishContext();
+    else {
+      const audio = encodeWav(frames, this.context.sampleRate);
+      // Final recognition later replaces these isolated caption chunks.
+      this.queue.push({ audio, segment: this.segment, phase: 'preview', turn: this.turn, generation: this.generation });
+    }
+    void this.drain();
+  }
+
+  private finishContext() {
+    if (!this.contextFrames.length || !this.context || !this.turn) return;
+    const segment = this.segment;
+    // Full contextual audio supersedes all previews that have not started.
+    this.queue = this.queue.filter(item => item.segment !== segment || item.phase !== 'preview');
+    this.queue.push({ audio: encodeWav(this.contextFrames, this.context.sampleRate), segment,
+      phase: 'final', turn: this.turn, generation: this.generation });
+    this.contextFrames = []; this.contextMs = 0; this.segment++;
+  }
+
+  private flushRecording() {
+    const frames = this.detector.flush();
+    if (frames) this.collect(frames, true);
+    else this.finishContext();
+    if (this.queue.length) void this.drain();
+  }
+
+  private publishRecognition() {
+    this.draft = [this.baseDraft, ...this.segments.map(segment => segment.text)].filter(Boolean).join(' ').trim();
+    this.current().setAnswer(this.draft);
+    this.emit({ captions: [this.baseDraft, ...this.segments.map(segment => segment.text || segment.preview)].filter(Boolean).join(' ').trim(),
+      review: this.segments.find(segment => segment.review)?.review ?? null });
+  }
+
+  confirmReview(segment: number, alternative: boolean) {
+    const item = this.segments[segment], review = item?.review;
+    if (!review || (alternative && !review.alternative)) return;
+    item.text = alternative ? review.alternative! : review.text;
+    item.review = null;
+    this.publishRecognition(); this.scheduleSubmit();
+  }
+
+  rejectReview(segment: number) {
+    if (!this.segments[segment]?.review) return;
+    this.segments[segment] = { preview: '', text: '', resolved: true, review: null };
+    this.cancelTimer(); this.publishRecognition();
+    // Repeating the audio is explicit; do not auto-submit the remaining draft.
+    this.setAuto(false);
+  }
+
+  private get unsettled() {
+    return Boolean(this.contextFrames.length || this.segments.some(segment => !segment.resolved || segment.review));
+  }
+
+  canSubmit() { return !this.detector.active && !this.processing && !this.queue.length && !this.failed && !this.unsettled; }
 
   private async drain() {
     if (this.processing || this.closed || this.failed) return;
@@ -194,15 +263,24 @@ class VoiceConversation {
         if (recording.generation !== this.generation) continue;
         const abort = new AbortController(); this.recognitionAbort = abort;
         try {
-          const text = await interviewVoice.transcribe(this.current().id, recording.turn, recording.audio, abort.signal);
+          const result: RecognitionResult = await interviewVoice.transcribe(this.current().id, recording.turn, recording.audio, abort.signal, recording.phase);
           if (this.closed || abort.signal.aborted || recording.generation !== this.generation) continue;
-          this.draft = [this.draft.trim(), text.trim()].filter(Boolean).join(' ');
-          this.current().setAnswer(this.draft);
+          const segment = this.segments[recording.segment];
+          if (recording.phase === 'preview') {
+            if (!segment.text) segment.preview = [segment.preview, result.text].filter(Boolean).join(' ');
+          } else {
+            segment.text = result.text;
+            segment.resolved = true;
+            segment.review = result.review_required ? { segment: recording.segment, audio: recording.audio,
+              text: result.text, alternative: result.alternative_text, unavailable: result.verification === 'unavailable' } : null;
+          }
+          this.publishRecognition();
         } catch (error) {
-          if (!abort.signal.aborted && recording.generation === this.generation) {
+          if (recording.phase === 'final' && !abort.signal.aborted && recording.generation === this.generation) {
             this.failed = recording; this.cancelTimer();
             this.emit({ retryAvailable: true, error: interviewError(error) });
           }
+          // Preview failures do not discard audio: the contextual final request still owns it.
         }
       }
     } finally {
@@ -216,20 +294,26 @@ class VoiceConversation {
     this.queue.unshift(this.failed); this.failed = null;
     this.emit({ retryAvailable: false, error: '' }); void this.drain();
   }
-  discard() { this.failed = null; this.emit({ retryAvailable: false, error: '' }); void this.drain(); }
+  discard() {
+    if (this.failed) {
+      // An explicit discard removes the failed segment; a preview can never stand in for it.
+      this.segments[this.failed.segment] = { preview: '', text: '', resolved: true, review: null };
+    }
+    this.failed = null; this.publishRecognition(); this.emit({ retryAvailable: false, error: '' }); void this.drain();
+  }
 
   private scheduleSubmit() {
     this.cancelTimer();
     const options = this.current();
     if (!this.auto || this.paused || options.suspended || options.busy || this.submitting || this.detector.active
-      || this.failed || this.processing || this.queue.length || this.playing || this.speechAbort || !this.draft.trim()) return;
+      || !this.canSubmit() || this.playing || this.speechAbort || !this.draft.trim()) return;
     const generation = this.generation;
     this.emit({ countdown: true });
     this.timer = setTimeout(async () => {
       this.timer = null; this.emit({ countdown: false });
       const latest = this.current();
       if (this.closed || this.paused || latest.suspended || latest.busy || this.detector.active
-        || this.failed || this.processing || this.queue.length || generation !== this.generation) return;
+        || !this.canSubmit() || generation !== this.generation) return;
       this.beforeSubmit();
       const next = await latest.submit(this.draft);
       this.submitting = false;
@@ -243,6 +327,7 @@ class VoiceConversation {
     this.startupAbort.abort();
     this.cancelTimer(); this.cancelSpeech(); this.recognitionAbort?.abort();
     this.closed = true; this.generation++; this.queue = []; this.failed = null;
+    this.contextFrames = []; this.segments = [];
     this.player?.close();
     if (this.capture) { this.capture.port.onmessage = null; this.capture.disconnect(); }
     this.source?.disconnect(); this.silent?.disconnect();
@@ -275,6 +360,7 @@ export function useEvidenceVoice(options: Options) {
     } finally { setStarting(false); }
   };
   const submit = async (response?: string) => {
+    if (engine.current && !engine.current.canSubmit()) return;
     engine.current?.beforeSubmit();
     try { return await latest.current.submit(response ?? latest.current.answer); }
     finally { engine.current?.afterSubmit(); }
@@ -283,6 +369,8 @@ export function useEvidenceVoice(options: Options) {
     pause: () => engine.current?.pause(!state.paused),
     replay: () => engine.current?.speak(), interrupt: () => engine.current?.cancelSpeech(),
     retry: () => engine.current?.retry(), discard: () => engine.current?.discard(),
+    confirmReview: (segment: number, alternative: boolean) => engine.current?.confirmReview(segment, alternative),
+    rejectReview: (segment: number) => { setAutomatic(false); engine.current?.rejectReview(segment); },
     cancelAuto: () => engine.current?.cancelTimer(),
     setAutomatic: (value: boolean) => { setAutomatic(value); engine.current?.setAuto(value); },
     setSilenceMs: (value: number) => { setSilenceMs(value); engine.current?.setSilence(value); },

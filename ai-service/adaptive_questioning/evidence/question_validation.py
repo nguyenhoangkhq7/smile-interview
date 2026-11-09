@@ -3,6 +3,9 @@ import re
 from .models import Question
 
 
+VOICE_MAX_WORDS = 90
+
+
 def single_question(text: str) -> bool:
     prose = re.sub(r"```[\s\S]*?```|`[^`]*`", "", text)
     prose = re.sub(r"https?://[^\s<>]+", "", prose)
@@ -35,4 +38,10 @@ def question_errors(question: Question, context: dict[str, object], criteria: li
         errors.append("criterion_ids must equal required_question_contract.criterion_ids exactly, with ONE criterion")
     if not single_question(question.text):
         errors.append("Ask exactly ONE response task; remove independent subquestions or numbered requests")
+    if context.get("interaction_mode") == "VOICE" and len(question.text.split()) > VOICE_MAX_WORDS:
+        errors.append(
+            f"VOICE question must use at most {VOICE_MAX_WORDS} whitespace-separated words including scenario; "
+            "rewrite concisely with ONE focused response task, preserving essential problem data, "
+            "target criterion, evidence_scope and required depth. Do not truncate the question."
+        )
     return errors

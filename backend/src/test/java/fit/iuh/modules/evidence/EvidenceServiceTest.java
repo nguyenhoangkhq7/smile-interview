@@ -27,6 +27,20 @@ class EvidenceServiceTest {
         when(sessions.findById("s")).thenReturn(Optional.of(Session.builder().id("s").userId(owner.getId()).build()));
     }
 
+    @Test void voiceVocabularyUsesFrozenSkillNamesWithoutSendingCvOrExpectedAnswers() {
+        session();
+        InterviewRun run = new InterviewRun();
+        run.setSnapshotJson("""
+            {"skills":[{"jd_skill_id":"spring_boot"},{"jd_skill_id":"PostgreSQL"},{"jd_skill_id":"spring_boot"}],
+             "secret_expected_answer":"must never be a transcription hint"}
+            """);
+        when(runs.findById("s")).thenReturn(Optional.of(run));
+        assertThat(service.voiceTerms("s", owner)).containsExactly("spring boot", "PostgreSQL");
+        assertThatThrownBy(() -> service.voiceTerms("s", User.builder().id(UUID.randomUUID()).build()))
+                .isInstanceOf(ResponseStatusException.class);
+        verifyNoInteractions(ai, inputs);
+    }
+
     @Test void ownerIsCheckedBeforeReturningAReplay() {
         session();
         var answer = new EvidenceDtos.Answer(UUID.randomUUID(), "turn", 1, "answer");

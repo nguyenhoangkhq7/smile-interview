@@ -3,7 +3,8 @@ package fit.iuh.modules.skillgap;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import fit.iuh.config.AppProperties;
-import fit.iuh.modules.adaptive.client.AdaptiveInterviewClient;
+import fit.iuh.modules.evidence.EvidenceAiClient;
+import fit.iuh.modules.evidence.EvidenceJson;
 import fit.iuh.modules.skillgap.client.SkillGapClient;
 import org.junit.jupiter.api.Test;
 import java.net.InetSocketAddress;
@@ -37,9 +38,9 @@ class SkillGapHttpContractTest {
             exchange.sendResponseHeaders(200, body.length);
             exchange.getResponseBody().write(body); exchange.close();
         });
-        server.createContext("/api/v1/interview/start", exchange -> {
+        server.createContext("/api/v2/interview/start", exchange -> {
             interviewRequest.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-            byte[] body = "{\"session_id\":\"ai-test\",\"turn\":1,\"is_finished\":false}".getBytes(StandardCharsets.UTF_8);
+            byte[] body = "{\"snapshot\":{},\"public\":{}}".getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "application/json");
             exchange.sendResponseHeaders(200, body.length);
             exchange.getResponseBody().write(body); exchange.close();
@@ -54,7 +55,8 @@ class SkillGapHttpContractTest {
             assertThat(roundtrip.path("skills").get(0).path("job_tasks"))
                     .isEqualTo(original.path("skills").get(0).path("job_tasks"));
             assertThat(mapper.readTree(analysisRequest.get()).path("analysis_id").asText()).isEqualTo("test");
-            new AdaptiveInterviewClient(properties).startInterview(result.skills());
+            new EvidenceAiClient(properties, new EvidenceJson(mapper))
+                    .compute("start", java.util.Map.of("session_id", "test", "skills", result.skills()));
             assertThat(mapper.readTree(interviewRequest.get()).path("skills").get(0).path("job_tasks"))
                     .isEqualTo(original.path("skills").get(0).path("job_tasks"));
             // Spring Boot 4's MVC and RestClient use Jackson 3 by default.

@@ -121,6 +121,8 @@ class Blueprint(BaseModel):
 class Observation(BaseModel):
     criterion_id: str
     response_excerpt: str = ""
+    response_line_range: tuple[int, int] | None = Field(
+        default=None, description="Optional inclusive 1-based range in answer_lines; server copies the original lines as evidence")
     observation: Literal["SUPPORTS", "CONTRADICTS", "UNCLEAR", "NO_EVIDENCE"]
     performance: Literal["BELOW", "AT_TARGET", "ABOVE", "UNDETERMINED"]
     rationale: str = Field(min_length=3)
@@ -145,8 +147,6 @@ class Judgment(BaseModel):
     explicit_inability: bool = False
     inability_excerpt: str = ""
     feedback_contains_hint: bool = False
-    raw_belief: list[float] = Field(min_length=3, max_length=3)
-    tag: Literal["INVARIANT", "MINOR_SHIFT", "MODERATE_SHIFT", "DECISIVE_SHIFT"]
 
 
 class Question(BaseModel):
@@ -191,7 +191,6 @@ class ObjectiveState(BaseModel):
     criterion_progress: dict[str, CriterionProgress] = Field(default_factory=dict)
     active_criterion_id: str | None = None
     probe_reason: str = "Initial evidence for an essential criterion"
-    belief: list[float] = Field(default_factory=list)
 
 
 class Turn(BaseModel):

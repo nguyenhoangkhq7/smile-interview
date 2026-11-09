@@ -23,7 +23,7 @@ flowchart LR
 - `skill_gap`: bổ sung `job_tasks`, trích dẫn JD, lý do mức yêu cầu, trọng số quan trọng, độ bao phủ bằng chứng CV, cờ recency/degraded. Giữ công thức gap và priority hiện có. Thứ tự suy luận mức yêu cầu: nhiệm vụ/độ sâu rõ ràng → kinh nghiệm riêng của kỹ năng → seniority fallback. Optional không đồng nghĩa mức thấp.
 - `evidence/provider.py`: interface LLM cho blueprint, question, judge. Không tải compiled artifact C3 cũ. Câu hỏi, rubric và kết luận của LLM đều phải qua kiểm tra trước khi lưu.
 - `planning.py`: mỗi nhiệm vụ có mục tiêu riêng; ID ổn định theo skill/task. Blueprint phủ đúng yêu cầu đầu vào. Nhóm core được ưu tiên trước; trong nhóm core dùng gap priority rồi importance. MATCH core vẫn được xác minh. Ưu tiên một lượt trên các kỹ năng, giữ phần ngân sách cho follow-up và có thể đưa mục tiêu chưa hỏi trở lại khi còn ngân sách.
-- `assessment.py`: kiểm tra trích dẫn nguyên văn, criterion IDs và tính hợp lệ của judgment; tổng hợp bằng chứng; quyết định clarification/follow-up/easier/deeper/contradiction verification. Belief chỉ là tín hiệu phụ, không quyết định đủ bằng chứng.
+- `assessment.py`: kiểm tra trích dẫn nguyên văn, criterion IDs và tính hợp lệ của judgment; tổng hợp bằng chứng; quyết định clarification/follow-up/easier/deeper/contradiction verification. Kết luận dựa trên bằng chứng và độ sâu theo Criteria.
 - `workflow.py`: chuyển trạng thái trên bản sao sâu. Lỗi judge/generator không làm thay đổi snapshot đã lưu. Giới hạn thời gian, tổng số câu và số câu/mục tiêu; dành cơ hội ban đầu cho các mục tiêu còn lại.
 - `reporting.py`: projection thuần từ snapshot. Kết luận theo mục tiêu, nhóm theo kỹ năng trên UI; mỗi bằng chứng có `turn_id` và trích dẫn câu trả lời.
 
@@ -59,6 +59,10 @@ Hết retry là `QuestionUnavailableError` → HTTP 503 với thông báo tiến
 `criterion_progress` lưu riêng số lượt, clarification/easier/extension, các phần chưa xác minh, số lượt không tiến triển, những case đã quan sát và lý do dừng. Cờ tổng ở objective được giữ cho tương thích/telemetry, không còn tiêu hao cơ hội hỏi làm rõ hoặc chẩn đoán của tiêu chí khác. Snapshot cũ thiếu counters được khôi phục từ các lượt đã lưu khi tiếp tục trả lời.
 
 Sau mỗi câu trả lời: ưu tiên giải quyết mâu thuẫn, quay về target sau chẩn đoán thành công, chuyển tiêu chí khi đã đủ bằng chứng, hoặc hỏi tiếp đúng phần chưa rõ. Judge trả `unresolved_aspects` cho bằng chứng chưa đầy đủ; không được vừa đánh dấu đạt anchor vừa khai báo phần bắt buộc còn thiếu. Một follow-up không mặc định tăng độ khó. Extension chỉ bật bằng policy, với anchor cao hơn đã khóa; từng tiêu chí được hỏi riêng.
+
+Trích dẫn bằng chứng phải là một đoạn liên tục trong câu trả lời hiện tại. Validator cho phép đối chiếu khác biệt khoảng trắng và Unicode NFC/NFD, rồi lưu lại đúng đoạn nguyên văn từ bản gốc. Không bỏ dấu, đổi hoa/thường, sửa từ, thêm dấu câu hoặc nối các đoạn rời. Kết quả sai được gửi lại cho Judge cùng lỗi cụ thể để sửa trong giới hạn retry; nếu vẫn không có trích dẫn hợp lệ thì trả 503, giữ nguyên trạng thái và không gán điểm cho ứng viên.
+
+Với mã nguồn hoặc câu trả lời nhiều dòng, Judge nhận `answer_lines` có số dòng từ 1 và có thể chọn `response_line_range=[start,end]` liên tục, bao gồm cả hai đầu. Server lấy nguyên văn các dòng từ câu trả lời gốc, giữ cả xuống dòng và ký tự HTML/JavaScript, thay vì để AI viết lại code trong trích dẫn. Khoảng dòng ngoài giới hạn hoặc chỉ chứa khoảng trắng bị từ chối; cách trích dẫn bằng chuỗi nguyên văn vẫn tương thích với dữ liệu cũ. Nhận xét quá 300 ký tự được thay bằng lời xác nhận trung tính sẵn có; lỗi trình bày này không hủy bằng chứng hợp lệ hoặc yêu cầu chấm lại. Kiểm thử hồi quy bao gồm To-Do List, trích dẫn nối đoạn sai, khôi phục theo dòng và giữ nguyên snapshot khi bằng chứng không hợp lệ.
 
 Các mặc định là heuristic vận hành, chưa được hiệu chuẩn trên người dùng:
 
@@ -102,6 +106,8 @@ Public backend: `/api/v2/sessions/{sessionId}/interview`.
 
 Backend kiểm tra chủ sở hữu trước khi trả state hoặc receipt. Frontend gửi qua service `evidenceInterview` và axiosClient theo cấu hình kết nối backend hiện tại; component không gọi HTTP trực tiếp.
 
+Khi trang phỏng vấn đang mở, bộ đếm kiểm tra `deadline_at` mỗi giây và khi tab nhận focus/đổi trạng thái hiển thị. Hết hạn tự gọi `/stop`, kể cả sau lỗi chấm AI; không tự nộp bản nháp. Nếu đang gửi câu trả lời, chờ yêu cầu đó hoàn tất rồi kiểm tra lại hạn. Lỗi kết thúc tạm thời được thử lại cách nhau ít nhất 5 giây với cùng request ID; HTTP 409 tải lại state trước khi thử với version mới. Trang kết quả chỉ đọc không gửi lệnh kết thúc. Đây là bộ đếm phía trình duyệt; khi đóng trang hoàn toàn, backend kiểm tra hạn ở yêu cầu tiếp theo. `web-app/scripts/interview-expiry-smoke.mjs` kiểm thử 7 tình huống bằng API fixtures: idle, lỗi chấm, lỗi stop, xung đột version, yêu cầu đang chạy, voice và chỉ đọc.
+
 Migration `V2__evidence_interviews.sql` thêm:
 
 - `interview_runs`: một snapshot có version, config và public projection cho mỗi session.
@@ -117,13 +123,21 @@ Trong lúc hệ thống còn dùng Jackson 2 để lưu JSON và Spring Boot 4/J
 ## Tương thích và triển khai
 
 - Flyway tự áp dụng V2 khi backend khởi động; không sửa V1, không chạy migration vào DB đang dùng trong các script kiểm thử.
-- Phiên C3 cũ tiếp tục qua endpoint/UI cũ. Phiên đã có transcript hoặc AI session ID cũ không được đổi engine; clone để dùng V2.
+- Engine C3 cũ đã được gỡ. Endpoint thực thi cũ trả HTTP 410, UI chỉ cho xem lại lịch sử/kết quả đã lưu. Phiên đã có transcript hoặc AI session ID cũ không được đổi engine tại chỗ; clone hoặc tạo lượt mới để dùng V2.
 - Phiên V2 đã bắt đầu khóa config/blueprint. Các API ghi transcript/trạng thái cũ bị chặn đối với V2. Feedback người dùng/HR vẫn dùng cơ chế hiện có.
 - Cache C2 cũ thiếu contract nhiệm vụ được phân tích lại trước khi bắt đầu V2 từ CV/JD gốc. Không phân tích lại trong mỗi lượt trả lời. Snapshot giữ dữ liệu C2 và rubric cho phiên đang chạy.
-- Chuyển UI về engine cũ chỉ áp dụng cho phiên mới; không hạ cấp snapshot V2 hoặc xóa bảng để rollback. Snapshot có `schema_version=2`, `engine_version` và `rubric_version=evidence-2.0`.
+- Snapshot giữ `schema_version=2`, `engine_version` và `rubric_version=evidence-2.0`. Các field cũ `belief`, `raw_belief`, `tag` được bỏ qua khi đọc và không được ghi lại trong snapshot mới. Không cần migration phá hủy dữ liệu hoặc tính lại báo cáo cũ.
 - Để chạy LLM thật cần `OPENROUTER_API_KEY` và `OPENROUTER_MODEL` trên AI service. Câu coding hiện được đánh giá theo code/lập luận người dùng nhập; chưa có sandbox thực thi code.
 
 ## Kiểm chứng và giới hạn nghiên cứu
+
+Ngày 09/11/2026: loại bỏ phân phối niềm tin khỏi luồng V2, gồm schema Judge, prompt, khởi tạo từ CV, cập nhật simplex, metamorphic tag và phép tính TV. Gỡ engine và UI thực thi cũ sử dụng cơ chế đó. Dataset/bộ tối ưu DSPy được khôi phục sau khi gỡ quá rộng: giữ đủ 20 mẫu hỏi, 20 câu trả lời gốc và split train/dev 14/6; chuyển nhãn sang Criteria/bằng chứng, cập nhật metric, compile và regenerate artifacts theo schema V2. Source questions/answers và provenance nằm trong `optimization/examples.json`, không đưa metadata nguồn vào output demos. Provider chỉ load artifacts khi truyền `compiled_dir` rõ ràng, có kiểm tra manifest và fingerprint schema; không tự kích hoạt demos mới cho phiên đang chạy. Xem [hướng dẫn DSPy](../ai-service/adaptive_questioning/optimization/README.md). Module skill gap không tính phân phối này; giữ nguyên điểm CV/JD, confidence trích xuất, độ thiếu hụt và priority tất định. Các bài kiểm thử toán học/engine cũ được gỡ theo phần thực thi đã loại bỏ; bổ sung kiểm thử hợp đồng không có xác suất, đọc snapshot cũ và ngăn gọi engine đã ngừng hỗ trợ. Báo cáo audit ngày 07/11 là tài liệu lịch sử, không mô tả contract hiện tại.
+
+Kiểm chứng đợt loại bỏ: 238 kiểm thử Python (skill gap, phỏng vấn, voice), 64 kiểm thử backend trên PostgreSQL tạm, TypeScript, ESLint các file thay đổi và production build Docker của cả ba dịch vụ đều đạt. Browser smoke xác nhận luồng TEXT qua 15 lượt/reload/mobile và phiên cũ chỉ xem lại, không gửi yêu cầu thực thi. Đã cập nhật dịch vụ cục bộ và xác nhận schema AI đang chạy không còn các field đã loại bỏ. Không gọi LLM thật trong đợt kiểm chứng này.
+
+Kiểm chứng sau khi khôi phục DSPy: 273 kiểm thử Python đạt, gồm 28 kiểm thử optimization. Có kiểm tra digest của toàn bộ câu hỏi/câu trả lời gốc, split train/dev, validator runtime, metric, compile/save/load, gọi provider V2 bằng DummyLM và artifact tương đương LF/CRLF. Đã tái sinh artifact theo contract mới nhất (bao gồm response_line_range), cập nhật riêng AI service và kiểm tra load artifact/health thành công. Bootstrap với LLM thật chưa được chạy; demos vẫn là tùy chọn rõ ràng qua compiled_dir.
+
+Generator hỏi ngắn, tập trung đúng một nhiệm vụ của tiêu chí đang đánh giá. Phần lời dẫn TEXT thường 1–3 câu, tối đa khoảng 80 từ; code, bảng và log cần thiết được đặt riêng, không cắt dữ kiện để rút ngắn đề. VOICE hướng tới 30–55 đơn vị tách bằng khoảng trắng (tính cả bối cảnh), tối đa 90; vượt giới hạn sẽ được yêu cầu sinh lại qua cơ chế retry hiện có, không cắt chuỗi. Đây là cách đếm kỹ thuật, không phải bộ tách từ tiếng Việt. Câu hỏi giữ nguyên độ sâu và dữ kiện cần thiết, không đọc rubric hoặc gộp nhiều yêu cầu vào một câu. Lượt hỏi tiếp tập trung vào khía cạnh chưa có bằng chứng; khi sắp hết lượt, ưu tiên một nhiệm vụ có giá trị phân biệt cao, không dồn các câu hỏi còn lại. Cơ chế đánh giá bằng chứng và ngân sách lượt giữ nguyên.
 
 Chạy từ `ai-service`: `python -m pytest tests_skill_gap tests_adaptive_questioning -q`.
 

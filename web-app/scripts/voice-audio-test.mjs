@@ -57,4 +57,10 @@ for (let i = 0; i < 12; i++) captionEnd = captions.feed(frame(0), 16000, 0.015, 
 assert.equal(captionEnd.ended, true);
 assert.equal(captionEnd.frames, null, 'Do not send a silence-only tail to ASR or invent a caption');
 
+detector.reset();
+for (let i = 0; i < 8; i++) detector.feed(frame(0.1), 16000, 0.015, 1200);
+assert.equal(detector.flush().reduce((sum, item) => sum + item.length, 0), 8 * 1600,
+  'Pausing keeps every unfinished speech frame');
+assert.equal(detector.flush(), null, 'Flushing twice cannot transcribe the same speech twice');
+
 console.log('PASS: WAV resampling, sustained speech, silence and continuous caption segments.');

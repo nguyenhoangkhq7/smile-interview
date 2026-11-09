@@ -5,7 +5,10 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from adaptive_questioning.evidence.question_validation import single_question
+from adaptive_questioning.evidence.question_validation import (
+    VOICE_MAX_WORDS, question_errors, single_question,
+)
+from adaptive_questioning.evidence.models import Question
 from adaptive_questioning.evidence.routes import router
 from test_evidence_workflow import setup, start, answer
 
@@ -26,6 +29,58 @@ def test_data_question_marks_and_conditional_constraints_are_not_extra_tasks(tex
 ])
 def test_independent_response_tasks_are_still_rejected(text):
     assert not single_question(text)
+
+
+@pytest.mark.parametrize("word_count, rejected", [(VOICE_MAX_WORDS, False), (VOICE_MAX_WORDS + 1, True)])
+def test_voice_length_boundary(word_count, rejected):
+    question = Question(text=" ".join(["API"] * (word_count - 1) + ["chậm?"]),
+                        criterion_ids=["c1"], mode="DEBUGGING", depth=3, evidence_scope="slow-api")
+    context = {"mode": "DEBUGGING", "question_depth": 3, "interaction_mode": "VOICE"}
+    errors = question_errors(question, context, ["c1"])
+    assert bool(errors) == rejected
+    if rejected:
+        assert "Do not truncate" in errors[0]
+
+
+def test_long_voice_question_is_rewritten_with_same_target_and_depth(setup, monkeypatch):
+    provider, engine, _ = setup
+    original = provider.question
+    calls = []
+    concise = "API phản hồi chậm nhưng CPU vẫn bình thường. Bạn sẽ kiểm tra gì đầu tiên?"
+
+    def question(context):
+        calls.append(json.loads(context))
+        result = original(context)
+        result.evidence_scope = "slow-api"
+        result.text = ("Bối cảnh hệ thống đang phục vụ nhiều người dùng. " * 12 + concise
+                       if len(calls) == 1 else concise)
+        return result
+
+    monkeypatch.setattr(provider, "question", question)
+    result = start(engine, interaction_mode="VOICE")
+    pending = result.snapshot.pending_turn.question
+    assert len(calls) == 2
+    assert "VOICE question must use at most" in calls[1]["validation_error"]
+    assert calls[0]["required_question_contract"] == calls[1]["required_question_contract"]
+    assert pending.text == concise
+    assert pending.depth == calls[0]["question_depth"]
+    assert pending.criterion_ids == calls[0]["target_criteria"]
+    assert pending.evidence_scope == "slow-api"
+
+
+def test_text_problem_data_is_not_subject_to_voice_limit(setup, monkeypatch):
+    provider, engine, _ = setup
+    original = provider.question
+    text = "Log hệ thống:\n```\n" + "request duration=5000ms\n" * 100 + "```\nBạn chẩn đoán nguyên nhân nào?"
+
+    def question(context):
+        result = original(context)
+        result.text = text
+        return result
+
+    monkeypatch.setattr(provider, "question", question)
+    result = start(engine, interaction_mode="TEXT")
+    assert result.snapshot.pending_turn.question.text == text
 
 
 def test_retry_identifies_the_exact_invalid_field_and_keeps_the_contract(setup, monkeypatch, caplog):

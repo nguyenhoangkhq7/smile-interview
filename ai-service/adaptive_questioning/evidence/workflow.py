@@ -4,7 +4,6 @@ from uuid import uuid4
 from collections import Counter
 import logging
 from pydantic import ValidationError
-from adaptive_questioning.core.math_utils import temperature_softmax_prior
 
 from .assessment import TERMINAL, apply_judgment, eligible_criteria, next_action, validate_judgment
 from .errors import JudgmentUnavailableError, QuestionUnavailableError
@@ -67,6 +66,8 @@ class EvidenceWorkflow:
         context = {
             "interaction_mode": snapshot.config.interaction_mode,
             "objective": objective, "turn": turn,
+            "answer_lines": [{"line": index, "text": text} for index, text in
+                             enumerate((turn.answer or "").splitlines(), start=1)],
             "required_criterion_ids": ids, "target_criteria": targets,
             "depth_definitions": DEPTH_DEFINITIONS,
             "prior_observations": [item for item in state.evidence_history if item.criterion_id in ids],
@@ -76,6 +77,7 @@ class EvidenceWorkflow:
         for attempt in range(snapshot.policy.judgment_attempts):
             if attempt and self.clock() >= snapshot.deadline_at:
                 break
+            judgment = None
             try:
                 judgment = self.provider.judge(encode_context(context))
                 validate_judgment(judgment, turn)
@@ -84,6 +86,8 @@ class EvidenceWorkflow:
                 last_error = exc
                 feedback = str(exc.errors(include_input=False, include_url=False)) if isinstance(exc, ValidationError) else str(exc)
                 context["validation_error"] = feedback
+                if judgment is not None:
+                    context["previous_invalid_judgment"] = judgment.model_dump(mode="json")
                 logger.warning("Invalid judge output for turn %s (attempt %s/%s): %s",
                                turn.turn_id, attempt + 1, snapshot.policy.judgment_attempts, feedback)
         raise JudgmentUnavailableError(
@@ -263,8 +267,6 @@ class EvidenceWorkflow:
                     continue
                 state.selected_mode, state.mode_selection_reason = mode, reason
                 state.excluded_reason, state.lifecycle = None, "PLANNED"
-                skill = next(s for s in snapshot.skills if s.jd_skill_id == state.objective.skill_id)
-                state.belief = temperature_softmax_prior(skill.candidate_proficiency)
                 snapshot.queue.append(state.objective.objective_id)
                 break
 

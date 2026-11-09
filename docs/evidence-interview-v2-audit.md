@@ -2,6 +2,8 @@
 
 Ngày kiểm chứng: 07/11/2026. Phạm vi: tổ chức phỏng vấn và đánh giá bằng chứng trong V2. Giữ nguyên contract Module 1 `w_j`/`soft_match` và công thức nghiên cứu C2.
 
+Lưu ý lịch sử: ngày 09/11/2026 đã gỡ belief/raw_belief/tag và engine C3 cũ. Những mô tả belief trong audit này ghi nhận phiên bản trước; xem [contract hiện tại](evidence-interview-v2.md).
+
 ## 1. Kết quả audit trước khi sửa
 
 Các số dòng **trước sửa** dưới đây ghi nhận từ source lúc bắt đầu audit; phần 3 dẫn đến vị trí implementation hiện tại. Không coi tất cả yêu cầu trong đề bài là tính năng chưa có.
