@@ -89,7 +89,7 @@ def test_hint_is_not_repeated_in_the_introduction_or_public_feedback(setup, monk
     assert "secret_solution" not in result.public.model_dump_json()
 
 
-def test_overlong_feedback_is_retried_without_an_extra_interview_turn(setup, monkeypatch):
+def test_overlong_feedback_uses_acknowledgment_without_regrading(setup, monkeypatch):
     provider, engine, _ = setup
     provider.criterion_count = 2
     original = provider.judge
@@ -103,10 +103,11 @@ def test_overlong_feedback_is_retried_without_an_extra_interview_turn(setup, mon
 
     monkeypatch.setattr(provider, "judge", judge)
     result = answer(engine, start(engine).snapshot)
-    assert len(calls) == 2
-    assert "300 characters" in calls[1]["validation_error"]
+    assert len(calls) == 1
     assert len(result.snapshot.turns) == 1
-    assert result.public.pending_turn.introduction.startswith(FEEDBACK)
+    assert result.snapshot.turns[0].judgment.feedback == ACKNOWLEDGMENT
+    assert result.snapshot.turns[0].judgment.observations[0].performance == "AT_TARGET"
+    assert result.public.pending_turn.introduction.startswith(ACKNOWLEDGMENT)
 
 
 def test_legacy_snapshots_default_introductions_and_accept_old_feedback(setup):

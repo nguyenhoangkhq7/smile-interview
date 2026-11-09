@@ -27,6 +27,17 @@ public class EvidenceService {
         return json.read(run(sessionId).getPublicJson());
     }
 
+    public java.util.List<String> voiceTerms(String sessionId, User user) {
+        owned(sessionId, user);
+        var snapshot = json.read(run(sessionId).getSnapshotJson());
+        var terms = new java.util.LinkedHashSet<String>();
+        for (var skill : snapshot.path("skills")) {
+            var name = skill.path("jd_skill_id").asText("").replace('_', ' ').strip();
+            if (!name.isEmpty() && name.length() <= 100) terms.add(name);
+        }
+        return terms.stream().limit(60).toList();
+    }
+
     public JsonNode start(String sessionId, User user, EvidenceDtos.Config config) {
         Session session = owned(sessionId, user);
         JsonNode configNode = json.tree(config);

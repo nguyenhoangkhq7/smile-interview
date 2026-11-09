@@ -64,7 +64,7 @@ class ScriptedProvider:
                                       observation=self.observation, performance=self.performance,
                                       rationale="Grounded finding", resolves_contradiction=self.resolve)
                           for key in values["turn"]["question"]["criterion_ids"]],
-            feedback="Assessment feedback", raw_belief=[0, 0, 1], tag="DECISIVE_SHIFT",
+            feedback="Assessment feedback",
             explicit_inability=self.inability, inability_excerpt=answer if self.inability else "",
         )
 
@@ -176,7 +176,7 @@ def test_turn_cap_is_not_verification(setup):
     assert report.target_attainment is None
 
 
-def test_high_belief_does_not_replace_coverage(setup):
+def test_passing_one_criterion_does_not_replace_full_coverage(setup):
     provider, engine, _ = setup
     provider.limit_criteria = True
     result = answer(engine, start(engine).snapshot)

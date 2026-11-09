@@ -2,6 +2,24 @@
 
 Luồng: micro → nhận diện giọng nói → bản nháp câu trả lời → API V2 hiện có → câu hỏi tiếp theo → TTS streaming → Simli video/audio realtime.
 
+## Nhận diện ưu tiên độ chính xác
+
+STT chỉ dùng **một model: `openai/gpt-transcribe` qua OpenRouter**. Mỗi request preview hoặc final gọi provider đúng một lần, không gọi model thứ hai để đối chiếu, không bắt chọn giữa hai bản chữ. Biến cũ `OPENROUTER_STT_VERIFIER_MODEL` không còn được đọc. Không dùng LLM viết lại nội dung hay sửa kiến thức của ứng viên. Model được giữ vì đã nhận đúng câu tổng hợp Việt–Anh trên môi trường local; đây không phải benchmark giọng thật.
+
+- Capture dùng AudioContext 16 kHz và worklet 1.024 mẫu; trình duyệt thực hiện resampling. Echo cancellation/noise suppression vẫn bật. VAD hiện vẫn dựa trên năng lượng, chưa phải neural/semantic VAD.
+- Khi nói liên tục, đoạn khoảng 4 giây tạo **phụ đề tạm**. Chúng không ghi vào câu trả lời dùng để chấm điểm.
+- Audio gốc được giữ trong bộ nhớ, gom đến khi nghỉ hoặc đủ khoảng 24 giây. Bản chính thức nhận diện lại toàn bộ cửa sổ này, thay thế các phụ đề thuộc cửa sổ, không nối kết quả chính thức vào phụ đề cũ. Giới hạn WAV API vẫn là 45 giây. Cửa sổ dài liên tiếp không có overlap; tất cả frame lời nói có đúng một cửa sổ chính thức.
+- Backend lấy `jd_skill_id` từ snapshot kỹ năng của phiên (được tạo từ CV/JD) và câu hỏi đã lưu; AI service bổ sung một số tên công nghệ liên quan. Không gửi toàn bộ CV/JD, rubric hay đáp án mẫu làm gợi ý. Vocabulary giới hạn 80 mục. MAI dùng `provider.options.azure.phraseList.phrases`, `verbatim` và auto-detect ngôn ngữ để giữ câu Việt–Anh. GPT dùng provider options `languages`, `keywords`, `prompt`; live acceptance không chứng minh provider thực sự áp dụng mọi hint.
+- Bản final là kết quả trực tiếp của cùng model trên audio dài hơn, giữ nguyên từ ngữ của ứng viên. Không còn bước so sánh chữ, chuẩn hóa từ đệm để đối chiếu hay model verifier. Final thành công được dùng làm câu trả lời; không hiển thị hộp chọn bản đối chiếu.
+- Model lỗi/429 hoặc trả rỗng được coi là lỗi có thể thử lại. Giữ bản ghi để retry, không tự gọi model khác hoặc âm thầm mất lời. Không gắn nhãn kết quả là đã xác minh đúng; trường `verification` trả `not_requested`.
+- Preview chưa chạy được bỏ khi cửa sổ chính thức đã sẵn sàng. Queue giới hạn và tự tạm dừng khi quá tải, giữ bản ghi. Tạm dừng, mở hộp thoại và nghe lại câu hỏi flush phần audio còn lại thay vì bỏ mất. Kết quả đến muộn sau đổi turn/rời trang bị bỏ. HTTP client STT tái sử dụng kết nối và đóng khi service shutdown.
+
+Một model vẫn có thể nhận audio ở cả preview và final để có phụ đề sớm và bản chốt đủ ngữ cảnh. Đây không phải mỗi đoạn audio chỉ gửi đúng một lần; đã bỏ chi phí/độ trễ của model đối chiếu. Đây vẫn là STT theo đoạn qua OpenRouter, không phải streaming từng từ.
+
+Kiểm thử: `node scripts/voice-recognition-test.mjs`, `node scripts/voice-audio-test.mjs`, browser smoke cho thay thế preview/giữ audio, Python `tests_voice` (xác nhận đúng một provider call kể cả khi còn biến verifier cũ), backend `EvidenceVoiceTest`/`EvidenceServiceTest`. UI vẫn hiểu contract cũ để không cần cập nhật đồng thời các client; service hiện luôn trả `review_required=false`.
+
+Live check có tính phí: `python -B scripts/verify-voice-openrouter.py --audio-file path/to/mono-16khz.wav`. Không truyền audio riêng tư vào bộ test tự động. Có thể dùng `--save-audio .pytest_cache/voice-test.wav` khi tổng hợp để thử lại STT mà không gọi TTS lần nữa. Mock/synthetic tests không đánh giá được độ chính xác trên giọng thật; cần bộ câu Việt–Anh do người dùng đọc để so sánh model.
+
 ## Hai trải nghiệm riêng
 
 Trước khi bắt đầu, người dùng chọn **Bằng văn bản** hoặc **Bằng giọng nói**. `config.interaction_mode` (`TEXT` / `VOICE`) được lưu trong config/snapshot/public state và khóa khi phiên đã bắt đầu. Phiên V2 cũ không có trường này mặc định là `TEXT`; không cần migration DB vì cấu hình đang được lưu dạng JSON.
@@ -25,7 +43,7 @@ Giữ `OPENROUTER_API_KEY` ở `.env` gốc hoặc `ai-service/.env`. Không dù
 ```dotenv
 OPENROUTER_MODEL=qwen/qwen3.7-flash
 INTERVIEW_VOICE_ENABLED=true
-OPENROUTER_STT_MODEL=qwen/qwen3-asr-1.7b
+OPENROUTER_STT_MODEL=openai/gpt-transcribe
 OPENROUTER_TTS_MODEL=heygen/heygen-voice-1-turbo:free
 OPENROUTER_TTS_VOICE=nadine
 OPENROUTER_TTS_FORMAT=pcm
@@ -68,7 +86,7 @@ Simli nhận audio TTS đã chuyển sang PCM16 mono 16 kHz và trả video/âm 
 Public, yêu cầu JWT của chủ phiên:
 
 - `GET /api/v2/sessions/{id}/interview/voice/config`
-- `POST .../voice/transcribe`: `{turn_id, expected_state_version, audio}`; `audio` là base64 WAV.
+- `POST .../voice/transcribe`: `{turn_id, expected_state_version, audio, phase}`; `audio` là base64 WAV, `phase` là `preview` hoặc `final` (mặc định). Trả `{text, phase, verification: "not_requested", review_required: false}`; không trả `alternative_text`. Client không tự chọn model, vocabulary hay topic; backend lấy từ phiên đã xác thực. Mỗi request gọi đúng một model một lần. Timeout frontend 115 giây/backend 110 giây là trần bảo vệ cũ, không phải thời gian chờ cố định.
 - `POST .../voice/speech`: `{turn_id, expected_state_version}`; trả raw audio stream với `X-Audio-Format` và `X-Audio-Sample-Rate`.
 
 Internal, chỉ giữ trong mạng backend: `/api/v2/voice/config`, `/transcribe`, `/speech` trên AI service. Các endpoint voice không ghi trạng thái phỏng vấn. Bản nháp chỉ được đánh giá khi đi qua `/interview/respond` thông thường.

@@ -1,9 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import axios from 'axios';
 import { toast } from 'sonner';
 import { historyService, SessionHistoryItem } from '@/services/historyService';
 import { AnswerRequest, EvidenceSession, InterviewConfig, evidenceInterview, interviewError } from '@/services/evidenceInterview';
+
+const EXPIRY_RETRY_DELAY_MS = 5000;
 
 export function useEvidenceInterview(id: string, readOnly = false) {
   const [session, setSession] = useState<EvidenceSession | null>(null);
@@ -65,22 +68,43 @@ export function useEvidenceInterview(id: string, readOnly = false) {
     if (stopRequest.current?.version !== session.state_version) {
       stopRequest.current = { id: crypto.randomUUID(), version: session.state_version };
     }
-    const next = await evidenceInterview.stop(session, stopRequest.current.id);
+    let next: EvidenceSession;
+    try { next = await evidenceInterview.stop(session, stopRequest.current.id); }
+    catch (cause) {
+      if (!axios.isAxiosError(cause) || cause.response?.status !== 409) throw cause;
+      // Another tab or an answer may have committed first. Retry expiry with its version.
+      const current = await evidenceInterview.get(id);
+      if (!current) throw cause;
+      next = current;
+    }
     stopRequest.current = null;
     return next;
-  }), [session, run]);
+  }), [id, session, run]);
 
   useEffect(() => {
     if (!session || session.is_finished || readOnly) return;
+    let nextAttemptAt = 0;
     const tick = () => {
-      const remaining = Math.max(0, Math.ceil((Date.parse(session.deadline_at) - Date.now()) / 1000));
+      const now = Date.now();
+      const remaining = Math.max(0, Math.ceil((Date.parse(session.deadline_at) - now) / 1000));
       setSecondsLeft(remaining);
-      if (!remaining && !inFlight.current && !error) void stop();
+      // Earlier grading errors must never prevent expiry. Serialize with answer submission
+      // and retry transient stop failures using the same idempotent request ID.
+      if (!remaining && !inFlight.current && now >= nextAttemptAt) {
+        nextAttemptAt = now + EXPIRY_RETRY_DELAY_MS;
+        void stop();
+      }
     };
     tick();
     const interval = setInterval(tick, 1000);
-    return () => clearInterval(interval);
-  }, [session, stop, readOnly, error]);
+    window.addEventListener('focus', tick);
+    document.addEventListener('visibilitychange', tick);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', tick);
+      document.removeEventListener('visibilitychange', tick);
+    };
+  }, [session, stop, readOnly]);
 
   return { session, metadata, loading, legacy, busy, error, answer, setAnswer, secondsLeft, reload, start, submit, stop };
 }

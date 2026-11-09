@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -25,7 +26,10 @@ public class EvidenceVoiceController {
 
     public record Turn(@NotBlank String turn_id, long expected_state_version) {}
     public record Recording(@NotBlank String turn_id, long expected_state_version,
-                            @NotBlank @Size(max = 2_000_000) String audio) {}
+                            @NotBlank @Size(max = 2_000_000) String audio,
+                            @Pattern(regexp = "preview|final") String phase) {
+        public Recording(String turnId, long version, String audio) { this(turnId, version, audio, "final"); }
+    }
 
     @GetMapping(value = "/config", produces = "application/json")
     public String config(@PathVariable String sessionId, @AuthenticationPrincipal User user) {
@@ -36,8 +40,13 @@ public class EvidenceVoiceController {
     @PostMapping(value = "/transcribe", produces = "application/json")
     public String transcribe(@PathVariable String sessionId, @AuthenticationPrincipal User user,
                              @Valid @RequestBody Recording recording) {
-        active(sessionId, user, recording.turn_id(), recording.expected_state_version());
-        return voice.transcribe(Map.of("audio", recording.audio()));
+        var state = active(sessionId, user, recording.turn_id(), recording.expected_state_version());
+        // Vocabulary is resolved from persisted session data, never arbitrary client hints.
+        return voice.transcribe(Map.of("audio", recording.audio(),
+                "phase", recording.phase() == null ? "final" : recording.phase(),
+                "terms", interviews.voiceTerms(sessionId, user),
+                "topic", state.path("pending_turn").path("question").asText("").substring(0,
+                    Math.min(2000, state.path("pending_turn").path("question").asText("").length()))));
     }
 
     @PostMapping(value = "/avatar-session", produces = "application/json")

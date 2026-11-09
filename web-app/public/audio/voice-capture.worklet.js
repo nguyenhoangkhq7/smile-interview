@@ -2,7 +2,7 @@
 class VoiceCaptureProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
-    this.frames = new Float32Array(2048);
+    this.frames = new Float32Array(1024);
     this.offset = 0;
   }
   process(inputs) {
@@ -12,7 +12,7 @@ class VoiceCaptureProcessor extends AudioWorkletProcessor {
         this.frames[this.offset++] = input[i];
         if (this.offset === this.frames.length) {
           this.port.postMessage(this.frames, [this.frames.buffer]);
-          this.frames = new Float32Array(2048);
+          this.frames = new Float32Array(1024);
           this.offset = 0;
         }
       }

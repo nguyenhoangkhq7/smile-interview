@@ -6,7 +6,6 @@ import re
 import hashlib
 import json
 
-from adaptive_questioning.core.math_utils import temperature_softmax_prior
 from .models import Blueprint, GroundedRequirement, InterviewConfig, InterviewSkill, Mode, Objective, ObjectiveState
 from .depth import DEPTH_DEFINITIONS, ground_depth
 from .policy_config import InterviewPolicy
@@ -139,8 +138,6 @@ def _allocate(objectives, by_skill, config, policy):
             state.lifecycle, state.excluded_reason = "EXCLUDED", reason
         else:
             state.selected_mode = mode
-            skill = by_skill[obj.skill_id]
-            state.belief = temperature_softmax_prior(skill.candidate_proficiency)
             queue.append(obj.objective_id)
             mode_usage[mode] += 1
             remaining -= obj.estimated_seconds

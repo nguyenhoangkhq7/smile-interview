@@ -1,11 +1,9 @@
 """Grounded evidence ledger and deterministic sufficiency; CV priors never decide results."""
-from math import isfinite
-
-from adaptive_questioning.core.math_utils import simplex_convex_update
 from .models import Action, Assessment, Judgment, ObjectiveState, Observation, RecordedEvidence, Turn
 from .policy_config import InterviewPolicy
 from .criterion_progress import progress_for, record_progress
-from .conversation import MAX_FEEDBACK_LENGTH
+from .conversation import ACKNOWLEDGMENT, MAX_FEEDBACK_LENGTH
+from .excerpts import source_excerpt, source_lines
 
 VALID_PERFORMANCE = {"BELOW", "AT_TARGET", "ABOVE"}
 SUBSTANTIVE = {"SUPPORTS", "CONTRADICTS"}
@@ -14,10 +12,14 @@ TERMINAL = {Assessment.AT, Assessment.ABOVE, Assessment.BELOW, Assessment.NOT_DE
 
 def validate_judgment(judgment: Judgment, turn: Turn) -> None:
     if len(judgment.feedback.strip()) > MAX_FEEDBACK_LENGTH:
-        raise ValueError("Keep candidate feedback within 300 characters: one brief grounded sentence, no answer or hints")
-    if judgment.explicit_inability and (not judgment.inability_excerpt.strip()
-                                       or judgment.inability_excerpt not in (turn.answer or "")):
-        raise ValueError("Explicit inability requires a grounded excerpt")
+        # Presentation failure must not discard otherwise valid assessment evidence.
+        judgment.feedback = ACKNOWLEDGMENT
+    if judgment.explicit_inability:
+        grounded = source_excerpt(judgment.inability_excerpt, turn.answer or "")
+        if grounded is None:
+            raise ValueError("Explicit inability requires a grounded excerpt: copy ONE contiguous passage "
+                             "from turn.answer into inability_excerpt, without paraphrasing or added words")
+        judgment.inability_excerpt = grounded
     ids = [item.criterion_id for item in judgment.observations]
     if len(ids) != len(set(ids)) or set(ids) != set(turn.question.criterion_ids):
         expected = set(turn.question.criterion_ids)
@@ -25,14 +27,23 @@ def validate_judgment(judgment: Judgment, turn: Turn) -> None:
         raise ValueError("Judge must assess exactly the targeted criteria; "
                          f"missing={sorted(expected - set(ids))}, "
                          f"unexpected={sorted(set(ids) - expected)}, duplicates={duplicates}")
-    if any(not isfinite(value) or value < 0 for value in judgment.raw_belief) or sum(judgment.raw_belief) <= 0:
-        raise ValueError("Invalid belief distribution")
     for item in judgment.observations:
         if item.performance in {"AT_TARGET", "ABOVE"} and item.unresolved_aspects:
             raise ValueError("A passed criterion cannot have unresolved required aspects")
         substantive = item.observation in SUBSTANTIVE
-        if substantive and (not item.response_excerpt.strip() or item.response_excerpt not in (turn.answer or "")):
-            raise ValueError("Evidence excerpt not found in candidate answer")
+        if substantive:
+            grounded = (source_lines(item.response_line_range, turn.answer or "")
+                        if item.response_line_range is not None
+                        else source_excerpt(item.response_excerpt, turn.answer or ""))
+            if grounded is None:
+                raise ValueError(f"Evidence excerpt not found in candidate answer for criterion_id={item.criterion_id}. "
+                                 "Copy ONE contiguous passage from turn.answer into response_excerpt exactly; "
+                                 "do not paraphrase, correct spelling, add quotation marks or combine passages. "
+                                 "Put interpretation in rationale, not response_excerpt. Reassess the observation "
+                                 "if no passage supports it; never fabricate a quote to keep a score. "
+                                 "For code, set response_line_range=[start_line,end_line] using answer_lines "
+                                 "(inclusive, 1-based); the server copies those original lines verbatim.")
+            item.response_excerpt = grounded
         if substantive and item.performance not in VALID_PERFORMANCE:
             raise ValueError("Substantive evidence requires a performance level")
         if not substantive and item.performance != "UNDETERMINED":
@@ -58,8 +69,6 @@ def apply_judgment(state: ObjectiveState, turn: Turn, policy: InterviewPolicy | 
     state.assessment = assess(state, policy)
     if judgment.feedback_contains_hint:
         state.assisted_criteria = sorted(set(state.assisted_criteria) | set(turn.question.criterion_ids))
-    if any(item.observation in SUBSTANTIVE for item in judgment.observations):
-        state.belief = simplex_convex_update(state.belief, judgment.raw_belief, judgment.tag)
 
 
 def _record_observation(state: ObjectiveState, turn: Turn, observation: Observation) -> None:

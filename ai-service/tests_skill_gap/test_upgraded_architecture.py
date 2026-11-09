@@ -408,13 +408,14 @@ def test_fastapi_endpoints_and_module3_contract_interoperability():
     if project_root not in sys.path:
         sys.path.insert(0, project_root)
 
-    from adaptive_questioning.schemas.skill_gap_input import SkillGapInput
-    from adaptive_questioning.core.router import initialize_session_state
+    from adaptive_questioning.evidence.models import InterviewSkill
+    from adaptive_questioning.evidence.planning import requirements_for
 
-    m3_inputs = [SkillGapInput.model_validate(item) for item in data["skills"]]
-    session_state = initialize_session_state(skills_input=m3_inputs, session_id="m2_to_m3_test")
-    assert session_state.total_initial_d == data["skills_requiring_probing"]
-    assert session_state.active_skill_id is not None
+    m3_inputs = [InterviewSkill.model_validate(item) for item in data["skills"]]
+    requirements = requirements_for(m3_inputs)
+    assert {r["skill_id"] for r in requirements.values()} == {s.jd_skill_id for s in m3_inputs}
+    for skill in m3_inputs:
+        assert sum(r["skill_id"] == skill.jd_skill_id for r in requirements.values()) == max(1, len(skill.job_tasks))
 
 
 def test_three_llm_optimizations_fastpath_batch_and_schema():

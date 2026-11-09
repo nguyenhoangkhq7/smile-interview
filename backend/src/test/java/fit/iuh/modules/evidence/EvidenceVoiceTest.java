@@ -47,6 +47,29 @@ class EvidenceVoiceTest {
         verifyNoInteractions(voice);
     }
 
+    @Test void transcriptionUsesSavedVocabularyAndQuestionWithExplicitPhase() {
+        state();
+        when(interviews.voiceTerms("s", user)).thenReturn(java.util.List.of("Java", "PostgreSQL"));
+        controller.transcribe("s", user, new EvidenceVoiceController.Recording("t", 2, "audio", "preview"));
+        verify(voice).transcribe(Map.of("audio", "audio", "phase", "preview",
+                "terms", java.util.List.of("Java", "PostgreSQL"), "topic", "Câu hỏi đã lưu"));
+    }
+
+    @Test void missingPhaseDefaultsToFinalAndExpiredSessionsCannotTranscribe() {
+        state();
+        when(interviews.voiceTerms("s", user)).thenReturn(java.util.List.of());
+        controller.transcribe("s", user, new EvidenceVoiceController.Recording("t", 2, "audio", null));
+        verify(voice).transcribe(Map.of("audio", "audio", "phase", "final", "terms", java.util.List.of(), "topic", "Câu hỏi đã lưu"));
+        clearInvocations(voice);
+        when(interviews.read("s", user)).thenReturn(json.read("""
+            {"state_version":2,"config":{"interaction_mode":"VOICE"},"is_finished":false,
+             "deadline_at":"2000-01-01T00:00:00Z","pending_turn":{"turn_id":"t"}}
+            """));
+        assertThatThrownBy(() -> controller.transcribe("s", user, new EvidenceVoiceController.Recording("t", 2, "audio")))
+                .isInstanceOf(ResponseStatusException.class);
+        verifyNoInteractions(voice);
+    }
+
     @Test void textInterviewsCannotCallVoiceProviders() {
         when(interviews.read("s", user)).thenReturn(json.read("{\"config\":{\"interaction_mode\":\"TEXT\"}}"));
         assertThatThrownBy(() -> controller.config("s", user)).isInstanceOf(ResponseStatusException.class);

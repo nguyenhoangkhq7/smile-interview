@@ -20,10 +20,10 @@ ai-service/
 │   ├── pipeline/                       # SkillGapPipeline
 │   └── services/                       # GraphEngine, DependencyResolver
 │
-├── adaptive_questioning/               # [Module 3]: Bayesian Adaptive Interviewing (Phỏng vấn thích ứng)
-│   ├── api/routes.py                   # POST /interview/start, POST /interview/respond, GET /interview/report/{session_id}
-│   ├── core/engine.py                  # State machine & Bayesian Belief Update (Blow, Bmed, Bhigh)
-│   └── graph/state.py                  # AuditableHITLReport, ReflectiveInsight
+├── adaptive_questioning/               # [Module 3]: Phỏng vấn thích ứng theo bằng chứng
+│   ├── evidence/routes.py             # POST /api/v2/interview/start, /respond, /stop
+│   ├── evidence/assessment.py         # Kiểm tra trích dẫn, tổng hợp bằng chứng theo Criteria
+│   └── evidence/models.py             # Objective, Turn, Judgment, ObjectiveState, Snapshot
 │
 ├── app/
 │   ├── config.py                       # Cấu hình môi trường & Settings
@@ -42,9 +42,11 @@ ai-service/
 | :--- | :--- | :--- |
 | `POST` | `/api/v1/match` | Module 1: So khớp ngữ nghĩa kỹ năng CV và JD |
 | `POST` | `/api/v1/pipeline/analyze` | Module 2: Nhận CV + JD và trả về kết quả phân tích khoảng trống năng lực (Skill-Gap) |
-| `POST` | `/api/v1/interview/start` | Module 3: Khởi tạo buổi phỏng vấn thích ứng dựa trên output Skill-Gap |
-| `POST` | `/api/v1/interview/respond` | Module 3: Nhận câu trả lời của ứng viên, cập nhật Bayesian và trả về câu hỏi tiếp theo |
-| `GET` | `/api/v1/interview/report/{id}` | Module 3: Trả về Báo cáo Thẩm định Năng lực HITL hoàn chỉnh |
+| `POST` | `/api/v2/interview/start` | Module 3: Lập kế hoạch và tạo câu hỏi từ Skill-Gap và nhiệm vụ JD |
+| `POST` | `/api/v2/interview/respond` | Module 3: Đánh giá bằng chứng và tạo câu hỏi tiếp theo |
+| `POST` | `/api/v2/interview/stop` | Module 3: Kết thúc và trả báo cáo theo Criteria |
+
+Module 2 dùng điểm năng lực CV/JD và độ thiếu hụt tất định; không khởi tạo phân phối xác suất năng lực. Module 3 không yêu cầu hoặc cập nhật `raw_belief`, `belief`, `tag` hay TV. Engine phỏng vấn cũ đã được gỡ; API AI `/api/v1/interview/*` trả HTTP 410. Dataset và bộ tối ưu DSPy được khôi phục, chuyển sang schema bằng chứng V2; xem [hướng dẫn compile/load](adaptive_questioning/optimization/README.md). Backend vẫn phục vụ báo cáo cũ đã lưu, không gọi AI để tính lại. Snapshot V2 cũ được đọc bằng cách bỏ qua các field đã loại bỏ; lần chuyển trạng thái thành công tiếp theo lưu cấu trúc mới. Xem [tài liệu V2](../docs/evidence-interview-v2.md).
 
 ---
 
@@ -62,4 +64,4 @@ Dịch vụ sẽ lắng nghe tại `http://localhost:8000`. Swagger UI có tại
 ```bash
 pytest tests_skill_gap tests_adaptive_questioning -q
 ```
-*(Hiện tại 132/132 tests đều pass)*
+Kết quả kiểm thử thay đổi theo phiên bản; chạy lệnh trên để kiểm tra mã hiện tại.

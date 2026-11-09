@@ -1,4 +1,4 @@
-/** WAV input is independent of browser MediaRecorder codecs (Qwen ASR accepts WAV). */
+/** WAV mono 16 kHz input independent of browser MediaRecorder codecs. */
 export function encodeWav(frames: Float32Array[], sourceRate: number): string {
   const length = frames.reduce((sum, frame) => sum + frame.length, 0);
   const input = new Float32Array(length);
@@ -43,6 +43,13 @@ export class VoiceDetector {
   reset() {
     this.preRoll = []; this.frames = []; this.speechMs = 0;
     this.silenceMs = 0; this.durationMs = 0; this.active = false; this.segmentHasSpeech = false;
+  }
+
+  /** Preserve the unfinished speech on pause/dialog/replay instead of dropping it. */
+  flush() {
+    const frames = this.active && this.segmentHasSpeech ? this.frames : null;
+    this.reset();
+    return frames;
   }
 
   feed(frame: Float32Array, rate: number, threshold: number, silenceLimit: number) {

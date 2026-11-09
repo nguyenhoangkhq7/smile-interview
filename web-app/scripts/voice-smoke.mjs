@@ -69,7 +69,11 @@ try {
       const payload = JSON.parse(request.postData()); transcriptions.push(payload);
       assert.equal(Buffer.from(payload.audio, 'base64').toString('ascii', 0, 4), 'RIFF');
       if (failRecognition) { failRecognition = false; return send({ message: 'Nhận diện đang lỗi thử nghiệm.' }, 503); }
-      return send({ text: payload.turn_id === 't3'
+      assert.ok(['preview', 'final'].includes(payload.phase));
+      return send({ phase: payload.phase, review_required: payload.phase === 'final' && payload.turn_id === 't3',
+        verification: payload.phase === 'preview' ? 'not_requested' : payload.turn_id === 't3' ? 'disagreed' : 'agreed',
+        alternative_text: payload.turn_id === 't3' ? 'Em dùng reduce để cộng các phần tử và kiểm tra mảng rỗng.' : undefined,
+        text: payload.turn_id === 't3'
         ? 'Em duyệt từng phần tử, cộng vào tổng và kiểm tra mảng rỗng.'
         : 'Em dùng transaction để bảo đảm tính nhất quán.' });
     }
@@ -191,8 +195,26 @@ try {
       window.__capture.onmessage({ data: new Float32Array(2048) });
     }
   });
+  await page.waitForSelector('[aria-label="Xác nhận lời nói"]');
+  await new Promise(resolve => setTimeout(resolve, 1300));
+  assert.equal(answers.length, 2, 'Disagreement blocks automatic grading even after silence');
+  assert.equal(await page.$eval('button::-p-text(Tôi đã trả lời xong)', element => element.disabled), true);
+  assert.ok(await page.$('[aria-label="Nghe lại đoạn cần xác nhận"]'), 'The original audio can be replayed');
+  await page.screenshot({ path: '.next/voice-recognition-review.png', fullPage: true });
+  await page.setViewport({ width: 320, height: 740 });
+  assert.ok(await page.evaluate(() => {
+    const box = document.querySelector('[aria-label="Xác nhận lời nói"]').getBoundingClientRect();
+    return box.height <= innerHeight * 0.5 && document.documentElement.scrollWidth <= innerWidth;
+  }), 'Long review content remains scrollable and fits the mobile viewport');
+  await page.screenshot({ path: '.next/voice-recognition-review-mobile.png', fullPage: true });
+  await page.setViewport({ width: 1440, height: 900 });
+  const contextual = transcriptions.filter(item => item.turn_id === 't3' && item.phase === 'final').at(-1);
+  assert.ok(Buffer.from(contextual.audio, 'base64').readUInt32LE(40) / 32000 > 9,
+    'Final recognition receives the full contextual audio, not the last caption chunk');
+  await click('Dùng bản đối chiếu');
   await page.waitForFunction(() => document.body.textContent.includes('Đã trả lời 3/10'));
-  assert.ok(answers[2].candidate_response.includes(`${oral} ${oral}`));
+  assert.equal(answers[2].candidate_response, 'Em dùng reduce để cộng các phần tử và kiểm tra mảng rỗng.',
+    'Only the selected final result is graded; preview captions are replaced, not appended');
   assert.ok(!answers[2].candidate_response.includes('BÀI LÀM'));
   await page.waitForSelector('::-p-text(Người phỏng vấn đang nói)');
   await page.screenshot({ path: '.next/voice-smoke-active.png', fullPage: true });

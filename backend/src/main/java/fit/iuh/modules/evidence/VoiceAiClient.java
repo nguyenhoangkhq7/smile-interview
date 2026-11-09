@@ -35,7 +35,8 @@ public class VoiceAiClient {
     public String avatarSession(Object payload) { return request("avatar-session", payload); }
 
     private HttpRequest build(String operation, Object payload) {
-        var builder = HttpRequest.newBuilder(URI.create(baseUrl + operation)).timeout(Duration.ofSeconds(65));
+        var builder = HttpRequest.newBuilder(URI.create(baseUrl + operation))
+                .timeout(Duration.ofSeconds(operation.equals("transcribe") ? 110 : 65));
         return payload == null ? builder.GET().build() : builder.header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(json.tree(payload).toString(), StandardCharsets.UTF_8)).build();
     }

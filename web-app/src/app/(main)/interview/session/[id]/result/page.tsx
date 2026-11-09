@@ -4,7 +4,7 @@ import { MarkdownContent } from '@/components/common/MarkdownContent';
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { FolderOpen, AlertTriangle, MessageSquare, BarChart3, CheckCircle2, XCircle, Download, CornerDownRight, ShieldCheck, BrainCircuit } from 'lucide-react';
+import { FolderOpen, AlertTriangle, MessageSquare, BarChart3, CheckCircle2, Download, CornerDownRight, ShieldCheck, BrainCircuit } from 'lucide-react';
 import { historyService, SessionHistoryItem } from '@/services/historyService';
 import { cvJdMatchingService, HITLReportResponse } from '@/services/cvJdMatching';
 import { exportQuestionBankToCSV } from '@/lib/exportUtils';
@@ -240,14 +240,6 @@ function LegacyInterviewResultPage() {
                               </strong>
                               <div>{q.strengths || '—'}</div>
                             </div>
-                            {q.improvements && (
-                              <div className={`${styles.feedbackBox} ${styles.feedbackImprovement}`}>
-                                <strong style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-                                  <XCircle size={14} style={{ color: '#f59e0b' }} /> Thông số Bayesian
-                                </strong>
-                                <div style={{ fontFamily: 'monospace', fontSize: '0.78rem' }}>{q.improvements}</div>
-                              </div>
-                            )}
                           </div>
                         </div>
                         {q.suggestedAnswer && (

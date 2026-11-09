@@ -19,8 +19,8 @@ export function EvidenceVoiceInterview({ interview, suspended, onStop }: {
   const voice = useEvidenceVoice({ id: session?.session_id || '', session, busy, answer: interview.answer,
     setAnswer: interview.setAnswer, submit: interview.submit, suspended, videoRef, audioRef });
   const previousAnswer = session?.turns.at(-1)?.answer || '';
-  const caption = interview.answer || (!voice.listening && !voice.transcribing && !voice.retryAvailable ? previousAnswer : '');
-  const sent = !interview.answer && Boolean(caption);
+  const caption = voice.captions || interview.answer || (!voice.listening && !voice.transcribing && !voice.retryAvailable ? previousAnswer : '');
+  const sent = !voice.captions && !interview.answer && Boolean(caption);
   const captionBox = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const box = captionBox.current;
@@ -48,7 +48,7 @@ export function EvidenceVoiceInterview({ interview, suspended, onStop }: {
   }[state];
   const processing = ['connecting', 'thinking', 'transcribing', 'loading'].includes(state);
   const StatusIcon = processing ? LoaderCircle : state === 'paused' ? MicOff : state === 'retry' ? AlertCircle : state === 'speaking' ? Volume2 : Mic;
-  const cannotSubmit = busy || voice.transcribing || voice.listening || voice.retryAvailable;
+  const cannotSubmit = busy || voice.transcribing || voice.listening || voice.retryAvailable || Boolean(voice.review);
   const time = `${Math.floor(interview.secondsLeft / 60)}:${String(interview.secondsLeft % 60).padStart(2, '0')}`;
 
   return <section data-interview-mode="VOICE" aria-label="Không gian phỏng vấn giọng nói" className={styles.room}>
@@ -111,10 +111,22 @@ export function EvidenceVoiceInterview({ interview, suspended, onStop }: {
             </div>
             <div className={styles.transcriptFoot}>
               {voice.countdown ? <div role="status" className={styles.countdown}><span>Sắp gửi câu trả lời…</span><button onClick={voice.cancelAuto}>Chờ thêm</button></div>
-                : <p>{voice.transcribing ? <><LoaderCircle size={14} className={styles.spinner} />Đang nhận diện phần tiếp theo…</> : 'Phụ đề cập nhật theo từng đoạn nói.'}</p>}
+                : <p>{voice.transcribing ? <><LoaderCircle size={14} className={styles.spinner} />Đang nhận diện và kiểm tra lại lời nói…</> : voice.listening ? 'Phụ đề tạm; nội dung được kiểm tra lại khi bạn ngừng nói.' : voice.review ? 'Cần xác nhận đoạn chưa rõ trước khi gửi.' : 'Chỉ bản nhận diện đã chốt được dùng để đánh giá.'}</p>}
               {(turn.mode === 'CODING' || turn.mode === 'DEBUGGING') && <p className={styles.codingHint}>Câu này chỉ cần giải thích cách làm bằng lời.</p>}
             </div>
           </>}
+          {voice.review && <div role="region" aria-label="Xác nhận lời nói" tabIndex={0} className={styles.recognitionReview}>
+            <h3>{voice.review.unavailable ? 'Chưa đối chiếu được đoạn ghi này' : 'Hai lần nhận diện có nội dung khác nhau'}</h3>
+            <p>Nghe lại và chọn bản đúng với lời bạn nói. Câu trả lời chưa được gửi đánh giá.</p>
+            <audio key={voice.review.segment} controls preload="none" aria-label="Nghe lại đoạn cần xác nhận" src={`data:audio/wav;base64,${voice.review.audio}`} />
+            <blockquote>{voice.review.text}</blockquote>
+            <Button size="sm" variant="outline" onClick={() => voice.confirmReview(voice.review!.segment, false)}>Dùng bản nhận diện này</Button>
+            {voice.review.alternative && <>
+              <blockquote>{voice.review.alternative}</blockquote>
+              <Button size="sm" variant="outline" onClick={() => voice.confirmReview(voice.review!.segment, true)}>Dùng bản đối chiếu</Button>
+            </>}
+            <Button size="sm" variant="ghost" onClick={() => voice.rejectReview(voice.review!.segment)}>Bỏ đoạn này và nói lại</Button>
+          </div>}
           {voice.error && <div role="alert" className={styles.error}>
             <AlertCircle size={17} aria-hidden="true" /><div><p>{voice.error}</p>
               {voice.retryAvailable && <div className={styles.retryActions}><Button size="sm" variant="outline" onClick={voice.retry}>Nhận diện lại bản ghi</Button><Button size="sm" variant="ghost" onClick={voice.discard}>Bỏ đoạn ghi lỗi</Button></div>}

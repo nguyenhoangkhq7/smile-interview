@@ -1,0 +1,2874 @@
+{
+  "version": "evidence-demos-1",
+  "source_revision": "2967311998b91f9e370aa41f646607ea0b152c97",
+  "source_path": "ai-service/adaptive_questioning/optimization/dataset.py",
+  "notes": "Recovered all 20 question cases and 20 candidate responses. V2 labels are curated examples, not an independently validated benchmark. Original 14/6 ordering retained.",
+  "questions": [
+    {
+      "sample_id": "q01",
+      "context": {
+        "objective": {
+          "objective_id": "q01",
+          "skill_id": "java_spring",
+          "claim": "Spring transaction rollback",
+          "target_depth": 3,
+          "criteria": [
+            {
+              "criterion_id": "q01:c1",
+              "description": "Spring transaction rollback",
+              "expected_evidence": "Giải thích rollback khi phương thức Spring có transaction gặp RuntimeException.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Giải thích rollback khi phương thức Spring có transaction gặp RuntimeException.",
+              "at_target": "Giải thích rollback khi phương thức Spring có transaction gặp RuntimeException.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Giải thích rollback khi phương thức Spring có transaction gặp RuntimeException.",
+              "essential": true
+            }
+          ]
+        },
+        "mode": "DEBUGGING",
+        "interaction_mode": "VOICE",
+        "action": "INITIAL",
+        "question_depth": 3,
+        "target_criteria": [
+          "q01:c1"
+        ],
+        "required_question_contract": {
+          "mode": "DEBUGGING",
+          "depth": 3,
+          "criterion_ids": [
+            "q01:c1"
+          ]
+        },
+        "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `java_spring` (Matched CV Skill: `java_spring`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.30 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Phát triển các RESTful API CRUD cơ bản sử dụng Java Spring Boot và Spring Data JPA.\"\n- Ngữ cảnh công việc: Junior Java Developer (01/2022 - 05/2023)\n- Context Anchors bắc cầu (A_ctx):\n  1. [INITIAL_NONE] Skill: postgresql | s_cv=4.00 | Job: Backend Developer (06/2023 - Hiện tại)\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng java_spring tại local turn k=1)",
+        "strategy": "PROBE_DEPTH",
+        "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
+        "remaining_questions": 8,
+        "history": []
+      },
+      "question": {
+        "text": "Trong Spring Boot, một phương thức @Transactional ném RuntimeException giữa chừng. Dữ liệu của transaction đó được rollback như thế nào?",
+        "criterion_ids": [
+          "q01:c1"
+        ],
+        "assistance": "NONE",
+        "mode": "DEBUGGING",
+        "depth": 3,
+        "evidence_scope": "q01-case"
+      },
+      "source_question": "Trong các dự án backend sử dụng Spring Boot và PostgreSQL, khi một phương thức được đánh dấu @Transactional gặp ngoại lệ runtime giữa chừng, anh/chị cấu hình cơ chế rollback và quản lý propagation như thế nào để đảm bảo tính toàn vẹn dữ liệu?",
+      "source_context": "- Kỹ năng mục tiêu (Primary Skill d*): `java_spring` (Matched CV Skill: `java_spring`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.30 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Phát triển các RESTful API CRUD cơ bản sử dụng Java Spring Boot và Spring Data JPA.\"\n- Ngữ cảnh công việc: Junior Java Developer (01/2022 - 05/2023)\n- Context Anchors bắc cầu (A_ctx):\n  1. [INITIAL_NONE] Skill: postgresql | s_cv=4.00 | Job: Backend Developer (06/2023 - Hiện tại)\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng java_spring tại local turn k=1)",
+      "source_directives": "- Persona: Senior Technical Interviewer / Principal Engineer phỏng vấn bằng tiếng Việt chuyên nghiệp.\n- Chiến lược phỏng vấn: Đào sâu chuyên môn (PROBE_DEPTH).\n- Hiệu chỉnh độ khó (r_target): Đo lường đúng ngưỡng 4.00/5.0.\n- Ràng buộc: One-Question-One-Answer, Show Don't Tell, kết nối tự nhiên với Context Anchor postgresql.",
+      "source_reasoning": {
+        "surprising_fact_C": "CV chỉ ghi nhận kinh nghiệm CRUD cơ bản với Java Spring Boot (s_cv=2.30), trong khi JD yêu cầu mức độ chuyên sâu 4.00, và ứng viên lại có nền tảng PostgreSQL rất mạnh (s_cv=4.00) ở công việc hiện tại.",
+        "hypothesis_A": "Ứng viên có thể đã làm việc với các hệ thống backend kết nối DB quy mô lớn nhưng chủ yếu dựa vào kỹ năng viết SQL tối ưu, chưa thực sự nắm sâu cơ chế quản lý Transaction nội tại của Spring (@Transactional, Propagation, Isolation, Rollback behavior)."
+      },
+      "source_slot": "java_spring:primary",
+      "source_required_proficiency": 4.0
+    },
+    {
+      "sample_id": "q02",
+      "context": {
+        "objective": {
+          "objective_id": "q02",
+          "skill_id": "terraform",
+          "claim": "Terraform state locking",
+          "target_depth": 4,
+          "criteria": [
+            {
+              "criterion_id": "q02:c1",
+              "description": "Terraform state locking",
+              "expected_evidence": "Thiết kế cơ chế phối hợp truy cập remote state khi nhiều người cùng apply.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Thiết kế cơ chế phối hợp truy cập remote state khi nhiều người cùng apply.",
+              "at_target": "Thiết kế cơ chế phối hợp truy cập remote state khi nhiều người cùng apply.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Thiết kế cơ chế phối hợp truy cập remote state khi nhiều người cùng apply.",
+              "essential": true
+            }
+          ]
+        },
+        "mode": "DESIGN",
+        "interaction_mode": "VOICE",
+        "action": "INITIAL",
+        "question_depth": 4,
+        "target_criteria": [
+          "q02:c1"
+        ],
+        "required_question_contract": {
+          "mode": "DESIGN",
+          "depth": 4,
+          "criterion_ids": [
+            "q02:c1"
+          ]
+        },
+        "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `terraform` (Matched CV Skill: `cloudformation`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.40 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Tự động hóa cấp phát hạ tầng AWS bằng CloudFormation templates.\"\n- Ngữ cảnh công việc: Cloud Engineer (06/2021 - 02/2024)\n- Context Anchors bắc cầu (A_ctx):\n  1. [INITIAL_NONE] Skill: kubernetes | s_cv=4.50 | Job: DevOps Lead (03/2024 - Hiện tại)\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng terraform tại local turn k=1)",
+        "strategy": "COMPARE_SUBSTITUTE",
+        "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
+        "remaining_questions": 8,
+        "history": []
+      },
+      "question": {
+        "text": "Nhiều thành viên cùng chạy Terraform trên một hạ tầng. Bạn thiết kế remote state locking thế nào để tránh ghi đè trạng thái?",
+        "criterion_ids": [
+          "q02:c1"
+        ],
+        "assistance": "NONE",
+        "mode": "DESIGN",
+        "depth": 4,
+        "evidence_scope": "q02-case"
+      },
+      "source_question": "Từ kinh nghiệm tự động hóa hạ tầng bằng CloudFormation trước đây và quản lý cụm Kubernetes hiện tại, khi chuyển sang dùng Terraform cho nhiều thành viên cùng thao tác, anh/chị thiết kế cơ chế Remote Backend kết hợp State Locking như thế nào để ngăn chặn xung đột trạng thái hạ tầng?",
+      "source_context": "- Kỹ năng mục tiêu (Primary Skill d*): `terraform` (Matched CV Skill: `cloudformation`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.40 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Tự động hóa cấp phát hạ tầng AWS bằng CloudFormation templates.\"\n- Ngữ cảnh công việc: Cloud Engineer (06/2021 - 02/2024)\n- Context Anchors bắc cầu (A_ctx):\n  1. [INITIAL_NONE] Skill: kubernetes | s_cv=4.50 | Job: DevOps Lead (03/2024 - Hiện tại)\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng terraform tại local turn k=1)",
+      "source_directives": "- Persona: Senior Technical Interviewer / Principal Engineer phỏng vấn bằng tiếng Việt chuyên nghiệp.\n- Chiến lược phỏng vấn: So sánh kỹ năng thay thế (COMPARE_SUBSTITUTE) giữa CloudFormation và Terraform.\n- Hiệu chỉnh độ khó (r_target): Đo lường đúng ngưỡng 4.00/5.0.\n- Ràng buộc: One-Question-One-Answer, Show Don't Tell, kết nối tự nhiên với Context Anchor kubernetes.",
+      "source_reasoning": {
+        "surprising_fact_C": "Ứng viên đạt năng lực chuyên gia về Kubernetes (s_cv=4.50) nhưng về IaC lại chỉ có kinh nghiệm với CloudFormation (s_cv=2.40) thay vì công cụ Terraform theo yêu cầu của JD.",
+        "hypothesis_A": "Ứng viên đã quen với tư duy hạ tầng dạng mã nguồn (IaC) trên AWS thông qua CloudFormation, nhưng có thể chưa va chạm với các bài toán đặc thù của Terraform như State Locking từ xa, quản lý Drift, hoặc thiết kế Modular hạ tầng đa môi trường."
+      },
+      "source_slot": "terraform:primary",
+      "source_required_proficiency": 4.0
+    },
+    {
+      "sample_id": "q03",
+      "context": {
+        "objective": {
+          "objective_id": "q03",
+          "skill_id": "english",
+          "claim": "English technical error triage",
+          "target_depth": 3,
+          "criteria": [
+            {
+              "criterion_id": "q03:c1",
+              "description": "English technical error triage",
+              "expected_evidence": "Dùng thông tin trong thông báo lỗi tiếng Anh và tài liệu để kiểm chứng nguyên nhân.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Dùng thông tin trong thông báo lỗi tiếng Anh và tài liệu để kiểm chứng nguyên nhân.",
+              "at_target": "Dùng thông tin trong thông báo lỗi tiếng Anh và tài liệu để kiểm chứng nguyên nhân.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Dùng thông tin trong thông báo lỗi tiếng Anh và tài liệu để kiểm chứng nguyên nhân.",
+              "essential": true
+            }
+          ]
+        },
+        "mode": "DEBUGGING",
+        "interaction_mode": "VOICE",
+        "action": "INITIAL",
+        "question_depth": 3,
+        "target_criteria": [
+          "q03:c1"
+        ],
+        "required_question_contract": {
+          "mode": "DEBUGGING",
+          "depth": 3,
+          "criterion_ids": [
+            "q03:c1"
+          ]
+        },
+        "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `english` (Matched CV Skill: `english`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 3.50 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.00 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Đọc hiểu tài liệu kỹ thuật tiếng Anh cơ bản.\"\n- Ngữ cảnh công việc: Backend Developer (06/2023 - Hiện tại)\n- Context Anchors bắc cầu (A_ctx): Các dự án Backend thực tế\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng english tại local turn k=1)",
+        "strategy": "PROBE_DEPTH",
+        "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
+        "remaining_questions": 8,
+        "history": []
+      },
+      "question": {
+        "text": "Bạn gặp thông báo lỗi tiếng Anh từ một thư viện, còn tài liệu chưa giải thích rõ. Bạn sẽ tra cứu thế nào để xác định nguyên nhân?",
+        "criterion_ids": [
+          "q03:c1"
+        ],
+        "assistance": "NONE",
+        "mode": "DEBUGGING",
+        "depth": 3,
+        "evidence_scope": "q03-case"
+      },
+      "source_question": "Khi gặp một thông báo lỗi nghiêm trọng từ thư viện bên thứ ba viết bằng tiếng Anh kỹ thuật chuyên sâu mà tài liệu không có giải thích rõ ràng, anh/chị áp dụng quy trình phân tích và tra cứu trực tiếp như thế nào để xác định chính xác nguyên nhân gốc?",
+      "source_context": "- Kỹ năng mục tiêu (Primary Skill d*): `english` (Matched CV Skill: `english`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 3.50 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.00 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Đọc hiểu tài liệu kỹ thuật tiếng Anh cơ bản.\"\n- Ngữ cảnh công việc: Backend Developer (06/2023 - Hiện tại)\n- Context Anchors bắc cầu (A_ctx): Các dự án Backend thực tế\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng english tại local turn k=1)",
+      "source_directives": "- Persona: Senior Technical Interviewer / Principal Engineer.\n- Chiến lược phỏng vấn: Đào sâu chuyên môn (PROBE_DEPTH) cho kỹ năng ngoại ngữ chuyên ngành.\n- Hiệu chỉnh độ khó: Đọc hiểu tài liệu kỹ thuật độc lập (3.50/5.0).\n- Ràng buộc: Đặt câu hỏi cụ thể về cách tiếp cận khi gặp lỗi hoặc tài liệu chuyên ngành phức tạp.",
+      "source_reasoning": {
+        "surprising_fact_C": "Ứng viên làm Backend Developer ở dự án hiện tại nhưng tự khai tiếng Anh chỉ ở mức đọc hiểu cơ bản (2.00), thấp hơn yêu cầu tự chủ đọc tài liệu kỹ thuật chuyên sâu của JD (3.50).",
+        "hypothesis_A": "Ứng viên có thể gặp rào cản khi đọc tài liệu mở rộng hoặc log lỗi bằng tiếng Anh và phải phụ thuộc vào công cụ dịch máy thay vì tự tin phân tích trực tiếp."
+      },
+      "source_slot": "english:primary",
+      "source_required_proficiency": 3.5
+    },
+    {
+      "sample_id": "q04",
+      "context": {
+        "objective": {
+          "objective_id": "q04",
+          "skill_id": "kubernetes",
+          "claim": "Kubernetes OOMKilled",
+          "target_depth": 3,
+          "criteria": [
+            {
+              "criterion_id": "q04:c1",
+              "description": "Kubernetes OOMKilled",
+              "expected_evidence": "Dùng trạng thái container và số liệu bộ nhớ để chẩn đoán OOMKilled.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Dùng trạng thái container và số liệu bộ nhớ để chẩn đoán OOMKilled.",
+              "at_target": "Dùng trạng thái container và số liệu bộ nhớ để chẩn đoán OOMKilled.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Dùng trạng thái container và số liệu bộ nhớ để chẩn đoán OOMKilled.",
+              "essential": true
+            }
+          ]
+        },
+        "mode": "DEBUGGING",
+        "interaction_mode": "VOICE",
+        "action": "INITIAL",
+        "question_depth": 3,
+        "target_criteria": [
+          "q04:c1"
+        ],
+        "required_question_contract": {
+          "mode": "DEBUGGING",
+          "depth": 3,
+          "criterion_ids": [
+            "q04:c1"
+          ]
+        },
+        "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `kubernetes` (Matched CV Skill: `kubernetes`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.50 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 3.00 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Triển khai ứng dụng lên Kubernetes cluster bằng Helm chart.\"\n- Ngữ cảnh công việc: Backend Developer (03/2023 - Hiện tại)\n- Context Anchors bắc cầu (A_ctx): 1. [INITIAL_NONE] Skill: docker | s_cv=4.00\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng kubernetes tại local turn k=1)",
+        "strategy": "PROBE_DEPTH",
+        "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
+        "remaining_questions": 8,
+        "history": []
+      },
+      "question": {
+        "text": "Pod xử lý tác vụ nặng liên tục bị OOMKilled, exit code 137. Bạn sẽ dùng bằng chứng nào để xác định nguyên nhân?",
+        "criterion_ids": [
+          "q04:c1"
+        ],
+        "assistance": "NONE",
+        "mode": "DEBUGGING",
+        "depth": 3,
+        "evidence_scope": "q04-case"
+      },
+      "source_question": "Trong môi trường production, khi một Pod xử lý tác vụ nặng liên tục bị restart với exit code 137 (OOMKilled), anh/chị tiến hành các bước điều tra và cấu hình lại resource requests/limits ra sao để ngăn chặn triệt để sự cố này?",
+      "source_context": "- Kỹ năng mục tiêu (Primary Skill d*): `kubernetes` (Matched CV Skill: `kubernetes`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.50 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 3.00 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Triển khai ứng dụng lên Kubernetes cluster bằng Helm chart.\"\n- Ngữ cảnh công việc: Backend Developer (03/2023 - Hiện tại)\n- Context Anchors bắc cầu (A_ctx): 1. [INITIAL_NONE] Skill: docker | s_cv=4.00\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng kubernetes tại local turn k=1)",
+      "source_directives": "- Persona: Principal DevOps / SRE Lead.\n- Chiến lược phỏng vấn: Đào sâu chuyên môn (PROBE_DEPTH).\n- Hiệu chỉnh độ khó: Đo lường mức chuyên gia vận hành production (4.50/5.0).\n- Ràng buộc: One-Question-One-Answer, Show Don't Tell.",
+      "source_reasoning": {
+        "surprising_fact_C": "Ứng viên đã dùng Docker rất vững (4.00) và dùng Helm trên K8s, nhưng điểm CV K8s chỉ ở mức 3.00 so với yêu cầu vận hành production khắt khe 4.50 của JD.",
+        "hypothesis_A": "Ứng viên có thể chỉ viết manifests và deploy ở mức cơ bản, chưa từng trực tiếp điều tra và khắc phục các sự cố runtime nghiêm trọng như Pod bị OOMKilled hay thiết lập QoS Class phù hợp."
+      },
+      "source_slot": "kubernetes:primary",
+      "source_required_proficiency": 4.5
+    },
+    {
+      "sample_id": "q05",
+      "context": {
+        "objective": {
+          "objective_id": "q05",
+          "skill_id": "kafka",
+          "claim": "Kafka consumer lag",
+          "target_depth": 3,
+          "criteria": [
+            {
+              "criterion_id": "q05:c1",
+              "description": "Kafka consumer lag",
+              "expected_evidence": "Chẩn đoán nguyên nhân consumer lag từ hành vi poll và rebalance.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Chẩn đoán nguyên nhân consumer lag từ hành vi poll và rebalance.",
+              "at_target": "Chẩn đoán nguyên nhân consumer lag từ hành vi poll và rebalance.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Chẩn đoán nguyên nhân consumer lag từ hành vi poll và rebalance.",
+              "essential": true
+            }
+          ]
+        },
+        "mode": "DEBUGGING",
+        "interaction_mode": "VOICE",
+        "action": "INITIAL",
+        "question_depth": 3,
+        "target_criteria": [
+          "q05:c1"
+        ],
+        "required_question_contract": {
+          "mode": "DEBUGGING",
+          "depth": 3,
+          "criterion_ids": [
+            "q05:c1"
+          ]
+        },
+        "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `kafka` (Matched CV Skill: `rabbitmq`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.50 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Sử dụng RabbitMQ để xử lý hàng đợi tin nhắn giữa các microservices.\"\n- Ngữ cảnh công việc: Backend Engineer (05/2022 - 01/2024)\n- Context Anchors bắc cầu (A_ctx): 1. [INITIAL_NONE] Skill: java_spring | s_cv=4.00\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng kafka tại local turn k=1)",
+        "strategy": "COMPARE_SUBSTITUTE",
+        "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
+        "remaining_questions": 8,
+        "history": []
+      },
+      "question": {
+        "text": "Consumer lag của một Kafka topic tăng đột biến. Bạn sẽ kiểm tra gì để phân biệt consumer xử lý chậm với rebalance liên tục?",
+        "criterion_ids": [
+          "q05:c1"
+        ],
+        "assistance": "NONE",
+        "mode": "DEBUGGING",
+        "depth": 3,
+        "evidence_scope": "q05-case"
+      },
+      "source_question": "Khi hệ thống streaming gặp tình trạng Consumer Lag tăng đột biến tại một topic có lưu lượng lớn, anh/chị phân tích nguyên nhân và điều chỉnh cơ chế tiêu thụ tin nhắn trong Consumer Group như thế nào để giải tỏa tắc nghẽn?",
+      "source_context": "- Kỹ năng mục tiêu (Primary Skill d*): `kafka` (Matched CV Skill: `rabbitmq`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.50 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Sử dụng RabbitMQ để xử lý hàng đợi tin nhắn giữa các microservices.\"\n- Ngữ cảnh công việc: Backend Engineer (05/2022 - 01/2024)\n- Context Anchors bắc cầu (A_ctx): 1. [INITIAL_NONE] Skill: java_spring | s_cv=4.00\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng kafka tại local turn k=1)",
+      "source_directives": "- Persona: Senior Distributed Systems Architect.\n- Chiến lược phỏng vấn: So sánh kỹ năng thay thế (COMPARE_SUBSTITUTE).\n- Hiệu chỉnh độ khó: Mức độ làm chủ hệ thống streaming quy mô lớn (4.00/5.0).\n- Ràng buộc: One-Question-One-Answer, Show Don't Tell.",
+      "source_reasoning": {
+        "surprising_fact_C": "Ứng viên có kinh nghiệm với RabbitMQ nhưng vị trí tuyển dụng yêu cầu Kafka ở quy mô sự kiện lớn, với đặc tính lưu trữ log phân tán hoàn toàn khác với message broker truyền thống.",
+        "hypothesis_A": "Ứng viên có thể mang tư duy message queue hàng đợi tạm thời sang Kafka, chưa nắm rõ cơ chế phân chia Partition, Consumer Group và hiện tượng Consumer Lag."
+      },
+      "source_slot": "kafka:primary",
+      "source_required_proficiency": 4.0
+    },
+    {
+      "sample_id": "q06",
+      "context": {
+        "objective": {
+          "objective_id": "q06",
+          "skill_id": "postgresql",
+          "claim": "PostgreSQL EXPLAIN ANALYZE",
+          "target_depth": 3,
+          "criteria": [
+            {
+              "criterion_id": "q06:c1",
+              "description": "PostgreSQL EXPLAIN ANALYZE",
+              "expected_evidence": "Dùng execution plan thực tế để đánh giá lựa chọn index cho truy vấn.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Dùng execution plan thực tế để đánh giá lựa chọn index cho truy vấn.",
+              "at_target": "Dùng execution plan thực tế để đánh giá lựa chọn index cho truy vấn.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Dùng execution plan thực tế để đánh giá lựa chọn index cho truy vấn.",
+              "essential": true
+            }
+          ]
+        },
+        "mode": "DEBUGGING",
+        "interaction_mode": "VOICE",
+        "action": "INITIAL",
+        "question_depth": 3,
+        "target_criteria": [
+          "q06:c1"
+        ],
+        "required_question_contract": {
+          "mode": "DEBUGGING",
+          "depth": 3,
+          "criterion_ids": [
+            "q06:c1"
+          ]
+        },
+        "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `postgresql` (Matched CV Skill: `postgresql`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.80 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Thiết kế cơ sở dữ liệu quan hệ PostgreSQL và viết câu truy vấn SQL.\"\n- Ngữ cảnh công việc: Backend Developer (08/2022 - Hiện tại)\n- Context Anchors bắc cầu (A_ctx): Các dịch vụ API hiện hành\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng postgresql tại local turn k=1)",
+        "strategy": "PROBE_DEPTH",
+        "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
+        "remaining_questions": 8,
+        "history": []
+      },
+      "question": {
+        "text": "Truy vấn báo cáo trên bảng hàng triệu dòng phản hồi chậm. Bạn đọc chỉ số nào trong EXPLAIN ANALYZE để đánh giá nhu cầu thêm index?",
+        "criterion_ids": [
+          "q06:c1"
+        ],
+        "assistance": "NONE",
+        "mode": "DEBUGGING",
+        "depth": 3,
+        "evidence_scope": "q06-case"
+      },
+      "source_question": "Khi một câu truy vấn báo cáo phức tạp trên bảng dữ liệu hàng triệu dòng bị phản hồi chậm, anh/chị dùng công cụ EXPLAIN ANALYZE để đọc các chỉ số then chốt nào nhằm quyết định chiến lược đánh chỉ mục phù hợp?",
+      "source_context": "- Kỹ năng mục tiêu (Primary Skill d*): `postgresql` (Matched CV Skill: `postgresql`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.80 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Thiết kế cơ sở dữ liệu quan hệ PostgreSQL và viết câu truy vấn SQL.\"\n- Ngữ cảnh công việc: Backend Developer (08/2022 - Hiện tại)\n- Context Anchors bắc cầu (A_ctx): Các dịch vụ API hiện hành\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng postgresql tại local turn k=1)",
+      "source_directives": "- Persona: Database Performance Engineer / Principal Backend.\n- Chiến lược phỏng vấn: Đào sâu chuyên môn (PROBE_DEPTH).\n- Hiệu chỉnh độ khó: Đo lường kỹ năng tối ưu truy vấn thực chiến (4.00/5.0).\n- Ràng buộc: One-Question-One-Answer, Show Don't Tell.",
+      "source_reasoning": {
+        "surprising_fact_C": "CV ghi thiết kế CSDL và viết SQL nhưng không đề cập đến kinh nghiệm tuning, tối ưu hóa chỉ mục hay giải quyết nghẽn I/O.",
+        "hypothesis_A": "Ứng viên có thể chưa từng phân tích Query Plan bằng EXPLAIN ANALYZE trên các bảng dữ liệu hàng triệu dòng để tối ưu chỉ mục composite."
+      },
+      "source_slot": "postgresql:primary",
+      "source_required_proficiency": 4.0
+    },
+    {
+      "sample_id": "q07",
+      "context": {
+        "objective": {
+          "objective_id": "q07",
+          "skill_id": "redis",
+          "claim": "Redis cache stampede",
+          "target_depth": 4,
+          "criteria": [
+            {
+              "criterion_id": "q07:c1",
+              "description": "Redis cache stampede",
+              "expected_evidence": "Điều phối việc làm mới một hot key khi cache hết hạn.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Điều phối việc làm mới một hot key khi cache hết hạn.",
+              "at_target": "Điều phối việc làm mới một hot key khi cache hết hạn.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Điều phối việc làm mới một hot key khi cache hết hạn.",
+              "essential": true
+            }
+          ]
+        },
+        "mode": "DESIGN",
+        "interaction_mode": "VOICE",
+        "action": "INITIAL",
+        "question_depth": 4,
+        "target_criteria": [
+          "q07:c1"
+        ],
+        "required_question_contract": {
+          "mode": "DESIGN",
+          "depth": 4,
+          "criterion_ids": [
+            "q07:c1"
+          ]
+        },
+        "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `redis` (Matched CV Skill: `memcached`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 3.50 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.20 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Sử dụng Memcached để lưu tạm session và dữ liệu bộ nhớ đệm.\"\n- Ngữ cảnh công việc: Web Developer (01/2021 - 12/2022)\n- Context Anchors bắc cầu (A_ctx): Dự án Web Thương mại điện tử\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng redis tại local turn k=1)",
+        "strategy": "COMPARE_SUBSTITUTE",
+        "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
+        "remaining_questions": 8,
+        "history": []
+      },
+      "question": {
+        "text": "Một Redis hot key hết hạn khiến nhiều request cùng truy vấn database. Bạn thiết kế cơ chế làm mới cache thế nào để tránh stampede?",
+        "criterion_ids": [
+          "q07:c1"
+        ],
+        "assistance": "NONE",
+        "mode": "DESIGN",
+        "depth": 4,
+        "evidence_scope": "q07-case"
+      },
+      "source_question": "Khi chuyển đổi từ mô hình cache đơn giản sang Redis, anh/chị thiết kế giải pháp như thế nào để ngăn chặn hiện tượng Cache Stampede khi một key có lượng truy cập rất lớn bất ngờ hết hạn?",
+      "source_context": "- Kỹ năng mục tiêu (Primary Skill d*): `redis` (Matched CV Skill: `memcached`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 3.50 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.20 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Sử dụng Memcached để lưu tạm session và dữ liệu bộ nhớ đệm.\"\n- Ngữ cảnh công việc: Web Developer (01/2021 - 12/2022)\n- Context Anchors bắc cầu (A_ctx): Dự án Web Thương mại điện tử\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng redis tại local turn k=1)",
+      "source_directives": "- Persona: Technical Lead.\n- Chiến lược phỏng vấn: So sánh kỹ năng thay thế (COMPARE_SUBSTITUTE).\n- Hiệu chỉnh độ khó: Mức 3.50/5.0.\n- Ràng buộc: One-Question-One-Answer, Show Don't Tell.",
+      "source_reasoning": {
+        "surprising_fact_C": "Ứng viên mới chỉ dùng Memcached cho cache đơn giản, trong khi JD yêu cầu Redis phục vụ kiến trúc cache nâng cao.",
+        "hypothesis_A": "Ứng viên chưa từng áp dụng các cấu trúc dữ liệu phong phú của Redis hoặc chưa có kinh nghiệm xử lý hiện tượng Cache Stampede khi key hết hạn đồng loạt."
+      },
+      "source_slot": "redis:primary",
+      "source_required_proficiency": 3.5
+    },
+    {
+      "sample_id": "q08",
+      "context": {
+        "objective": {
+          "objective_id": "q08",
+          "skill_id": "docker",
+          "claim": "Docker multi-stage build",
+          "target_depth": 2,
+          "criteria": [
+            {
+              "criterion_id": "q08:c1",
+              "description": "Docker multi-stage build",
+              "expected_evidence": "Giải thích cách tách môi trường build khỏi runtime image.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Giải thích cách tách môi trường build khỏi runtime image.",
+              "at_target": "Giải thích cách tách môi trường build khỏi runtime image.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Giải thích cách tách môi trường build khỏi runtime image.",
+              "essential": true
+            }
+          ]
+        },
+        "mode": "TECHNICAL_EXPLANATION",
+        "interaction_mode": "VOICE",
+        "action": "INITIAL",
+        "question_depth": 2,
+        "target_criteria": [
+          "q08:c1"
+        ],
+        "required_question_contract": {
+          "mode": "TECHNICAL_EXPLANATION",
+          "depth": 2,
+          "criterion_ids": [
+            "q08:c1"
+          ]
+        },
+        "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `docker` (Matched CV Skill: `docker`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 3.50 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.50 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Sử dụng Docker đóng gói ứng dụng Node.js.\"\n- Ngữ cảnh công việc: Junior Developer (06/2022 - 04/2023)\n- Context Anchors bắc cầu (A_ctx): Dự án Node.js API\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng docker tại local turn k=1)",
+        "strategy": "PROBE_DEPTH",
+        "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
+        "remaining_questions": 8,
+        "history": []
+      },
+      "question": {
+        "text": "Ứng dụng cần compiler khi build nhưng không cần compiler lúc chạy. Bạn tổ chức multi-stage Dockerfile thế nào để giảm kích thước image?",
+        "criterion_ids": [
+          "q08:c1"
+        ],
+        "assistance": "NONE",
+        "mode": "TECHNICAL_EXPLANATION",
+        "depth": 2,
+        "evidence_scope": "q08-case"
+      },
+      "source_question": "Để giảm thiểu kích thước Docker image của ứng dụng từ hàng trăm megabyte xuống mức tối thiểu và tăng tốc độ CI build, anh/chị đã áp dụng kỹ thuật Multi-stage build cụ thể như thế nào trong Dockerfile?",
+      "source_context": "- Kỹ năng mục tiêu (Primary Skill d*): `docker` (Matched CV Skill: `docker`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 3.50 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.50 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Sử dụng Docker đóng gói ứng dụng Node.js.\"\n- Ngữ cảnh công việc: Junior Developer (06/2022 - 04/2023)\n- Context Anchors bắc cầu (A_ctx): Dự án Node.js API\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng docker tại local turn k=1)",
+      "source_directives": "- Persona: Senior DevOps Engineer.\n- Chiến lược phỏng vấn: Đào sâu chuyên môn (PROBE_DEPTH).\n- Hiệu chỉnh độ khó: Mức 3.50/5.0.\n- Ràng buộc: One-Question-One-Answer, Show Don't Tell.",
+      "source_reasoning": {
+        "surprising_fact_C": "CV chỉ ghi dùng Docker đóng gói cơ bản, trong khi production yêu cầu tối ưu hóa dung lượng image và bảo mật container.",
+        "hypothesis_A": "Ứng viên có thể chỉ copy toàn bộ source code vào một image cơ bản lớn, chưa áp dụng Multi-stage build hay cơ chế layer cache để tối ưu kích thước."
+      },
+      "source_slot": "docker:primary",
+      "source_required_proficiency": 3.5
+    },
+    {
+      "sample_id": "q09",
+      "context": {
+        "objective": {
+          "objective_id": "q09",
+          "skill_id": "golang",
+          "claim": "Go goroutine leak",
+          "target_depth": 3,
+          "criteria": [
+            {
+              "criterion_id": "q09:c1",
+              "description": "Go goroutine leak",
+              "expected_evidence": "Dùng dấu hiệu runtime và cơ chế hủy tác vụ để chẩn đoán goroutine bị kẹt.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Dùng dấu hiệu runtime và cơ chế hủy tác vụ để chẩn đoán goroutine bị kẹt.",
+              "at_target": "Dùng dấu hiệu runtime và cơ chế hủy tác vụ để chẩn đoán goroutine bị kẹt.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Dùng dấu hiệu runtime và cơ chế hủy tác vụ để chẩn đoán goroutine bị kẹt.",
+              "essential": true
+            }
+          ]
+        },
+        "mode": "DEBUGGING",
+        "interaction_mode": "VOICE",
+        "action": "INITIAL",
+        "question_depth": 3,
+        "target_criteria": [
+          "q09:c1"
+        ],
+        "required_question_contract": {
+          "mode": "DEBUGGING",
+          "depth": 3,
+          "criterion_ids": [
+            "q09:c1"
+          ]
+        },
+        "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `golang` (Matched CV Skill: `golang`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.60 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Phát triển microservice xử lý dữ liệu bằng Go.\"\n- Ngữ cảnh công việc: Backend Developer (10/2022 - Hiện tại)\n- Context Anchors bắc cầu (A_ctx): Hệ thống backend xử lý dữ liệu\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng golang tại local turn k=1)",
+        "strategy": "PROBE_DEPTH",
+        "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
+        "remaining_questions": 8,
+        "history": []
+      },
+      "question": {
+        "text": "Service Go tích lũy goroutine sau mỗi đợt tải dù request đã kết thúc. Bạn sẽ kiểm tra gì để xác định goroutine đang bị kẹt?",
+        "criterion_ids": [
+          "q09:c1"
+        ],
+        "assistance": "NONE",
+        "mode": "DEBUGGING",
+        "depth": 3,
+        "evidence_scope": "q09-case"
+      },
+      "source_question": "Trong một service viết bằng Go xử lý hàng ngàn tác vụ đồng thời, anh/chị sử dụng công cụ hoặc mẫu thiết kế nào để phát hiện và kiểm soát việc rò rỉ goroutine (goroutine leak) khi các channel không được đóng đúng cách?",
+      "source_context": "- Kỹ năng mục tiêu (Primary Skill d*): `golang` (Matched CV Skill: `golang`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.60 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Phát triển microservice xử lý dữ liệu bằng Go.\"\n- Ngữ cảnh công việc: Backend Developer (10/2022 - Hiện tại)\n- Context Anchors bắc cầu (A_ctx): Hệ thống backend xử lý dữ liệu\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng golang tại local turn k=1)",
+      "source_directives": "- Persona: Lead Systems Engineer.\n- Chiến lược phỏng vấn: Đào sâu chuyên môn (PROBE_DEPTH).\n- Hiệu chỉnh độ khó: Mức 4.00/5.0.\n- Ràng buộc: One-Question-One-Answer, Show Don't Tell.",
+      "source_reasoning": {
+        "surprising_fact_C": "Ứng viên viết Go cho microservice nhưng CV không thể hiện cách quản lý concurrency an toàn, vốn là cốt lõi của Go trong backend tải cao.",
+        "hypothesis_A": "Ứng viên có thể chưa từng đối mặt với hiện tượng Goroutine leak hoặc race condition khi sử dụng channel và sync primitives dưới tải lớn."
+      },
+      "source_slot": "golang:primary",
+      "source_required_proficiency": 4.0
+    },
+    {
+      "sample_id": "q10",
+      "context": {
+        "objective": {
+          "objective_id": "q10",
+          "skill_id": "aws",
+          "claim": "AWS availability zone failure",
+          "target_depth": 4,
+          "criteria": [
+            {
+              "criterion_id": "q10:c1",
+              "description": "AWS availability zone failure",
+              "expected_evidence": "Thiết kế đường phục hồi ứng dụng khi một Availability Zone lỗi.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Thiết kế đường phục hồi ứng dụng khi một Availability Zone lỗi.",
+              "at_target": "Thiết kế đường phục hồi ứng dụng khi một Availability Zone lỗi.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Thiết kế đường phục hồi ứng dụng khi một Availability Zone lỗi.",
+              "essential": true
+            }
+          ]
+        },
+        "mode": "DESIGN",
+        "interaction_mode": "VOICE",
+        "action": "INITIAL",
+        "question_depth": 4,
+        "target_criteria": [
+          "q10:c1"
+        ],
+        "required_question_contract": {
+          "mode": "DESIGN",
+          "depth": 4,
+          "criterion_ids": [
+            "q10:c1"
+          ]
+        },
+        "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `aws` (Matched CV Skill: `aws`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.70 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Sử dụng EC2, S3 và RDS để vận hành ứng dụng trên AWS.\"\n- Ngữ cảnh công việc: Infrastructure Support (02/2022 - 11/2023)\n- Context Anchors bắc cầu (A_ctx): Dự án triển khai AWS\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng aws tại local turn k=1)",
+        "strategy": "PROBE_DEPTH",
+        "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
+        "remaining_questions": 8,
+        "history": []
+      },
+      "question": {
+        "text": "Ứng dụng trên AWS phải tiếp tục phục vụ khi một Availability Zone lỗi. Bạn thiết kế đường failover cho ứng dụng và database thế nào?",
+        "criterion_ids": [
+          "q10:c1"
+        ],
+        "assistance": "NONE",
+        "mode": "DESIGN",
+        "depth": 4,
+        "evidence_scope": "q10-case"
+      },
+      "source_question": "Khi thiết kế kiến trúc hệ thống trên AWS yêu cầu khả năng chịu lỗi cao (High Availability), anh/chị cấu hình cơ chế Multi-AZ failover giữa Application Load Balancer và RDS như thế nào để đảm bảo thời gian gián đoạn là tối thiểu khi một Availability Zone gặp sự cố?",
+      "source_context": "- Kỹ năng mục tiêu (Primary Skill d*): `aws` (Matched CV Skill: `aws`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.70 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Sử dụng EC2, S3 và RDS để vận hành ứng dụng trên AWS.\"\n- Ngữ cảnh công việc: Infrastructure Support (02/2022 - 11/2023)\n- Context Anchors bắc cầu (A_ctx): Dự án triển khai AWS\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng aws tại local turn k=1)",
+      "source_directives": "- Persona: AWS Solutions Architect Professional.\n- Chiến lược phỏng vấn: Đào sâu chuyên môn (PROBE_DEPTH).\n- Hiệu chỉnh độ khó: Mức 4.00/5.0.\n- Ràng buộc: One-Question-One-Answer, Show Don't Tell.",
+      "source_reasoning": {
+        "surprising_fact_C": "CV liệt kê các dịch vụ EC2, S3, RDS nhưng chỉ ở mức hỗ trợ vận hành, chưa thể hiện năng lực thiết kế hạ tầng có độ sẵn sàng cao (High Availability).",
+        "hypothesis_A": "Ứng viên có thể chỉ thao tác trên AWS Management Console đơn lẻ, chưa có kinh nghiệm thiết lập kiến trúc Multi-AZ tự động failover cho cơ sở dữ liệu và tải ứng dụng."
+      },
+      "source_slot": "aws:primary",
+      "source_required_proficiency": 4.0
+    },
+    {
+      "sample_id": "q11",
+      "context": {
+        "objective": {
+          "objective_id": "q11",
+          "skill_id": "reactjs",
+          "claim": "React render profiling",
+          "target_depth": 3,
+          "criteria": [
+            {
+              "criterion_id": "q11:c1",
+              "description": "React render profiling",
+              "expected_evidence": "Liên hệ kết quả Profiler với prop reference gây render thừa.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Liên hệ kết quả Profiler với prop reference gây render thừa.",
+              "at_target": "Liên hệ kết quả Profiler với prop reference gây render thừa.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Liên hệ kết quả Profiler với prop reference gây render thừa.",
+              "essential": true
+            }
+          ]
+        },
+        "mode": "DEBUGGING",
+        "interaction_mode": "VOICE",
+        "action": "INITIAL",
+        "question_depth": 3,
+        "target_criteria": [
+          "q11:c1"
+        ],
+        "required_question_contract": {
+          "mode": "DEBUGGING",
+          "depth": 3,
+          "criterion_ids": [
+            "q11:c1"
+          ]
+        },
+        "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `reactjs` (Matched CV Skill: `reactjs`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.50 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Xây dựng giao diện người dùng web sử dụng ReactJS và Redux.\"\n- Ngữ cảnh công việc: Frontend Developer (05/2022 - Hiện tại)\n- Context Anchors bắc cầu (A_ctx): Dự án Dashboard quản trị\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng reactjs tại local turn k=1)",
+        "strategy": "PROBE_DEPTH",
+        "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
+        "remaining_questions": 8,
+        "history": []
+      },
+      "question": {
+        "text": "Dashboard React render lại liên tục khi người dùng tương tác. Bạn dùng Profiler thế nào để xác định component và prop gây render thừa?",
+        "criterion_ids": [
+          "q11:c1"
+        ],
+        "assistance": "NONE",
+        "mode": "DEBUGGING",
+        "depth": 3,
+        "evidence_scope": "q11-case"
+      },
+      "source_question": "Khi một màn hình dashboard hiển thị lượng lớn dữ liệu bị giật lag do render lại liên tục, anh/chị dùng công cụ React DevTools Profiler như thế nào để khoanh vùng nguyên nhân và tối ưu hóa việc truyền props giữa các component?",
+      "source_context": "- Kỹ năng mục tiêu (Primary Skill d*): `reactjs` (Matched CV Skill: `reactjs`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.50 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Xây dựng giao diện người dùng web sử dụng ReactJS và Redux.\"\n- Ngữ cảnh công việc: Frontend Developer (05/2022 - Hiện tại)\n- Context Anchors bắc cầu (A_ctx): Dự án Dashboard quản trị\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng reactjs tại local turn k=1)",
+      "source_directives": "- Persona: Senior Frontend Architect.\n- Chiến lược phỏng vấn: Đào sâu chuyên môn (PROBE_DEPTH).\n- Hiệu chỉnh độ khó: Mức 4.00/5.0.\n- Ràng buộc: One-Question-One-Answer, Show Don't Tell.",
+      "source_reasoning": {
+        "surprising_fact_C": "Ứng viên làm React hơn 1 năm với Redux nhưng CV không đề cập đến kinh nghiệm đo lường hiệu năng hay giải quyết hiện tượng re-render thừa.",
+        "hypothesis_A": "Ứng viên có thể chưa thành thạo việc sử dụng React Profiler để xác định các component bị re-render không cần thiết trong cây component phân cấp sâu."
+      },
+      "source_slot": "reactjs:primary",
+      "source_required_proficiency": 4.0
+    },
+    {
+      "sample_id": "q12",
+      "context": {
+        "objective": {
+          "objective_id": "q12",
+          "skill_id": "ci_cd",
+          "claim": "GitLab dependency cache",
+          "target_depth": 2,
+          "criteria": [
+            {
+              "criterion_id": "q12:c1",
+              "description": "GitLab dependency cache",
+              "expected_evidence": "Giải thích việc gắn cache key với dependency lockfile.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Giải thích việc gắn cache key với dependency lockfile.",
+              "at_target": "Giải thích việc gắn cache key với dependency lockfile.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Giải thích việc gắn cache key với dependency lockfile.",
+              "essential": true
+            }
+          ]
+        },
+        "mode": "TECHNICAL_EXPLANATION",
+        "interaction_mode": "VOICE",
+        "action": "INITIAL",
+        "question_depth": 2,
+        "target_criteria": [
+          "q12:c1"
+        ],
+        "required_question_contract": {
+          "mode": "TECHNICAL_EXPLANATION",
+          "depth": 2,
+          "criterion_ids": [
+            "q12:c1"
+          ]
+        },
+        "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `ci_cd` (Matched CV Skill: `jenkins`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 3.50 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.40 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Cấu hình Jenkins job để tự động build và deploy mã nguồn.\"\n- Ngữ cảnh công việc: Software Engineer (09/2021 - 03/2023)\n- Context Anchors bắc cầu (A_ctx): Hệ thống tự động hóa build\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng ci_cd tại local turn k=1)",
+        "strategy": "COMPARE_SUBSTITUTE",
+        "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
+        "remaining_questions": 8,
+        "history": []
+      },
+      "question": {
+        "text": "Pipeline GitLab CI tải lại dependencies ở mỗi lần build. Bạn chọn cache key thế nào để tái sử dụng cache khi dependencies không đổi?",
+        "criterion_ids": [
+          "q12:c1"
+        ],
+        "assistance": "NONE",
+        "mode": "TECHNICAL_EXPLANATION",
+        "depth": 2,
+        "evidence_scope": "q12-case"
+      },
+      "source_question": "Khi chuyển đổi quy trình build từ Jenkins sang sử dụng GitLab CI (.gitlab-ci.yml), anh/chị cấu hình cơ chế caching dependencies giữa các job như thế nào để rút ngắn thời gian thực thi của toàn bộ pipeline?",
+      "source_context": "- Kỹ năng mục tiêu (Primary Skill d*): `ci_cd` (Matched CV Skill: `jenkins`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 3.50 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.40 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Cấu hình Jenkins job để tự động build và deploy mã nguồn.\"\n- Ngữ cảnh công việc: Software Engineer (09/2021 - 03/2023)\n- Context Anchors bắc cầu (A_ctx): Hệ thống tự động hóa build\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng ci_cd tại local turn k=1)",
+      "source_directives": "- Persona: DevOps Lead.\n- Chiến lược phỏng vấn: So sánh kỹ năng thay thế (COMPARE_SUBSTITUTE).\n- Hiệu chỉnh độ khó: Mức 3.50/5.0.\n- Ràng buộc: One-Question-One-Answer, Show Don't Tell.",
+      "source_reasoning": {
+        "surprising_fact_C": "Ứng viên có kinh nghiệm với Jenkins truyền thống nhưng dự án yêu cầu xây dựng pipeline hiện đại bằng GitLab CI dạng declarative mã nguồn.",
+        "hypothesis_A": "Ứng viên quen với cấu hình UI của Jenkins, có thể chưa nắm rõ cách quản lý cache dependencies và artifacts giữa các stage song song trong file YAML."
+      },
+      "source_slot": "ci_cd:primary",
+      "source_required_proficiency": 3.5
+    },
+    {
+      "sample_id": "q13",
+      "context": {
+        "objective": {
+          "objective_id": "q13",
+          "skill_id": "system_design",
+          "claim": "Distributed rate limiting",
+          "target_depth": 4,
+          "criteria": [
+            {
+              "criterion_id": "q13:c1",
+              "description": "Distributed rate limiting",
+              "expected_evidence": "Thiết kế cập nhật bộ đếm phân tán nhất quán khi nhiều service cùng giới hạn request.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Thiết kế cập nhật bộ đếm phân tán nhất quán khi nhiều service cùng giới hạn request.",
+              "at_target": "Thiết kế cập nhật bộ đếm phân tán nhất quán khi nhiều service cùng giới hạn request.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Thiết kế cập nhật bộ đếm phân tán nhất quán khi nhiều service cùng giới hạn request.",
+              "essential": true
+            }
+          ]
+        },
+        "mode": "DESIGN",
+        "interaction_mode": "VOICE",
+        "action": "INITIAL",
+        "question_depth": 4,
+        "target_criteria": [
+          "q13:c1"
+        ],
+        "required_question_contract": {
+          "mode": "DESIGN",
+          "depth": 4,
+          "criterion_ids": [
+            "q13:c1"
+          ]
+        },
+        "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `system_design` (Matched CV Skill: `system_design`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.50 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.80 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Tham gia thiết kế kiến trúc các dịch vụ backend phục vụ người dùng.\"\n- Ngữ cảnh công việc: Senior Backend (01/2023 - Hiện tại)\n- Context Anchors bắc cầu (A_ctx): 1. [INITIAL_NONE] Skill: redis | s_cv=4.00\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng system_design tại local turn k=1)",
+        "strategy": "PROBE_DEPTH",
+        "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
+        "remaining_questions": 8,
+        "history": []
+      },
+      "question": {
+        "text": "Nhiều microservice cùng áp dụng rate limit theo user bằng Redis. Bạn chọn thuật toán nào để xử lý request đồng thời nhất quán?",
+        "criterion_ids": [
+          "q13:c1"
+        ],
+        "assistance": "NONE",
+        "mode": "DESIGN",
+        "depth": 4,
+        "evidence_scope": "q13-case"
+      },
+      "source_question": "Để bảo vệ cụm microservices khỏi nguy cơ quá tải khi gặp các đợt lưu lượng truy cập đột biến (traffic spike), anh/chị thiết kế cơ chế Rate Limiting phân tán sử dụng Redis với thuật toán cụ thể nào để đảm bảo tính công bằng và chính xác?",
+      "source_context": "- Kỹ năng mục tiêu (Primary Skill d*): `system_design` (Matched CV Skill: `system_design`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.50 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.80 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Tham gia thiết kế kiến trúc các dịch vụ backend phục vụ người dùng.\"\n- Ngữ cảnh công việc: Senior Backend (01/2023 - Hiện tại)\n- Context Anchors bắc cầu (A_ctx): 1. [INITIAL_NONE] Skill: redis | s_cv=4.00\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng system_design tại local turn k=1)",
+      "source_directives": "- Persona: Principal Architect.\n- Chiến lược phỏng vấn: Đào sâu chuyên môn (PROBE_DEPTH).\n- Hiệu chỉnh độ khó: Mức 4.50/5.0.\n- Ràng buộc: One-Question-One-Answer, Show Don't Tell.",
+      "source_reasoning": {
+        "surprising_fact_C": "Ứng viên tham gia thiết kế backend nhưng CV chưa có bằng chứng giải quyết các bài toán bảo vệ hệ thống trước lưu lượng đột biến ở quy mô lớn.",
+        "hypothesis_A": "Ứng viên có thể chưa từng trực tiếp thiết kế giải pháp Rate Limiting phân tán bằng thuật toán Token Bucket hoặc Sliding Window Log."
+      },
+      "source_slot": "system_design:primary",
+      "source_required_proficiency": 4.5
+    },
+    {
+      "sample_id": "q14",
+      "context": {
+        "objective": {
+          "objective_id": "q14",
+          "skill_id": "graphql",
+          "claim": "GraphQL DataLoader batching",
+          "target_depth": 2,
+          "criteria": [
+            {
+              "criterion_id": "q14:c1",
+              "description": "GraphQL DataLoader batching",
+              "expected_evidence": "Giải thích cách batch các yêu cầu resolver để giảm truy vấn N+1.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Giải thích cách batch các yêu cầu resolver để giảm truy vấn N+1.",
+              "at_target": "Giải thích cách batch các yêu cầu resolver để giảm truy vấn N+1.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Giải thích cách batch các yêu cầu resolver để giảm truy vấn N+1.",
+              "essential": true
+            }
+          ]
+        },
+        "mode": "TECHNICAL_EXPLANATION",
+        "interaction_mode": "VOICE",
+        "action": "INITIAL",
+        "question_depth": 2,
+        "target_criteria": [
+          "q14:c1"
+        ],
+        "required_question_contract": {
+          "mode": "TECHNICAL_EXPLANATION",
+          "depth": 2,
+          "criterion_ids": [
+            "q14:c1"
+          ]
+        },
+        "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `graphql` (Matched CV Skill: `rest_api`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.40 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Xây dựng hệ thống REST API theo chuẩn OpenAPI.\"\n- Ngữ cảnh công việc: Backend Developer (03/2022 - 08/2023)\n- Context Anchors bắc cầu (A_ctx): Hệ thống API dịch vụ\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng graphql tại local turn k=1)",
+        "strategy": "COMPARE_SUBSTITUTE",
+        "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
+        "remaining_questions": 8,
+        "history": []
+      },
+      "question": {
+        "text": "Các GraphQL resolver lấy tác giả cho nhiều bài viết gây N+1 query. Bạn tổ chức DataLoader thế nào để gộp các lần lấy tác giả?",
+        "criterion_ids": [
+          "q14:c1"
+        ],
+        "assistance": "NONE",
+        "mode": "TECHNICAL_EXPLANATION",
+        "depth": 2,
+        "evidence_scope": "q14-case"
+      },
+      "source_question": "Khi xây dựng API bằng GraphQL, làm thế nào anh/chị áp dụng cơ chế Batching và Caching của thư viện DataLoader trong các resolver lồng nhau để giải quyết triệt để vấn đề N+1 query xuống cơ sở dữ liệu?",
+      "source_context": "- Kỹ năng mục tiêu (Primary Skill d*): `graphql` (Matched CV Skill: `rest_api`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.40 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Xây dựng hệ thống REST API theo chuẩn OpenAPI.\"\n- Ngữ cảnh công việc: Backend Developer (03/2022 - 08/2023)\n- Context Anchors bắc cầu (A_ctx): Hệ thống API dịch vụ\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng graphql tại local turn k=1)",
+      "source_directives": "- Persona: Lead API Architect.\n- Chiến lược phỏng vấn: So sánh kỹ năng thay thế (COMPARE_SUBSTITUTE).\n- Hiệu chỉnh độ khó: Mức 4.00/5.0.\n- Ràng buộc: One-Question-One-Answer, Show Don't Tell.",
+      "source_reasoning": {
+        "surprising_fact_C": "Ứng viên chỉ thuần thục REST API nhưng JD yêu cầu kiến trúc GraphQL giải quyết bài toán over-fetching và under-fetching.",
+        "hypothesis_A": "Ứng viên chuyển từ tư duy REST sang GraphQL dễ mắc bẫy N+1 query trong các resolver lồng nhau nếu chưa nắm cơ chế DataLoader."
+      },
+      "source_slot": "graphql:primary",
+      "source_required_proficiency": 4.0
+    },
+    {
+      "sample_id": "q15",
+      "context": {
+        "objective": {
+          "objective_id": "q15",
+          "skill_id": "elasticsearch",
+          "claim": "Elasticsearch analyzer",
+          "target_depth": 2,
+          "criteria": [
+            {
+              "criterion_id": "q15:c1",
+              "description": "Elasticsearch analyzer",
+              "expected_evidence": "Giải thích normalization cho nhu cầu tìm kiếm không phân biệt dấu và hoa thường.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Giải thích normalization cho nhu cầu tìm kiếm không phân biệt dấu và hoa thường.",
+              "at_target": "Giải thích normalization cho nhu cầu tìm kiếm không phân biệt dấu và hoa thường.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Giải thích normalization cho nhu cầu tìm kiếm không phân biệt dấu và hoa thường.",
+              "essential": true
+            }
+          ]
+        },
+        "mode": "TECHNICAL_EXPLANATION",
+        "interaction_mode": "VOICE",
+        "action": "INITIAL",
+        "question_depth": 2,
+        "target_criteria": [
+          "q15:c1"
+        ],
+        "required_question_contract": {
+          "mode": "TECHNICAL_EXPLANATION",
+          "depth": 2,
+          "criterion_ids": [
+            "q15:c1"
+          ]
+        },
+        "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `elasticsearch` (Matched CV Skill: `postgresql`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 3.50 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.00 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Tìm kiếm dữ liệu toàn văn bằng tính năng Full-text search của PostgreSQL.\"\n- Ngữ cảnh công việc: Backend Developer (06/2022 - Hiện tại)\n- Context Anchors bắc cầu (A_ctx): Dự án tìm kiếm dữ liệu sản phẩm\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng elasticsearch tại local turn k=1)",
+        "strategy": "LEARNING_AGILITY",
+        "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
+        "remaining_questions": 8,
+        "history": []
+      },
+      "question": {
+        "text": "Tìm kiếm cụm từ kỹ thuật cần bỏ qua dấu và chữ hoa, chữ thường. Bạn cấu hình analyzer Elasticsearch thế nào cho yêu cầu này?",
+        "criterion_ids": [
+          "q15:c1"
+        ],
+        "assistance": "NONE",
+        "mode": "TECHNICAL_EXPLANATION",
+        "depth": 2,
+        "evidence_scope": "q15-case"
+      },
+      "source_question": "Dựa trên nguyên lý Inverted Index của Elasticsearch, anh/chị lựa chọn bộ Analyzer và cấu hình Tokenizer ra sao để hệ thống có thể tìm kiếm chính xác các cụm từ kỹ thuật không phân biệt dấu và chữ hoa chữ thường?",
+      "source_context": "- Kỹ năng mục tiêu (Primary Skill d*): `elasticsearch` (Matched CV Skill: `postgresql`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 3.50 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.00 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Tìm kiếm dữ liệu toàn văn bằng tính năng Full-text search của PostgreSQL.\"\n- Ngữ cảnh công việc: Backend Developer (06/2022 - Hiện tại)\n- Context Anchors bắc cầu (A_ctx): Dự án tìm kiếm dữ liệu sản phẩm\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng elasticsearch tại local turn k=1)",
+      "source_directives": "- Persona: Search Engineering Lead.\n- Chiến lược phỏng vấn: Khả năng học hỏi thích ứng kỹ thuật (LEARNING_AGILITY).\n- Hiệu chỉnh độ khó: Mức 3.50/5.0.\n- Ràng buộc: One-Question-One-Answer, Show Don't Tell.",
+      "source_reasoning": {
+        "surprising_fact_C": "Ứng viên có kiến thức cơ bản về tìm kiếm toàn văn trên RDBMS nhưng chưa có kinh nghiệm thực tế với công cụ tìm kiếm chuyên dụng Elasticsearch.",
+        "hypothesis_A": "Ứng viên cần hiểu nguyên lý cấu trúc chỉ mục đảo (Inverted Index) và cơ chế Tokenizer/Analyzer của Elasticsearch khi chuyển giao giải pháp."
+      },
+      "source_slot": "elasticsearch:primary",
+      "source_required_proficiency": 3.5
+    },
+    {
+      "sample_id": "q16",
+      "context": {
+        "objective": {
+          "objective_id": "q16",
+          "skill_id": "microservices_security",
+          "claim": "JWT token revocation",
+          "target_depth": 4,
+          "criteria": [
+            {
+              "criterion_id": "q16:c1",
+              "description": "JWT token revocation",
+              "expected_evidence": "Thiết kế kiểm tra thu hồi token trước thời điểm hết hạn.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Thiết kế kiểm tra thu hồi token trước thời điểm hết hạn.",
+              "at_target": "Thiết kế kiểm tra thu hồi token trước thời điểm hết hạn.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Thiết kế kiểm tra thu hồi token trước thời điểm hết hạn.",
+              "essential": true
+            }
+          ]
+        },
+        "mode": "DESIGN",
+        "interaction_mode": "VOICE",
+        "action": "INITIAL",
+        "question_depth": 4,
+        "target_criteria": [
+          "q16:c1"
+        ],
+        "required_question_contract": {
+          "mode": "DESIGN",
+          "depth": 4,
+          "criterion_ids": [
+            "q16:c1"
+          ]
+        },
+        "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `microservices_security` (Matched CV Skill: `jwt`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.50 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Xác thực người dùng bằng JSON Web Token (JWT).\"\n- Ngữ cảnh công việc: Backend Developer (01/2022 - 12/2023)\n- Context Anchors bắc cầu (A_ctx): Cổng xác thực người dùng\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng microservices_security tại local turn k=1)",
+        "strategy": "PROBE_DEPTH",
+        "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
+        "remaining_questions": 8,
+        "history": []
+      },
+      "question": {
+        "text": "Một JWT access token bị lộ trước khi hết hạn. Bạn thiết kế kiểm tra tại API Gateway thế nào để thu hồi token ngay?",
+        "criterion_ids": [
+          "q16:c1"
+        ],
+        "assistance": "NONE",
+        "mode": "DESIGN",
+        "depth": 4,
+        "evidence_scope": "q16-case"
+      },
+      "source_question": "Vì JWT có tính chất stateless, trong trường hợp một Access Token bị lộ trước khi hết hạn, anh/chị thiết kế giải pháp thu hồi quyền truy cập (Token Revocation) tức thời ở API Gateway như thế nào?",
+      "source_context": "- Kỹ năng mục tiêu (Primary Skill d*): `microservices_security` (Matched CV Skill: `jwt`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.50 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Xác thực người dùng bằng JSON Web Token (JWT).\"\n- Ngữ cảnh công việc: Backend Developer (01/2022 - 12/2023)\n- Context Anchors bắc cầu (A_ctx): Cổng xác thực người dùng\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng microservices_security tại local turn k=1)",
+      "source_directives": "- Persona: Application Security Specialist.\n- Chiến lược phỏng vấn: Đào sâu chuyên môn (PROBE_DEPTH).\n- Hiệu chỉnh độ khó: Mức 4.00/5.0.\n- Ràng buộc: One-Question-One-Answer, Show Don't Tell.",
+      "source_reasoning": {
+        "surprising_fact_C": "CV ghi nhận dùng JWT để xác thực nhưng không làm rõ cách xử lý thu hồi token (token revocation) hoặc xoay vòng refresh token.",
+        "hypothesis_A": "Ứng viên có thể chỉ sinh token tĩnh với hạn dài mà chưa có cơ chế thu hồi token tức thì khi tài khoản có dấu hiệu bị xâm nhập."
+      },
+      "source_slot": "microservices_security:primary",
+      "source_required_proficiency": 4.0
+    },
+    {
+      "sample_id": "q17",
+      "context": {
+        "objective": {
+          "objective_id": "q17",
+          "skill_id": "java_spring",
+          "claim": "Saga compensation",
+          "target_depth": 4,
+          "criteria": [
+            {
+              "criterion_id": "q17:c1",
+              "description": "Saga compensation",
+              "expected_evidence": "Thiết kế hành vi bù khi một bước của giao dịch phân tán thất bại.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Thiết kế hành vi bù khi một bước của giao dịch phân tán thất bại.",
+              "at_target": "Thiết kế hành vi bù khi một bước của giao dịch phân tán thất bại.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Thiết kế hành vi bù khi một bước của giao dịch phân tán thất bại.",
+              "essential": true
+            }
+          ]
+        },
+        "mode": "DESIGN",
+        "interaction_mode": "VOICE",
+        "action": "FOLLOW_UP",
+        "question_depth": 4,
+        "target_criteria": [
+          "q17:c1"
+        ],
+        "required_question_contract": {
+          "mode": "DESIGN",
+          "depth": 4,
+          "criterion_ids": [
+            "q17:c1"
+          ]
+        },
+        "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `java_spring` (Matched CV Skill: `java_spring`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.30 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Phát triển các RESTful API CRUD cơ bản sử dụng Java Spring Boot...\"\n- Ngữ cảnh công việc: Junior Java Developer\n- Lịch sử hội thoại:\n- [Turn t=1, k=1, Skill='java_spring', Slot='java_spring:primary']\n  + Câu hỏi: Cấu hình rollback cho @Transactional khi gặp runtime exception?\n  + Trả lời: Em dùng @Transactional(rollbackFor = Exception.class) trên Service.\n  + Judge Insight: Ứng viên nắm được cú pháp cơ bản cho local transaction đơn lẻ.",
+        "strategy": "PROBE_DEPTH",
+        "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
+        "remaining_questions": 8,
+        "history": []
+      },
+      "question": {
+        "text": "Nghiệp vụ thanh toán cập nhật hai microservice và bước cuối thất bại. Bạn thiết kế compensating transaction trong Saga thế nào?",
+        "criterion_ids": [
+          "q17:c1"
+        ],
+        "assistance": "NONE",
+        "mode": "DESIGN",
+        "depth": 4,
+        "evidence_scope": "q17-case"
+      },
+      "source_question": "Khi một nghiệp vụ thanh toán đòi hỏi cập nhật trạng thái đồng thời trên hai microservices độc lập, anh/chị áp dụng mô hình Saga Pattern (Choreography hoặc Orchestration) như thế nào để xử lý giao dịch bù (Compensating Transaction) nếu bước cuối cùng thất bại?",
+      "source_context": "- Kỹ năng mục tiêu (Primary Skill d*): `java_spring` (Matched CV Skill: `java_spring`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.30 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Phát triển các RESTful API CRUD cơ bản sử dụng Java Spring Boot...\"\n- Ngữ cảnh công việc: Junior Java Developer\n- Lịch sử hội thoại:\n- [Turn t=1, k=1, Skill='java_spring', Slot='java_spring:primary']\n  + Câu hỏi: Cấu hình rollback cho @Transactional khi gặp runtime exception?\n  + Trả lời: Em dùng @Transactional(rollbackFor = Exception.class) trên Service.\n  + Judge Insight: Ứng viên nắm được cú pháp cơ bản cho local transaction đơn lẻ.",
+      "source_directives": "- Persona: Senior Technical Interviewer.\n- Chiến lược phỏng vấn: Đào sâu chuyên môn (PROBE_DEPTH) tại lượt hỏi xoáy k=2.\n- Quản lý Probing Sub-slot: Sinh 1 sub-slot mới để kiểm tra giao dịch phân tán (distributed transaction).\n- Ràng buộc: One-Question-One-Answer, Show Don't Tell.",
+      "source_reasoning": {
+        "surprising_fact_C": "Ứng viên trả lời tốt về local transaction ở lượt k=1, nhưng chưa rõ năng lực xử lý giao dịch trải rộng qua nhiều microservices.",
+        "hypothesis_A": "Ứng viên có thể chưa từng triển khai các mô hình đảm bảo tính nhất quán dữ liệu phân tán như Saga Pattern hay Outbox Pattern."
+      },
+      "source_slot": "java_spring:sub_1",
+      "source_required_proficiency": 4.0
+    },
+    {
+      "sample_id": "q18",
+      "context": {
+        "objective": {
+          "objective_id": "q18",
+          "skill_id": "kafka",
+          "claim": "Kafka consumer idempotency",
+          "target_depth": 4,
+          "criteria": [
+            {
+              "criterion_id": "q18:c1",
+              "description": "Kafka consumer idempotency",
+              "expected_evidence": "Ngăn một message được giao lại tạo tác động giao dịch trùng.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Ngăn một message được giao lại tạo tác động giao dịch trùng.",
+              "at_target": "Ngăn một message được giao lại tạo tác động giao dịch trùng.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Ngăn một message được giao lại tạo tác động giao dịch trùng.",
+              "essential": true
+            }
+          ]
+        },
+        "mode": "DESIGN",
+        "interaction_mode": "VOICE",
+        "action": "FOLLOW_UP",
+        "question_depth": 4,
+        "target_criteria": [
+          "q18:c1"
+        ],
+        "required_question_contract": {
+          "mode": "DESIGN",
+          "depth": 4,
+          "criterion_ids": [
+            "q18:c1"
+          ]
+        },
+        "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `kafka` (Matched CV Skill: `rabbitmq`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.50 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Sử dụng RabbitMQ xử lý message queue.\"\n- Lịch sử hội thoại:\n- [Turn t=2, k=1, Skill='kafka', Slot='kafka:primary']\n  + Câu hỏi: Xử lý consumer lag khi topic lưu lượng lớn?\n  + Trả lời: Em tăng số partition và scale thêm instance trong consumer group.\n  + Judge Insight: Ứng viên hiểu cơ chế scale partition của Kafka.",
+        "strategy": "PROBE_DEPTH",
+        "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
+        "remaining_questions": 8,
+        "history": []
+      },
+      "question": {
+        "text": "Kafka giao lại một message giao dịch đã được consumer xử lý. Bạn thiết kế consumer thế nào để tác động lên dữ liệu không bị lặp?",
+        "criterion_ids": [
+          "q18:c1"
+        ],
+        "assistance": "NONE",
+        "mode": "DESIGN",
+        "depth": 4,
+        "evidence_scope": "q18-case"
+      },
+      "source_question": "Trong trường hợp mạng chập chờn khiến Kafka Broker gửi lại các message đã được tiêu thụ, anh/chị thiết kế cơ chế Idempotent Consumer ở tầng ứng dụng như thế nào để đảm bảo không bị xử lý trùng lặp dữ liệu giao dịch?",
+      "source_context": "- Kỹ năng mục tiêu (Primary Skill d*): `kafka` (Matched CV Skill: `rabbitmq`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.50 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Sử dụng RabbitMQ xử lý message queue.\"\n- Lịch sử hội thoại:\n- [Turn t=2, k=1, Skill='kafka', Slot='kafka:primary']\n  + Câu hỏi: Xử lý consumer lag khi topic lưu lượng lớn?\n  + Trả lời: Em tăng số partition và scale thêm instance trong consumer group.\n  + Judge Insight: Ứng viên hiểu cơ chế scale partition của Kafka.",
+      "source_directives": "- Persona: Lead Architect.\n- Chiến lược phỏng vấn: Đào sâu chuyên môn (PROBE_DEPTH) tại lượt k=2.\n- Quản lý Probing Sub-slot: Sinh 1 sub-slot mới để kiểm tra Exactly-once delivery.\n- Ràng buộc: One-Question-One-Answer, Show Don't Tell.",
+      "source_reasoning": {
+        "surprising_fact_C": "Ứng viên biết cách scale consumer group nhưng chưa làm rõ việc xử lý trùng lặp tin nhắn khi broker rebalance.",
+        "hypothesis_A": "Ứng viên có thể dựa vào At-least-once mặc định mà chưa thiết kế cơ chế Idempotent Consumer để loại trừ tin nhắn bị gửi lại."
+      },
+      "source_slot": "kafka:sub_1",
+      "source_required_proficiency": 4.0
+    },
+    {
+      "sample_id": "q19",
+      "context": {
+        "objective": {
+          "objective_id": "q19",
+          "skill_id": "kubernetes",
+          "claim": "Kubernetes queue autoscaling",
+          "target_depth": 4,
+          "criteria": [
+            {
+              "criterion_id": "q19:c1",
+              "description": "Kubernetes queue autoscaling",
+              "expected_evidence": "Chọn tín hiệu autoscaling theo backlog khi CPU không phản ánh tải.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Chọn tín hiệu autoscaling theo backlog khi CPU không phản ánh tải.",
+              "at_target": "Chọn tín hiệu autoscaling theo backlog khi CPU không phản ánh tải.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Chọn tín hiệu autoscaling theo backlog khi CPU không phản ánh tải.",
+              "essential": true
+            }
+          ]
+        },
+        "mode": "DESIGN",
+        "interaction_mode": "VOICE",
+        "action": "FOLLOW_UP",
+        "question_depth": 4,
+        "target_criteria": [
+          "q19:c1"
+        ],
+        "required_question_contract": {
+          "mode": "DESIGN",
+          "depth": 4,
+          "criterion_ids": [
+            "q19:c1"
+          ]
+        },
+        "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `kubernetes` (Matched CV Skill: `kubernetes`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.50 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 3.00 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Triển khai ứng dụng lên Kubernetes cluster...\"\n- Lịch sử hội thoại:\n- [Turn t=3, k=1, Skill='kubernetes', Slot='kubernetes:primary']\n  + Câu hỏi: Xử lý Pod bị OOMKilled exit code 137?\n  + Trả lời: Em kiểm tra heap dump và tăng limit memory trong Deployment spec.\n  + Judge Insight: Ứng viên biết cách khắc phục cơ bản.",
+        "strategy": "PROBE_DEPTH",
+        "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
+        "remaining_questions": 8,
+        "history": []
+      },
+      "question": {
+        "text": "Hàng đợi tăng mạnh nhưng CPU của Pod vẫn thấp. Bạn thiết kế tín hiệu autoscaling bằng KEDA hoặc HPA thế nào?",
+        "criterion_ids": [
+          "q19:c1"
+        ],
+        "assistance": "NONE",
+        "mode": "DESIGN",
+        "depth": 4,
+        "evidence_scope": "q19-case"
+      },
+      "source_question": "Khi CPU của Pod không tăng nhưng hàng đợi tin nhắn của hệ thống bị ùn ứ, anh/chị tích hợp Horizontal Pod Autoscaler (HPA) với Prometheus hoặc KEDA như thế nào để tự động tăng số lượng Pod theo độ dài hàng đợi?",
+      "source_context": "- Kỹ năng mục tiêu (Primary Skill d*): `kubernetes` (Matched CV Skill: `kubernetes`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.50 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 3.00 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Triển khai ứng dụng lên Kubernetes cluster...\"\n- Lịch sử hội thoại:\n- [Turn t=3, k=1, Skill='kubernetes', Slot='kubernetes:primary']\n  + Câu hỏi: Xử lý Pod bị OOMKilled exit code 137?\n  + Trả lời: Em kiểm tra heap dump và tăng limit memory trong Deployment spec.\n  + Judge Insight: Ứng viên biết cách khắc phục cơ bản.",
+      "source_directives": "- Persona: SRE Lead.\n- Chiến lược phỏng vấn: Đào sâu chuyên môn (PROBE_DEPTH) tại lượt k=2.\n- Quản lý Probing Sub-slot: Sinh 1 sub-slot mới về Custom Metrics Autoscaling.\n- Ràng buộc: One-Question-One-Answer, Show Don't Tell.",
+      "source_reasoning": {
+        "surprising_fact_C": "Ứng viên biết tinh chỉnh thông số tĩnh trong Deployment nhưng chưa đề cập đến cơ chế tự động mở rộng (autoscaling) theo tải thực tế.",
+        "hypothesis_A": "Ứng viên có thể chỉ quen với CPU-based HPA mặc định mà chưa từng tích hợp Prometheus Adapter để scale Pod dựa trên độ dài hàng đợi tin nhắn."
+      },
+      "source_slot": "kubernetes:sub_1",
+      "source_required_proficiency": 4.5
+    },
+    {
+      "sample_id": "q20",
+      "context": {
+        "objective": {
+          "objective_id": "q20",
+          "skill_id": "postgresql",
+          "claim": "PostgreSQL lock dependency",
+          "target_depth": 3,
+          "criteria": [
+            {
+              "criterion_id": "q20:c1",
+              "description": "PostgreSQL lock dependency",
+              "expected_evidence": "Dùng quan hệ khóa giữa các tiến trình để chẩn đoán deadlock.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Dùng quan hệ khóa giữa các tiến trình để chẩn đoán deadlock.",
+              "at_target": "Dùng quan hệ khóa giữa các tiến trình để chẩn đoán deadlock.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Dùng quan hệ khóa giữa các tiến trình để chẩn đoán deadlock.",
+              "essential": true
+            }
+          ]
+        },
+        "mode": "DEBUGGING",
+        "interaction_mode": "VOICE",
+        "action": "FOLLOW_UP",
+        "question_depth": 3,
+        "target_criteria": [
+          "q20:c1"
+        ],
+        "required_question_contract": {
+          "mode": "DEBUGGING",
+          "depth": 3,
+          "criterion_ids": [
+            "q20:c1"
+          ]
+        },
+        "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `postgresql` (Matched CV Skill: `postgresql`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.80 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Thiết kế cơ sở dữ liệu quan hệ PostgreSQL...\"\n- Ngữ cảnh công việc: Backend Developer\n- Lịch sử hội thoại:\n- [Turn t=4, k=1, Skill='postgresql', Slot='postgresql:primary']\n  + Câu hỏi: Dùng EXPLAIN ANALYZE tối ưu truy vấn chậm?\n  + Trả lời: Em phân tích cost, xem node nào bị seq scan thì thêm composite index.\n  + Judge Insight: Nắm vững nguyên lý đánh index cơ bản.",
+        "strategy": "PROBE_DEPTH",
+        "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
+        "remaining_questions": 8,
+        "history": []
+      },
+      "question": {
+        "text": "Nhiều giao dịch PostgreSQL gặp deadlock khi cập nhật các bảng liên quan. Bạn dùng pg_locks thế nào để xác định chuỗi khóa giữa các tiến trình?",
+        "criterion_ids": [
+          "q20:c1"
+        ],
+        "assistance": "NONE",
+        "mode": "DEBUGGING",
+        "depth": 3,
+        "evidence_scope": "q20-case"
+      },
+      "source_question": "Khi nhiều giao dịch cùng cập nhật các bảng liên quan dẫn đến tình trạng Deadlock liên tục trong PostgreSQL, anh/chị dùng câu lệnh và phương pháp nào trong pg_locks để xác định chính xác chuỗi khóa gây nghẽn giữa các tiến trình?",
+      "source_context": "- Kỹ năng mục tiêu (Primary Skill d*): `postgresql` (Matched CV Skill: `postgresql`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.80 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Thiết kế cơ sở dữ liệu quan hệ PostgreSQL...\"\n- Ngữ cảnh công việc: Backend Developer\n- Lịch sử hội thoại:\n- [Turn t=4, k=1, Skill='postgresql', Slot='postgresql:primary']\n  + Câu hỏi: Dùng EXPLAIN ANALYZE tối ưu truy vấn chậm?\n  + Trả lời: Em phân tích cost, xem node nào bị seq scan thì thêm composite index.\n  + Judge Insight: Nắm vững nguyên lý đánh index cơ bản.",
+      "source_directives": "- Persona: Database Administrator / Performance Lead.\n- Chiến lược phỏng vấn: Đào sâu chuyên môn (PROBE_DEPTH) tại lượt k=2.\n- Quản lý Probing Sub-slot: Sinh 1 sub-slot mới về giải quyết Deadlock đồng thời.\n- Ràng buộc: One-Question-One-Answer, Show Don't Tell.",
+      "source_reasoning": {
+        "surprising_fact_C": "Ứng viên tối ưu tốt truy vấn đọc (Read), nhưng chưa rõ cách xử lý xung đột khóa khi có nhiều giao dịch ghi (Write) đồng thời.",
+        "hypothesis_A": "Ứng viên có thể chưa từng trực tiếp giải quyết sự cố Deadlock giữa các transaction cập nhật dữ liệu đa luồng."
+      },
+      "source_slot": "postgresql:sub_1",
+      "source_required_proficiency": 4.0
+    }
+  ],
+  "judgments": [
+    {
+      "sample_id": "j01",
+      "context": {
+        "interaction_mode": "VOICE",
+        "objective": {
+          "objective_id": "j01",
+          "skill_id": "java_spring",
+          "claim": "Spring transaction rollback",
+          "target_depth": 3,
+          "criteria": [
+            {
+              "criterion_id": "j01:c1",
+              "description": "Spring transaction rollback",
+              "expected_evidence": "Giải thích rollback khi phương thức Spring có transaction gặp RuntimeException.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Giải thích rollback khi phương thức Spring có transaction gặp RuntimeException.",
+              "at_target": "Giải thích rollback khi phương thức Spring có transaction gặp RuntimeException.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Giải thích rollback khi phương thức Spring có transaction gặp RuntimeException.",
+              "essential": true
+            }
+          ]
+        },
+        "turn": {
+          "turn_id": "j01-turn",
+          "objective_id": "j01",
+          "skill_id": "java_spring",
+          "mode": "DEBUGGING",
+          "action": "INITIAL",
+          "difficulty": 3,
+          "question_depth": 3,
+          "question": {
+            "text": "Khi một phương thức @Transactional gặp RuntimeException, anh/chị cấu hình rollback và propagation như thế nào?",
+            "criterion_ids": [
+              "j01:c1"
+            ],
+            "assistance": "NONE",
+            "mode": "DEBUGGING",
+            "depth": 3,
+            "evidence_scope": "j01-case"
+          },
+          "answer": "Thực tế em mới chỉ dùng Spring Boot để viết các API CRUD cơ bản và gọi hàm có sẵn của Spring Data JPA, chứ chưa từng trực tiếp xử lý các vấn đề chuyên sâu về quản lý Transaction phức tạp hay cấu hình propagation.",
+          "judgment": null,
+          "introduction": ""
+        },
+        "required_criterion_ids": [
+          "j01:c1"
+        ],
+        "target_criteria": [
+          {
+            "criterion_id": "j01:c1",
+            "description": "Spring transaction rollback",
+            "expected_evidence": "Giải thích rollback khi phương thức Spring có transaction gặp RuntimeException.",
+            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Giải thích rollback khi phương thức Spring có transaction gặp RuntimeException.",
+            "at_target": "Giải thích rollback khi phương thức Spring có transaction gặp RuntimeException.",
+            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Giải thích rollback khi phương thức Spring có transaction gặp RuntimeException.",
+            "essential": true
+          }
+        ],
+        "prior_observations": [],
+        "prior_turns": []
+      },
+      "judgment": {
+        "observations": [
+          {
+            "criterion_id": "j01:c1",
+            "response_excerpt": "",
+            "observation": "UNCLEAR",
+            "performance": "UNDETERMINED",
+            "rationale": "Chưa có lời giải về rollback và propagation.",
+            "resolves_contradiction": false,
+            "unresolved_aspects": [
+              "Chưa có lời giải về rollback và propagation."
+            ]
+          }
+        ],
+        "feedback": "Bạn đã nói rõ phạm vi kinh nghiệm Spring hiện tại.",
+        "explicit_inability": true,
+        "inability_excerpt": "Thực tế em mới chỉ dùng Spring Boot để viết các API CRUD cơ bản và gọi hàm có sẵn của Spring Data JPA, chứ chưa từng trực tiếp xử lý các vấn đề chuyên sâu về quản lý Transaction phức tạp hay cấu hình propagation.",
+        "feedback_contains_hint": false
+      },
+      "source_question": "Khi một phương thức @Transactional gặp RuntimeException, anh/chị cấu hình rollback và propagation như thế nào?",
+      "source_response": "Thực tế em mới chỉ dùng Spring Boot để viết các API CRUD cơ bản và gọi hàm có sẵn của Spring Data JPA, chứ chưa từng trực tiếp xử lý các vấn đề chuyên sâu về quản lý Transaction phức tạp hay cấu hình propagation.",
+      "source_context": "- Kỹ năng đang đánh giá (d*): `java_spring`\n- Mức năng lực yêu cầu từ JD (s_jd): 4.00 / 5.0\n- Mức năng lực ước lượng từ CV (s_cv): 2.30 / 5.0\n- Bằng chứng trong CV: \"Phát triển các RESTful API CRUD cơ bản...\"\n- Hệ quy chiếu Rubric: Low(1.5), Med(3.0), High(4.5)",
+      "source_required_proficiency": 4.0
+    },
+    {
+      "sample_id": "j02",
+      "context": {
+        "interaction_mode": "VOICE",
+        "objective": {
+          "objective_id": "j02",
+          "skill_id": "terraform",
+          "claim": "Terraform state locking",
+          "target_depth": 4,
+          "criteria": [
+            {
+              "criterion_id": "j02:c1",
+              "description": "Terraform state locking",
+              "expected_evidence": "Thiết kế cơ chế phối hợp truy cập remote state khi nhiều người cùng apply.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Thiết kế cơ chế phối hợp truy cập remote state khi nhiều người cùng apply.",
+              "at_target": "Thiết kế cơ chế phối hợp truy cập remote state khi nhiều người cùng apply.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Thiết kế cơ chế phối hợp truy cập remote state khi nhiều người cùng apply.",
+              "essential": true
+            }
+          ]
+        },
+        "turn": {
+          "turn_id": "j02-turn",
+          "objective_id": "j02",
+          "skill_id": "terraform",
+          "mode": "DESIGN",
+          "action": "INITIAL",
+          "difficulty": 4,
+          "question_depth": 4,
+          "question": {
+            "text": "Anh/chị thiết kế cơ chế Remote Backend kết hợp State Locking như thế nào để ngăn chặn xung đột?",
+            "criterion_ids": [
+              "j02:c1"
+            ],
+            "assistance": "NONE",
+            "mode": "DESIGN",
+            "depth": 4,
+            "evidence_scope": "j02-case"
+          },
+          "answer": "Em dùng S3 bucket để lưu tfstate và bật versioning, sau đó cấu hình DynamoDB table làm lock table. Mỗi khi ai đó chạy terraform apply thì sẽ lấy lock từ DynamoDB trước, nếu có người đang chạy thì sẽ báo lỗi chờ.",
+          "judgment": null,
+          "introduction": ""
+        },
+        "required_criterion_ids": [
+          "j02:c1"
+        ],
+        "target_criteria": [
+          {
+            "criterion_id": "j02:c1",
+            "description": "Terraform state locking",
+            "expected_evidence": "Thiết kế cơ chế phối hợp truy cập remote state khi nhiều người cùng apply.",
+            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Thiết kế cơ chế phối hợp truy cập remote state khi nhiều người cùng apply.",
+            "at_target": "Thiết kế cơ chế phối hợp truy cập remote state khi nhiều người cùng apply.",
+            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Thiết kế cơ chế phối hợp truy cập remote state khi nhiều người cùng apply.",
+            "essential": true
+          }
+        ],
+        "prior_observations": [],
+        "prior_turns": []
+      },
+      "judgment": {
+        "observations": [
+          {
+            "criterion_id": "j02:c1",
+            "response_excerpt": "Em dùng S3 bucket để lưu tfstate và bật versioning, sau đó cấu hình DynamoDB table làm lock table. Mỗi khi ai đó chạy terraform apply thì sẽ lấy lock từ DynamoDB trước, nếu có người đang chạy thì sẽ báo lỗi chờ.",
+            "observation": "SUPPORTS",
+            "performance": "AT_TARGET",
+            "rationale": "Nêu remote state dùng S3 và cơ chế khóa phối hợp apply bằng DynamoDB.",
+            "resolves_contradiction": false,
+            "unresolved_aspects": []
+          }
+        ],
+        "feedback": "Bạn đã mô tả cách phối hợp truy cập remote state.",
+        "explicit_inability": false,
+        "inability_excerpt": "",
+        "feedback_contains_hint": false
+      },
+      "source_question": "Anh/chị thiết kế cơ chế Remote Backend kết hợp State Locking như thế nào để ngăn chặn xung đột?",
+      "source_response": "Em dùng S3 bucket để lưu tfstate và bật versioning, sau đó cấu hình DynamoDB table làm lock table. Mỗi khi ai đó chạy terraform apply thì sẽ lấy lock từ DynamoDB trước, nếu có người đang chạy thì sẽ báo lỗi chờ.",
+      "source_context": "- Kỹ năng đang đánh giá (d*): `terraform`\n- Mức năng lực yêu cầu từ JD (s_jd): 4.00 / 5.0\n- Mức năng lực ước lượng từ CV (s_cv): 2.40 / 5.0\n- Bằng chứng trong CV: \"Tự động hóa cấp phát hạ tầng AWS bằng CloudFormation templates.\"\n- Hệ quy chiếu Rubric: Low(1.5), Med(3.0), High(4.5)",
+      "source_required_proficiency": 4.0
+    },
+    {
+      "sample_id": "j03",
+      "context": {
+        "interaction_mode": "VOICE",
+        "objective": {
+          "objective_id": "j03",
+          "skill_id": "docker",
+          "claim": "Docker multi-stage build",
+          "target_depth": 2,
+          "criteria": [
+            {
+              "criterion_id": "j03:c1",
+              "description": "Docker multi-stage build",
+              "expected_evidence": "Giải thích cách tách môi trường build khỏi runtime image.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Giải thích cách tách môi trường build khỏi runtime image.",
+              "at_target": "Giải thích cách tách môi trường build khỏi runtime image.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Giải thích cách tách môi trường build khỏi runtime image.",
+              "essential": true
+            }
+          ]
+        },
+        "turn": {
+          "turn_id": "j03-turn",
+          "objective_id": "j03",
+          "skill_id": "docker",
+          "mode": "TECHNICAL_EXPLANATION",
+          "action": "INITIAL",
+          "difficulty": 2,
+          "question_depth": 2,
+          "question": {
+            "text": "Anh/chị đã áp dụng những kỹ thuật nào trong Dockerfile để tối ưu hóa kích thước image và tăng tốc độ build?",
+            "criterion_ids": [
+              "j03:c1"
+            ],
+            "assistance": "NONE",
+            "mode": "TECHNICAL_EXPLANATION",
+            "depth": 2,
+            "evidence_scope": "j03-case"
+          },
+          "answer": "Dạ em dùng Docker rất nhiều, Docker là công nghệ ảo hóa rất tốt giúp đóng gói ứng dụng nhanh chóng, triển khai CI/CD rất mượt mà và hiện đại cho toàn bộ team.",
+          "judgment": null,
+          "introduction": ""
+        },
+        "required_criterion_ids": [
+          "j03:c1"
+        ],
+        "target_criteria": [
+          {
+            "criterion_id": "j03:c1",
+            "description": "Docker multi-stage build",
+            "expected_evidence": "Giải thích cách tách môi trường build khỏi runtime image.",
+            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Giải thích cách tách môi trường build khỏi runtime image.",
+            "at_target": "Giải thích cách tách môi trường build khỏi runtime image.",
+            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Giải thích cách tách môi trường build khỏi runtime image.",
+            "essential": true
+          }
+        ],
+        "prior_observations": [],
+        "prior_turns": []
+      },
+      "judgment": {
+        "observations": [
+          {
+            "criterion_id": "j03:c1",
+            "response_excerpt": "",
+            "observation": "NO_EVIDENCE",
+            "performance": "UNDETERMINED",
+            "rationale": "Chưa nêu kỹ thuật tối ưu Docker image hoặc build.",
+            "resolves_contradiction": false,
+            "unresolved_aspects": [
+              "Chưa nêu kỹ thuật tối ưu Docker image hoặc build."
+            ]
+          }
+        ],
+        "feedback": "Câu trả lời chưa đề cập kỹ thuật tối ưu image cụ thể.",
+        "explicit_inability": false,
+        "inability_excerpt": "",
+        "feedback_contains_hint": false
+      },
+      "source_question": "Anh/chị đã áp dụng những kỹ thuật nào trong Dockerfile để tối ưu hóa kích thước image và tăng tốc độ build?",
+      "source_response": "Dạ em dùng Docker rất nhiều, Docker là công nghệ ảo hóa rất tốt giúp đóng gói ứng dụng nhanh chóng, triển khai CI/CD rất mượt mà và hiện đại cho toàn bộ team.",
+      "source_context": "- Kỹ năng đang đánh giá (d*): `docker`\n- Mức năng lực yêu cầu từ JD (s_jd): 3.50 / 5.0\n- Mức năng lực ước lượng từ CV (s_cv): 2.50 / 5.0\n- Bằng chứng trong CV: \"Sử dụng Docker đóng gói ứng dụng.\"\n- Hệ quy chiếu Rubric: Low(1.5), Med(3.0), High(4.5)",
+      "source_required_proficiency": 3.5
+    },
+    {
+      "sample_id": "j04",
+      "context": {
+        "interaction_mode": "VOICE",
+        "objective": {
+          "objective_id": "j04",
+          "skill_id": "aws",
+          "claim": "AWS availability zone failure",
+          "target_depth": 4,
+          "criteria": [
+            {
+              "criterion_id": "j04:c1",
+              "description": "AWS availability zone failure",
+              "expected_evidence": "Thiết kế đường phục hồi ứng dụng khi một Availability Zone lỗi.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Thiết kế đường phục hồi ứng dụng khi một Availability Zone lỗi.",
+              "at_target": "Thiết kế đường phục hồi ứng dụng khi một Availability Zone lỗi.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Thiết kế đường phục hồi ứng dụng khi một Availability Zone lỗi.",
+              "essential": true
+            }
+          ]
+        },
+        "turn": {
+          "turn_id": "j04-turn",
+          "objective_id": "j04",
+          "skill_id": "aws",
+          "mode": "DESIGN",
+          "action": "INITIAL",
+          "difficulty": 4,
+          "question_depth": 4,
+          "question": {
+            "text": "Anh/chị cấu hình cơ chế Multi-AZ failover giữa Application Load Balancer và RDS như thế nào?",
+            "criterion_ids": [
+              "j04:c1"
+            ],
+            "assistance": "NONE",
+            "mode": "DESIGN",
+            "depth": 4,
+            "evidence_scope": "j04-case"
+          },
+          "answer": "Ở công ty cũ của em, toàn bộ phần thiết lập mạng VPC và Multi-AZ do đội DevOps chuyên trách quản lý. Em là developer chỉ được cấp quyền đọc CloudWatch để xem log và cấu hình biến môi trường kết nối database thôi ạ.",
+          "judgment": null,
+          "introduction": ""
+        },
+        "required_criterion_ids": [
+          "j04:c1"
+        ],
+        "target_criteria": [
+          {
+            "criterion_id": "j04:c1",
+            "description": "AWS availability zone failure",
+            "expected_evidence": "Thiết kế đường phục hồi ứng dụng khi một Availability Zone lỗi.",
+            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Thiết kế đường phục hồi ứng dụng khi một Availability Zone lỗi.",
+            "at_target": "Thiết kế đường phục hồi ứng dụng khi một Availability Zone lỗi.",
+            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Thiết kế đường phục hồi ứng dụng khi một Availability Zone lỗi.",
+            "essential": true
+          }
+        ],
+        "prior_observations": [],
+        "prior_turns": []
+      },
+      "judgment": {
+        "observations": [
+          {
+            "criterion_id": "j04:c1",
+            "response_excerpt": "",
+            "observation": "NO_EVIDENCE",
+            "performance": "UNDETERMINED",
+            "rationale": "Chưa có bằng chứng cấu hình Multi-AZ; giới hạn phân quyền không chứng minh thiếu năng lực.",
+            "resolves_contradiction": false,
+            "unresolved_aspects": [
+              "Chưa có bằng chứng cấu hình Multi-AZ; giới hạn phân quyền không chứng minh thiếu năng lực."
+            ]
+          }
+        ],
+        "feedback": "Bạn đã làm rõ phạm vi quyền truy cập hạ tầng trước đây.",
+        "explicit_inability": false,
+        "inability_excerpt": "",
+        "feedback_contains_hint": false
+      },
+      "source_question": "Anh/chị cấu hình cơ chế Multi-AZ failover giữa Application Load Balancer và RDS như thế nào?",
+      "source_response": "Ở công ty cũ của em, toàn bộ phần thiết lập mạng VPC và Multi-AZ do đội DevOps chuyên trách quản lý. Em là developer chỉ được cấp quyền đọc CloudWatch để xem log và cấu hình biến môi trường kết nối database thôi ạ.",
+      "source_context": "- Kỹ năng đang đánh giá (d*): `aws`\n- Mức năng lực yêu cầu từ JD (s_jd): 4.00 / 5.0\n- Mức năng lực ước lượng từ CV (s_cv): 2.70 / 5.0\n- Bằng chứng trong CV: \"Sử dụng EC2, S3 và RDS để vận hành ứng dụng trên AWS.\"\n- Hệ quy chiếu Rubric: Low(1.5), Med(3.0), High(4.5)",
+      "source_required_proficiency": 4.0
+    },
+    {
+      "sample_id": "j05",
+      "context": {
+        "interaction_mode": "VOICE",
+        "objective": {
+          "objective_id": "j05",
+          "skill_id": "kubernetes",
+          "claim": "Kubernetes Guaranteed QoS configuration",
+          "target_depth": 3,
+          "criteria": [
+            {
+              "criterion_id": "j05:c1",
+              "description": "Kubernetes Guaranteed QoS configuration",
+              "expected_evidence": "Guaranteed QoS yêu cầu CPU/memory request và limit bằng nhau cho từng container.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Guaranteed QoS yêu cầu CPU/memory request và limit bằng nhau cho từng container.",
+              "at_target": "Guaranteed QoS yêu cầu CPU/memory request và limit bằng nhau cho từng container.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Guaranteed QoS yêu cầu CPU/memory request và limit bằng nhau cho từng container.",
+              "essential": true
+            }
+          ]
+        },
+        "turn": {
+          "turn_id": "j05-turn",
+          "objective_id": "j05",
+          "skill_id": "kubernetes",
+          "mode": "DEBUGGING",
+          "action": "INITIAL",
+          "difficulty": 3,
+          "question_depth": 3,
+          "question": {
+            "text": "Khi Pod liên tục bị OOMKilled exit code 137, anh/chị điều tra và cấu hình lại resource limits ra sao?",
+            "criterion_ids": [
+              "j05:c1"
+            ],
+            "assistance": "NONE",
+            "mode": "DEBUGGING",
+            "depth": 3,
+            "evidence_scope": "j05-case"
+          },
+          "answer": "Đầu tiên em dùng kubectl describe pod để xác định container bị OOMKilled. Tiếp theo em chụp heap dump của JVM bằng cách cấu hình flag -XX:+HeapDumpOnOutOfMemoryError lưu vào persistent volume. Sau khi phân tích thấy ứng dụng Java không nhận diện được cgroup v2 của K8s dẫn đến phân bổ quá RAM máy ảo, em đã cấu hình lại cgroup v2 và thêm flag -XX:MaxRAMPercentage=75.0, đồng thời căn chỉnh memory request bằng 80% limit để container luôn đạt Guaranteed QoS Class.",
+          "judgment": null,
+          "introduction": ""
+        },
+        "required_criterion_ids": [
+          "j05:c1"
+        ],
+        "target_criteria": [
+          {
+            "criterion_id": "j05:c1",
+            "description": "Kubernetes Guaranteed QoS configuration",
+            "expected_evidence": "Guaranteed QoS yêu cầu CPU/memory request và limit bằng nhau cho từng container.",
+            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Guaranteed QoS yêu cầu CPU/memory request và limit bằng nhau cho từng container.",
+            "at_target": "Guaranteed QoS yêu cầu CPU/memory request và limit bằng nhau cho từng container.",
+            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Guaranteed QoS yêu cầu CPU/memory request và limit bằng nhau cho từng container.",
+            "essential": true
+          }
+        ],
+        "prior_observations": [],
+        "prior_turns": []
+      },
+      "judgment": {
+        "observations": [
+          {
+            "criterion_id": "j05:c1",
+            "response_excerpt": "Đầu tiên em dùng kubectl describe pod để xác định container bị OOMKilled. Tiếp theo em chụp heap dump của JVM bằng cách cấu hình flag -XX:+HeapDumpOnOutOfMemoryError lưu vào persistent volume. Sau khi phân tích thấy ứng dụng Java không nhận diện được cgroup v2 của K8s dẫn đến phân bổ quá RAM máy ảo, em đã cấu hình lại cgroup v2 và thêm flag -XX:MaxRAMPercentage=75.0, đồng thời căn chỉnh memory request bằng 80% limit để container luôn đạt Guaranteed QoS Class.",
+            "observation": "CONTRADICTS",
+            "performance": "BELOW",
+            "rationale": "Khẳng định memory request bằng 80% limit đạt Guaranteed QoS là sai; Guaranteed yêu cầu request và limit bằng nhau cho CPU và memory của từng container.",
+            "resolves_contradiction": false,
+            "unresolved_aspects": []
+          }
+        ],
+        "feedback": "Phần giải thích về Guaranteed QoS có điểm chưa chính xác.",
+        "explicit_inability": false,
+        "inability_excerpt": "",
+        "feedback_contains_hint": false
+      },
+      "source_question": "Khi Pod liên tục bị OOMKilled exit code 137, anh/chị điều tra và cấu hình lại resource limits ra sao?",
+      "source_response": "Đầu tiên em dùng kubectl describe pod để xác định container bị OOMKilled. Tiếp theo em chụp heap dump của JVM bằng cách cấu hình flag -XX:+HeapDumpOnOutOfMemoryError lưu vào persistent volume. Sau khi phân tích thấy ứng dụng Java không nhận diện được cgroup v2 của K8s dẫn đến phân bổ quá RAM máy ảo, em đã cấu hình lại cgroup v2 và thêm flag -XX:MaxRAMPercentage=75.0, đồng thời căn chỉnh memory request bằng 80% limit để container luôn đạt Guaranteed QoS Class.",
+      "source_context": "- Kỹ năng đang đánh giá (d*): `kubernetes`\n- Mức năng lực yêu cầu từ JD (s_jd): 4.50 / 5.0\n- Mức năng lực ước lượng từ CV (s_cv): 3.00 / 5.0\n- Bằng chứng trong CV: \"Triển khai ứng dụng lên Kubernetes cluster bằng Helm chart.\"\n- Hệ quy chiếu Rubric: Low(1.5), Med(3.0), High(4.5)",
+      "annotation_note": "Corrected a technically incorrect positive annotation; candidate answer retained verbatim.",
+      "annotation_source": "https://kubernetes.io/docs/tasks/configure-pod-container/quality-service-pod/",
+      "source_required_proficiency": 4.5
+    },
+    {
+      "sample_id": "j06",
+      "context": {
+        "interaction_mode": "VOICE",
+        "objective": {
+          "objective_id": "j06",
+          "skill_id": "postgresql",
+          "claim": "PostgreSQL EXPLAIN ANALYZE",
+          "target_depth": 3,
+          "criteria": [
+            {
+              "criterion_id": "j06:c1",
+              "description": "PostgreSQL EXPLAIN ANALYZE",
+              "expected_evidence": "Dùng execution plan thực tế để đánh giá lựa chọn index cho truy vấn.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Dùng execution plan thực tế để đánh giá lựa chọn index cho truy vấn.",
+              "at_target": "Dùng execution plan thực tế để đánh giá lựa chọn index cho truy vấn.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Dùng execution plan thực tế để đánh giá lựa chọn index cho truy vấn.",
+              "essential": true
+            }
+          ]
+        },
+        "turn": {
+          "turn_id": "j06-turn",
+          "objective_id": "j06",
+          "skill_id": "postgresql",
+          "mode": "DEBUGGING",
+          "action": "INITIAL",
+          "difficulty": 3,
+          "question_depth": 3,
+          "question": {
+            "text": "Anh/chị dùng EXPLAIN ANALYZE đọc các chỉ số then chốt nào nhằm quyết định chiến lược đánh chỉ mục?",
+            "criterion_ids": [
+              "j06:c1"
+            ],
+            "assistance": "NONE",
+            "mode": "DEBUGGING",
+            "depth": 3,
+            "evidence_scope": "j06-case"
+          },
+          "answer": "Em kiểm tra node nào có Seq Scan và so sánh cost ước tính với actual time. Nếu số rows thực tế lệch lớn với estimated rows thì em chạy ANALYZE lại bảng. Nếu câu lệnh lọc theo nhiều điều kiện WHERE kết hợp ORDER BY thì em tạo composite B-tree index theo quy tắc cột có tính chọn lọc cao đứng trước.",
+          "judgment": null,
+          "introduction": ""
+        },
+        "required_criterion_ids": [
+          "j06:c1"
+        ],
+        "target_criteria": [
+          {
+            "criterion_id": "j06:c1",
+            "description": "PostgreSQL EXPLAIN ANALYZE",
+            "expected_evidence": "Dùng execution plan thực tế để đánh giá lựa chọn index cho truy vấn.",
+            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Dùng execution plan thực tế để đánh giá lựa chọn index cho truy vấn.",
+            "at_target": "Dùng execution plan thực tế để đánh giá lựa chọn index cho truy vấn.",
+            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Dùng execution plan thực tế để đánh giá lựa chọn index cho truy vấn.",
+            "essential": true
+          }
+        ],
+        "prior_observations": [],
+        "prior_turns": []
+      },
+      "judgment": {
+        "observations": [
+          {
+            "criterion_id": "j06:c1",
+            "response_excerpt": "",
+            "observation": "UNCLEAR",
+            "performance": "UNDETERMINED",
+            "rationale": "Chưa đủ dữ kiện về điều kiện lọc và ORDER BY để xác nhận thứ tự cột index.",
+            "resolves_contradiction": false,
+            "unresolved_aspects": [
+              "Chưa đủ dữ kiện về điều kiện lọc và ORDER BY để xác nhận thứ tự cột index."
+            ]
+          }
+        ],
+        "feedback": "Bạn đã nêu cách đọc plan nhưng căn cứ chọn thứ tự cột index còn chưa rõ.",
+        "explicit_inability": false,
+        "inability_excerpt": "",
+        "feedback_contains_hint": false
+      },
+      "source_question": "Anh/chị dùng EXPLAIN ANALYZE đọc các chỉ số then chốt nào nhằm quyết định chiến lược đánh chỉ mục?",
+      "source_response": "Em kiểm tra node nào có Seq Scan và so sánh cost ước tính với actual time. Nếu số rows thực tế lệch lớn với estimated rows thì em chạy ANALYZE lại bảng. Nếu câu lệnh lọc theo nhiều điều kiện WHERE kết hợp ORDER BY thì em tạo composite B-tree index theo quy tắc cột có tính chọn lọc cao đứng trước.",
+      "source_context": "- Kỹ năng đang đánh giá (d*): `postgresql`\n- Mức năng lực yêu cầu từ JD (s_jd): 4.00 / 5.0\n- Mức năng lực ước lượng từ CV (s_cv): 2.80 / 5.0\n- Bằng chứng trong CV: \"Thiết kế cơ sở dữ liệu quan hệ PostgreSQL...\"\n- Hệ quy chiếu Rubric: Low(1.5), Med(3.0), High(4.5)",
+      "source_required_proficiency": 4.0
+    },
+    {
+      "sample_id": "j07",
+      "context": {
+        "interaction_mode": "VOICE",
+        "objective": {
+          "objective_id": "j07",
+          "skill_id": "microservices_security",
+          "claim": "JWT token revocation",
+          "target_depth": 4,
+          "criteria": [
+            {
+              "criterion_id": "j07:c1",
+              "description": "JWT token revocation",
+              "expected_evidence": "Thiết kế kiểm tra thu hồi token trước thời điểm hết hạn.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Thiết kế kiểm tra thu hồi token trước thời điểm hết hạn.",
+              "at_target": "Thiết kế kiểm tra thu hồi token trước thời điểm hết hạn.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Thiết kế kiểm tra thu hồi token trước thời điểm hết hạn.",
+              "essential": true
+            }
+          ]
+        },
+        "turn": {
+          "turn_id": "j07-turn",
+          "objective_id": "j07",
+          "skill_id": "microservices_security",
+          "mode": "DESIGN",
+          "action": "INITIAL",
+          "difficulty": 4,
+          "question_depth": 4,
+          "question": {
+            "text": "Anh/chị thiết kế giải pháp thu hồi quyền truy cập (Token Revocation) tức thời ở API Gateway như thế nào?",
+            "criterion_ids": [
+              "j07:c1"
+            ],
+            "assistance": "NONE",
+            "mode": "DESIGN",
+            "depth": 4,
+            "evidence_scope": "j07-case"
+          },
+          "answer": "Dạ như trong CV em có ghi, em làm bảo mật theo chuẩn công ty và dùng JWT để xác thực người dùng trong các API microservices.",
+          "judgment": null,
+          "introduction": ""
+        },
+        "required_criterion_ids": [
+          "j07:c1"
+        ],
+        "target_criteria": [
+          {
+            "criterion_id": "j07:c1",
+            "description": "JWT token revocation",
+            "expected_evidence": "Thiết kế kiểm tra thu hồi token trước thời điểm hết hạn.",
+            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Thiết kế kiểm tra thu hồi token trước thời điểm hết hạn.",
+            "at_target": "Thiết kế kiểm tra thu hồi token trước thời điểm hết hạn.",
+            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Thiết kế kiểm tra thu hồi token trước thời điểm hết hạn.",
+            "essential": true
+          }
+        ],
+        "prior_observations": [],
+        "prior_turns": []
+      },
+      "judgment": {
+        "observations": [
+          {
+            "criterion_id": "j07:c1",
+            "response_excerpt": "",
+            "observation": "NO_EVIDENCE",
+            "performance": "UNDETERMINED",
+            "rationale": "Chưa nêu cơ chế thu hồi JWT trước hạn.",
+            "resolves_contradiction": false,
+            "unresolved_aspects": [
+              "Chưa nêu cơ chế thu hồi JWT trước hạn."
+            ]
+          }
+        ],
+        "feedback": "Câu trả lời chưa làm rõ cơ chế thu hồi token.",
+        "explicit_inability": false,
+        "inability_excerpt": "",
+        "feedback_contains_hint": false
+      },
+      "source_question": "Anh/chị thiết kế giải pháp thu hồi quyền truy cập (Token Revocation) tức thời ở API Gateway như thế nào?",
+      "source_response": "Dạ như trong CV em có ghi, em làm bảo mật theo chuẩn công ty và dùng JWT để xác thực người dùng trong các API microservices.",
+      "source_context": "- Kỹ năng đang đánh giá (d*): `microservices_security`\n- Mức năng lực yêu cầu từ JD (s_jd): 4.00 / 5.0\n- Mức năng lực ước lượng từ CV (s_cv): 2.50 / 5.0\n- Bằng chứng trong CV: \"Xác thực người dùng bằng JSON Web Token (JWT).\"\n- Hệ quy chiếu Rubric: Low(1.5), Med(3.0), High(4.5)",
+      "source_required_proficiency": 4.0
+    },
+    {
+      "sample_id": "j08",
+      "context": {
+        "interaction_mode": "VOICE",
+        "objective": {
+          "objective_id": "j08",
+          "skill_id": "kafka",
+          "claim": "Kafka consumer lag",
+          "target_depth": 3,
+          "criteria": [
+            {
+              "criterion_id": "j08:c1",
+              "description": "Kafka consumer lag",
+              "expected_evidence": "Liên hệ thời gian xử lý vượt max.poll.interval.ms với hiện tượng rebalance liên tục.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Liên hệ thời gian xử lý vượt max.poll.interval.ms với hiện tượng rebalance liên tục.",
+              "at_target": "Liên hệ thời gian xử lý vượt max.poll.interval.ms với hiện tượng rebalance liên tục.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Liên hệ thời gian xử lý vượt max.poll.interval.ms với hiện tượng rebalance liên tục.",
+              "essential": true
+            }
+          ]
+        },
+        "turn": {
+          "turn_id": "j08-turn",
+          "objective_id": "j08",
+          "skill_id": "kafka",
+          "mode": "DEBUGGING",
+          "action": "INITIAL",
+          "difficulty": 3,
+          "question_depth": 3,
+          "question": {
+            "text": "Anh/chị phân tích nguyên nhân và điều chỉnh cơ chế tiêu thụ tin nhắn trong Consumer Group như thế nào để giải tỏa tắc nghẽn?",
+            "criterion_ids": [
+              "j08:c1"
+            ],
+            "assistance": "NONE",
+            "mode": "DEBUGGING",
+            "depth": 3,
+            "evidence_scope": "j08-case"
+          },
+          "answer": "Khi lag tăng đột biến, em kiểm tra xem có hiện tượng rebalancing storm không. Trong hệ thống trước đây, do xử lý tin nhắn quá lâu khiến quá thời gian max.poll.interval.ms làm coordinator tưởng consumer chết và rebalance liên tục. Em đã chuyển sang dùng CooperativeStickyAssignor để rebalance tăng dần không dừng toàn bộ consumer, đồng thời bóc tách tác vụ I/O nặng sang worker pool riêng và commit offset thủ công theo batch sau khi hoàn thành.",
+          "judgment": null,
+          "introduction": ""
+        },
+        "required_criterion_ids": [
+          "j08:c1"
+        ],
+        "target_criteria": [
+          {
+            "criterion_id": "j08:c1",
+            "description": "Kafka consumer lag",
+            "expected_evidence": "Liên hệ thời gian xử lý vượt max.poll.interval.ms với hiện tượng rebalance liên tục.",
+            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Liên hệ thời gian xử lý vượt max.poll.interval.ms với hiện tượng rebalance liên tục.",
+            "at_target": "Liên hệ thời gian xử lý vượt max.poll.interval.ms với hiện tượng rebalance liên tục.",
+            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Liên hệ thời gian xử lý vượt max.poll.interval.ms với hiện tượng rebalance liên tục.",
+            "essential": true
+          }
+        ],
+        "prior_observations": [],
+        "prior_turns": []
+      },
+      "judgment": {
+        "observations": [
+          {
+            "criterion_id": "j08:c1",
+            "response_excerpt": "Khi lag tăng đột biến, em kiểm tra xem có hiện tượng rebalancing storm không. Trong hệ thống trước đây, do xử lý tin nhắn quá lâu khiến quá thời gian max.poll.interval.ms làm coordinator tưởng consumer chết và rebalance liên tục. Em đã chuyển sang dùng CooperativeStickyAssignor để rebalance tăng dần không dừng toàn bộ consumer, đồng thời bóc tách tác vụ I/O nặng sang worker pool riêng và commit offset thủ công theo batch sau khi hoàn thành.",
+            "observation": "SUPPORTS",
+            "performance": "AT_TARGET",
+            "rationale": "Liên hệ xử lý chậm, max.poll.interval.ms và rebalance lặp lại.",
+            "resolves_contradiction": false,
+            "unresolved_aspects": []
+          }
+        ],
+        "feedback": "Bạn đã nêu nguyên nhân rebalance gắn với thời gian xử lý message.",
+        "explicit_inability": false,
+        "inability_excerpt": "",
+        "feedback_contains_hint": false
+      },
+      "source_question": "Anh/chị phân tích nguyên nhân và điều chỉnh cơ chế tiêu thụ tin nhắn trong Consumer Group như thế nào để giải tỏa tắc nghẽn?",
+      "source_response": "Khi lag tăng đột biến, em kiểm tra xem có hiện tượng rebalancing storm không. Trong hệ thống trước đây, do xử lý tin nhắn quá lâu khiến quá thời gian max.poll.interval.ms làm coordinator tưởng consumer chết và rebalance liên tục. Em đã chuyển sang dùng CooperativeStickyAssignor để rebalance tăng dần không dừng toàn bộ consumer, đồng thời bóc tách tác vụ I/O nặng sang worker pool riêng và commit offset thủ công theo batch sau khi hoàn thành.",
+      "source_context": "- Kỹ năng đang đánh giá (d*): `kafka`\n- Mức năng lực yêu cầu từ JD (s_jd): 4.00 / 5.0\n- Mức năng lực ước lượng từ CV (s_cv): 2.50 / 5.0\n- Bằng chứng trong CV: \"Sử dụng RabbitMQ để xử lý hàng đợi tin nhắn...\"\n- Hệ quy chiếu Rubric: Low(1.5), Med(3.0), High(4.5)",
+      "source_required_proficiency": 4.0
+    },
+    {
+      "sample_id": "j09",
+      "context": {
+        "interaction_mode": "VOICE",
+        "objective": {
+          "objective_id": "j09",
+          "skill_id": "golang",
+          "claim": "Go goroutine leak",
+          "target_depth": 3,
+          "criteria": [
+            {
+              "criterion_id": "j09:c1",
+              "description": "Go goroutine leak",
+              "expected_evidence": "Dùng dấu hiệu runtime và cơ chế hủy tác vụ để chẩn đoán goroutine bị kẹt.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Dùng dấu hiệu runtime và cơ chế hủy tác vụ để chẩn đoán goroutine bị kẹt.",
+              "at_target": "Dùng dấu hiệu runtime và cơ chế hủy tác vụ để chẩn đoán goroutine bị kẹt.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Dùng dấu hiệu runtime và cơ chế hủy tác vụ để chẩn đoán goroutine bị kẹt.",
+              "essential": true
+            }
+          ]
+        },
+        "turn": {
+          "turn_id": "j09-turn",
+          "objective_id": "j09",
+          "skill_id": "golang",
+          "mode": "DEBUGGING",
+          "action": "INITIAL",
+          "difficulty": 3,
+          "question_depth": 3,
+          "question": {
+            "text": "Anh/chị sử dụng công cụ hoặc mẫu thiết kế nào để phát hiện và kiểm soát việc rò rỉ goroutine?",
+            "criterion_ids": [
+              "j09:c1"
+            ],
+            "assistance": "NONE",
+            "mode": "DEBUGGING",
+            "depth": 3,
+            "evidence_scope": "j09-case"
+          },
+          "answer": "Em dùng sync.WaitGroup để đợi các goroutine kết thúc trước khi hàm main return, còn công cụ chuyên dụng để đo rò rỉ bộ nhớ thì dự án trước em chưa cấu hình profiling trực tiếp.",
+          "judgment": null,
+          "introduction": ""
+        },
+        "required_criterion_ids": [
+          "j09:c1"
+        ],
+        "target_criteria": [
+          {
+            "criterion_id": "j09:c1",
+            "description": "Go goroutine leak",
+            "expected_evidence": "Dùng dấu hiệu runtime và cơ chế hủy tác vụ để chẩn đoán goroutine bị kẹt.",
+            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Dùng dấu hiệu runtime và cơ chế hủy tác vụ để chẩn đoán goroutine bị kẹt.",
+            "at_target": "Dùng dấu hiệu runtime và cơ chế hủy tác vụ để chẩn đoán goroutine bị kẹt.",
+            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Dùng dấu hiệu runtime và cơ chế hủy tác vụ để chẩn đoán goroutine bị kẹt.",
+            "essential": true
+          }
+        ],
+        "prior_observations": [],
+        "prior_turns": []
+      },
+      "judgment": {
+        "observations": [
+          {
+            "criterion_id": "j09:c1",
+            "response_excerpt": "",
+            "observation": "UNCLEAR",
+            "performance": "UNDETERMINED",
+            "rationale": "WaitGroup chờ hoàn tất, chưa cho thấy cách phát hiện và hủy goroutine bị kẹt.",
+            "resolves_contradiction": false,
+            "unresolved_aspects": [
+              "WaitGroup chờ hoàn tất, chưa cho thấy cách phát hiện và hủy goroutine bị kẹt."
+            ]
+          }
+        ],
+        "feedback": "Bạn đã nêu cơ chế đồng bộ, còn cách chẩn đoán goroutine leak chưa rõ.",
+        "explicit_inability": false,
+        "inability_excerpt": "",
+        "feedback_contains_hint": false
+      },
+      "source_question": "Anh/chị sử dụng công cụ hoặc mẫu thiết kế nào để phát hiện và kiểm soát việc rò rỉ goroutine?",
+      "source_response": "Em dùng sync.WaitGroup để đợi các goroutine kết thúc trước khi hàm main return, còn công cụ chuyên dụng để đo rò rỉ bộ nhớ thì dự án trước em chưa cấu hình profiling trực tiếp.",
+      "source_context": "- Kỹ năng đang đánh giá (d*): `golang`\n- Mức năng lực yêu cầu từ JD (s_jd): 4.00 / 5.0\n- Mức năng lực ước lượng từ CV (s_cv): 2.60 / 5.0\n- Bằng chứng trong CV: \"Phát triển microservice xử lý dữ liệu bằng Go.\"\n- Hệ quy chiếu Rubric: Low(1.5), Med(3.0), High(4.5)",
+      "source_required_proficiency": 4.0
+    },
+    {
+      "sample_id": "j10",
+      "context": {
+        "interaction_mode": "VOICE",
+        "objective": {
+          "objective_id": "j10",
+          "skill_id": "redis",
+          "claim": "Redis cache stampede",
+          "target_depth": 4,
+          "criteria": [
+            {
+              "criterion_id": "j10:c1",
+              "description": "Redis cache stampede",
+              "expected_evidence": "Điều phối việc làm mới một hot key khi cache hết hạn.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Điều phối việc làm mới một hot key khi cache hết hạn.",
+              "at_target": "Điều phối việc làm mới một hot key khi cache hết hạn.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Điều phối việc làm mới một hot key khi cache hết hạn.",
+              "essential": true
+            }
+          ]
+        },
+        "turn": {
+          "turn_id": "j10-turn",
+          "objective_id": "j10",
+          "skill_id": "redis",
+          "mode": "DESIGN",
+          "action": "INITIAL",
+          "difficulty": 4,
+          "question_depth": 4,
+          "question": {
+            "text": "Anh/chị thiết kế giải pháp như thế nào để ngăn chặn hiện tượng Cache Stampede khi key có lượng truy cập lớn hết hạn?",
+            "criterion_ids": [
+              "j10:c1"
+            ],
+            "assistance": "NONE",
+            "mode": "DESIGN",
+            "depth": 4,
+            "evidence_scope": "j10-case"
+          },
+          "answer": "Em áp dụng hai giải pháp: thứ nhất là thêm một khoảng thời gian jitter ngẫu nhiên vào TTL của key để các key không hết hạn cùng lúc; thứ hai là khi key hết hạn, dùng Redis Distributed Lock (SETNX) để chỉ cho phép một worker chạy query database cập nhật cache, các request khác chờ hoặc nhận dữ liệu cũ tạm thời.",
+          "judgment": null,
+          "introduction": ""
+        },
+        "required_criterion_ids": [
+          "j10:c1"
+        ],
+        "target_criteria": [
+          {
+            "criterion_id": "j10:c1",
+            "description": "Redis cache stampede",
+            "expected_evidence": "Điều phối việc làm mới một hot key khi cache hết hạn.",
+            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Điều phối việc làm mới một hot key khi cache hết hạn.",
+            "at_target": "Điều phối việc làm mới một hot key khi cache hết hạn.",
+            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Điều phối việc làm mới một hot key khi cache hết hạn.",
+            "essential": true
+          }
+        ],
+        "prior_observations": [],
+        "prior_turns": []
+      },
+      "judgment": {
+        "observations": [
+          {
+            "criterion_id": "j10:c1",
+            "response_excerpt": "Em áp dụng hai giải pháp: thứ nhất là thêm một khoảng thời gian jitter ngẫu nhiên vào TTL của key để các key không hết hạn cùng lúc; thứ hai là khi key hết hạn, dùng Redis Distributed Lock (SETNX) để chỉ cho phép một worker chạy query database cập nhật cache, các request khác chờ hoặc nhận dữ liệu cũ tạm thời.",
+            "observation": "SUPPORTS",
+            "performance": "AT_TARGET",
+            "rationale": "Dùng mutex để chỉ một worker làm mới hot key, các request khác chờ hoặc nhận dữ liệu cũ.",
+            "resolves_contradiction": false,
+            "unresolved_aspects": []
+          }
+        ],
+        "feedback": "Bạn đã mô tả cách điều phối worker khi hot key hết hạn.",
+        "explicit_inability": false,
+        "inability_excerpt": "",
+        "feedback_contains_hint": false
+      },
+      "source_question": "Anh/chị thiết kế giải pháp như thế nào để ngăn chặn hiện tượng Cache Stampede khi key có lượng truy cập lớn hết hạn?",
+      "source_response": "Em áp dụng hai giải pháp: thứ nhất là thêm một khoảng thời gian jitter ngẫu nhiên vào TTL của key để các key không hết hạn cùng lúc; thứ hai là khi key hết hạn, dùng Redis Distributed Lock (SETNX) để chỉ cho phép một worker chạy query database cập nhật cache, các request khác chờ hoặc nhận dữ liệu cũ tạm thời.",
+      "source_context": "- Kỹ năng đang đánh giá (d*): `redis`\n- Mức năng lực yêu cầu từ JD (s_jd): 3.50 / 5.0\n- Mức năng lực ước lượng từ CV (s_cv): 2.20 / 5.0\n- Bằng chứng trong CV: \"Sử dụng Memcached để lưu tạm session...\"\n- Hệ quy chiếu Rubric: Low(1.5), Med(3.0), High(4.5)",
+      "source_required_proficiency": 3.5
+    },
+    {
+      "sample_id": "j11",
+      "context": {
+        "interaction_mode": "VOICE",
+        "objective": {
+          "objective_id": "j11",
+          "skill_id": "elasticsearch",
+          "claim": "Elasticsearch analyzer",
+          "target_depth": 2,
+          "criteria": [
+            {
+              "criterion_id": "j11:c1",
+              "description": "Elasticsearch analyzer",
+              "expected_evidence": "Giải thích normalization cho nhu cầu tìm kiếm không phân biệt dấu và hoa thường.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Giải thích normalization cho nhu cầu tìm kiếm không phân biệt dấu và hoa thường.",
+              "at_target": "Giải thích normalization cho nhu cầu tìm kiếm không phân biệt dấu và hoa thường.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Giải thích normalization cho nhu cầu tìm kiếm không phân biệt dấu và hoa thường.",
+              "essential": true
+            }
+          ]
+        },
+        "turn": {
+          "turn_id": "j11-turn",
+          "objective_id": "j11",
+          "skill_id": "elasticsearch",
+          "mode": "TECHNICAL_EXPLANATION",
+          "action": "INITIAL",
+          "difficulty": 2,
+          "question_depth": 2,
+          "question": {
+            "text": "Anh/chị lựa chọn bộ Analyzer và cấu hình Tokenizer ra sao để tìm kiếm chính xác các cụm từ kỹ thuật?",
+            "criterion_ids": [
+              "j11:c1"
+            ],
+            "assistance": "NONE",
+            "mode": "TECHNICAL_EXPLANATION",
+            "depth": 2,
+            "evidence_scope": "j11-case"
+          },
+          "answer": "Thành thật là em chưa từng trực tiếp cấu hình Analyzer hay mapping trong Elasticsearch bao giờ. Em mới chỉ đọc qua tài liệu khái niệm thôi chứ chưa triển khai vào dự án thực tế.",
+          "judgment": null,
+          "introduction": ""
+        },
+        "required_criterion_ids": [
+          "j11:c1"
+        ],
+        "target_criteria": [
+          {
+            "criterion_id": "j11:c1",
+            "description": "Elasticsearch analyzer",
+            "expected_evidence": "Giải thích normalization cho nhu cầu tìm kiếm không phân biệt dấu và hoa thường.",
+            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Giải thích normalization cho nhu cầu tìm kiếm không phân biệt dấu và hoa thường.",
+            "at_target": "Giải thích normalization cho nhu cầu tìm kiếm không phân biệt dấu và hoa thường.",
+            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Giải thích normalization cho nhu cầu tìm kiếm không phân biệt dấu và hoa thường.",
+            "essential": true
+          }
+        ],
+        "prior_observations": [],
+        "prior_turns": []
+      },
+      "judgment": {
+        "observations": [
+          {
+            "criterion_id": "j11:c1",
+            "response_excerpt": "",
+            "observation": "UNCLEAR",
+            "performance": "UNDETERMINED",
+            "rationale": "Chưa có lời giải cấu hình analyzer cho nhu cầu tìm kiếm.",
+            "resolves_contradiction": false,
+            "unresolved_aspects": [
+              "Chưa có lời giải cấu hình analyzer cho nhu cầu tìm kiếm."
+            ]
+          }
+        ],
+        "feedback": "Bạn đã nói rõ kinh nghiệm hiện tại với Elasticsearch.",
+        "explicit_inability": true,
+        "inability_excerpt": "Thành thật là em chưa từng trực tiếp cấu hình Analyzer hay mapping trong Elasticsearch bao giờ. Em mới chỉ đọc qua tài liệu khái niệm thôi chứ chưa triển khai vào dự án thực tế.",
+        "feedback_contains_hint": false
+      },
+      "source_question": "Anh/chị lựa chọn bộ Analyzer và cấu hình Tokenizer ra sao để tìm kiếm chính xác các cụm từ kỹ thuật?",
+      "source_response": "Thành thật là em chưa từng trực tiếp cấu hình Analyzer hay mapping trong Elasticsearch bao giờ. Em mới chỉ đọc qua tài liệu khái niệm thôi chứ chưa triển khai vào dự án thực tế.",
+      "source_context": "- Kỹ năng đang đánh giá (d*): `elasticsearch`\n- Mức năng lực yêu cầu từ JD (s_jd): 3.50 / 5.0\n- Mức năng lực ước lượng từ CV (s_cv): 2.00 / 5.0\n- Bằng chứng trong CV: \"Tìm kiếm dữ liệu toàn văn bằng tính năng Full-text search của PostgreSQL.\"\n- Hệ quy chiếu Rubric: Low(1.5), Med(3.0), High(4.5)",
+      "source_required_proficiency": 3.5
+    },
+    {
+      "sample_id": "j12",
+      "context": {
+        "interaction_mode": "VOICE",
+        "objective": {
+          "objective_id": "j12",
+          "skill_id": "ci_cd",
+          "claim": "GitLab dependency cache",
+          "target_depth": 2,
+          "criteria": [
+            {
+              "criterion_id": "j12:c1",
+              "description": "GitLab dependency cache",
+              "expected_evidence": "Giải thích việc gắn cache key với dependency lockfile.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Giải thích việc gắn cache key với dependency lockfile.",
+              "at_target": "Giải thích việc gắn cache key với dependency lockfile.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Giải thích việc gắn cache key với dependency lockfile.",
+              "essential": true
+            }
+          ]
+        },
+        "turn": {
+          "turn_id": "j12-turn",
+          "objective_id": "j12",
+          "skill_id": "ci_cd",
+          "mode": "TECHNICAL_EXPLANATION",
+          "action": "INITIAL",
+          "difficulty": 2,
+          "question_depth": 2,
+          "question": {
+            "text": "Anh/chị cấu hình cơ chế caching dependencies giữa các job như thế nào để rút ngắn thời gian pipeline?",
+            "criterion_ids": [
+              "j12:c1"
+            ],
+            "assistance": "NONE",
+            "mode": "TECHNICAL_EXPLANATION",
+            "depth": 2,
+            "evidence_scope": "j12-case"
+          },
+          "answer": "Trong file .gitlab-ci.yml, em định nghĩa block cache với key dựa theo hash của file package-lock.json hoặc build.gradle. Khi lockfile không đổi thì GitLab Runner sẽ kéo cache về thay vì tải lại toàn bộ dependencies, giúp giảm thời gian build từ 12 phút xuống còn 3 phút.",
+          "judgment": null,
+          "introduction": ""
+        },
+        "required_criterion_ids": [
+          "j12:c1"
+        ],
+        "target_criteria": [
+          {
+            "criterion_id": "j12:c1",
+            "description": "GitLab dependency cache",
+            "expected_evidence": "Giải thích việc gắn cache key với dependency lockfile.",
+            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Giải thích việc gắn cache key với dependency lockfile.",
+            "at_target": "Giải thích việc gắn cache key với dependency lockfile.",
+            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Giải thích việc gắn cache key với dependency lockfile.",
+            "essential": true
+          }
+        ],
+        "prior_observations": [],
+        "prior_turns": []
+      },
+      "judgment": {
+        "observations": [
+          {
+            "criterion_id": "j12:c1",
+            "response_excerpt": "Trong file .gitlab-ci.yml, em định nghĩa block cache với key dựa theo hash của file package-lock.json hoặc build.gradle. Khi lockfile không đổi thì GitLab Runner sẽ kéo cache về thay vì tải lại toàn bộ dependencies, giúp giảm thời gian build từ 12 phút xuống còn 3 phút.",
+            "observation": "SUPPORTS",
+            "performance": "AT_TARGET",
+            "rationale": "Dùng cache key gắn với hash lockfile để tái sử dụng dependencies không đổi.",
+            "resolves_contradiction": false,
+            "unresolved_aspects": []
+          }
+        ],
+        "feedback": "Bạn đã liên hệ cache key với thay đổi dependencies.",
+        "explicit_inability": false,
+        "inability_excerpt": "",
+        "feedback_contains_hint": false
+      },
+      "source_question": "Anh/chị cấu hình cơ chế caching dependencies giữa các job như thế nào để rút ngắn thời gian pipeline?",
+      "source_response": "Trong file .gitlab-ci.yml, em định nghĩa block cache với key dựa theo hash của file package-lock.json hoặc build.gradle. Khi lockfile không đổi thì GitLab Runner sẽ kéo cache về thay vì tải lại toàn bộ dependencies, giúp giảm thời gian build từ 12 phút xuống còn 3 phút.",
+      "source_context": "- Kỹ năng đang đánh giá (d*): `ci_cd`\n- Mức năng lực yêu cầu từ JD (s_jd): 3.50 / 5.0\n- Mức năng lực ước lượng từ CV (s_cv): 2.40 / 5.0\n- Bằng chứng trong CV: \"Cấu hình Jenkins job để tự động build và deploy...\"\n- Hệ quy chiếu Rubric: Low(1.5), Med(3.0), High(4.5)",
+      "source_required_proficiency": 3.5
+    },
+    {
+      "sample_id": "j13",
+      "context": {
+        "interaction_mode": "VOICE",
+        "objective": {
+          "objective_id": "j13",
+          "skill_id": "reactjs",
+          "claim": "React render profiling",
+          "target_depth": 3,
+          "criteria": [
+            {
+              "criterion_id": "j13:c1",
+              "description": "React render profiling",
+              "expected_evidence": "Liên hệ kết quả Profiler với prop reference gây render thừa.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Liên hệ kết quả Profiler với prop reference gây render thừa.",
+              "at_target": "Liên hệ kết quả Profiler với prop reference gây render thừa.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Liên hệ kết quả Profiler với prop reference gây render thừa.",
+              "essential": true
+            }
+          ]
+        },
+        "turn": {
+          "turn_id": "j13-turn",
+          "objective_id": "j13",
+          "skill_id": "reactjs",
+          "mode": "DEBUGGING",
+          "action": "INITIAL",
+          "difficulty": 3,
+          "question_depth": 3,
+          "question": {
+            "text": "Anh/chị dùng React DevTools Profiler như thế nào để khoanh vùng nguyên nhân và tối ưu hóa việc truyền props?",
+            "criterion_ids": [
+              "j13:c1"
+            ],
+            "assistance": "NONE",
+            "mode": "DEBUGGING",
+            "depth": 3,
+            "evidence_scope": "j13-case"
+          },
+          "answer": "Em bật tùy chọn 'Highlight updates when components render' và ghi lại phiên thao tác bằng Profiler để tìm component có render time dài. Em phát hiện nguyên nhân là do truyền inline arrow function làm thay đổi prop reference ở mỗi lần render, nên em đã bọc các callback đó bằng useCallback và dùng React.memo cho component con.",
+          "judgment": null,
+          "introduction": ""
+        },
+        "required_criterion_ids": [
+          "j13:c1"
+        ],
+        "target_criteria": [
+          {
+            "criterion_id": "j13:c1",
+            "description": "React render profiling",
+            "expected_evidence": "Liên hệ kết quả Profiler với prop reference gây render thừa.",
+            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Liên hệ kết quả Profiler với prop reference gây render thừa.",
+            "at_target": "Liên hệ kết quả Profiler với prop reference gây render thừa.",
+            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Liên hệ kết quả Profiler với prop reference gây render thừa.",
+            "essential": true
+          }
+        ],
+        "prior_observations": [],
+        "prior_turns": []
+      },
+      "judgment": {
+        "observations": [
+          {
+            "criterion_id": "j13:c1",
+            "response_excerpt": "Em bật tùy chọn 'Highlight updates when components render' và ghi lại phiên thao tác bằng Profiler để tìm component có render time dài. Em phát hiện nguyên nhân là do truyền inline arrow function làm thay đổi prop reference ở mỗi lần render, nên em đã bọc các callback đó bằng useCallback và dùng React.memo cho component con.",
+            "observation": "SUPPORTS",
+            "performance": "AT_TARGET",
+            "rationale": "Dùng Profiler tìm render tốn thời gian và liên hệ prop reference với render thừa.",
+            "resolves_contradiction": false,
+            "unresolved_aspects": []
+          }
+        ],
+        "feedback": "Bạn đã liên hệ kết quả profiling với thay đổi prop reference.",
+        "explicit_inability": false,
+        "inability_excerpt": "",
+        "feedback_contains_hint": false
+      },
+      "source_question": "Anh/chị dùng React DevTools Profiler như thế nào để khoanh vùng nguyên nhân và tối ưu hóa việc truyền props?",
+      "source_response": "Em bật tùy chọn 'Highlight updates when components render' và ghi lại phiên thao tác bằng Profiler để tìm component có render time dài. Em phát hiện nguyên nhân là do truyền inline arrow function làm thay đổi prop reference ở mỗi lần render, nên em đã bọc các callback đó bằng useCallback và dùng React.memo cho component con.",
+      "source_context": "- Kỹ năng đang đánh giá (d*): `reactjs`\n- Mức năng lực yêu cầu từ JD (s_jd): 4.00 / 5.0\n- Mức năng lực ước lượng từ CV (s_cv): 2.50 / 5.0\n- Bằng chứng trong CV: \"Xây dựng giao diện người dùng web sử dụng ReactJS và Redux.\"\n- Hệ quy chiếu Rubric: Low(1.5), Med(3.0), High(4.5)",
+      "source_required_proficiency": 4.0
+    },
+    {
+      "sample_id": "j14",
+      "context": {
+        "interaction_mode": "VOICE",
+        "objective": {
+          "objective_id": "j14",
+          "skill_id": "kafka",
+          "claim": "Kafka consumer lag",
+          "target_depth": 3,
+          "criteria": [
+            {
+              "criterion_id": "j14:c1",
+              "description": "Kafka consumer lag",
+              "expected_evidence": "Chẩn đoán nguyên nhân consumer lag từ hành vi poll và rebalance.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Chẩn đoán nguyên nhân consumer lag từ hành vi poll và rebalance.",
+              "at_target": "Chẩn đoán nguyên nhân consumer lag từ hành vi poll và rebalance.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Chẩn đoán nguyên nhân consumer lag từ hành vi poll và rebalance.",
+              "essential": true
+            }
+          ]
+        },
+        "turn": {
+          "turn_id": "j14-turn",
+          "objective_id": "j14",
+          "skill_id": "kafka",
+          "mode": "DEBUGGING",
+          "action": "INITIAL",
+          "difficulty": 3,
+          "question_depth": 3,
+          "question": {
+            "text": "Anh/chị phân tích nguyên nhân và điều chỉnh cơ chế tiêu thụ tin nhắn trong Consumer Group như thế nào để giải tỏa tắc nghẽn?",
+            "criterion_ids": [
+              "j14:c1"
+            ],
+            "assistance": "NONE",
+            "mode": "DEBUGGING",
+            "depth": 3,
+            "evidence_scope": "j14-case"
+          },
+          "answer": "Mỗi khi thấy tin nhắn bị chậm thì bên em vào xem bảng điều khiển Kafka UI, thấy lag tăng thì team em restart lại service consumer hoặc tăng tạm thêm RAM cho pod để nó tiêu thụ nhanh hơn.",
+          "judgment": null,
+          "introduction": ""
+        },
+        "required_criterion_ids": [
+          "j14:c1"
+        ],
+        "target_criteria": [
+          {
+            "criterion_id": "j14:c1",
+            "description": "Kafka consumer lag",
+            "expected_evidence": "Chẩn đoán nguyên nhân consumer lag từ hành vi poll và rebalance.",
+            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Chẩn đoán nguyên nhân consumer lag từ hành vi poll và rebalance.",
+            "at_target": "Chẩn đoán nguyên nhân consumer lag từ hành vi poll và rebalance.",
+            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Chẩn đoán nguyên nhân consumer lag từ hành vi poll và rebalance.",
+            "essential": true
+          }
+        ],
+        "prior_observations": [],
+        "prior_turns": []
+      },
+      "judgment": {
+        "observations": [
+          {
+            "criterion_id": "j14:c1",
+            "response_excerpt": "",
+            "observation": "UNCLEAR",
+            "performance": "UNDETERMINED",
+            "rationale": "Restart hoặc tăng RAM chưa xác định nguyên nhân consumer lag.",
+            "resolves_contradiction": false,
+            "unresolved_aspects": [
+              "Restart hoặc tăng RAM chưa xác định nguyên nhân consumer lag."
+            ]
+          }
+        ],
+        "feedback": "Bạn đã mô tả cách xử lý tạm thời, còn nguyên nhân lag chưa được làm rõ.",
+        "explicit_inability": false,
+        "inability_excerpt": "",
+        "feedback_contains_hint": false
+      },
+      "source_question": "Anh/chị phân tích nguyên nhân và điều chỉnh cơ chế tiêu thụ tin nhắn trong Consumer Group như thế nào để giải tỏa tắc nghẽn?",
+      "source_response": "Mỗi khi thấy tin nhắn bị chậm thì bên em vào xem bảng điều khiển Kafka UI, thấy lag tăng thì team em restart lại service consumer hoặc tăng tạm thêm RAM cho pod để nó tiêu thụ nhanh hơn.",
+      "source_context": "- Kỹ năng đang đánh giá (d*): `kafka`\n- Mức năng lực yêu cầu từ JD (s_jd): 4.00 / 5.0\n- Mức năng lực ước lượng từ CV (s_cv): 2.50 / 5.0\n- Bằng chứng trong CV: \"Sử dụng RabbitMQ để xử lý hàng đợi tin nhắn...\"\n- Hệ quy chiếu Rubric: Low(1.5), Med(3.0), High(4.5)",
+      "source_required_proficiency": 4.0
+    },
+    {
+      "sample_id": "j15",
+      "context": {
+        "interaction_mode": "VOICE",
+        "objective": {
+          "objective_id": "j15",
+          "skill_id": "postgresql",
+          "claim": "PostgreSQL lock dependency",
+          "target_depth": 3,
+          "criteria": [
+            {
+              "criterion_id": "j15:c1",
+              "description": "PostgreSQL lock dependency",
+              "expected_evidence": "Xác định blocked pid và quan hệ phụ thuộc khóa từ pg_locks/pg_stat_activity.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Xác định blocked pid và quan hệ phụ thuộc khóa từ pg_locks/pg_stat_activity.",
+              "at_target": "Xác định blocked pid và quan hệ phụ thuộc khóa từ pg_locks/pg_stat_activity.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Xác định blocked pid và quan hệ phụ thuộc khóa từ pg_locks/pg_stat_activity.",
+              "essential": true
+            }
+          ]
+        },
+        "turn": {
+          "turn_id": "j15-turn",
+          "objective_id": "j15",
+          "skill_id": "postgresql",
+          "mode": "DEBUGGING",
+          "action": "INITIAL",
+          "difficulty": 3,
+          "question_depth": 3,
+          "question": {
+            "text": "Anh/chị xác định chuỗi khóa gây nghẽn và chuẩn hóa thứ tự giao dịch để loại trừ Deadlock như thế nào?",
+            "criterion_ids": [
+              "j15:c1"
+            ],
+            "assistance": "NONE",
+            "mode": "DEBUGGING",
+            "depth": 3,
+            "evidence_scope": "j15-case"
+          },
+          "answer": "Em dùng view pg_stat_activity kết hợp pg_locks để tìm các pid đang bị blocked và chuỗi lock dependency. Nguyên nhân deadlock cốt lõi thường là do 2 giao dịch cập nhật các dòng theo thứ tự ngược nhau (Transaction A cập nhật user rồi order, Transaction B ngược lại). Em đã chuẩn hóa toàn bộ mã nguồn phải lock theo thứ tự ID tăng dần, đồng thời thiết lập lock_timeout=3s và chuyển các tác vụ cập nhật số dư sang dùng Optimistic Locking với cột version để tránh giữ pessimistic lock lâu.",
+          "judgment": null,
+          "introduction": ""
+        },
+        "required_criterion_ids": [
+          "j15:c1"
+        ],
+        "target_criteria": [
+          {
+            "criterion_id": "j15:c1",
+            "description": "PostgreSQL lock dependency",
+            "expected_evidence": "Xác định blocked pid và quan hệ phụ thuộc khóa từ pg_locks/pg_stat_activity.",
+            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Xác định blocked pid và quan hệ phụ thuộc khóa từ pg_locks/pg_stat_activity.",
+            "at_target": "Xác định blocked pid và quan hệ phụ thuộc khóa từ pg_locks/pg_stat_activity.",
+            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Xác định blocked pid và quan hệ phụ thuộc khóa từ pg_locks/pg_stat_activity.",
+            "essential": true
+          }
+        ],
+        "prior_observations": [],
+        "prior_turns": []
+      },
+      "judgment": {
+        "observations": [
+          {
+            "criterion_id": "j15:c1",
+            "response_excerpt": "Em dùng view pg_stat_activity kết hợp pg_locks để tìm các pid đang bị blocked và chuỗi lock dependency. Nguyên nhân deadlock cốt lõi thường là do 2 giao dịch cập nhật các dòng theo thứ tự ngược nhau (Transaction A cập nhật user rồi order, Transaction B ngược lại). Em đã chuẩn hóa toàn bộ mã nguồn phải lock theo thứ tự ID tăng dần, đồng thời thiết lập lock_timeout=3s và chuyển các tác vụ cập nhật số dư sang dùng Optimistic Locking với cột version để tránh giữ pessimistic lock lâu.",
+            "observation": "SUPPORTS",
+            "performance": "AT_TARGET",
+            "rationale": "Dùng pg_stat_activity và pg_locks để xác định blocked pid và quan hệ phụ thuộc khóa.",
+            "resolves_contradiction": false,
+            "unresolved_aspects": []
+          }
+        ],
+        "feedback": "Bạn đã mô tả cách xác định tiến trình và quan hệ khóa.",
+        "explicit_inability": false,
+        "inability_excerpt": "",
+        "feedback_contains_hint": false
+      },
+      "source_question": "Anh/chị xác định chuỗi khóa gây nghẽn và chuẩn hóa thứ tự giao dịch để loại trừ Deadlock như thế nào?",
+      "source_response": "Em dùng view pg_stat_activity kết hợp pg_locks để tìm các pid đang bị blocked và chuỗi lock dependency. Nguyên nhân deadlock cốt lõi thường là do 2 giao dịch cập nhật các dòng theo thứ tự ngược nhau (Transaction A cập nhật user rồi order, Transaction B ngược lại). Em đã chuẩn hóa toàn bộ mã nguồn phải lock theo thứ tự ID tăng dần, đồng thời thiết lập lock_timeout=3s và chuyển các tác vụ cập nhật số dư sang dùng Optimistic Locking với cột version để tránh giữ pessimistic lock lâu.",
+      "source_context": "- Kỹ năng đang đánh giá (d*): `postgresql`\n- Mức năng lực yêu cầu từ JD (s_jd): 4.00 / 5.0\n- Mức năng lực ước lượng từ CV (s_cv): 2.80 / 5.0\n- Bằng chứng trong CV: \"Thiết kế cơ sở dữ liệu quan hệ PostgreSQL...\"\n- Hệ quy chiếu Rubric: Low(1.5), Med(3.0), High(4.5)",
+      "source_required_proficiency": 4.0
+    },
+    {
+      "sample_id": "j16",
+      "context": {
+        "interaction_mode": "VOICE",
+        "objective": {
+          "objective_id": "j16",
+          "skill_id": "system_design",
+          "claim": "Distributed rate limiting",
+          "target_depth": 4,
+          "criteria": [
+            {
+              "criterion_id": "j16:c1",
+              "description": "Distributed rate limiting",
+              "expected_evidence": "Thiết kế cập nhật bộ đếm phân tán nhất quán khi nhiều service cùng giới hạn request.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Thiết kế cập nhật bộ đếm phân tán nhất quán khi nhiều service cùng giới hạn request.",
+              "at_target": "Thiết kế cập nhật bộ đếm phân tán nhất quán khi nhiều service cùng giới hạn request.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Thiết kế cập nhật bộ đếm phân tán nhất quán khi nhiều service cùng giới hạn request.",
+              "essential": true
+            }
+          ]
+        },
+        "turn": {
+          "turn_id": "j16-turn",
+          "objective_id": "j16",
+          "skill_id": "system_design",
+          "mode": "DESIGN",
+          "action": "INITIAL",
+          "difficulty": 4,
+          "question_depth": 4,
+          "question": {
+            "text": "Anh/chị thiết kế cơ chế Rate Limiting phân tán sử dụng Redis với thuật toán cụ thể nào?",
+            "criterion_ids": [
+              "j16:c1"
+            ],
+            "assistance": "NONE",
+            "mode": "DESIGN",
+            "depth": 4,
+            "evidence_scope": "j16-case"
+          },
+          "answer": "Về phần Rate Limiting này ở công ty em dùng Cloudflare để chặn IP ở tầng ngoài thôi chứ ở tầng backend thì em chưa từng tự tay thiết kế thuật toán hay dùng Redis để giới hạn request phân tán bao giờ ạ.",
+          "judgment": null,
+          "introduction": ""
+        },
+        "required_criterion_ids": [
+          "j16:c1"
+        ],
+        "target_criteria": [
+          {
+            "criterion_id": "j16:c1",
+            "description": "Distributed rate limiting",
+            "expected_evidence": "Thiết kế cập nhật bộ đếm phân tán nhất quán khi nhiều service cùng giới hạn request.",
+            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Thiết kế cập nhật bộ đếm phân tán nhất quán khi nhiều service cùng giới hạn request.",
+            "at_target": "Thiết kế cập nhật bộ đếm phân tán nhất quán khi nhiều service cùng giới hạn request.",
+            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Thiết kế cập nhật bộ đếm phân tán nhất quán khi nhiều service cùng giới hạn request.",
+            "essential": true
+          }
+        ],
+        "prior_observations": [],
+        "prior_turns": []
+      },
+      "judgment": {
+        "observations": [
+          {
+            "criterion_id": "j16:c1",
+            "response_excerpt": "",
+            "observation": "UNCLEAR",
+            "performance": "UNDETERMINED",
+            "rationale": "Chưa có lời giải thiết kế rate limit phân tán ở backend.",
+            "resolves_contradiction": false,
+            "unresolved_aspects": [
+              "Chưa có lời giải thiết kế rate limit phân tán ở backend."
+            ]
+          }
+        ],
+        "feedback": "Bạn đã làm rõ phạm vi kinh nghiệm về rate limiting.",
+        "explicit_inability": true,
+        "inability_excerpt": "Về phần Rate Limiting này ở công ty em dùng Cloudflare để chặn IP ở tầng ngoài thôi chứ ở tầng backend thì em chưa từng tự tay thiết kế thuật toán hay dùng Redis để giới hạn request phân tán bao giờ ạ.",
+        "feedback_contains_hint": false
+      },
+      "source_question": "Anh/chị thiết kế cơ chế Rate Limiting phân tán sử dụng Redis với thuật toán cụ thể nào?",
+      "source_response": "Về phần Rate Limiting này ở công ty em dùng Cloudflare để chặn IP ở tầng ngoài thôi chứ ở tầng backend thì em chưa từng tự tay thiết kế thuật toán hay dùng Redis để giới hạn request phân tán bao giờ ạ.",
+      "source_context": "- Kỹ năng đang đánh giá (d*): `system_design`\n- Mức năng lực yêu cầu từ JD (s_jd): 4.50 / 5.0\n- Mức năng lực ước lượng từ CV (s_cv): 2.80 / 5.0\n- Bằng chứng trong CV: \"Tham gia thiết kế kiến trúc các dịch vụ backend...\"\n- Hệ quy chiếu Rubric: Low(1.5), Med(3.0), High(4.5)",
+      "source_required_proficiency": 4.5
+    },
+    {
+      "sample_id": "j17",
+      "context": {
+        "interaction_mode": "VOICE",
+        "objective": {
+          "objective_id": "j17",
+          "skill_id": "postgresql",
+          "claim": "PostgreSQL EXPLAIN ANALYZE",
+          "target_depth": 3,
+          "criteria": [
+            {
+              "criterion_id": "j17:c1",
+              "description": "PostgreSQL EXPLAIN ANALYZE",
+              "expected_evidence": "Dùng execution plan thực tế để đánh giá lựa chọn index cho truy vấn.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Dùng execution plan thực tế để đánh giá lựa chọn index cho truy vấn.",
+              "at_target": "Dùng execution plan thực tế để đánh giá lựa chọn index cho truy vấn.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Dùng execution plan thực tế để đánh giá lựa chọn index cho truy vấn.",
+              "essential": true
+            }
+          ]
+        },
+        "turn": {
+          "turn_id": "j17-turn",
+          "objective_id": "j17",
+          "skill_id": "postgresql",
+          "mode": "DEBUGGING",
+          "action": "INITIAL",
+          "difficulty": 3,
+          "question_depth": 3,
+          "question": {
+            "text": "Anh/chị dùng EXPLAIN ANALYZE đọc các chỉ số then chốt nào nhằm quyết định chiến lược đánh chỉ mục?",
+            "criterion_ids": [
+              "j17:c1"
+            ],
+            "assistance": "NONE",
+            "mode": "DEBUGGING",
+            "depth": 3,
+            "evidence_scope": "j17-case"
+          },
+          "answer": "Dạ em rất đam mê công nghệ dữ liệu, em thấy PostgreSQL là database mã nguồn mở tốt nhất hiện nay và em thường xuyên đọc các bài viết về database.",
+          "judgment": null,
+          "introduction": ""
+        },
+        "required_criterion_ids": [
+          "j17:c1"
+        ],
+        "target_criteria": [
+          {
+            "criterion_id": "j17:c1",
+            "description": "PostgreSQL EXPLAIN ANALYZE",
+            "expected_evidence": "Dùng execution plan thực tế để đánh giá lựa chọn index cho truy vấn.",
+            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Dùng execution plan thực tế để đánh giá lựa chọn index cho truy vấn.",
+            "at_target": "Dùng execution plan thực tế để đánh giá lựa chọn index cho truy vấn.",
+            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Dùng execution plan thực tế để đánh giá lựa chọn index cho truy vấn.",
+            "essential": true
+          }
+        ],
+        "prior_observations": [],
+        "prior_turns": []
+      },
+      "judgment": {
+        "observations": [
+          {
+            "criterion_id": "j17:c1",
+            "response_excerpt": "",
+            "observation": "NO_EVIDENCE",
+            "performance": "UNDETERMINED",
+            "rationale": "Không có phân tích EXPLAIN ANALYZE hoặc bằng chứng chọn index.",
+            "resolves_contradiction": false,
+            "unresolved_aspects": [
+              "Không có phân tích EXPLAIN ANALYZE hoặc bằng chứng chọn index."
+            ]
+          }
+        ],
+        "feedback": "Câu trả lời chưa đề cập nội dung phân tích truy vấn được hỏi.",
+        "explicit_inability": false,
+        "inability_excerpt": "",
+        "feedback_contains_hint": false
+      },
+      "source_question": "Anh/chị dùng EXPLAIN ANALYZE đọc các chỉ số then chốt nào nhằm quyết định chiến lược đánh chỉ mục?",
+      "source_response": "Dạ em rất đam mê công nghệ dữ liệu, em thấy PostgreSQL là database mã nguồn mở tốt nhất hiện nay và em thường xuyên đọc các bài viết về database.",
+      "source_context": "- Kỹ năng đang đánh giá (d*): `postgresql`\n- Mức năng lực yêu cầu từ JD (s_jd): 4.00 / 5.0\n- Mức năng lực ước lượng từ CV (s_cv): 2.80 / 5.0\n- Bằng chứng trong CV: \"Thiết kế cơ sở dữ liệu quan hệ PostgreSQL...\"\n- Hệ quy chiếu Rubric: Low(1.5), Med(3.0), High(4.5)",
+      "source_required_proficiency": 4.0
+    },
+    {
+      "sample_id": "j18",
+      "context": {
+        "interaction_mode": "VOICE",
+        "objective": {
+          "objective_id": "j18",
+          "skill_id": "kubernetes",
+          "claim": "Kubernetes OOMKilled",
+          "target_depth": 3,
+          "criteria": [
+            {
+              "criterion_id": "j18:c1",
+              "description": "Kubernetes OOMKilled",
+              "expected_evidence": "Dùng trạng thái container và số liệu bộ nhớ để chẩn đoán OOMKilled.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Dùng trạng thái container và số liệu bộ nhớ để chẩn đoán OOMKilled.",
+              "at_target": "Dùng trạng thái container và số liệu bộ nhớ để chẩn đoán OOMKilled.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Dùng trạng thái container và số liệu bộ nhớ để chẩn đoán OOMKilled.",
+              "essential": true
+            }
+          ]
+        },
+        "turn": {
+          "turn_id": "j18-turn",
+          "objective_id": "j18",
+          "skill_id": "kubernetes",
+          "mode": "DEBUGGING",
+          "action": "INITIAL",
+          "difficulty": 3,
+          "question_depth": 3,
+          "question": {
+            "text": "Khi Pod liên tục bị OOMKilled exit code 137, anh/chị điều tra và cấu hình lại resource limits ra sao?",
+            "criterion_ids": [
+              "j18:c1"
+            ],
+            "assistance": "NONE",
+            "mode": "DEBUGGING",
+            "depth": 3,
+            "evidence_scope": "j18-case"
+          },
+          "answer": "Em dùng kubectl logs xem pod có báo lỗi gì không, sau đó em mở file helm values.yaml do Tech Lead viết sẵn rồi tăng thông số memory limit lên gấp đôi rồi chạy lệnh helm upgrade để deploy lại.",
+          "judgment": null,
+          "introduction": ""
+        },
+        "required_criterion_ids": [
+          "j18:c1"
+        ],
+        "target_criteria": [
+          {
+            "criterion_id": "j18:c1",
+            "description": "Kubernetes OOMKilled",
+            "expected_evidence": "Dùng trạng thái container và số liệu bộ nhớ để chẩn đoán OOMKilled.",
+            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Dùng trạng thái container và số liệu bộ nhớ để chẩn đoán OOMKilled.",
+            "at_target": "Dùng trạng thái container và số liệu bộ nhớ để chẩn đoán OOMKilled.",
+            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Dùng trạng thái container và số liệu bộ nhớ để chẩn đoán OOMKilled.",
+            "essential": true
+          }
+        ],
+        "prior_observations": [],
+        "prior_turns": []
+      },
+      "judgment": {
+        "observations": [
+          {
+            "criterion_id": "j18:c1",
+            "response_excerpt": "",
+            "observation": "UNCLEAR",
+            "performance": "UNDETERMINED",
+            "rationale": "Chưa có kiểm chứng nguyên nhân OOM trước khi tăng limit.",
+            "resolves_contradiction": false,
+            "unresolved_aspects": [
+              "Chưa có kiểm chứng nguyên nhân OOM trước khi tăng limit."
+            ]
+          }
+        ],
+        "feedback": "Bạn đã mô tả thao tác cấu hình, còn căn cứ chẩn đoán OOM chưa rõ.",
+        "explicit_inability": false,
+        "inability_excerpt": "",
+        "feedback_contains_hint": false
+      },
+      "source_question": "Khi Pod liên tục bị OOMKilled exit code 137, anh/chị điều tra và cấu hình lại resource limits ra sao?",
+      "source_response": "Em dùng kubectl logs xem pod có báo lỗi gì không, sau đó em mở file helm values.yaml do Tech Lead viết sẵn rồi tăng thông số memory limit lên gấp đôi rồi chạy lệnh helm upgrade để deploy lại.",
+      "source_context": "- Kỹ năng đang đánh giá (d*): `kubernetes`\n- Mức năng lực yêu cầu từ JD (s_jd): 4.50 / 5.0\n- Mức năng lực ước lượng từ CV (s_cv): 3.00 / 5.0\n- Bằng chứng trong CV: \"Triển khai ứng dụng lên Kubernetes cluster bằng Helm chart.\"\n- Hệ quy chiếu Rubric: Low(1.5), Med(3.0), High(4.5)",
+      "source_required_proficiency": 4.5
+    },
+    {
+      "sample_id": "j19",
+      "context": {
+        "interaction_mode": "VOICE",
+        "objective": {
+          "objective_id": "j19",
+          "skill_id": "java_spring",
+          "claim": "Spring transaction rollback",
+          "target_depth": 3,
+          "criteria": [
+            {
+              "criterion_id": "j19:c1",
+              "description": "Spring transaction rollback",
+              "expected_evidence": "Giải thích rollback khi phương thức Spring có transaction gặp RuntimeException.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Giải thích rollback khi phương thức Spring có transaction gặp RuntimeException.",
+              "at_target": "Giải thích rollback khi phương thức Spring có transaction gặp RuntimeException.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Giải thích rollback khi phương thức Spring có transaction gặp RuntimeException.",
+              "essential": true
+            }
+          ]
+        },
+        "turn": {
+          "turn_id": "j19-turn",
+          "objective_id": "j19",
+          "skill_id": "java_spring",
+          "mode": "DEBUGGING",
+          "action": "INITIAL",
+          "difficulty": 3,
+          "question_depth": 3,
+          "question": {
+            "text": "Anh/chị cấu hình cơ chế rollback và quản lý propagation như thế nào để đảm bảo tính toàn vẹn dữ liệu?",
+            "criterion_ids": [
+              "j19:c1"
+            ],
+            "assistance": "NONE",
+            "mode": "DEBUGGING",
+            "depth": 3,
+            "evidence_scope": "j19-case"
+          },
+          "answer": "Em khai báo @Transactional(rollbackFor = Exception.class) ở tầng Service. Trong trường hợp cần gọi sang một service ghi log độc lập mà không muốn bị rollback theo transaction chính nếu có lỗi, em cấu hình method đó với Propagation.REQUIRES_NEW để mở transaction riêng.",
+          "judgment": null,
+          "introduction": ""
+        },
+        "required_criterion_ids": [
+          "j19:c1"
+        ],
+        "target_criteria": [
+          {
+            "criterion_id": "j19:c1",
+            "description": "Spring transaction rollback",
+            "expected_evidence": "Giải thích rollback khi phương thức Spring có transaction gặp RuntimeException.",
+            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Giải thích rollback khi phương thức Spring có transaction gặp RuntimeException.",
+            "at_target": "Giải thích rollback khi phương thức Spring có transaction gặp RuntimeException.",
+            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Giải thích rollback khi phương thức Spring có transaction gặp RuntimeException.",
+            "essential": true
+          }
+        ],
+        "prior_observations": [],
+        "prior_turns": []
+      },
+      "judgment": {
+        "observations": [
+          {
+            "criterion_id": "j19:c1",
+            "response_excerpt": "Em khai báo @Transactional(rollbackFor = Exception.class) ở tầng Service. Trong trường hợp cần gọi sang một service ghi log độc lập mà không muốn bị rollback theo transaction chính nếu có lỗi, em cấu hình method đó với Propagation.REQUIRES_NEW để mở transaction riêng.",
+            "observation": "SUPPORTS",
+            "performance": "AT_TARGET",
+            "rationale": "Nêu rollbackFor và REQUIRES_NEW cho transaction ghi log độc lập.",
+            "resolves_contradiction": false,
+            "unresolved_aspects": []
+          }
+        ],
+        "feedback": "Bạn đã giải thích lựa chọn rollback và transaction ghi log độc lập.",
+        "explicit_inability": false,
+        "inability_excerpt": "",
+        "feedback_contains_hint": false
+      },
+      "source_question": "Anh/chị cấu hình cơ chế rollback và quản lý propagation như thế nào để đảm bảo tính toàn vẹn dữ liệu?",
+      "source_response": "Em khai báo @Transactional(rollbackFor = Exception.class) ở tầng Service. Trong trường hợp cần gọi sang một service ghi log độc lập mà không muốn bị rollback theo transaction chính nếu có lỗi, em cấu hình method đó với Propagation.REQUIRES_NEW để mở transaction riêng.",
+      "source_context": "- Kỹ năng đang đánh giá (d*): `java_spring`\n- Mức năng lực yêu cầu từ JD (s_jd): 4.00 / 5.0\n- Mức năng lực ước lượng từ CV (s_cv): 2.30 / 5.0\n- Bằng chứng trong CV: \"Phát triển các RESTful API CRUD cơ bản...\"\n- Hệ quy chiếu Rubric: Low(1.5), Med(3.0), High(4.5)",
+      "source_required_proficiency": 4.0
+    },
+    {
+      "sample_id": "j20",
+      "context": {
+        "interaction_mode": "VOICE",
+        "objective": {
+          "objective_id": "j20",
+          "skill_id": "graphql",
+          "claim": "GraphQL DataLoader batching",
+          "target_depth": 2,
+          "criteria": [
+            {
+              "criterion_id": "j20:c1",
+              "description": "GraphQL DataLoader batching",
+              "expected_evidence": "Giải thích cách batch các yêu cầu resolver để giảm truy vấn N+1.",
+              "below_target": "Đưa ra cách xử lý trái với yêu cầu: Giải thích cách batch các yêu cầu resolver để giảm truy vấn N+1.",
+              "at_target": "Giải thích cách batch các yêu cầu resolver để giảm truy vấn N+1.",
+              "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Giải thích cách batch các yêu cầu resolver để giảm truy vấn N+1.",
+              "essential": true
+            }
+          ]
+        },
+        "turn": {
+          "turn_id": "j20-turn",
+          "objective_id": "j20",
+          "skill_id": "graphql",
+          "mode": "TECHNICAL_EXPLANATION",
+          "action": "INITIAL",
+          "difficulty": 2,
+          "question_depth": 2,
+          "question": {
+            "text": "Làm thế nào anh/chị áp dụng cơ chế Batching và Caching của DataLoader để giải quyết triệt để N+1 query?",
+            "criterion_ids": [
+              "j20:c1"
+            ],
+            "assistance": "NONE",
+            "mode": "TECHNICAL_EXPLANATION",
+            "depth": 2,
+            "evidence_scope": "j20-case"
+          },
+          "answer": "Khi nhiều field resolver cùng cần lấy thông tin tác giả của danh sách bài viết, thay vì mỗi resolver gửi một câu SELECT độc lập, DataLoader sẽ gom toàn bộ author_id trong cùng một tick của Event Loop thành một mảng rồi gửi duy nhất một câu lệnh WHERE id IN (...) xuống database, sau đó phân phối lại kết quả theo thứ tự.",
+          "judgment": null,
+          "introduction": ""
+        },
+        "required_criterion_ids": [
+          "j20:c1"
+        ],
+        "target_criteria": [
+          {
+            "criterion_id": "j20:c1",
+            "description": "GraphQL DataLoader batching",
+            "expected_evidence": "Giải thích cách batch các yêu cầu resolver để giảm truy vấn N+1.",
+            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Giải thích cách batch các yêu cầu resolver để giảm truy vấn N+1.",
+            "at_target": "Giải thích cách batch các yêu cầu resolver để giảm truy vấn N+1.",
+            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Giải thích cách batch các yêu cầu resolver để giảm truy vấn N+1.",
+            "essential": true
+          }
+        ],
+        "prior_observations": [],
+        "prior_turns": []
+      },
+      "judgment": {
+        "observations": [
+          {
+            "criterion_id": "j20:c1",
+            "response_excerpt": "Khi nhiều field resolver cùng cần lấy thông tin tác giả của danh sách bài viết, thay vì mỗi resolver gửi một câu SELECT độc lập, DataLoader sẽ gom toàn bộ author_id trong cùng một tick của Event Loop thành một mảng rồi gửi duy nhất một câu lệnh WHERE id IN (...) xuống database, sau đó phân phối lại kết quả theo thứ tự.",
+            "observation": "SUPPORTS",
+            "performance": "AT_TARGET",
+            "rationale": "Batch author IDs thành truy vấn IN và phân phối kết quả theo thứ tự.",
+            "resolves_contradiction": false,
+            "unresolved_aspects": []
+          }
+        ],
+        "feedback": "Bạn đã mô tả cách batching các lần lấy tác giả.",
+        "explicit_inability": false,
+        "inability_excerpt": "",
+        "feedback_contains_hint": false
+      },
+      "source_question": "Làm thế nào anh/chị áp dụng cơ chế Batching và Caching của DataLoader để giải quyết triệt để N+1 query?",
+      "source_response": "Khi nhiều field resolver cùng cần lấy thông tin tác giả của danh sách bài viết, thay vì mỗi resolver gửi một câu SELECT độc lập, DataLoader sẽ gom toàn bộ author_id trong cùng một tick của Event Loop thành một mảng rồi gửi duy nhất một câu lệnh WHERE id IN (...) xuống database, sau đó phân phối lại kết quả theo thứ tự.",
+      "source_context": "- Kỹ năng đang đánh giá (d*): `graphql`\n- Mức năng lực yêu cầu từ JD (s_jd): 4.00 / 5.0\n- Mức năng lực ước lượng từ CV (s_cv): 2.40 / 5.0\n- Bằng chứng trong CV: \"Xây dựng hệ thống REST API theo chuẩn OpenAPI.\"\n- Hệ quy chiếu Rubric: Low(1.5), Med(3.0), High(4.5)",
+      "source_required_proficiency": 4.0
+    }
+  ]
+}

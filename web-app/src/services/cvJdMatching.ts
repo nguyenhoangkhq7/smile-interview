@@ -57,32 +57,6 @@ export interface AbductiveReasoning {
   hypothesis_A: string;
 }
 
-export interface StartInterviewResponse {
-  session_id: string;
-  turn: number;
-  active_skill_id?: string | null;
-  initial_belief: number[];
-  abductive_reasoning?: AbductiveReasoning | null;
-  question?: string | null;
-  is_finished: boolean;
-}
-
-export interface RespondInterviewResponse {
-  session_id: string;
-  turn: number;
-  evaluated_skill_id: string;
-  previous_belief: number[];
-  updated_belief: number[];
-  tv_delta: number;
-  metamorphic_tag: 'INVARIANT' | 'MINOR_SHIFT' | 'MODERATE_SHIFT' | 'DECISIVE_SHIFT' | string;
-  reflective_insight: string;
-  skill_verified: boolean;
-  active_skill_id?: string | null;
-  next_question?: string | null;
-  completion_rate: number;
-  is_finished: boolean;
-}
-
 export interface SkillAuditReportItem {
   jd_skill_id: string;
   matched_cv_skill_id?: string | null;
@@ -95,10 +69,6 @@ export interface SkillAuditReportItem {
   is_verified: boolean;
   verification_reason?: string | null;
   local_turns_spent: number;
-  prior_belief: number[];
-  final_belief: number[];
-  belief_trajectory: number[][];
-  metamorphic_tags: string[];
   judge_justifications: string[];
   primary_slot_value?: string | null;
   consolidated_finding?: string | null;
@@ -114,10 +84,6 @@ export interface TurnLogItem {
   candidate_response?: string | null;
   extracted_slot_value?: string | null;
   reflective_insight?: string | null;
-  metamorphic_tag?: string | null;
-  previous_belief: number[];
-  updated_belief?: number[] | null;
-  tv_delta?: number | null;
   skill_verified_after_turn: boolean;
   verification_reason?: string | null;
 }
@@ -196,27 +162,6 @@ export const cvJdMatchingService = {
       `/api/v1/sessions/${encodeURIComponent(sessionId)}/analyze-gap?forceRefresh=${forceRefresh}`,
       null,
       { headers: getAuthHeaders(false) }
-    );
-    return data;
-  },
-
-  async startAdaptiveInterview(sessionId: string): Promise<StartInterviewResponse> {
-    const { data } = await axiosClient.post<StartInterviewResponse>(
-      `/api/v1/sessions/${encodeURIComponent(sessionId)}/interview/start`,
-      null,
-      { headers: getAuthHeaders(false) }
-    );
-    return data;
-  },
-
-  async respondAdaptiveInterview(
-    sessionId: string,
-    candidateResponse: string
-  ): Promise<RespondInterviewResponse> {
-    const { data } = await axiosClient.post<RespondInterviewResponse>(
-      `/api/v1/sessions/${encodeURIComponent(sessionId)}/interview/respond`,
-      { candidate_response: candidateResponse },
-      { headers: getAuthHeaders(true) }
     );
     return data;
   },
