@@ -2,7 +2,6 @@ from unittest.mock import Mock
 
 import pytest
 
-from module1_matcher.extractor import DefaultModule1Extractor
 from skill_gap.domain.models import ExtractedCVSkill, ExtractedJDSkill, JDParserOutput, JDRequirement, JobTask, SpanMapping
 from skill_gap.domain.enums import SkillType
 from skill_gap.services.jd_requirement_parser import JDRequirementParser
@@ -46,12 +45,6 @@ def test_missing_richness_results_are_tracked_as_degraded():
     values = estimator.estimate_batch([skill], [SpanMapping(span=skill.evidence_spans[0], job_id="job")], [])
     assert values[0].degraded
     assert "richness_analysis_fallback" in values[0].flags
-
-
-def test_mock_matcher_provenance_is_explicit():
-    output = DefaultModule1Extractor(use_llm=False).extract_and_match("Python project", "Python required")
-    assert output.matcher_source == "MOCK_HEURISTIC"
-    assert output.match_results[0].soft_match > 0
 
 
 def test_runtime_jd_demos_ground_tasks_and_preserve_optional_complexity():

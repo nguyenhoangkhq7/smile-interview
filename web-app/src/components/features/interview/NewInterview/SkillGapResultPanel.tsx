@@ -5,6 +5,7 @@ import { MarkdownContent } from '@/components/common/MarkdownContent';
 import type { AnalyzeWithReportResponse, SkillGapResult } from '@/services/cvJdMatching';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { GnnScoreMetric } from '@/components/features/interview/GnnScoreMetric';
 import {
   CheckCircle2,
   AlertTriangle,
@@ -139,7 +140,8 @@ export function SkillGapResultPanel({
       </div>
 
       {/* KPI Metrics Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <GnnScoreMetric score={report?.matching_score} />
         <div className="rounded-xl border border-border bg-muted/30 p-4 text-center">
           <div className="text-2xl font-black text-brand-orange">{overallFitPercent}%</div>
           <div className="text-[11px] text-muted-foreground font-medium mt-1">Độ khớp năng lực</div>

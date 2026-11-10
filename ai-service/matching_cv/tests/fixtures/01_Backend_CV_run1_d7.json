@@ -1,0 +1,2002 @@
+{
+  "metadata": {
+    "provider": "OpenRouter",
+    "model_configured": "qwen/qwen3.7-flash",
+    "model_returned": "qwen/qwen3.7-flash",
+    "model": "qwen/qwen3.7-flash",
+    "temperature": 0.0,
+    "max_tokens_setting": "not set (provider default)",
+    "response_format": {
+      "type": "json_object"
+    },
+    "finish_reason": "stop",
+    "token_usage": {
+      "prompt_tokens": 3278,
+      "completion_tokens": 3155,
+      "total_tokens": 6433
+    },
+    "latency_seconds": 26.803,
+    "variant": "C3",
+    "prompt_template_sha256": "fe179cb6a7276bd5f925e72e812b230f4c0ede192a23ada6350fa192e2cf3461",
+    "text_sha256": "988fee55629f163567d17c91357c9d6505d1dff10f52071ad4c7e7d2b45ec3e4",
+    "run_index": 1,
+    "timestamp": "2026-10-19T07:27:55.411268+00:00",
+    "raw_validation_error": null
+  },
+  "raw_llm": {
+    "explicit_skills": [
+      {
+        "mention": "Java",
+        "kind": "skill",
+        "category": "Technology/Tool",
+        "source_sentence": "Backend engineer with 4 years of experience building and scaling Java/Spring Boot microservices for e-commerce and fintech platforms."
+      },
+      {
+        "mention": "Spring Boot",
+        "kind": "skill",
+        "category": "Technology/Tool",
+        "source_sentence": "Backend engineer with 4 years of experience building and scaling Java/Spring Boot microservices for e-commerce and fintech platforms."
+      },
+      {
+        "mention": "microservices",
+        "kind": "skill",
+        "category": "Technical Concept",
+        "source_sentence": "Backend engineer with 4 years of experience building and scaling Java/Spring Boot microservices for e-commerce and fintech platforms."
+      },
+      {
+        "mention": "e-commerce",
+        "kind": "domain",
+        "category": "Domain Knowledge",
+        "source_sentence": "Backend engineer with 4 years of experience building and scaling Java/Spring Boot microservices for e-commerce and fintech platforms."
+      },
+      {
+        "mention": "fintech",
+        "kind": "domain",
+        "category": "Domain Knowledge",
+        "source_sentence": "Backend engineer with 4 years of experience building and scaling Java/Spring Boot microservices for e-commerce and fintech platforms."
+      },
+      {
+        "mention": "relational database design",
+        "kind": "skill",
+        "category": "Technical Concept",
+        "source_sentence": "Strong background in relational database design, REST API development, and message-driven architectures."
+      },
+      {
+        "mention": "REST API development",
+        "kind": "skill",
+        "category": "Engineering Practice",
+        "source_sentence": "Strong background in relational database design, REST API development, and message-driven architectures."
+      },
+      {
+        "mention": "message-driven architectures",
+        "kind": "skill",
+        "category": "Technical Concept",
+        "source_sentence": "Strong background in relational database design, REST API development, and message-driven architectures."
+      },
+      {
+        "mention": "production monitoring",
+        "kind": "skill",
+        "category": "Engineering Practice",
+        "source_sentence": "Comfortable owning a service from design through production monitoring."
+      },
+      {
+        "mention": "Java",
+        "kind": "skill",
+        "category": "Technology/Tool",
+        "source_sentence": "Languages: Java (primary), SQL, some Python for tooling scripts"
+      },
+      {
+        "mention": "SQL",
+        "kind": "skill",
+        "category": "Technology/Tool",
+        "source_sentence": "Languages: Java (primary), SQL, some Python for tooling scripts"
+      },
+      {
+        "mention": "Python",
+        "kind": "skill",
+        "category": "Technology/Tool",
+        "source_sentence": "Languages: Java (primary), SQL, some Python for tooling scripts"
+      },
+      {
+        "mention": "Spring Boot",
+        "kind": "skill",
+        "category": "Technology/Tool",
+        "source_sentence": "Frameworks: Spring Boot, Spring Data JPA, Spring Security, Hibernate"
+      },
+      {
+        "mention": "Spring Data JPA",
+        "kind": "skill",
+        "category": "Technology/Tool",
+        "source_sentence": "Frameworks: Spring Boot, Spring Data JPA, Spring Security, Hibernate"
+      },
+      {
+        "mention": "Spring Security",
+        "kind": "skill",
+        "category": "Technology/Tool",
+        "source_sentence": "Frameworks: Spring Boot, Spring Data JPA, Spring Security, Hibernate"
+      },
+      {
+        "mention": "Hibernate",
+        "kind": "skill",
+        "category": "Technology/Tool",
+        "source_sentence": "Frameworks: Spring Boot, Spring Data JPA, Spring Security, Hibernate"
+      },
+      {
+        "mention": "PostgreSQL",
+        "kind": "skill",
+        "category": "Technology/Tool",
+        "source_sentence": "Data: PostgreSQL, MySQL, Redis (caching, rate limiting)"
+      },
+      {
+        "mention": "MySQL",
+        "kind": "skill",
+        "category": "Technology/Tool",
+        "source_sentence": "Data: PostgreSQL, MySQL, Redis (caching, rate limiting)"
+      },
+      {
+        "mention": "Redis",
+        "kind": "skill",
+        "category": "Technology/Tool",
+        "source_sentence": "Data: PostgreSQL, MySQL, Redis (caching, rate limiting)"
+      },
+      {
+        "mention": "caching",
+        "kind": "skill",
+        "category": "Technical Concept",
+        "source_sentence": "Data: PostgreSQL, MySQL, Redis (caching, rate limiting)"
+      },
+      {
+        "mention": "rate limiting",
+        "kind": "skill",
+        "category": "Technical Concept",
+        "source_sentence": "Data: PostgreSQL, MySQL, Redis (caching, rate limiting)"
+      },
+      {
+        "mention": "Apache Kafka",
+        "kind": "skill",
+        "category": "Technology/Tool",
+        "source_sentence": "Messaging & infra: Apache Kafka, RabbitMQ, Docker, basic Kubernetes"
+      },
+      {
+        "mention": "RabbitMQ",
+        "kind": "skill",
+        "category": "Technology/Tool",
+        "source_sentence": "Messaging & infra: Apache Kafka, RabbitMQ, Docker, basic Kubernetes"
+      },
+      {
+        "mention": "Docker",
+        "kind": "skill",
+        "category": "Technology/Tool",
+        "source_sentence": "Messaging & infra: Apache Kafka, RabbitMQ, Docker, basic Kubernetes"
+      },
+      {
+        "mention": "Kubernetes",
+        "kind": "skill",
+        "category": "Technology/Tool",
+        "source_sentence": "Messaging & infra: Apache Kafka, RabbitMQ, Docker, basic Kubernetes"
+      },
+      {
+        "mention": "JUnit 5",
+        "kind": "skill",
+        "category": "Technology/Tool",
+        "source_sentence": "Testing & tooling: JUnit 5, Mockito, Testcontainers, Maven, Git, Jenkins"
+      },
+      {
+        "mention": "Mockito",
+        "kind": "skill",
+        "category": "Technology/Tool",
+        "source_sentence": "Testing & tooling: JUnit 5, Mockito, Testcontainers, Maven, Git, Jenkins"
+      },
+      {
+        "mention": "Testcontainers",
+        "kind": "skill",
+        "category": "Technology/Tool",
+        "source_sentence": "Testing & tooling: JUnit 5, Mockito, Testcontainers, Maven, Git, Jenkins"
+      },
+      {
+        "mention": "Maven",
+        "kind": "skill",
+        "category": "Technology/Tool",
+        "source_sentence": "Testing & tooling: JUnit 5, Mockito, Testcontainers, Maven, Git, Jenkins"
+      },
+      {
+        "mention": "Git",
+        "kind": "skill",
+        "category": "Technology/Tool",
+        "source_sentence": "Testing & tooling: JUnit 5, Mockito, Testcontainers, Maven, Git, Jenkins"
+      },
+      {
+        "mention": "Jenkins",
+        "kind": "skill",
+        "category": "Technology/Tool",
+        "source_sentence": "Testing & tooling: JUnit 5, Mockito, Testcontainers, Maven, Git, Jenkins"
+      },
+      {
+        "mention": "order-management microservice",
+        "kind": "context",
+        "category": "Technology/Tool",
+        "source_sentence": "Own the order-management microservice (Spring Boot, PostgreSQL) handling ~120k orders/day; reduced p95 API latency by 38% through query indexing and Redis caching."
+      },
+      {
+        "mention": "Spring Boot",
+        "kind": "skill",
+        "category": "Technology/Tool",
+        "source_sentence": "Own the order-management microservice (Spring Boot, PostgreSQL) handling ~120k orders/day; reduced p95 API latency by 38% through query indexing and Redis caching."
+      },
+      {
+        "mention": "PostgreSQL",
+        "kind": "skill",
+        "category": "Technology/Tool",
+        "source_sentence": "Own the order-management microservice (Spring Boot, PostgreSQL) handling ~120k orders/day; reduced p95 API latency by 38% through query indexing and Redis caching."
+      },
+      {
+        "mention": "query indexing",
+        "kind": "skill",
+        "category": "Engineering Practice",
+        "source_sentence": "Own the order-management microservice (Spring Boot, PostgreSQL) handling ~120k orders/day; reduced p95 API latency by 38% through query indexing and Redis caching."
+      },
+      {
+        "mention": "Redis caching",
+        "kind": "skill",
+        "category": "Technical Concept",
+        "source_sentence": "Own the order-management microservice (Spring Boot, PostgreSQL) handling ~120k orders/day; reduced p95 API latency by 38% through query indexing and Redis caching."
+      },
+      {
+        "mention": "Kafka-based event pipeline",
+        "kind": "skill",
+        "category": "Technical Concept",
+        "source_sentence": "Designed and rolled out a Kafka-based event pipeline to decouple inventory updates from checkout, cutting checkout failures during flash sales by roughly 60%."
+      },
+      {
+        "mention": "inventory updates",
+        "kind": "domain",
+        "category": "Domain Knowledge",
+        "source_sentence": "Designed and rolled out a Kafka-based event pipeline to decouple inventory updates from checkout, cutting checkout failures during flash sales by roughly 60%."
+      },
+      {
+        "mention": "checkout",
+        "kind": "domain",
+        "category": "Domain Knowledge",
+        "source_sentence": "Designed and rolled out a Kafka-based event pipeline to decouple inventory updates from checkout, cutting checkout failures during flash sales by roughly 60%."
+      },
+      {
+        "mention": "integration tests",
+        "kind": "skill",
+        "category": "Engineering Practice",
+        "source_sentence": "Wrote integration tests with Testcontainers and raised service test coverage from 46% to 82%; mentored two junior engineers on API design conventions."
+      },
+      {
+        "mention": "Testcontainers",
+        "kind": "skill",
+        "category": "Technology/Tool",
+        "source_sentence": "Wrote integration tests with Testcontainers and raised service test coverage from 46% to 82%; mentored two junior engineers on API design conventions."
+      },
+      {
+        "mention": "API design conventions",
+        "kind": "skill",
+        "category": "Engineering Practice",
+        "source_sentence": "Wrote integration tests with Testcontainers and raised service test coverage from 46% to 82%; mentored two junior engineers on API design conventions."
+      },
+      {
+        "mention": "REST APIs",
+        "kind": "skill",
+        "category": "Technical Concept",
+        "source_sentence": "Built REST APIs for a KYC onboarding flow using Spring Boot and Spring Security (JWT-based auth)."
+      },
+      {
+        "mention": "KYC onboarding flow",
+        "kind": "domain",
+        "category": "Domain Knowledge",
+        "source_sentence": "Built REST APIs for a KYC onboarding flow using Spring Boot and Spring Security (JWT-based auth)."
+      },
+      {
+        "mention": "Spring Boot",
+        "kind": "skill",
+        "category": "Technology/Tool",
+        "source_sentence": "Built REST APIs for a KYC onboarding flow using Spring Boot and Spring Security (JWT-based auth)."
+      },
+      {
+        "mention": "Spring Security",
+        "kind": "skill",
+        "category": "Technology/Tool",
+        "source_sentence": "Built REST APIs for a KYC onboarding flow using Spring Boot and Spring Security (JWT-based auth)."
+      },
+      {
+        "mention": "JWT-based auth",
+        "kind": "skill",
+        "category": "Technical Concept",
+        "source_sentence": "Built REST APIs for a KYC onboarding flow using Spring Boot and Spring Security (JWT-based auth)."
+      },
+      {
+        "mention": "payment module",
+        "kind": "context",
+        "category": "Technology/Tool",
+        "source_sentence": "Migrated a legacy monolith's payment module to a standalone service, coordinating a zero-downtime cutover."
+      },
+      {
+        "mention": "zero-downtime cutover",
+        "kind": "skill",
+        "category": "Engineering Practice",
+        "source_sentence": "Migrated a legacy monolith's payment module to a standalone service, coordinating a zero-downtime cutover."
+      },
+      {
+        "mention": "Oracle Certified Professional: Java SE 11 Developer",
+        "kind": "certification",
+        "category": "Certification",
+        "source_sentence": "Oracle Certified Professional: Java SE 11 Developer"
+      },
+      {
+        "mention": "AWS Certified Developer – Associate",
+        "kind": "certification",
+        "category": "Certification",
+        "source_sentence": "AWS Certified Developer – Associate"
+      }
+    ],
+    "extraction_meta": {
+      "prompt_sha256": "fe179cb6a7276bd5f925e72e812b230f4c0ede192a23ada6350fa192e2cf3461",
+      "prompt_variant": "C3",
+      "model_configured": "qwen/qwen3.7-flash",
+      "temperature": 0.0,
+      "schema_version": "1.0.0",
+      "extracted_at": "2026-10-19T07:27:55.411248+00:00"
+    }
+  },
+  "processed_result": {
+    "filename": "01_Backend_CV.pdf",
+    "document_type": "CV",
+    "text_sha256": "988fee55629f163567d17c91357c9d6505d1dff10f52071ad4c7e7d2b45ec3e4",
+    "stats": {
+      "total_mentions": 51,
+      "unique_skills": 44,
+      "unresolved_evidences": 0,
+      "kind_conflicts": 0,
+      "non_verbatim_mentions": 0,
+      "header_evidences": 0,
+      "unresolved_mentions": 0,
+      "ambiguous_mentions": 1,
+      "unknown_category_mentions": 0,
+      "invalid_kind_mentions": 0,
+      "quarantined_mentions": 0
+    },
+    "skills": [
+      {
+        "skill_id": "java",
+        "surface_forms": [
+          "Java"
+        ],
+        "category": "Technology/Tool",
+        "category_raw": "Technology/Tool",
+        "kind": "skill",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "summary",
+          "skills"
+        ],
+        "evidences": [
+          {
+            "surface_form": "Java",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Backend engineer with 4 years of experience building and scaling Java/Spring Boot microservices for e-commerce and fintech platforms.",
+            "start": 145,
+            "end": 278,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "summary",
+            "category": "Technology/Tool",
+            "category_raw": "Technology/Tool",
+            "mention_start": 210,
+            "mention_end": 214,
+            "mention_ambiguous": false
+          },
+          {
+            "surface_form": "Java",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Languages: Java (primary), SQL, some Python for tooling scripts",
+            "start": 465,
+            "end": 528,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "skills",
+            "category": "Technology/Tool",
+            "category_raw": "Technology/Tool",
+            "mention_start": 476,
+            "mention_end": 480,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "spring-boot",
+        "surface_forms": [
+          "Spring Boot"
+        ],
+        "category": "Technology/Tool",
+        "category_raw": "Technology/Tool",
+        "kind": "skill",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "summary",
+          "skills",
+          "experience"
+        ],
+        "evidences": [
+          {
+            "surface_form": "Spring Boot",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Backend engineer with 4 years of experience building and scaling Java/Spring Boot microservices for e-commerce and fintech platforms.",
+            "start": 145,
+            "end": 278,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "summary",
+            "category": "Technology/Tool",
+            "category_raw": "Technology/Tool",
+            "mention_start": 215,
+            "mention_end": 226,
+            "mention_ambiguous": false
+          },
+          {
+            "surface_form": "Spring Boot",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Frameworks: Spring Boot, Spring Data JPA, Spring Security, Hibernate",
+            "start": 531,
+            "end": 599,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "skills",
+            "category": "Technology/Tool",
+            "category_raw": "Technology/Tool",
+            "mention_start": 543,
+            "mention_end": 554,
+            "mention_ambiguous": false
+          },
+          {
+            "surface_form": "Spring Boot",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Own the order-management microservice (Spring Boot, PostgreSQL) handling ~120k orders/day; reduced p95 API latency by 38% through query indexing and Redis caching.",
+            "start": 896,
+            "end": 1059,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "experience",
+            "category": "Technology/Tool",
+            "category_raw": "Technology/Tool",
+            "mention_start": 935,
+            "mention_end": 946,
+            "mention_ambiguous": false
+          },
+          {
+            "surface_form": "Spring Boot",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Built REST APIs for a KYC onboarding flow using Spring Boot and Spring Security (JWT-based auth).",
+            "start": 1466,
+            "end": 1563,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "experience",
+            "category": "Technology/Tool",
+            "category_raw": "Technology/Tool",
+            "mention_start": 1514,
+            "mention_end": 1525,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "microservices",
+        "surface_forms": [
+          "microservices"
+        ],
+        "category": "Technical Concept",
+        "category_raw": "Technical Concept",
+        "kind": "skill",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "summary"
+        ],
+        "evidences": [
+          {
+            "surface_form": "microservices",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Backend engineer with 4 years of experience building and scaling Java/Spring Boot microservices for e-commerce and fintech platforms.",
+            "start": 145,
+            "end": 278,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "summary",
+            "category": "Technical Concept",
+            "category_raw": "Technical Concept",
+            "mention_start": 227,
+            "mention_end": 240,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "e-commerce",
+        "surface_forms": [
+          "e-commerce"
+        ],
+        "category": "Domain Knowledge",
+        "category_raw": "Domain Knowledge",
+        "kind": "domain",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "summary"
+        ],
+        "evidences": [
+          {
+            "surface_form": "e-commerce",
+            "kind": "domain",
+            "kind_raw": "domain",
+            "kind_source": "llm",
+            "sentence": "Backend engineer with 4 years of experience building and scaling Java/Spring Boot microservices for e-commerce and fintech platforms.",
+            "start": 145,
+            "end": 278,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "summary",
+            "category": "Domain Knowledge",
+            "category_raw": "Domain Knowledge",
+            "mention_start": 245,
+            "mention_end": 255,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "fintech",
+        "surface_forms": [
+          "fintech"
+        ],
+        "category": "Domain Knowledge",
+        "category_raw": "Domain Knowledge",
+        "kind": "domain",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "summary"
+        ],
+        "evidences": [
+          {
+            "surface_form": "fintech",
+            "kind": "domain",
+            "kind_raw": "domain",
+            "kind_source": "llm",
+            "sentence": "Backend engineer with 4 years of experience building and scaling Java/Spring Boot microservices for e-commerce and fintech platforms.",
+            "start": 145,
+            "end": 278,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "summary",
+            "category": "Domain Knowledge",
+            "category_raw": "Domain Knowledge",
+            "mention_start": 260,
+            "mention_end": 267,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "relational-database-design",
+        "surface_forms": [
+          "relational database design"
+        ],
+        "category": "Technical Concept",
+        "category_raw": "Technical Concept",
+        "kind": "skill",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "summary"
+        ],
+        "evidences": [
+          {
+            "surface_form": "relational database design",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Strong background in relational database design, REST API development, and message-driven architectures.",
+            "start": 279,
+            "end": 383,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "summary",
+            "category": "Technical Concept",
+            "category_raw": "Technical Concept",
+            "mention_start": 300,
+            "mention_end": 326,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "rest-api-development",
+        "surface_forms": [
+          "REST API development"
+        ],
+        "category": "Engineering Practice",
+        "category_raw": "Engineering Practice",
+        "kind": "skill",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "summary"
+        ],
+        "evidences": [
+          {
+            "surface_form": "REST API development",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Strong background in relational database design, REST API development, and message-driven architectures.",
+            "start": 279,
+            "end": 383,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "summary",
+            "category": "Engineering Practice",
+            "category_raw": "Engineering Practice",
+            "mention_start": 328,
+            "mention_end": 348,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "message-driven-architectures",
+        "surface_forms": [
+          "message-driven architectures"
+        ],
+        "category": "Technical Concept",
+        "category_raw": "Technical Concept",
+        "kind": "skill",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "summary"
+        ],
+        "evidences": [
+          {
+            "surface_form": "message-driven architectures",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Strong background in relational database design, REST API development, and message-driven architectures.",
+            "start": 279,
+            "end": 383,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "summary",
+            "category": "Technical Concept",
+            "category_raw": "Technical Concept",
+            "mention_start": 354,
+            "mention_end": 382,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "production-monitoring",
+        "surface_forms": [
+          "production monitoring"
+        ],
+        "category": "Engineering Practice",
+        "category_raw": "Engineering Practice",
+        "kind": "skill",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "summary"
+        ],
+        "evidences": [
+          {
+            "surface_form": "production monitoring",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Comfortable owning a service from design through production monitoring.",
+            "start": 384,
+            "end": 455,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "summary",
+            "category": "Engineering Practice",
+            "category_raw": "Engineering Practice",
+            "mention_start": 433,
+            "mention_end": 454,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "sql",
+        "surface_forms": [
+          "SQL"
+        ],
+        "category": "Technology/Tool",
+        "category_raw": "Technology/Tool",
+        "kind": "skill",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "skills"
+        ],
+        "evidences": [
+          {
+            "surface_form": "SQL",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Languages: Java (primary), SQL, some Python for tooling scripts",
+            "start": 465,
+            "end": 528,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "skills",
+            "category": "Technology/Tool",
+            "category_raw": "Technology/Tool",
+            "mention_start": 492,
+            "mention_end": 495,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "python",
+        "surface_forms": [
+          "Python"
+        ],
+        "category": "Technology/Tool",
+        "category_raw": "Technology/Tool",
+        "kind": "skill",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "skills"
+        ],
+        "evidences": [
+          {
+            "surface_form": "Python",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Languages: Java (primary), SQL, some Python for tooling scripts",
+            "start": 465,
+            "end": 528,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "skills",
+            "category": "Technology/Tool",
+            "category_raw": "Technology/Tool",
+            "mention_start": 502,
+            "mention_end": 508,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "spring-data-jpa",
+        "surface_forms": [
+          "Spring Data JPA"
+        ],
+        "category": "Technology/Tool",
+        "category_raw": "Technology/Tool",
+        "kind": "skill",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "skills"
+        ],
+        "evidences": [
+          {
+            "surface_form": "Spring Data JPA",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Frameworks: Spring Boot, Spring Data JPA, Spring Security, Hibernate",
+            "start": 531,
+            "end": 599,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "skills",
+            "category": "Technology/Tool",
+            "category_raw": "Technology/Tool",
+            "mention_start": 556,
+            "mention_end": 571,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "spring-security",
+        "surface_forms": [
+          "Spring Security"
+        ],
+        "category": "Technology/Tool",
+        "category_raw": "Technology/Tool",
+        "kind": "skill",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "skills",
+          "experience"
+        ],
+        "evidences": [
+          {
+            "surface_form": "Spring Security",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Frameworks: Spring Boot, Spring Data JPA, Spring Security, Hibernate",
+            "start": 531,
+            "end": 599,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "skills",
+            "category": "Technology/Tool",
+            "category_raw": "Technology/Tool",
+            "mention_start": 573,
+            "mention_end": 588,
+            "mention_ambiguous": false
+          },
+          {
+            "surface_form": "Spring Security",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Built REST APIs for a KYC onboarding flow using Spring Boot and Spring Security (JWT-based auth).",
+            "start": 1466,
+            "end": 1563,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "experience",
+            "category": "Technology/Tool",
+            "category_raw": "Technology/Tool",
+            "mention_start": 1530,
+            "mention_end": 1545,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "hibernate",
+        "surface_forms": [
+          "Hibernate"
+        ],
+        "category": "Technology/Tool",
+        "category_raw": "Technology/Tool",
+        "kind": "skill",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "skills"
+        ],
+        "evidences": [
+          {
+            "surface_form": "Hibernate",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Frameworks: Spring Boot, Spring Data JPA, Spring Security, Hibernate",
+            "start": 531,
+            "end": 599,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "skills",
+            "category": "Technology/Tool",
+            "category_raw": "Technology/Tool",
+            "mention_start": 590,
+            "mention_end": 599,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "postgresql",
+        "surface_forms": [
+          "PostgreSQL"
+        ],
+        "category": "Technology/Tool",
+        "category_raw": "Technology/Tool",
+        "kind": "skill",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "skills",
+          "experience"
+        ],
+        "evidences": [
+          {
+            "surface_form": "PostgreSQL",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Data: PostgreSQL, MySQL, Redis (caching, rate limiting)",
+            "start": 602,
+            "end": 657,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "skills",
+            "category": "Technology/Tool",
+            "category_raw": "Technology/Tool",
+            "mention_start": 608,
+            "mention_end": 618,
+            "mention_ambiguous": false
+          },
+          {
+            "surface_form": "PostgreSQL",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Own the order-management microservice (Spring Boot, PostgreSQL) handling ~120k orders/day; reduced p95 API latency by 38% through query indexing and Redis caching.",
+            "start": 896,
+            "end": 1059,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "experience",
+            "category": "Technology/Tool",
+            "category_raw": "Technology/Tool",
+            "mention_start": 948,
+            "mention_end": 958,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "mysql",
+        "surface_forms": [
+          "MySQL"
+        ],
+        "category": "Technology/Tool",
+        "category_raw": "Technology/Tool",
+        "kind": "skill",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "skills"
+        ],
+        "evidences": [
+          {
+            "surface_form": "MySQL",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Data: PostgreSQL, MySQL, Redis (caching, rate limiting)",
+            "start": 602,
+            "end": 657,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "skills",
+            "category": "Technology/Tool",
+            "category_raw": "Technology/Tool",
+            "mention_start": 620,
+            "mention_end": 625,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "redis",
+        "surface_forms": [
+          "Redis"
+        ],
+        "category": "Technology/Tool",
+        "category_raw": "Technology/Tool",
+        "kind": "skill",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "skills"
+        ],
+        "evidences": [
+          {
+            "surface_form": "Redis",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Data: PostgreSQL, MySQL, Redis (caching, rate limiting)",
+            "start": 602,
+            "end": 657,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "skills",
+            "category": "Technology/Tool",
+            "category_raw": "Technology/Tool",
+            "mention_start": 627,
+            "mention_end": 632,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "caching",
+        "surface_forms": [
+          "caching"
+        ],
+        "category": "Technical Concept",
+        "category_raw": "Technical Concept",
+        "kind": "skill",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "skills"
+        ],
+        "evidences": [
+          {
+            "surface_form": "caching",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Data: PostgreSQL, MySQL, Redis (caching, rate limiting)",
+            "start": 602,
+            "end": 657,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "skills",
+            "category": "Technical Concept",
+            "category_raw": "Technical Concept",
+            "mention_start": 634,
+            "mention_end": 641,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "rate-limiting",
+        "surface_forms": [
+          "rate limiting"
+        ],
+        "category": "Technical Concept",
+        "category_raw": "Technical Concept",
+        "kind": "skill",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "skills"
+        ],
+        "evidences": [
+          {
+            "surface_form": "rate limiting",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Data: PostgreSQL, MySQL, Redis (caching, rate limiting)",
+            "start": 602,
+            "end": 657,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "skills",
+            "category": "Technical Concept",
+            "category_raw": "Technical Concept",
+            "mention_start": 643,
+            "mention_end": 656,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "apache-kafka",
+        "surface_forms": [
+          "Apache Kafka"
+        ],
+        "category": "Technology/Tool",
+        "category_raw": "Technology/Tool",
+        "kind": "skill",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "skills"
+        ],
+        "evidences": [
+          {
+            "surface_form": "Apache Kafka",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Messaging & infra: Apache Kafka, RabbitMQ, Docker, basic Kubernetes",
+            "start": 660,
+            "end": 727,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "skills",
+            "category": "Technology/Tool",
+            "category_raw": "Technology/Tool",
+            "mention_start": 679,
+            "mention_end": 691,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "rabbitmq",
+        "surface_forms": [
+          "RabbitMQ"
+        ],
+        "category": "Technology/Tool",
+        "category_raw": "Technology/Tool",
+        "kind": "skill",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "skills"
+        ],
+        "evidences": [
+          {
+            "surface_form": "RabbitMQ",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Messaging & infra: Apache Kafka, RabbitMQ, Docker, basic Kubernetes",
+            "start": 660,
+            "end": 727,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "skills",
+            "category": "Technology/Tool",
+            "category_raw": "Technology/Tool",
+            "mention_start": 693,
+            "mention_end": 701,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "docker",
+        "surface_forms": [
+          "Docker"
+        ],
+        "category": "Technology/Tool",
+        "category_raw": "Technology/Tool",
+        "kind": "skill",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "skills"
+        ],
+        "evidences": [
+          {
+            "surface_form": "Docker",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Messaging & infra: Apache Kafka, RabbitMQ, Docker, basic Kubernetes",
+            "start": 660,
+            "end": 727,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "skills",
+            "category": "Technology/Tool",
+            "category_raw": "Technology/Tool",
+            "mention_start": 703,
+            "mention_end": 709,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "kubernetes",
+        "surface_forms": [
+          "Kubernetes"
+        ],
+        "category": "Technology/Tool",
+        "category_raw": "Technology/Tool",
+        "kind": "skill",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "skills"
+        ],
+        "evidences": [
+          {
+            "surface_form": "Kubernetes",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Messaging & infra: Apache Kafka, RabbitMQ, Docker, basic Kubernetes",
+            "start": 660,
+            "end": 727,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "skills",
+            "category": "Technology/Tool",
+            "category_raw": "Technology/Tool",
+            "mention_start": 717,
+            "mention_end": 727,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "junit-5",
+        "surface_forms": [
+          "JUnit 5"
+        ],
+        "category": "Technology/Tool",
+        "category_raw": "Technology/Tool",
+        "kind": "skill",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "skills"
+        ],
+        "evidences": [
+          {
+            "surface_form": "JUnit 5",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Testing & tooling: JUnit 5, Mockito, Testcontainers, Maven, Git, Jenkins",
+            "start": 730,
+            "end": 802,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "skills",
+            "category": "Technology/Tool",
+            "category_raw": "Technology/Tool",
+            "mention_start": 749,
+            "mention_end": 756,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "mockito",
+        "surface_forms": [
+          "Mockito"
+        ],
+        "category": "Technology/Tool",
+        "category_raw": "Technology/Tool",
+        "kind": "skill",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "skills"
+        ],
+        "evidences": [
+          {
+            "surface_form": "Mockito",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Testing & tooling: JUnit 5, Mockito, Testcontainers, Maven, Git, Jenkins",
+            "start": 730,
+            "end": 802,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "skills",
+            "category": "Technology/Tool",
+            "category_raw": "Technology/Tool",
+            "mention_start": 758,
+            "mention_end": 765,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "testcontainers",
+        "surface_forms": [
+          "Testcontainers"
+        ],
+        "category": "Technology/Tool",
+        "category_raw": "Technology/Tool",
+        "kind": "skill",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "skills",
+          "experience"
+        ],
+        "evidences": [
+          {
+            "surface_form": "Testcontainers",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Testing & tooling: JUnit 5, Mockito, Testcontainers, Maven, Git, Jenkins",
+            "start": 730,
+            "end": 802,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "skills",
+            "category": "Technology/Tool",
+            "category_raw": "Technology/Tool",
+            "mention_start": 767,
+            "mention_end": 781,
+            "mention_ambiguous": false
+          },
+          {
+            "surface_form": "Testcontainers",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Wrote integration tests with Testcontainers and raised service test coverage from 46% to 82%; mentored two junior engineers on API design conventions.",
+            "start": 1223,
+            "end": 1373,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "experience",
+            "category": "Technology/Tool",
+            "category_raw": "Technology/Tool",
+            "mention_start": 1252,
+            "mention_end": 1266,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "maven",
+        "surface_forms": [
+          "Maven"
+        ],
+        "category": "Technology/Tool",
+        "category_raw": "Technology/Tool",
+        "kind": "skill",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "skills"
+        ],
+        "evidences": [
+          {
+            "surface_form": "Maven",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Testing & tooling: JUnit 5, Mockito, Testcontainers, Maven, Git, Jenkins",
+            "start": 730,
+            "end": 802,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "skills",
+            "category": "Technology/Tool",
+            "category_raw": "Technology/Tool",
+            "mention_start": 783,
+            "mention_end": 788,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "git",
+        "surface_forms": [
+          "Git"
+        ],
+        "category": "Technology/Tool",
+        "category_raw": "Technology/Tool",
+        "kind": "skill",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "skills"
+        ],
+        "evidences": [
+          {
+            "surface_form": "Git",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Testing & tooling: JUnit 5, Mockito, Testcontainers, Maven, Git, Jenkins",
+            "start": 730,
+            "end": 802,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "skills",
+            "category": "Technology/Tool",
+            "category_raw": "Technology/Tool",
+            "mention_start": 790,
+            "mention_end": 793,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "jenkins",
+        "surface_forms": [
+          "Jenkins"
+        ],
+        "category": "Technology/Tool",
+        "category_raw": "Technology/Tool",
+        "kind": "skill",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "skills"
+        ],
+        "evidences": [
+          {
+            "surface_form": "Jenkins",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Testing & tooling: JUnit 5, Mockito, Testcontainers, Maven, Git, Jenkins",
+            "start": 730,
+            "end": 802,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "skills",
+            "category": "Technology/Tool",
+            "category_raw": "Technology/Tool",
+            "mention_start": 795,
+            "mention_end": 802,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "order-management-microservice",
+        "surface_forms": [
+          "order-management microservice"
+        ],
+        "category": "Technology/Tool",
+        "category_raw": "Technology/Tool",
+        "kind": "context",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "experience"
+        ],
+        "evidences": [
+          {
+            "surface_form": "order-management microservice",
+            "kind": "context",
+            "kind_raw": "context",
+            "kind_source": "llm",
+            "sentence": "Own the order-management microservice (Spring Boot, PostgreSQL) handling ~120k orders/day; reduced p95 API latency by 38% through query indexing and Redis caching.",
+            "start": 896,
+            "end": 1059,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "experience",
+            "category": "Technology/Tool",
+            "category_raw": "Technology/Tool",
+            "mention_start": 904,
+            "mention_end": 933,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "query-indexing",
+        "surface_forms": [
+          "query indexing"
+        ],
+        "category": "Engineering Practice",
+        "category_raw": "Engineering Practice",
+        "kind": "skill",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "experience"
+        ],
+        "evidences": [
+          {
+            "surface_form": "query indexing",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Own the order-management microservice (Spring Boot, PostgreSQL) handling ~120k orders/day; reduced p95 API latency by 38% through query indexing and Redis caching.",
+            "start": 896,
+            "end": 1059,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "experience",
+            "category": "Engineering Practice",
+            "category_raw": "Engineering Practice",
+            "mention_start": 1026,
+            "mention_end": 1040,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "redis-caching",
+        "surface_forms": [
+          "Redis caching"
+        ],
+        "category": "Technical Concept",
+        "category_raw": "Technical Concept",
+        "kind": "skill",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "experience"
+        ],
+        "evidences": [
+          {
+            "surface_form": "Redis caching",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Own the order-management microservice (Spring Boot, PostgreSQL) handling ~120k orders/day; reduced p95 API latency by 38% through query indexing and Redis caching.",
+            "start": 896,
+            "end": 1059,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "experience",
+            "category": "Technical Concept",
+            "category_raw": "Technical Concept",
+            "mention_start": 1045,
+            "mention_end": 1058,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "kafka-based-event-pipeline",
+        "surface_forms": [
+          "Kafka-based event pipeline"
+        ],
+        "category": "Technical Concept",
+        "category_raw": "Technical Concept",
+        "kind": "skill",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "experience"
+        ],
+        "evidences": [
+          {
+            "surface_form": "Kafka-based event pipeline",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Designed and rolled out a Kafka-based event pipeline to decouple inventory updates from checkout, cutting checkout failures during flash sales by roughly 60%.",
+            "start": 1062,
+            "end": 1220,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "experience",
+            "category": "Technical Concept",
+            "category_raw": "Technical Concept",
+            "mention_start": 1088,
+            "mention_end": 1114,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "inventory-updates",
+        "surface_forms": [
+          "inventory updates"
+        ],
+        "category": "Domain Knowledge",
+        "category_raw": "Domain Knowledge",
+        "kind": "domain",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "experience"
+        ],
+        "evidences": [
+          {
+            "surface_form": "inventory updates",
+            "kind": "domain",
+            "kind_raw": "domain",
+            "kind_source": "llm",
+            "sentence": "Designed and rolled out a Kafka-based event pipeline to decouple inventory updates from checkout, cutting checkout failures during flash sales by roughly 60%.",
+            "start": 1062,
+            "end": 1220,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "experience",
+            "category": "Domain Knowledge",
+            "category_raw": "Domain Knowledge",
+            "mention_start": 1127,
+            "mention_end": 1144,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "checkout",
+        "surface_forms": [
+          "checkout"
+        ],
+        "category": "Domain Knowledge",
+        "category_raw": "Domain Knowledge",
+        "kind": "domain",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "experience"
+        ],
+        "evidences": [
+          {
+            "surface_form": "checkout",
+            "kind": "domain",
+            "kind_raw": "domain",
+            "kind_source": "llm",
+            "sentence": "Designed and rolled out a Kafka-based event pipeline to decouple inventory updates from checkout, cutting checkout failures during flash sales by roughly 60%.",
+            "start": 1062,
+            "end": 1220,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "experience",
+            "category": "Domain Knowledge",
+            "category_raw": "Domain Knowledge",
+            "mention_start": 1150,
+            "mention_end": 1158,
+            "mention_ambiguous": true
+          }
+        ]
+      },
+      {
+        "skill_id": "integration-tests",
+        "surface_forms": [
+          "integration tests"
+        ],
+        "category": "Engineering Practice",
+        "category_raw": "Engineering Practice",
+        "kind": "skill",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "experience"
+        ],
+        "evidences": [
+          {
+            "surface_form": "integration tests",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Wrote integration tests with Testcontainers and raised service test coverage from 46% to 82%; mentored two junior engineers on API design conventions.",
+            "start": 1223,
+            "end": 1373,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "experience",
+            "category": "Engineering Practice",
+            "category_raw": "Engineering Practice",
+            "mention_start": 1229,
+            "mention_end": 1246,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "api-design-conventions",
+        "surface_forms": [
+          "API design conventions"
+        ],
+        "category": "Engineering Practice",
+        "category_raw": "Engineering Practice",
+        "kind": "skill",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "experience"
+        ],
+        "evidences": [
+          {
+            "surface_form": "API design conventions",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Wrote integration tests with Testcontainers and raised service test coverage from 46% to 82%; mentored two junior engineers on API design conventions.",
+            "start": 1223,
+            "end": 1373,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "experience",
+            "category": "Engineering Practice",
+            "category_raw": "Engineering Practice",
+            "mention_start": 1350,
+            "mention_end": 1372,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "rest-apis",
+        "surface_forms": [
+          "REST APIs"
+        ],
+        "category": "Technical Concept",
+        "category_raw": "Technical Concept",
+        "kind": "skill",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "experience"
+        ],
+        "evidences": [
+          {
+            "surface_form": "REST APIs",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Built REST APIs for a KYC onboarding flow using Spring Boot and Spring Security (JWT-based auth).",
+            "start": 1466,
+            "end": 1563,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "experience",
+            "category": "Technical Concept",
+            "category_raw": "Technical Concept",
+            "mention_start": 1472,
+            "mention_end": 1481,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "kyc-onboarding-flow",
+        "surface_forms": [
+          "KYC onboarding flow"
+        ],
+        "category": "Domain Knowledge",
+        "category_raw": "Domain Knowledge",
+        "kind": "domain",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "experience"
+        ],
+        "evidences": [
+          {
+            "surface_form": "KYC onboarding flow",
+            "kind": "domain",
+            "kind_raw": "domain",
+            "kind_source": "llm",
+            "sentence": "Built REST APIs for a KYC onboarding flow using Spring Boot and Spring Security (JWT-based auth).",
+            "start": 1466,
+            "end": 1563,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "experience",
+            "category": "Domain Knowledge",
+            "category_raw": "Domain Knowledge",
+            "mention_start": 1488,
+            "mention_end": 1507,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "jwt-based-auth",
+        "surface_forms": [
+          "JWT-based auth"
+        ],
+        "category": "Technical Concept",
+        "category_raw": "Technical Concept",
+        "kind": "skill",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "experience"
+        ],
+        "evidences": [
+          {
+            "surface_form": "JWT-based auth",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Built REST APIs for a KYC onboarding flow using Spring Boot and Spring Security (JWT-based auth).",
+            "start": 1466,
+            "end": 1563,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "experience",
+            "category": "Technical Concept",
+            "category_raw": "Technical Concept",
+            "mention_start": 1547,
+            "mention_end": 1561,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "payment-module",
+        "surface_forms": [
+          "payment module"
+        ],
+        "category": "Technology/Tool",
+        "category_raw": "Technology/Tool",
+        "kind": "context",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "experience"
+        ],
+        "evidences": [
+          {
+            "surface_form": "payment module",
+            "kind": "context",
+            "kind_raw": "context",
+            "kind_source": "llm",
+            "sentence": "Migrated a legacy monolith's payment module to a standalone service, coordinating a zero-downtime cutover.",
+            "start": 1566,
+            "end": 1672,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "experience",
+            "category": "Technology/Tool",
+            "category_raw": "Technology/Tool",
+            "mention_start": 1595,
+            "mention_end": 1609,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "zero-downtime-cutover",
+        "surface_forms": [
+          "zero-downtime cutover"
+        ],
+        "category": "Engineering Practice",
+        "category_raw": "Engineering Practice",
+        "kind": "skill",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "experience"
+        ],
+        "evidences": [
+          {
+            "surface_form": "zero-downtime cutover",
+            "kind": "skill",
+            "kind_raw": "skill",
+            "kind_source": "llm",
+            "sentence": "Migrated a legacy monolith's payment module to a standalone service, coordinating a zero-downtime cutover.",
+            "start": 1566,
+            "end": 1672,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "experience",
+            "category": "Engineering Practice",
+            "category_raw": "Engineering Practice",
+            "mention_start": 1650,
+            "mention_end": 1671,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "oracle-certified-professional-java-se-11-developer",
+        "surface_forms": [
+          "Oracle Certified Professional: Java SE 11 Developer"
+        ],
+        "category": "Certification",
+        "category_raw": "Certification",
+        "kind": "certification",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "certifications"
+        ],
+        "evidences": [
+          {
+            "surface_form": "Oracle Certified Professional: Java SE 11 Developer",
+            "kind": "certification",
+            "kind_raw": "certification",
+            "kind_source": "llm",
+            "sentence": "Oracle Certified Professional: Java SE 11 Developer",
+            "start": 1799,
+            "end": 1850,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "certifications",
+            "category": "Certification",
+            "category_raw": "Certification",
+            "mention_start": 1799,
+            "mention_end": 1850,
+            "mention_ambiguous": false
+          }
+        ]
+      },
+      {
+        "skill_id": "aws-certified-developer-associate",
+        "surface_forms": [
+          "AWS Certified Developer – Associate"
+        ],
+        "category": "Certification",
+        "category_raw": "Certification",
+        "kind": "certification",
+        "type": "explicit",
+        "confidence": null,
+        "sections": [
+          "certifications"
+        ],
+        "evidences": [
+          {
+            "surface_form": "AWS Certified Developer – Associate",
+            "kind": "certification",
+            "kind_raw": "certification",
+            "kind_source": "llm",
+            "sentence": "AWS Certified Developer – Associate",
+            "start": 1853,
+            "end": 1888,
+            "offset_resolved": true,
+            "verbatim_ok": true,
+            "modifier_text": null,
+            "section": "certifications",
+            "category": "Certification",
+            "category_raw": "Certification",
+            "mention_start": 1853,
+            "mention_end": 1888,
+            "mention_ambiguous": false
+          }
+        ]
+      }
+    ],
+    "quarantined": [],
+    "extraction_meta": {
+      "prompt_sha256": "fe179cb6a7276bd5f925e72e812b230f4c0ede192a23ada6350fa192e2cf3461",
+      "prompt_variant": "C3",
+      "model_configured": "qwen/qwen3.7-flash",
+      "temperature": 0.0,
+      "schema_version": "1.0.0",
+      "extracted_at": "2026-10-19T07:27:55.411248+00:00"
+    }
+  },
+  "outcome": "ok"
+}

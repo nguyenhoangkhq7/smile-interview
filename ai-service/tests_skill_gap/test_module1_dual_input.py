@@ -18,7 +18,7 @@ def create_in_memory_pdf(text_content: str) -> bytes:
 
 
 @pytest.fixture
-def dual_input_client():
+def dual_input_client(fixed_matching_result):
     mock_llm = SimulatedLatencyMockLLM()
     app = create_app(llm_client=mock_llm)
     return TestClient(app)

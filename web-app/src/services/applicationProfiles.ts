@@ -41,8 +41,10 @@ export const attemptLabels: Record<AttemptStatus, string> = {
 const base = '/api/v1/application-profiles';
 export const applicationProfiles = {
   async competency(id: string): Promise<CurrentCompetency> { return (await axiosClient.get(`${base}/${id}/competency`)).data; },
-  async list(): Promise<ApplicationProfile[]> { return (await axiosClient.get(base)).data; },
-  async get(id: string): Promise<ApplicationProfile> { return (await axiosClient.get(`${base}/${id}`)).data; },
+  async list(signal?: AbortSignal): Promise<ApplicationProfile[]> { return (await axiosClient.get(base, { signal })).data; },
+  async get(id: string, signal?: AbortSignal): Promise<ApplicationProfile> {
+    return (await axiosClient.get(`${base}/${encodeURIComponent(id)}`, { signal })).data;
+  },
   async create(sourceSessionId: string, title: string, company: string): Promise<ApplicationProfile> {
     return (await axiosClient.post(base, { sourceSessionId, title, company })).data;
   },

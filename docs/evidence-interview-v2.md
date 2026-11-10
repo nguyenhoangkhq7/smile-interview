@@ -19,7 +19,7 @@ flowchart LR
     J --> K[Báo cáo theo kỹ năng và mục tiêu]
 ```
 
-- `module1_matcher`: giữ nguyên contract `w_j` và `soft_match`; adapter hiện tại ghi `matcher_source:MOCK_LLM` hoặc `MOCK_HEURISTIC` vào flags của C2. Implementation SBERT/GNN sau này thay qua `Module1MatcherProtocol`, không thay planner. Giá trị mock không phải kết quả nghiên cứu của metric mới.
+- `matching_cv` chạy Module 1 và tạo trực tiếp `Module1Output` với `w_j` và `soft_match`. Router ghi `matcher_source:MATCHING_CV` vào flags của C2. Kết quả cũ có thể chứa `MOCK_LLM` hoặc `MOCK_HEURISTIC`.
 - `skill_gap`: bổ sung `job_tasks`, trích dẫn JD, lý do mức yêu cầu, trọng số quan trọng, độ bao phủ bằng chứng CV, cờ recency/degraded. Giữ công thức gap và priority hiện có. Thứ tự suy luận mức yêu cầu: nhiệm vụ/độ sâu rõ ràng → kinh nghiệm riêng của kỹ năng → seniority fallback. Optional không đồng nghĩa mức thấp.
 - `evidence/provider.py`: interface LLM cho blueprint, question, judge. Không tải compiled artifact C3 cũ. Câu hỏi, rubric và kết luận của LLM đều phải qua kiểm tra trước khi lưu.
 - `planning.py`: mỗi nhiệm vụ có mục tiêu riêng; ID ổn định theo skill/task. Blueprint phủ đúng yêu cầu đầu vào. Nhóm core được ưu tiên trước; trong nhóm core dùng gap priority rồi importance. MATCH core vẫn được xác minh. Ưu tiên một lượt trên các kỹ năng, giữ phần ngân sách cho follow-up và có thể đưa mục tiêu chưa hỏi trở lại khi còn ngân sách.
