@@ -42,12 +42,6 @@
   gap: 0.25rem;
 }
 
-@media (max-width: 640px) {
-  .nav {
-    display: none;
-  }
-}
-
 .navLink {
   position: relative;
   padding: 0.5rem 0.875rem;
@@ -74,6 +68,28 @@
 
 .navLinkActive svg {
   color: #166534;
+}
+
+@media (max-width: 767px) {
+  .inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: 4rem auto;
+    height: auto;
+    padding-inline: 1rem;
+  }
+
+  .nav {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-content: center;
+    padding-bottom: 0.375rem;
+  }
+
+  .navLink {
+    padding: 0.375rem 0.5rem;
+    font-size: 0.8125rem;
+  }
 }
 
 /* ── Auth Buttons ── */

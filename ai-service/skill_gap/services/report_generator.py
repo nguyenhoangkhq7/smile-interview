@@ -69,6 +69,9 @@ class StaticGapAuditReport(BaseModel):
     partial_count: int
     missing_count: int
     skills_requiring_probing: int
+    matching_score: Optional[float] = Field(
+        default=None, ge=0.0, le=1.0, description="Overall GNN CV–JD compatibility on a 0–1 scale"
+    )
     degraded: bool = False
     system_flags: List[str] = Field(default_factory=list)
     items: List[StaticSkillAuditItem] = Field(default_factory=list)

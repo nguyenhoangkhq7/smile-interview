@@ -1,0 +1,273 @@
+{
+    "cv": {
+        "filename": "01_Backend_CV.pdf",
+        "document_type": "CV",
+        "text_sha256": "988fee55629f163567d17c91357c9d6505d1dff10f52071ad4c7e7d2b45ec3e4",
+        "stats": {
+            "total_inferences": 9,
+            "unique_skills": 9,
+            "unknown_category_count": 0,
+            "low_confidence_count": 0,
+            "quarantined_mentions": 0
+        },
+        "skills": [
+            {
+                "skill_id": "database-indexing-strategy",
+                "label": "Database Indexing Strategy",
+                "category": "Engineering Practice",
+                "category_raw": "Engineering Practice",
+                "type": "implicit",
+                "confidence": null,
+                "evidences": [
+                    {
+                        "inferred_from": "reduced p95 API latency by 38% through query indexing and Redis caching.",
+                        "reasoning": "Achieving a significant latency reduction via 'query indexing' requires understanding of B-tree/B+tree structures, query execution plans, and trade-offs between read/write performance — an implicit engineering practice beyond just knowing SQL syntax.",
+                        "confidence": 0.92
+                    }
+                ]
+            },
+            {
+                "skill_id": "cache-invalidation-consistency",
+                "label": "Cache Invalidation & Consistency",
+                "category": "Technical Concept",
+                "category_raw": "Technical Concept",
+                "type": "implicit",
+                "confidence": null,
+                "evidences": [
+                    {
+                        "inferred_from": "reduced p95 API latency by 38% through query indexing and Redis caching.",
+                        "reasoning": "Using Redis for caching in a high-throughput order management system implies managing cache coherence, invalidation strategies (e.g., write-through/behind), and handling cache misses/stamps to prevent stale data issues.",
+                        "confidence": 0.85
+                    }
+                ]
+            },
+            {
+                "skill_id": "event-driven-architecture-design",
+                "label": "Event-Driven Architecture Design",
+                "category": "Technical Concept",
+                "category_raw": "Technical Concept",
+                "type": "implicit",
+                "confidence": null,
+                "evidences": [
+                    {
+                        "inferred_from": "Designed and rolled out a Kafka-based event pipeline to decouple inventory updates from checkout...",
+                        "reasoning": "Decoupling services using an event pipeline requires designing for eventual consistency, handling message ordering, and ensuring idempotency — architectural concepts inherent to the solution but not explicitly listed as skills.",
+                        "confidence": 0.9
+                    }
+                ]
+            },
+            {
+                "skill_id": "high-availability-fault-tolerance",
+                "label": "High Availability & Fault Tolerance",
+                "category": "Technical Concept",
+                "category_raw": "Technical Concept",
+                "type": "implicit",
+                "confidence": null,
+                "evidences": [
+                    {
+                        "inferred_from": "...cutting checkout failures during flash sales by roughly 60%.",
+                        "reasoning": "Successfully reducing failure rates during 'flash sales' (high-concurrency spikes) implies implementing resilience patterns such as circuit breakers, rate limiting, or backpressure mechanisms to handle load surges.",
+                        "confidence": 0.82
+                    }
+                ]
+            },
+            {
+                "skill_id": "integration-testing-with-containers",
+                "label": "Integration Testing with Containers",
+                "category": "Engineering Practice",
+                "category_raw": "Engineering Practice",
+                "type": "implicit",
+                "confidence": null,
+                "evidences": [
+                    {
+                        "inferred_from": "Wrote integration tests with Testcontainers and raised service test coverage from 46% to 82%...",
+                        "reasoning": "Using Testcontainers specifically implies setting up ephemeral infrastructure (databases, message brokers) for testing environments, which is a distinct DevOps/testing practice separate from unit testing.",
+                        "confidence": 0.88
+                    }
+                ]
+            },
+            {
+                "skill_id": "legacy-system-modernization",
+                "label": "Legacy System Modernization",
+                "category": "Domain Knowledge",
+                "category_raw": "Domain Knowledge",
+                "type": "implicit",
+                "confidence": null,
+                "evidences": [
+                    {
+                        "inferred_from": "Migrated a legacy monolith's payment module to a standalone service...",
+                        "reasoning": "Extracting a module from a monolith (Strangler Fig pattern or similar) requires deep understanding of existing domain boundaries, data migration strategies, and dependency management within legacy codebases.",
+                        "confidence": 0.87
+                    }
+                ]
+            },
+            {
+                "skill_id": "zero-downtime-deployment-strategies",
+                "label": "Zero-Downtime Deployment Strategies",
+                "category": "Engineering Practice",
+                "category_raw": "Engineering Practice",
+                "type": "implicit",
+                "confidence": null,
+                "evidences": [
+                    {
+                        "inferred_from": "...coordinating a zero-downtime cutover.",
+                        "reasoning": "Executing a 'zero-downtime cutover' for a critical payment module implies knowledge of blue-green deployments, canary releases, or feature flags to manage traffic switching without service interruption.",
+                        "confidence": 0.85
+                    }
+                ]
+            },
+            {
+                "skill_id": "identity-access-management-iam",
+                "label": "Identity & Access Management (IAM)",
+                "category": "Technical Concept",
+                "category_raw": "Technical Concept",
+                "type": "implicit",
+                "confidence": null,
+                "evidences": [
+                    {
+                        "inferred_from": "Built REST APIs for a KYC onboarding flow using Spring Boot and Spring Security (JWT-based auth).",
+                        "reasoning": "Implementing JWT-based authentication for KYC flows involves understanding token lifecycle management, security best practices (storage, transmission), and potentially OAuth2/OIDC standards implicitly required for secure identity handling.",
+                        "confidence": 0.8
+                    }
+                ]
+            },
+            {
+                "skill_id": "cross-functional-coordination",
+                "label": "Cross-Functional Coordination",
+                "category": "Soft Skill",
+                "category_raw": "Soft Skill",
+                "type": "implicit",
+                "confidence": null,
+                "evidences": [
+                    {
+                        "inferred_from": "...coordinating a zero-downtime cutover.",
+                        "reasoning": "Coordinating a production cutover typically requires synchronization with QA, DevOps, and possibly support teams to monitor health checks and rollback if necessary, implying stakeholder management and communication skills.",
+                        "confidence": 0.75
+                    }
+                ]
+            }
+        ],
+        "quarantined": [],
+        "extraction_meta": {
+            "prompt_sha256": "1761372bbd812868b09c329782b3892586a66d9440920fd8fd4088f7b4ce66e4",
+            "prompt_variant": "default",
+            "model_configured": "qwen/qwen3.7-flash",
+            "temperature": 0,
+            "schema_version": "1.0.0",
+            "extracted_at": "2026-10-21T09:13:55.587265+00:00"
+        }
+    },
+    "jd": {
+        "filename": "01_Backend_JD.pdf",
+        "document_type": "JD",
+        "text_sha256": "43d4a49764a9d51c54a7adf6e14ead0212c18c943acc5a3a7df6c9b4dcea5872",
+        "stats": {
+            "total_inferences": 6,
+            "unique_skills": 6,
+            "unknown_category_count": 0,
+            "low_confidence_count": 0,
+            "quarantined_mentions": 0
+        },
+        "skills": [
+            {
+                "skill_id": "financial-domain-knowledge",
+                "label": "Financial Domain Knowledge",
+                "category": "Domain Knowledge",
+                "category_raw": "Domain Knowledge",
+                "type": "implicit",
+                "confidence": null,
+                "evidences": [
+                    {
+                        "inferred_from": "processing millions of transactions daily... merchant settlement... translate settlement and compliance requirements",
+                        "reasoning": "The role focuses on 'merchant settlement' and 'compliance requirements' in a payments context. This implies an understanding of financial concepts such as double-entry bookkeeping, reconciliation, audit trails, and regulatory compliance (e.g., PCI-DSS, AML), which are not explicitly listed as skills but are critical for the role.",
+                        "confidence": 0.95
+                    }
+                ]
+            },
+            {
+                "skill_id": "eventual-consistency-management",
+                "label": "Eventual Consistency Management",
+                "category": "Technical Concept",
+                "category_raw": "Technical Concept",
+                "type": "implicit",
+                "confidence": null,
+                "evidences": [
+                    {
+                        "inferred_from": "Build event-driven integrations using Kafka to keep downstream ledgers and reporting systems in sync.",
+                        "reasoning": "Using Kafka to synchronize ledgers implies handling asynchronous data flow, message ordering, and potential race conditions. The engineer must implicitly understand eventual consistency patterns and how to handle idempotency or conflict resolution in distributed ledger systems.",
+                        "confidence": 0.88
+                    }
+                ]
+            },
+            {
+                "skill_id": "production-incident-management",
+                "label": "Production Incident Management",
+                "category": "Engineering Practice",
+                "category_raw": "Engineering Practice",
+                "type": "implicit",
+                "confidence": null,
+                "evidences": [
+                    {
+                        "inferred_from": "participate in on-call rotation for production services... debugging production issues.",
+                        "reasoning": "Participating in on-call rotations and debugging live production issues requires skills in incident response, root cause analysis, log tracing, and maintaining system stability under pressure, which goes beyond standard development practices.",
+                        "confidence": 0.92
+                    }
+                ]
+            },
+            {
+                "skill_id": "relational-data-modeling",
+                "label": "Relational Data Modeling",
+                "category": "Technical Concept",
+                "category_raw": "Technical Concept",
+                "type": "implicit",
+                "confidence": null,
+                "evidences": [
+                    {
+                        "inferred_from": "Own data modeling and query performance for PostgreSQL-backed services handling high write throughput.",
+                        "reasoning": "While 'query optimization' is explicit, 'data modeling' for high-write-throughput scenarios implies knowledge of normalization vs. denormalization trade-offs, schema evolution strategies, and potentially partitioning/sharding techniques to support scale, which are implicit architectural decisions.",
+                        "confidence": 0.85
+                    }
+                ]
+            },
+            {
+                "skill_id": "cross-functional-translation",
+                "label": "Cross-Functional Translation",
+                "category": "Soft Skill",
+                "category_raw": "Soft Skill",
+                "type": "implicit",
+                "confidence": null,
+                "evidences": [
+                    {
+                        "inferred_from": "Collaborate with product managers to translate settlement and compliance requirements into technical designs.",
+                        "reasoning": "Translating non-technical business/regulatory requirements ('settlement and compliance') into technical specifications requires strong communication, requirement analysis, and the ability to bridge the gap between legal/business teams and engineering teams.",
+                        "confidence": 0.9
+                    }
+                ]
+            },
+            {
+                "skill_id": "container-orchestration-basics",
+                "label": "Container Orchestration Basics",
+                "category": "Technology/Tool",
+                "category_raw": "Technology/Tool",
+                "type": "implicit",
+                "confidence": null,
+                "evidences": [
+                    {
+                        "inferred_from": "Exposure to Kubernetes... Familiarity with Docker and basic containerized deployment workflows.",
+                        "reasoning": "While Docker is explicit, the mention of 'Kubernetes' in Nice-to-Have alongside 'containerized deployment' implies an implicit need to understand orchestration concepts (pods, services, scaling) if the team uses K8s, which is the industry standard for managing containerized Java/Spring Boot apps at scale.",
+                        "confidence": 0.75
+                    }
+                ]
+            }
+        ],
+        "quarantined": [],
+        "extraction_meta": {
+            "prompt_sha256": "1761372bbd812868b09c329782b3892586a66d9440920fd8fd4088f7b4ce66e4",
+            "prompt_variant": "default",
+            "model_configured": "qwen/qwen3.7-flash",
+            "temperature": 0,
+            "schema_version": "1.0.0",
+            "extracted_at": "2026-10-21T09:14:06.021373+00:00"
+        }
+    }
+}

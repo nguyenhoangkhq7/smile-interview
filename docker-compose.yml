@@ -47,8 +47,11 @@ services:
       - ./ai-service/.env
     environment:
       PORT: 8000
+      HF_HOME: /root/.cache/huggingface
     ports:
       - "8000:8000"
+    volumes:
+      - sbert_cache:/root/.cache/huggingface
 
   web-app:
     build:
@@ -69,3 +72,4 @@ services:
 
 volumes:
   postgres_data:
+  sbert_cache:

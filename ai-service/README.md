@@ -10,9 +10,9 @@ Dịch vụ AI phục vụ bài báo nghiên cứu khoa học:
 
 ```
 ai-service/
-├── module1_matcher/                    # [Module 1]: SBERT + GNN Adapter (Trích xuất & So khớp kỹ năng)
-│   ├── schemas.py                      # ExtractedCVSkill, ExtractedJDSkill, MatchResult
-│   ├── extractor.py                    # Pluggable Extractor & Semantic Matcher
+├── matching_cv/                        # [Module 1]: trích xuất, SBERT, đồ thị và ước lượng trọng số JD
+├── module1_matcher/
+│   ├── schemas.py                      # Hợp đồng Module1Output dùng chung với Module 2
 │   └── router.py                       # POST /api/v1/match & POST /api/v1/pipeline/analyze
 │
 ├── skill_gap/                                # [Module 2]: Skill-Gap Detection (Xác định khoảng trống năng lực)
@@ -45,6 +45,10 @@ ai-service/
 | `POST` | `/api/v2/interview/start` | Module 3: Lập kế hoạch và tạo câu hỏi từ Skill-Gap và nhiệm vụ JD |
 | `POST` | `/api/v2/interview/respond` | Module 3: Đánh giá bằng chứng và tạo câu hỏi tiếp theo |
 | `POST` | `/api/v2/interview/stop` | Module 3: Kết thúc và trả báo cáo theo Criteria |
+
+`/api/v1/match` trả `cv_skills`, `jd_skills`, `match_results` và `matcher_source: MATCHING_CV`. Cả hai endpoint phân tích hỗ trợ JSON văn bản và multipart. Module 2 dùng cùng văn bản đã làm sạch mà Module 1 dùng để trích dẫn. Kỹ năng JD thiếu cặp CV có `matched_cv_skill_id: "none"` và `soft_match: 0`. Confidence thiếu được ghi là `0`. Trọng số JD thiếu làm phân tích trả HTTP 503.
+
+`/api/v1/pipeline/analyze` trả thêm `report.matching_score` trên thang 0–1 khi checkpoint GNN cho kết quả. Khi điểm không khả dụng, trường này là `null` và báo cáo skill gap vẫn được trả về.
 
 Module 2 dùng điểm năng lực CV/JD và độ thiếu hụt tất định; không khởi tạo phân phối xác suất năng lực. Module 3 không yêu cầu hoặc cập nhật `raw_belief`, `belief`, `tag` hay TV. Engine phỏng vấn cũ đã được gỡ; API AI `/api/v1/interview/*` trả HTTP 410. Dataset và bộ tối ưu DSPy được khôi phục, chuyển sang schema bằng chứng V2; xem [hướng dẫn compile/load](adaptive_questioning/optimization/README.md). Backend vẫn phục vụ báo cáo cũ đã lưu, không gọi AI để tính lại. Snapshot V2 cũ được đọc bằng cách bỏ qua các field đã loại bỏ; lần chuyển trạng thái thành công tiếp theo lưu cấu trúc mới. Xem [tài liệu V2](../docs/evidence-interview-v2.md).
 

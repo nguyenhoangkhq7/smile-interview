@@ -1,0 +1,60 @@
+.surface,
+.taskDialog {
+  --practice-ink: #141c24;
+  --practice-muted: #526071;
+  --practice-primary: #b02700;
+  --practice-primary-hover: #8a1d00;
+  --practice-orange: #ffdad2;
+  --practice-pale: #edf4ff;
+  --practice-blue: #e5edf9;
+  --practice-blue-strong: #dbe3ef;
+  --practice-green: #146535;
+  --practice-green-bg: #a9f3ba;
+}
+
+.surface {
+  background: #f4f7fd;
+  color: var(--practice-ink);
+}
+
+.workspace {
+  display: grid;
+  gap: 1rem;
+}
+
+.mindMapWorkspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: clamp(21rem, 65dvh, 40rem);
+  overflow: hidden;
+  border: 1px solid var(--practice-blue-strong);
+  border-radius: 1rem;
+}
+
+.hasInspector > aside {
+  border-block-start: 1px solid var(--practice-blue-strong);
+}
+
+@media (min-width: 64rem) {
+  .mindMapWorkspace {
+    grid-template-rows: clamp(35rem, 70dvh, 49rem);
+  }
+
+  .mindMapWorkspace.hasInspector {
+    grid-template-columns: minmax(0, 1fr) minmax(19rem, 30%);
+  }
+
+  .hasInspector > aside {
+    border-block-start: 0;
+    border-inline-start: 1px solid var(--practice-blue-strong);
+    box-shadow: -8px 0 24px -20px #141c2460;
+  }
+}
+
+@media (min-width: 80rem) {
+  .workspace {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2.3fr) minmax(0, 1.1fr);
+    grid-template-rows: clamp(36rem, 68dvh, 48rem);
+    gap: 1.25rem;
+  }
+}

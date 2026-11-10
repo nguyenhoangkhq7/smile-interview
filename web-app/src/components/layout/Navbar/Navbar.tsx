@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
+import { BookOpen } from 'lucide-react';
 import styles from './navbar.module.css';
 import { useAuthStore } from '@/store/authStore';
 
@@ -27,6 +28,11 @@ const navLinks = [
         <circle cx="12" cy="12" r="2" />
       </svg>
     )
+  },
+  {
+    href: '/practice',
+    label: 'Ôn tập',
+    icon: <BookOpen size={16} strokeWidth={2.5} aria-hidden="true" />,
   },
 ];
 
@@ -58,11 +64,12 @@ export default function Navbar() {
           {navLinks.map((link) => {
             const isActive =
               pathname === link.href ||
-              (link.href !== '/' && pathname.startsWith(link.href));
+              (link.href !== '/' && pathname.startsWith(`${link.href}/`));
             return (
               <Link
                 key={link.href}
                 href={link.href}
+                aria-current={pathname === link.href ? 'page' : undefined}
                 className={`${styles.navLink} ${isActive ? styles.navLinkActive : ''}`}
               >
                 {link.icon}
