@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { FolderOpen } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { usePracticeProfile, usePracticeProfiles } from '@/hooks/usePracticeProfiles';
+import { usePracticePlanDetail, usePracticeProfiles, usePracticeRequest } from '@/hooks/usePracticeProfiles';
+import { studyPlans } from '@/services/studyPlans';
 import { PracticeStats } from './PracticeOverview';
 import { PracticePlanBoard } from './PracticePlanBoard';
 import { PracticePlanList } from './PracticePlanList';
@@ -42,21 +43,25 @@ function NoPracticeProfiles() {
 
 export function PracticeProfilesContent() {
   const { state, retry } = usePracticeProfiles();
+  const progress = usePracticeRequest(studyPlans.listProgress);
   if (state.status === 'loading') return <ProfileStatus loadingLabel="Đang tải hồ sơ ứng tuyển…" />;
   if (state.status === 'error') return <ProfileStatus message={state.message} onRetry={retry} />;
-  const plans = state.data.map(toPracticePlan);
+  const progressByProfile = new Map(progress.state.status === 'ready'
+    ? progress.state.data.map((item) => [item.applicationProfileId, item.progress]) : []);
+  const plans = state.data.map((profile) => toPracticePlan(profile, progressByProfile.get(profile.id), progress.state.status));
 
   return (
     <>
       <PracticeStats plans={plans} />
+      {progress.state.status === 'error' && <ProfileStatus message="Không tải được tiến độ ôn tập." onRetry={progress.retry} />}
       {plans.length ? <PracticePlanList plans={plans} /> : <NoPracticeProfiles />}
     </>
   );
 }
 
 export function PracticePlanDetail({ profileId }: { profileId: string }) {
-  const { state, retry } = usePracticeProfile(profileId);
-  if (state.status === 'loading') return <ProfileStatus loadingLabel="Đang tải hồ sơ ứng tuyển…" />;
+  const { state, retry } = usePracticePlanDetail(profileId);
+  if (state.status === 'loading') return <ProfileStatus loadingLabel="Đang tải kế hoạch ôn tập…" />;
   if (state.status === 'error') return <ProfileStatus message={state.message} onRetry={retry} />;
-  return <PracticePlanBoard profile={state.data} />;
+  return <PracticePlanBoard profile={state.data.profile} initialPlan={state.data.plan} />;
 }

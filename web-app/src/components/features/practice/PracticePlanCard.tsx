@@ -13,6 +13,7 @@ import { formatProfileDate } from '@/components/features/applications/applicatio
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { practiceStatuses, type PracticePlan, type PracticeStatus } from './practicePlans';
+import { formatStudyPercent } from './studyPlan';
 
 const statusTones: Record<PracticeStatus, string> = {
   'no-result': 'bg-(--practice-blue) text-(--practice-muted)',
@@ -113,7 +114,9 @@ export function PracticePlanCard({ plan }: PracticePlanCardProps) {
       <InterviewSummary plan={plan} />
       <p className="flex flex-wrap items-center justify-between gap-2 text-xs text-(--practice-muted)">
         <span>Tiến độ ôn tập</span>
-        <span>Chưa có dữ liệu</span>
+        <span>{plan.progress?.percent != null
+          ? `${formatStudyPercent(plan.progress.percent)} · ${plan.progress.done}/${plan.progress.total} đầu việc`
+          : { loading: 'Đang tải…', ready: 'Chưa theo dõi', error: 'Chưa tải được' }[plan.progressStatus]}</span>
       </p>
       <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-2">
         <span className="flex items-center gap-1.5 text-xs text-(--practice-muted)">

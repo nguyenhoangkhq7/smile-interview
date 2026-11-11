@@ -1,24 +1,47 @@
-export const DEFAULT_TARGET_COMPLETION_PERCENT = 80;
-
 export const studyTaskStatuses = [
   { value: 'TODO', label: 'Cần ôn' },
   { value: 'IN_PROGRESS', label: 'Đang ôn' },
   { value: 'DONE', label: 'Đã xong' },
 ] as const;
 
-export interface StudyTask {
-  id: string;
+export type StudyTaskStatus = (typeof studyTaskStatuses)[number]['value'];
+
+export interface StudyTaskFields {
   title: string;
-  status: (typeof studyTaskStatuses)[number]['value'];
-  skillId?: string;
-  notes?: string;
-  checklist?: readonly string[];
-  completedChecklist?: readonly number[];
+  status: StudyTaskStatus;
+  skillId?: string | null;
+  notes?: string | null;
+  sortOrder?: number;
+}
+
+export interface StudyChecklistItem {
+  id: number;
+  content: string;
+  isCompleted: boolean;
+  sortOrder: number;
+}
+
+export interface StudyResource {
+  id: number;
+  title: string;
+  url: string | null;
+  fileName: string | null;
+}
+
+export interface StudyTask extends StudyTaskFields {
+  id: number;
+  parentTaskId?: number | null;
+  checklist: readonly StudyChecklistItem[];
+  resources: readonly StudyResource[];
+}
+
+export interface NewStudyTask extends StudyTaskFields {
+  parentTaskId?: number;
+  checklist: readonly string[];
   referenceUrl?: string;
 }
 
-export type NewStudyTask = Omit<StudyTask, 'id'>;
-export type StudyTaskUpdate = Partial<Pick<StudyTask, 'status' | 'notes' | 'completedChecklist'>>;
+export type StudyTaskUpdate = Partial<StudyTaskFields>;
 
 export const studyTaskTones = {
   TODO: { color: '#665956', badge: 'bg-(--practice-blue) text-(--practice-muted)' },
@@ -32,22 +55,15 @@ export const formatStudyPercent = (value: number) => percentFormat.format(value 
 export function getStudyReferenceUrl(value: string) {
   try {
     const url = new URL(value);
-    return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : null;
+    return (url.protocol === 'http:' || url.protocol === 'https:') && !url.username && !url.password ? url.href : null;
   } catch {
     return null;
   }
 }
 
-export interface StudyPlan {
-  targetCompletionPercent: number;
-  tasks: readonly StudyTask[];
-}
-
-export function getStudyProgress({ targetCompletionPercent, tasks }: StudyPlan) {
-  const total = tasks.length;
-  const done = tasks.filter((task) => task.status === 'DONE').length;
-  const percent = total ? (done / total) * 100 : null;
-  const meetsTarget = total ? done * 100 >= targetCompletionPercent * total : null;
-
-  return { targetCompletionPercent, done, total, percent, meetsTarget };
+export interface StudyProgress {
+  done: number;
+  total: number;
+  percent: number | null;
+  meetsTarget: boolean | null;
 }

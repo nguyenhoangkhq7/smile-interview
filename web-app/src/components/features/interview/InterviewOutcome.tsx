@@ -7,7 +7,6 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { EvidenceSession, interviewError } from '@/services/evidenceInterview';
 import type { SessionHistoryItem } from '@/services/historyService';
 import { applicationProfiles } from '@/services/applicationProfiles';
-import { EvidenceReportPanel } from './EvidenceReportPanel';
 
 export function InterviewOutcome({ session, metadata }: { session: EvidenceSession; metadata: SessionHistoryItem | null }) {
   const router = useRouter();
@@ -24,8 +23,7 @@ export function InterviewOutcome({ session, metadata }: { session: EvidenceSessi
   }
   return <div className="space-y-6">
     {!session.is_finished ? <div className="rounded-xl border p-5"><h1 className="text-xl font-semibold">Lượt phỏng vấn đang diễn ra</h1><Link className={`${buttonVariants()} mt-4`} href={`/interview/session/${session.session_id}`}>Tiếp tục phỏng vấn</Link></div>
-      : !session.turns.length ? <section className="space-y-3 rounded-xl border bg-muted/20 p-6"><h1 className="text-2xl font-semibold">Lượt phỏng vấn đã kết thúc</h1><p>Bạn chưa gửi câu trả lời nào. Chưa có dữ liệu để đánh giá năng lực.</p></section>
-        : <><p className="text-sm text-muted-foreground">{session.report.termination_reason === 'USER_STOP' ? 'Bạn đã kết thúc sớm. Kết quả chỉ dựa trên các câu trả lời đã gửi.' : `Đã trả lời ${session.turns.length} câu trong lượt này.`}</p><EvidenceReportPanel report={session.report} /></>}
+      : <section className="space-y-3 rounded-xl border bg-muted/20 p-6"><h1 className="text-2xl font-semibold">Lượt phỏng vấn đã kết thúc</h1><p>Bạn chưa gửi câu trả lời nào. Chưa có dữ liệu để đánh giá năng lực.</p></section>}
     {error && <p role="alert" className="text-destructive">{error}</p>}
     <div className="flex flex-wrap gap-3 border-t pt-5">
       {metadata?.applicationProfileId ? <><Link className={buttonVariants({ variant: 'outline' })} href={`/applications/${metadata.applicationProfileId}#competency`}>Về hồ sơ ứng tuyển</Link>{session.is_finished && <Button disabled={busy} onClick={() => void newAttempt()}>{busy ? 'Đang tạo lượt…' : 'Phỏng vấn lượt mới'}</Button>}</>

@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { applicationProfiles } from '@/services/applicationProfiles';
 import { interviewError } from '@/services/evidenceInterview';
+import { studyPlans } from '@/services/studyPlans';
 
 type ProfileRequestState<T> =
   | { status: 'loading' }
   | { status: 'error'; message: string }
   | { status: 'ready'; data: T };
 
-function useProfileRequest<T>(load: (signal: AbortSignal) => Promise<T>) {
+export function usePracticeRequest<T>(load: (signal: AbortSignal) => Promise<T>) {
   const [state, setState] = useState<ProfileRequestState<T>>({ status: 'loading' });
   const [revision, setRevision] = useState(0);
 
@@ -34,10 +35,18 @@ function useProfileRequest<T>(load: (signal: AbortSignal) => Promise<T>) {
 }
 
 export function usePracticeProfiles() {
-  return useProfileRequest(applicationProfiles.list);
+  return usePracticeRequest(applicationProfiles.list);
 }
 
-export function usePracticeProfile(profileId: string) {
-  const load = useCallback((signal: AbortSignal) => applicationProfiles.get(profileId, signal), [profileId]);
-  return useProfileRequest(load);
+export function usePracticePlanDetail(profileId: string) {
+  const load = useCallback(async (signal: AbortSignal) => {
+    const [profile, plan] = await Promise.all([applicationProfiles.get(profileId, signal), studyPlans.get(profileId, signal)]);
+    return { profile, plan };
+  }, [profileId]);
+  return usePracticeRequest(load);
+}
+
+export function usePracticeKnowledgeGaps(profileId: string) {
+  const load = useCallback((signal: AbortSignal) => studyPlans.gaps(profileId, signal), [profileId]);
+  return usePracticeRequest(load);
 }
