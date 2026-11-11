@@ -54,7 +54,7 @@ function ChecklistFields() {
         </div>
       ))}
       <Button type="button" variant="ghost" size="sm" className="px-0 text-(--practice-primary) hover:bg-transparent hover:underline"
-        onClick={addItem}>
+        disabled={items.length >= 50} onClick={addItem}>
         <Plus aria-hidden="true" /> Thêm mục checklist
       </Button>
     </fieldset>
@@ -63,14 +63,19 @@ function ChecklistFields() {
 
 interface CreateStudyTaskProps {
   skillIds: readonly string[];
-  onCreate: (task: NewStudyTask) => void;
+  onCreate: (task: NewStudyTask) => Promise<boolean>;
+  disabled: boolean;
+  parent?: { id: number; title: string; skillId?: string | null };
+  branch?: { title: string; skillId?: string | null };
+  connector?: { color: string; filled?: boolean };
 }
 
-function StudyTaskForm({ skillIds, onCreate }: CreateStudyTaskProps) {
+function StudyTaskForm({ skillIds, onCreate, disabled, parent, branch }: CreateStudyTaskProps) {
   const id = useId();
   const [error, setError] = useState<{ field: 'title' | 'reference'; message: string }>();
+  const [saveFailed, setSaveFailed] = useState(false);
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
     const data = new FormData(form);
@@ -89,14 +94,18 @@ function StudyTaskForm({ skillIds, onCreate }: CreateStudyTaskProps) {
     }
 
     const status = studyTaskStatuses.find(({ value: option }) => option === data.get('status'))?.value ?? 'TODO';
-    onCreate({
+    setError(undefined);
+    setSaveFailed(false);
+    const saved = await onCreate({
       title,
       status,
-      skillId: value('skill') || undefined,
+      parentTaskId: parent?.id,
+      skillId: branch?.skillId === undefined ? value('skill') || undefined : branch.skillId,
       notes: value('notes') || undefined,
       checklist: data.getAll('checklist').map((item) => String(item).trim()).filter(Boolean),
       referenceUrl: referenceUrl ?? undefined,
     });
+    if (!saved) setSaveFailed(true);
   }
 
   return (
@@ -112,7 +121,8 @@ function StudyTaskForm({ skillIds, onCreate }: CreateStudyTaskProps) {
         <div className="space-y-1.5">
           <label htmlFor={`${id}-skill`} className="block font-medium">Kỹ năng liên quan</label>
           <div className="relative">
-            <select id={`${id}-skill`} name="skill" className={cn(inputStyle, 'w-full appearance-none border pr-9')}>
+            <select id={`${id}-skill`} name="skill" defaultValue={parent?.skillId ?? branch?.skillId ?? ''}
+              disabled={branch?.skillId !== undefined} className={cn(inputStyle, 'w-full appearance-none border pr-9')}>
               <option value="">Không chọn kỹ năng</option>
               {skillIds.map((skill) => <option key={skill} value={skill}>{skillLabel(skill)}</option>)}
             </select>
@@ -150,25 +160,38 @@ function StudyTaskForm({ skillIds, onCreate }: CreateStudyTaskProps) {
         </div>
       </div>
       <div className="flex shrink-0 justify-end gap-2 border-t bg-(--practice-pale)/70 px-5 py-3 sm:px-6">
-        <DialogClose render={<Button type="button" variant="outline" className="h-9 rounded-full px-4" />}>Hủy</DialogClose>
-        <Button type="submit" className={actionStyle}>Tạo đầu việc</Button>
+        {saveFailed && <p role="alert" className="mr-auto self-center text-xs text-destructive">Không tạo được đầu việc. Bạn có thể thử lại.</p>}
+        <DialogClose render={<Button type="button" variant="outline" className="h-9 rounded-full px-4" disabled={disabled} />}>Hủy</DialogClose>
+        <Button type="submit" className={actionStyle} disabled={disabled}>{disabled ? 'Đang lưu…' : parent ? 'Tạo đầu việc con' : 'Tạo đầu việc'}</Button>
       </div>
     </form>
   );
 }
 
-export function StudyTaskCreateDialog({ skillIds, onCreate }: CreateStudyTaskProps) {
+export function StudyTaskCreateDialog({ skillIds, onCreate, disabled, parent, branch, connector }: CreateStudyTaskProps) {
   const [open, setOpen] = useState(false);
   const [formKey, setFormKey] = useState(0);
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => {
+      if (disabled) return;
       if (nextOpen) setFormKey((current) => current + 1);
       setOpen(nextOpen);
     }}>
-      <DialogTrigger render={<Button type="button" className={actionStyle} />}>
-        <Plus size={16} aria-hidden="true" /> Tạo đầu việc
-      </DialogTrigger>
+      {parent || branch ? (
+        <DialogTrigger render={<button type="button" disabled={disabled}
+          aria-label={parent ? `Thêm đầu việc con cho ${parent.title}` : `Thêm đầu việc vào ${branch?.title}`}
+          title={parent ? 'Thêm đầu việc con' : 'Thêm đầu việc'}
+          style={connector?.filled ? { backgroundColor: connector.color, color: 'white', borderColor: 'white' }
+            : connector ? { color: connector.color, borderColor: connector.color } : undefined}
+          className="absolute top-1/2 right-0 z-10 grid size-5 translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-(--practice-blue-strong) bg-card text-(--practice-primary) shadow-xs hover:border-(--practice-primary) hover:bg-(--practice-orange) hover:shadow-sm focus-visible:outline-2 disabled:opacity-50" />}>
+          <Plus size={12} aria-hidden="true" />
+        </DialogTrigger>
+      ) : (
+        <DialogTrigger render={<Button type="button" className={actionStyle} disabled={disabled} />}>
+          <Plus size={16} aria-hidden="true" /> Tạo đầu việc
+        </DialogTrigger>
+      )}
       <DialogContent showCloseButton={false} overlayClassName="z-60 bg-slate-900/55 supports-backdrop-filter:backdrop-blur-sm"
         className={cn(styles.taskDialog, 'z-60 flex max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden rounded-2xl p-0 shadow-2xl sm:max-w-[620px]')}>
         <div className="flex shrink-0 items-start gap-3 border-b px-5 py-4 sm:px-6">
@@ -176,18 +199,19 @@ export function StudyTaskCreateDialog({ skillIds, onCreate }: CreateStudyTaskPro
             <CirclePlus size={22} aria-hidden="true" />
           </span>
           <div className="min-w-0 flex-1 space-y-1">
-            <DialogTitle className="text-base leading-tight font-bold sm:text-lg">Tạo đầu việc ôn tập mới</DialogTitle>
+            <DialogTitle className="text-base leading-tight font-bold sm:text-lg">{parent ? 'Tạo đầu việc con' : 'Tạo đầu việc ôn tập mới'}</DialogTitle>
             <DialogDescription className="text-xs leading-5 sm:text-sm">
-              Thêm mục tiêu ôn luyện để củng cố kiến thức trước buổi phỏng vấn tiếp theo.
+              {parent ? `Đầu việc cha: ${parent.title}` : branch ? `Nhánh: ${branch.title}` : 'Thêm mục tiêu ôn luyện để củng cố kiến thức trước buổi phỏng vấn tiếp theo.'}
             </DialogDescription>
           </div>
-          <DialogClose render={<Button type="button" variant="ghost" size="icon-sm" aria-label="Đóng form tạo đầu việc" />}>
+          <DialogClose render={<Button type="button" variant="ghost" size="icon-sm" aria-label="Đóng form tạo đầu việc" disabled={disabled} />}>
             <X aria-hidden="true" />
           </DialogClose>
         </div>
-        <StudyTaskForm key={formKey} skillIds={skillIds} onCreate={(task) => {
-          onCreate(task);
-          setOpen(false);
+        <StudyTaskForm key={formKey} skillIds={skillIds} disabled={disabled} parent={parent} branch={branch} onCreate={async (task) => {
+          const saved = await onCreate(task);
+          if (saved) setOpen(false);
+          return saved;
         }} />
       </DialogContent>
     </Dialog>

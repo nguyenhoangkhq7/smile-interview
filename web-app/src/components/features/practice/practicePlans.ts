@@ -1,5 +1,6 @@
 import { finishedAttempt } from '@/components/features/applications/applicationUi';
 import type { ApplicationProfile } from '@/services/applicationProfiles';
+import type { StudyProgress } from './studyPlan';
 
 export const practiceStatuses = [
   { value: 'no-result', label: 'Chưa có kết quả phỏng vấn' },
@@ -19,9 +20,12 @@ export interface PracticePlan {
   status: PracticeStatus;
   skillCount: number;
   interviewCount: number;
+  progress?: StudyProgress;
+  progressStatus: 'loading' | 'ready' | 'error';
 }
 
-export function toPracticePlan(profile: ApplicationProfile): PracticePlan {
+export function toPracticePlan(profile: ApplicationProfile, progress: StudyProgress | undefined,
+                               progressStatus: PracticePlan['progressStatus']): PracticePlan {
   const hasResult = profile.attempts.some((attempt) => finishedAttempt(attempt) && attempt.answeredCount > 0);
 
   return {
@@ -34,5 +38,7 @@ export function toPracticePlan(profile: ApplicationProfile): PracticePlan {
     status: hasResult ? 'has-result' : 'no-result',
     skillCount: profile.skills.length,
     interviewCount: profile.attempts.length,
+    progress,
+    progressStatus,
   };
 }
