@@ -40,6 +40,7 @@ export interface StaticGapAuditReport {
   partial_count: number;
   missing_count: number;
   skills_requiring_probing: number;
+  matching_score?: number | null;
   degraded: boolean;
   system_flags: string[];
   items: StaticSkillAuditItem[];

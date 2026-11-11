@@ -13,12 +13,6 @@ export function HeroSection() {
       </div>
 
       <div className="relative mx-auto max-w-4xl px-6 text-center">
-        {/* Badge */}
-        <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-brand-orange/20 bg-brand-orange/8 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-brand-orange">
-          <span className="size-1.5 animate-pulse rounded-full bg-brand-orange" />
-          Được hỗ trợ bởi AI tiên tiến nhất
-        </div>
-
         {/* Title */}
         <h1 className="mb-6 text-4xl font-extrabold leading-tight tracking-tight text-foreground sm:text-5xl lg:text-6xl">
           Phỏng vấn giả lập bằng AI.{' '}

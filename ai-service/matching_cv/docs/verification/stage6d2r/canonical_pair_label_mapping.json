@@ -1,0 +1,471 @@
+{
+  "timestamp": "2026-11-04T06:20:19Z",
+  "total_pairs": 46,
+  "class_distribution": {
+    "No Fit": 14,
+    "Potential Fit": 15,
+    "Good Fit": 17
+  },
+  "mapping": {
+    "pair_ebe2388be982de53": {
+      "pair_id": "pair_ebe2388be982de53",
+      "cv_id": "cv_f1128f7451e88924",
+      "jd_id": "jd_9a7bfabb2a7d0e5a",
+      "label": "No Fit",
+      "target": 0.0,
+      "graph_file": "data/cache/stage6b3_live/pair_ebe2388be982de53_graph.pt",
+      "is_frozen": true,
+      "source_manifest_verified": true
+    },
+    "pair_6d598451aa797d61": {
+      "pair_id": "pair_6d598451aa797d61",
+      "cv_id": "cv_7415714dbfbb828e",
+      "jd_id": "jd_5b0e54d2e8639990",
+      "label": "No Fit",
+      "target": 0.0,
+      "graph_file": "data/cache/stage6b3_live/pair_6d598451aa797d61_graph.pt",
+      "is_frozen": true,
+      "source_manifest_verified": true
+    },
+    "pair_d9afdea67a89ccad": {
+      "pair_id": "pair_d9afdea67a89ccad",
+      "cv_id": "cv_4a6b98c738cc8b3b",
+      "jd_id": "jd_3f13280d553bcd0f",
+      "label": "No Fit",
+      "target": 0.0,
+      "graph_file": "data/cache/stage6b3_live/pair_d9afdea67a89ccad_graph.pt",
+      "is_frozen": true,
+      "source_manifest_verified": true
+    },
+    "pair_31560e43f8fc7c1f": {
+      "pair_id": "pair_31560e43f8fc7c1f",
+      "cv_id": "cv_329974cf8e21ebea",
+      "jd_id": "jd_0b2652f48fb9cdf3",
+      "label": "No Fit",
+      "target": 0.0,
+      "graph_file": "data/cache/stage6b3_live/pair_31560e43f8fc7c1f_graph.pt",
+      "is_frozen": true,
+      "source_manifest_verified": true
+    },
+    "pair_a8b9befb6bdb8c17": {
+      "pair_id": "pair_a8b9befb6bdb8c17",
+      "cv_id": "cv_959844204907b562",
+      "jd_id": "jd_b874754651b38c20",
+      "label": "No Fit",
+      "target": 0.0,
+      "graph_file": "data/cache/stage6b3_live/pair_a8b9befb6bdb8c17_graph.pt",
+      "is_frozen": true,
+      "source_manifest_verified": true
+    },
+    "pair_4000ca51d960f6c5": {
+      "pair_id": "pair_4000ca51d960f6c5",
+      "cv_id": "cv_afabeaf914b5d965",
+      "jd_id": "jd_a7ea7b8b7c75a699",
+      "label": "No Fit",
+      "target": 0.0,
+      "graph_file": "data/cache/stage6b3_live/pair_4000ca51d960f6c5_graph.pt",
+      "is_frozen": true,
+      "source_manifest_verified": true
+    },
+    "pair_bac50430e13595a5": {
+      "pair_id": "pair_bac50430e13595a5",
+      "cv_id": "cv_a09c3041ff5fba3a",
+      "jd_id": "jd_d0fab2ddc183612f",
+      "label": "No Fit",
+      "target": 0.0,
+      "graph_file": "data/cache/stage6b3_live/pair_bac50430e13595a5_graph.pt",
+      "is_frozen": true,
+      "source_manifest_verified": true
+    },
+    "pair_6edb09d44c7216f2": {
+      "pair_id": "pair_6edb09d44c7216f2",
+      "cv_id": "cv_d159249758b44b0d",
+      "jd_id": "jd_4ca7153f237ad5d7",
+      "label": "No Fit",
+      "target": 0.0,
+      "graph_file": "data/cache/stage6b3_live/pair_6edb09d44c7216f2_graph.pt",
+      "is_frozen": true,
+      "source_manifest_verified": true
+    },
+    "pair_e9137d03abfdcd32": {
+      "pair_id": "pair_e9137d03abfdcd32",
+      "cv_id": "cv_e51ca06b1e65da7d",
+      "jd_id": "jd_3f8ebff644a048fe",
+      "label": "No Fit",
+      "target": 0.0,
+      "graph_file": "data/cache/stage6b3_live/pair_e9137d03abfdcd32_graph.pt",
+      "is_frozen": true,
+      "source_manifest_verified": true
+    },
+    "pair_e83bd039d6fc3eae": {
+      "pair_id": "pair_e83bd039d6fc3eae",
+      "cv_id": "cv_1c171d7823dcda04",
+      "jd_id": "jd_10078bfaaf17d60a",
+      "label": "Potential Fit",
+      "target": 0.5,
+      "graph_file": "data/cache/stage6b3_live/pair_e83bd039d6fc3eae_graph.pt",
+      "is_frozen": true,
+      "source_manifest_verified": true
+    },
+    "pair_30c0a676528e741d": {
+      "pair_id": "pair_30c0a676528e741d",
+      "cv_id": "cv_e651bb377ddd6136",
+      "jd_id": "jd_b89b0d2a3b9d49ac",
+      "label": "Potential Fit",
+      "target": 0.5,
+      "graph_file": "data/cache/stage6b3_live/pair_30c0a676528e741d_graph.pt",
+      "is_frozen": true,
+      "source_manifest_verified": true
+    },
+    "pair_876c702af866e6a3": {
+      "pair_id": "pair_876c702af866e6a3",
+      "cv_id": "cv_5101c9eaf34b810c",
+      "jd_id": "jd_7a3d7ae345d2399a",
+      "label": "Potential Fit",
+      "target": 0.5,
+      "graph_file": "data/cache/stage6b3_live/pair_876c702af866e6a3_graph.pt",
+      "is_frozen": true,
+      "source_manifest_verified": true
+    },
+    "pair_4daf4cf6463d8d22": {
+      "pair_id": "pair_4daf4cf6463d8d22",
+      "cv_id": "cv_09237a074acd7afc",
+      "jd_id": "jd_9e02d686780c0f35",
+      "label": "Potential Fit",
+      "target": 0.5,
+      "graph_file": "data/cache/stage6b3_live/pair_4daf4cf6463d8d22_graph.pt",
+      "is_frozen": true,
+      "source_manifest_verified": true
+    },
+    "pair_c4d0d158e6709d1f": {
+      "pair_id": "pair_c4d0d158e6709d1f",
+      "cv_id": "cv_9bd642ed7ec1edb4",
+      "jd_id": "jd_6073c804c2b47160",
+      "label": "Potential Fit",
+      "target": 0.5,
+      "graph_file": "data/cache/stage6b3_live/pair_c4d0d158e6709d1f_graph.pt",
+      "is_frozen": true,
+      "source_manifest_verified": true
+    },
+    "pair_56db4ffed202d657": {
+      "pair_id": "pair_56db4ffed202d657",
+      "cv_id": "cv_0132ba952d9f9da0",
+      "jd_id": "jd_4a8516ae52cac856",
+      "label": "Potential Fit",
+      "target": 0.5,
+      "graph_file": "data/cache/stage6b3_live/pair_56db4ffed202d657_graph.pt",
+      "is_frozen": true,
+      "source_manifest_verified": true
+    },
+    "pair_fcff3969e3ed1e4b": {
+      "pair_id": "pair_fcff3969e3ed1e4b",
+      "cv_id": "cv_01faae23232a4a8b",
+      "jd_id": "jd_c8fb8c8bf104931e",
+      "label": "Potential Fit",
+      "target": 0.5,
+      "graph_file": "data/cache/stage6b3_live/pair_fcff3969e3ed1e4b_graph.pt",
+      "is_frozen": true,
+      "source_manifest_verified": true
+    },
+    "pair_2fa47b17fbc87238": {
+      "pair_id": "pair_2fa47b17fbc87238",
+      "cv_id": "cv_f7cd5424ce93a1af",
+      "jd_id": "jd_9fe4d35211a74e9a",
+      "label": "Potential Fit",
+      "target": 0.5,
+      "graph_file": "data/cache/stage6b3_live/pair_2fa47b17fbc87238_graph.pt",
+      "is_frozen": true,
+      "source_manifest_verified": true
+    },
+    "pair_56bf00b34dd024eb": {
+      "pair_id": "pair_56bf00b34dd024eb",
+      "cv_id": "cv_0196f5cc750ee0a5",
+      "jd_id": "jd_6850c63c2bc4918d",
+      "label": "Potential Fit",
+      "target": 0.5,
+      "graph_file": "data/cache/stage6b3_live/pair_56bf00b34dd024eb_graph.pt",
+      "is_frozen": true,
+      "source_manifest_verified": true
+    },
+    "pair_49ca812d98bcf0bd": {
+      "pair_id": "pair_49ca812d98bcf0bd",
+      "cv_id": "cv_2539e3cc2666f642",
+      "jd_id": "jd_305c2b36fbe26e6c",
+      "label": "Potential Fit",
+      "target": 0.5,
+      "graph_file": "data/cache/stage6b3_live/pair_49ca812d98bcf0bd_graph.pt",
+      "is_frozen": true,
+      "source_manifest_verified": true
+    },
+    "pair_1139acae44844d62": {
+      "pair_id": "pair_1139acae44844d62",
+      "cv_id": "cv_d9df034d450aed94",
+      "jd_id": "jd_ff85250751d47209",
+      "label": "Good Fit",
+      "target": 1.0,
+      "graph_file": "data/cache/stage6b3_live/pair_1139acae44844d62_graph.pt",
+      "is_frozen": true,
+      "source_manifest_verified": true
+    },
+    "pair_949e728962c7c629": {
+      "pair_id": "pair_949e728962c7c629",
+      "cv_id": "cv_145121c3c5c09026",
+      "jd_id": "jd_571dffc79071d1d8",
+      "label": "Good Fit",
+      "target": 1.0,
+      "graph_file": "data/cache/stage6b3_live/pair_949e728962c7c629_graph.pt",
+      "is_frozen": true,
+      "source_manifest_verified": true
+    },
+    "pair_dba5c5d0155b1e2d": {
+      "pair_id": "pair_dba5c5d0155b1e2d",
+      "cv_id": "cv_96618f2a2580894b",
+      "jd_id": "jd_14a168bd963d8194",
+      "label": "Good Fit",
+      "target": 1.0,
+      "graph_file": "data/cache/stage6b3_live/pair_dba5c5d0155b1e2d_graph.pt",
+      "is_frozen": true,
+      "source_manifest_verified": true
+    },
+    "pair_5f518289bfd34107": {
+      "pair_id": "pair_5f518289bfd34107",
+      "cv_id": "cv_15032fd2acd64f03",
+      "jd_id": "jd_b874754651b38c20",
+      "label": "Good Fit",
+      "target": 1.0,
+      "graph_file": "data/cache/stage6b3_live/pair_5f518289bfd34107_graph.pt",
+      "is_frozen": true,
+      "source_manifest_verified": true
+    },
+    "pair_883635115873237a": {
+      "pair_id": "pair_883635115873237a",
+      "cv_id": "cv_211f59595068e41f",
+      "jd_id": "jd_d0fab2ddc183612f",
+      "label": "Good Fit",
+      "target": 1.0,
+      "graph_file": "data/cache/stage6b3_live/pair_883635115873237a_graph.pt",
+      "is_frozen": true,
+      "source_manifest_verified": true
+    },
+    "pair_354e4b783848c332": {
+      "pair_id": "pair_354e4b783848c332",
+      "cv_id": "cv_5f50e63f6bd756f5",
+      "jd_id": "jd_31c291a8713c19ca",
+      "label": "Good Fit",
+      "target": 1.0,
+      "graph_file": "data/cache/stage6b3_live/pair_354e4b783848c332_graph.pt",
+      "is_frozen": true,
+      "source_manifest_verified": true
+    },
+    "pair_0d1f14d33d475621": {
+      "pair_id": "pair_0d1f14d33d475621",
+      "cv_id": "cv_9396c184d15f9d7d",
+      "jd_id": "jd_d0fab2ddc183612f",
+      "label": "Good Fit",
+      "target": 1.0,
+      "graph_file": "data/cache/stage6b3_live/pair_0d1f14d33d475621_graph.pt",
+      "is_frozen": true,
+      "source_manifest_verified": true
+    },
+    "pair_df5872649ebdcf38": {
+      "pair_id": "pair_df5872649ebdcf38",
+      "cv_id": "cv_a6e0f76307c9d8b0",
+      "jd_id": "jd_9da08f246d964ff5",
+      "label": "Good Fit",
+      "target": 1.0,
+      "graph_file": "data/cache/stage6b3_live/pair_df5872649ebdcf38_graph.pt",
+      "is_frozen": true,
+      "source_manifest_verified": true
+    },
+    "pair_225b1a081d2c8e1d": {
+      "pair_id": "pair_225b1a081d2c8e1d",
+      "cv_id": "cv_66146c20e5cd6f43",
+      "jd_id": "jd_571dffc79071d1d8",
+      "label": "Good Fit",
+      "target": 1.0,
+      "graph_file": "data/cache/stage6b3_live/pair_225b1a081d2c8e1d_graph.pt",
+      "is_frozen": true,
+      "source_manifest_verified": true
+    },
+    "pair_e26fed7e017a3ed9": {
+      "pair_id": "pair_e26fed7e017a3ed9",
+      "cv_id": "cv_8978dcd1eeec101a",
+      "jd_id": "jd_487ead27f8374e63",
+      "label": "Good Fit",
+      "target": 1.0,
+      "graph_file": "data/cache/stage6b3_live/pair_e26fed7e017a3ed9_graph.pt",
+      "is_frozen": true,
+      "source_manifest_verified": true
+    },
+    "pair_cb937c5786d505ce": {
+      "pair_id": "pair_cb937c5786d505ce",
+      "cv_id": "cv_a6e0f76307c9d8b0",
+      "jd_id": "jd_68ee045a1d491a9e",
+      "label": "No Fit",
+      "target": 0.0,
+      "graph_file": "data/cache/stage6d2\\pair_cb937c5786d505ce_graph.pt",
+      "is_frozen": false,
+      "source_manifest_verified": true
+    },
+    "pair_fdc0425aff03d097": {
+      "pair_id": "pair_fdc0425aff03d097",
+      "cv_id": "cv_15c8b1fdfc8dbcbd",
+      "jd_id": "jd_52d7f963d2828f9f",
+      "label": "No Fit",
+      "target": 0.0,
+      "graph_file": "data/cache/stage6d2\\pair_fdc0425aff03d097_graph.pt",
+      "is_frozen": false,
+      "source_manifest_verified": true
+    },
+    "pair_70294276ad782ba8": {
+      "pair_id": "pair_70294276ad782ba8",
+      "cv_id": "cv_96618f2a2580894b",
+      "jd_id": "jd_cd3ce67af11710b6",
+      "label": "No Fit",
+      "target": 0.0,
+      "graph_file": "data/cache/stage6d2\\pair_70294276ad782ba8_graph.pt",
+      "is_frozen": false,
+      "source_manifest_verified": true
+    },
+    "pair_8bd6980bc3a20acd": {
+      "pair_id": "pair_8bd6980bc3a20acd",
+      "cv_id": "cv_211f59595068e41f",
+      "jd_id": "jd_4c4925252ff9ed45",
+      "label": "No Fit",
+      "target": 0.0,
+      "graph_file": "data/cache/stage6d2\\pair_8bd6980bc3a20acd_graph.pt",
+      "is_frozen": false,
+      "source_manifest_verified": true
+    },
+    "pair_c0ec9b227bb45985": {
+      "pair_id": "pair_c0ec9b227bb45985",
+      "cv_id": "cv_5101c9eaf34b810c",
+      "jd_id": "jd_5b0e54d2e8639990",
+      "label": "No Fit",
+      "target": 0.0,
+      "graph_file": "data/cache/stage6d2\\pair_c0ec9b227bb45985_graph.pt",
+      "is_frozen": false,
+      "source_manifest_verified": true
+    },
+    "pair_60342e2d8b757a55": {
+      "pair_id": "pair_60342e2d8b757a55",
+      "cv_id": "cv_d7ffff9cec0f08fd",
+      "jd_id": "jd_c1b5972c29d7902c",
+      "label": "Potential Fit",
+      "target": 0.5,
+      "graph_file": "data/cache/stage6d2\\pair_60342e2d8b757a55_graph.pt",
+      "is_frozen": false,
+      "source_manifest_verified": true
+    },
+    "pair_5ded5344498a52dc": {
+      "pair_id": "pair_5ded5344498a52dc",
+      "cv_id": "cv_211f59595068e41f",
+      "jd_id": "jd_4f8583a0730b4593",
+      "label": "Potential Fit",
+      "target": 0.5,
+      "graph_file": "data/cache/stage6d2\\pair_5ded5344498a52dc_graph.pt",
+      "is_frozen": false,
+      "source_manifest_verified": true
+    },
+    "pair_6f455f4369385977": {
+      "pair_id": "pair_6f455f4369385977",
+      "cv_id": "cv_178297cb3fb16381",
+      "jd_id": "jd_b2dec3fab148bcb4",
+      "label": "Potential Fit",
+      "target": 0.5,
+      "graph_file": "data/cache/stage6d2\\pair_6f455f4369385977_graph.pt",
+      "is_frozen": false,
+      "source_manifest_verified": true
+    },
+    "pair_cd99fa2256d8fc0d": {
+      "pair_id": "pair_cd99fa2256d8fc0d",
+      "cv_id": "cv_8f52484aa860bb52",
+      "jd_id": "jd_fa88f4c524416c17",
+      "label": "Potential Fit",
+      "target": 0.5,
+      "graph_file": "data/cache/stage6d2\\pair_cd99fa2256d8fc0d_graph.pt",
+      "is_frozen": false,
+      "source_manifest_verified": true
+    },
+    "pair_9a32b75b6fd206df": {
+      "pair_id": "pair_9a32b75b6fd206df",
+      "cv_id": "cv_cc911042381dab93",
+      "jd_id": "jd_9e02d686780c0f35",
+      "label": "Potential Fit",
+      "target": 0.5,
+      "graph_file": "data/cache/stage6d2\\pair_9a32b75b6fd206df_graph.pt",
+      "is_frozen": false,
+      "source_manifest_verified": true
+    },
+    "pair_34c85f364a5e00d1": {
+      "pair_id": "pair_34c85f364a5e00d1",
+      "cv_id": "cv_1c171d7823dcda04",
+      "jd_id": "jd_4c4925252ff9ed45",
+      "label": "Good Fit",
+      "target": 1.0,
+      "graph_file": "data/cache/stage6d2\\pair_34c85f364a5e00d1_graph.pt",
+      "is_frozen": false,
+      "source_manifest_verified": true
+    },
+    "pair_b171bf04963b3b72": {
+      "pair_id": "pair_b171bf04963b3b72",
+      "cv_id": "cv_2df94b3f26b2e53f",
+      "jd_id": "jd_1271474b97f37159",
+      "label": "Good Fit",
+      "target": 1.0,
+      "graph_file": "data/cache/stage6d2\\pair_b171bf04963b3b72_graph.pt",
+      "is_frozen": false,
+      "source_manifest_verified": true
+    },
+    "pair_3de39d2bfdfdab6c": {
+      "pair_id": "pair_3de39d2bfdfdab6c",
+      "cv_id": "cv_e51ca06b1e65da7d",
+      "jd_id": "jd_571dffc79071d1d8",
+      "label": "Good Fit",
+      "target": 1.0,
+      "graph_file": "data/cache/stage6d2\\pair_3de39d2bfdfdab6c_graph.pt",
+      "is_frozen": false,
+      "source_manifest_verified": true
+    },
+    "pair_611de5b883bf3ae4": {
+      "pair_id": "pair_611de5b883bf3ae4",
+      "cv_id": "cv_20b27110fdb80071",
+      "jd_id": "jd_4c4bb7eabffedb46",
+      "label": "Good Fit",
+      "target": 1.0,
+      "graph_file": "data/cache/stage6d2\\pair_611de5b883bf3ae4_graph.pt",
+      "is_frozen": false,
+      "source_manifest_verified": true
+    },
+    "pair_0f622284f4d6c4e3": {
+      "pair_id": "pair_0f622284f4d6c4e3",
+      "cv_id": "cv_3c0658cfff4501ae",
+      "jd_id": "jd_2fe23e06b3387bf8",
+      "label": "Good Fit",
+      "target": 1.0,
+      "graph_file": "data/cache/stage6d2\\pair_0f622284f4d6c4e3_graph.pt",
+      "is_frozen": false,
+      "source_manifest_verified": true
+    },
+    "pair_255cd6cf7108b229": {
+      "pair_id": "pair_255cd6cf7108b229",
+      "cv_id": "cv_15c8b1fdfc8dbcbd",
+      "jd_id": "jd_0404c9f18709f60d",
+      "label": "Good Fit",
+      "target": 1.0,
+      "graph_file": "data/cache/stage6d2\\pair_255cd6cf7108b229_graph.pt",
+      "is_frozen": false,
+      "source_manifest_verified": true
+    },
+    "pair_0aa2b45faba9ed87": {
+      "pair_id": "pair_0aa2b45faba9ed87",
+      "cv_id": "cv_09d08acc9d1cbf09",
+      "jd_id": "jd_abf8d7db5947e15f",
+      "label": "Good Fit",
+      "target": 1.0,
+      "graph_file": "data/cache/stage6d2\\pair_0aa2b45faba9ed87_graph.pt",
+      "is_frozen": false,
+      "source_manifest_verified": true
+    }
+  }
+}

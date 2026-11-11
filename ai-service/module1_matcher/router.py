@@ -1,31 +1,67 @@
 """
 FastAPI Router for Module 1 (`POST /api/v1/match`) and End-to-End Pipeline (`POST /api/v1/pipeline/analyze`).
 Supports DUAL-INPUT: Both raw text (JSON) and PDF file uploads (Multipart Form-Data).
-Connects Module 1 (SBERT + GNN Adapter) -> Module 2 (Skill-Gap Detection).
+Connects matching_cv to Module 2 (Skill-Gap Detection).
 """
 
+from __future__ import annotations
+
+import logging
 import uuid
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from fastapi import APIRouter, Request, File, Form, UploadFile, status, HTTPException
+from starlette.concurrency import run_in_threadpool
 
 from skill_gap.api.routes import _get_orchestrator, _get_report_store
 from skill_gap.api.schemas import AnalyzeWithReportResponse
-from .schemas import MatchPipelineRequest, Module1Output
-from .extractor import DefaultModule1Extractor, Module1MatcherProtocol
+from .schemas import Module1Output
 from .pdf_helper import extract_document_text
 
+if TYPE_CHECKING:
+    from matching_cv.app.container import MatchedDocuments
+
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1", tags=["NCKH Pipeline (Module 1 -> Module 2)"])
 
 
-def _get_module1_matcher(request: Request) -> Module1MatcherProtocol:
-    if not hasattr(request.app.state, "module1_matcher"):
-        orchestrator = _get_orchestrator(request)
-        fallback_llm = getattr(orchestrator.llm_client, "fallback_client", None) or orchestrator.llm_client
-        request.app.state.module1_matcher = DefaultModule1Extractor(
-            llm_client=fallback_llm,
-            use_llm=True,
+async def _match_documents(
+    cv_text: str, jd_text: str, *, include_compatibility_score: bool = False,
+) -> MatchedDocuments:
+    # Load the ML pipeline on the first matching request.
+    from matching_cv.app.container import match_documents
+    from matching_cv.app.services.standardized_output_builder import Module1OutputError
+
+    try:
+        return await match_documents(
+            cv_text, jd_text, include_compatibility_score=include_compatibility_score,
         )
-    return request.app.state.module1_matcher
+    except Module1OutputError as error:
+        logger.warning("Module 1 could not complete the analysis: %s", error)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Không thể hoàn tất phân tích kỹ năng từ CV và JD.",
+        ) from error
+
+
+async def _analyze_documents(
+    request: Request, documents: MatchedDocuments, analysis_id: Optional[str],
+) -> AnalyzeWithReportResponse:
+    orchestrator = _get_orchestrator(request)
+    match = documents.output
+    skills, report = await run_in_threadpool(
+        orchestrator.run_pipeline_with_report,
+        cv_text=documents.cv_text,
+        jd_text=documents.jd_text,
+        cv_skills=match.cv_skills,
+        jd_skills=match.jd_skills,
+        match_results=match.match_results,
+        analysis_id=analysis_id or str(uuid.uuid4()),
+    )
+    for skill in skills:
+        skill.flags.append(f"matcher_source:{match.matcher_source}")
+    report.matching_score = documents.matching_score
+    _get_report_store(request)[report.analysis_id] = report
+    return AnalyzeWithReportResponse(analysis_id=report.analysis_id, skills=skills, report=report)
 
 
 async def _resolve_request_inputs(request: Request) -> tuple[str, str, Optional[str]]:
@@ -65,8 +101,8 @@ async def _resolve_request_inputs(request: Request) -> tuple[str, str, Optional[
     try:
         body = await request.json()
         return (
-            body.get("cv_text", "").strip(),
-            body.get("jd_text", "").strip(),
+            (body.get("cv_text") or "").strip(),
+            (body.get("jd_text") or "").strip(),
             body.get("analysis_id"),
         )
     except Exception as e:
@@ -80,7 +116,7 @@ async def _resolve_request_inputs(request: Request) -> tuple[str, str, Optional[
     "/match",
     response_model=Module1Output,
     status_code=status.HTTP_200_OK,
-    summary="Execute Module 1 (SBERT + GNN Adapter) with JSON or Multipart (PDF/Text)",
+    summary="Run CV/JD matching with JSON or multipart (PDF/text)",
 )
 async def run_module1_match(request: Request) -> Module1Output:
     cv_text, jd_text, _ = await _resolve_request_inputs(request)
@@ -89,8 +125,7 @@ async def run_module1_match(request: Request) -> Module1Output:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Both CV content and JD content (file or text) are required.",
         )
-    matcher = _get_module1_matcher(request)
-    return matcher.extract_and_match(cv_text=cv_text, jd_text=jd_text)
+    return (await _match_documents(cv_text, jd_text)).output
 
 
 @router.post(
@@ -100,7 +135,6 @@ async def run_module1_match(request: Request) -> Module1Output:
     summary="Execute Module 1 using explicit file uploads (PDF) or text fields",
 )
 async def run_module1_match_upload(
-    request: Request,
     cv_file: Optional[UploadFile] = File(None, description="CV PDF file"),
     jd_file: Optional[UploadFile] = File(None, description="JD PDF file"),
     cv_text: Optional[str] = Form(None, description="CV plain text"),
@@ -118,8 +152,7 @@ async def run_module1_match_upload(
             detail="Both CV and JD must be provided via file upload or text.",
         )
 
-    matcher = _get_module1_matcher(request)
-    return matcher.extract_and_match(cv_text=resolved_cv, jd_text=resolved_jd)
+    return (await _match_documents(resolved_cv, resolved_jd)).output
 
 
 @router.post(
@@ -136,30 +169,8 @@ async def run_full_static_pipeline(request: Request) -> AnalyzeWithReportRespons
             detail="Both CV content and JD content (file or text) are required.",
         )
 
-    matcher = _get_module1_matcher(request)
-    orchestrator = _get_orchestrator(request)
-    store = _get_report_store(request)
-
-    m1_out = matcher.extract_and_match(cv_text=cv_text, jd_text=jd_text)
-    final_analysis_id = analysis_id or str(uuid.uuid4())
-
-    gap_results, report = orchestrator.run_pipeline_with_report(
-        cv_text=cv_text,
-        jd_text=jd_text,
-        cv_skills=m1_out.cv_skills,
-        jd_skills=m1_out.jd_skills,
-        match_results=m1_out.match_results,
-        analysis_id=final_analysis_id,
-    )
-    for result in gap_results:
-        result.flags.append(f"matcher_source:{m1_out.matcher_source}")
-    store[report.analysis_id] = report
-
-    return AnalyzeWithReportResponse(
-        analysis_id=report.analysis_id,
-        skills=gap_results,
-        report=report,
-    )
+    documents = await _match_documents(cv_text, jd_text, include_compatibility_score=True)
+    return await _analyze_documents(request, documents, analysis_id)
 
 
 @router.post(
@@ -188,27 +199,5 @@ async def run_full_static_pipeline_upload(
             detail="Both CV and JD must be provided via file upload or text.",
         )
 
-    matcher = _get_module1_matcher(request)
-    orchestrator = _get_orchestrator(request)
-    store = _get_report_store(request)
-
-    m1_out = matcher.extract_and_match(cv_text=resolved_cv, jd_text=resolved_jd)
-    final_analysis_id = analysis_id or str(uuid.uuid4())
-
-    gap_results, report = orchestrator.run_pipeline_with_report(
-        cv_text=resolved_cv,
-        jd_text=resolved_jd,
-        cv_skills=m1_out.cv_skills,
-        jd_skills=m1_out.jd_skills,
-        match_results=m1_out.match_results,
-        analysis_id=final_analysis_id,
-    )
-    for result in gap_results:
-        result.flags.append(f"matcher_source:{m1_out.matcher_source}")
-    store[report.analysis_id] = report
-
-    return AnalyzeWithReportResponse(
-        analysis_id=report.analysis_id,
-        skills=gap_results,
-        report=report,
-    )
+    documents = await _match_documents(resolved_cv, resolved_jd, include_compatibility_score=True)
+    return await _analyze_documents(request, documents, analysis_id)

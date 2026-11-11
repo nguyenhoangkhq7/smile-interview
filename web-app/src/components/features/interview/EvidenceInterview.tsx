@@ -9,9 +9,9 @@ import { EvidenceTextInterview } from './EvidenceTextInterview';
 import { EvidenceTurn } from '@/services/evidenceInterview';
 import { EvidenceSetup, modeLabels } from './EvidenceSetup';
 import { InterviewOutcome } from './InterviewOutcome';
+import { InterviewResultDashboard } from './result/InterviewResultDashboard';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { MarkdownContent } from '@/components/common/MarkdownContent';
-import { History } from 'lucide-react';
 
 const VoiceInterview = dynamic(() => import('./EvidenceVoiceInterview').then(module => module.EvidenceVoiceInterview),
   { ssr: false, loading: () => <p className="p-6 text-sm">Đang chuẩn bị phòng phỏng vấn giọng nói…</p> });
@@ -42,12 +42,15 @@ export function EvidenceInterview() {
     <div className="flex gap-4"><Link className="text-brand-orange" href={`/interview/session/${id}/result`}>Xem kết quả đã lưu</Link>
       <Link className="text-brand-orange" href="/interview/new">Tạo lượt phỏng vấn mới</Link></div>
   </main>;
+  if (session?.is_finished && session.turns.length > 0) {
+    return <InterviewResultDashboard session={session} metadata={interview.metadata} />;
+  }
   return <main className="mx-auto w-full max-w-6xl space-y-4 px-4 py-5 sm:px-6">
     {interview.metadata?.applicationProfileId && <header className="space-y-2 border-b pb-5"><Link className="text-sm text-brand-orange" href={`/applications/${interview.metadata.applicationProfileId}`}>← Về hồ sơ ứng tuyển</Link><h2 className="text-xl font-semibold">{interview.metadata.applicationProfileTitle} · Lượt {interview.metadata.attemptNumber}</h2></header>}
     {error && <div role="alert" className="rounded border border-red-300 p-4"><p>{error}</p><Button variant="outline" onClick={() => void interview.reload()}>Tải lại phiên</Button></div>}
     {!session && <EvidenceSetup busy={busy} onStart={config => void interview.start(config)} />}
     {session && <>
-      {session.is_finished ? <><InterviewOutcome session={session} metadata={interview.metadata} />{session.turns.length > 0 && <Button variant="outline" onClick={() => setHistoryOpen(true)}><History size={16} />Lịch sử ({session.turns.length} câu)</Button>}</>
+      {session.is_finished ? <InterviewOutcome session={session} metadata={interview.metadata} />
         : session.config.interaction_mode === 'VOICE'
           ? <VoiceInterview interview={interview} suspended={confirmStop || Boolean(error)} onStop={() => setConfirmStop(true)} />
           : <EvidenceTextInterview interview={interview} onHistory={() => setHistoryOpen(true)} onStop={() => setConfirmStop(true)} />}
