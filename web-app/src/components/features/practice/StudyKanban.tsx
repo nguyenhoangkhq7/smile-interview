@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, type DragEvent } from 'react';
+import { useState, type DragEvent, type RefObject } from 'react';
 import { CircleCheck, GripVertical, ListChecks } from 'lucide-react';
 import { skillLabel } from '@/components/features/applications/applicationUi';
 import { cn } from '@/lib/utils';
 import { studyTaskStatuses, studyTaskTones, type StudyTask, type StudyTaskStatus } from './studyPlan';
 import styles from './practice.module.css';
 import { useStudyTaskDrag } from './useStudyTaskDrag';
+import { studyGapDragType, type StudyGap } from './StudyGapCard';
 
 interface StudyKanbanProps {
   tasks: readonly StudyTask[];
@@ -15,6 +16,8 @@ interface StudyKanbanProps {
   completedTaskId: number | null;
   onSelect: (id: number) => void;
   onMove: (task: StudyTask, status: StudyTaskStatus, beforeTaskId?: number | null) => Promise<boolean>;
+  gapSource: RefObject<StudyGap | null>;
+  onGapDrop: (gap: StudyGap, status: StudyTaskStatus) => Promise<boolean>;
 }
 
 interface StudyTaskCardProps {
@@ -77,10 +80,11 @@ function StudyTaskCard({ task, statusLabel, selected, dragging, draggable, justC
   );
 }
 
-export function StudyKanban({ tasks, selectedTaskId, disabled, completedTaskId, onSelect, onMove }: StudyKanbanProps) {
+export function StudyKanban({ tasks, selectedTaskId, disabled, completedTaskId, onSelect, onMove, gapSource, onGapDrop }: StudyKanbanProps) {
   const { draggingId, dropStatus, savingStatus, announcement, arrival, startDrag, finishDrag, dragOver, dragLeave, drop, finishArrival } =
     useStudyTaskDrag({ disabled, onSelect, onMove });
   const [insertion, setInsertion] = useState<{ status: StudyTaskStatus; beforeId: number | null }>();
+  const [gapTarget, setGapTarget] = useState<StudyTaskStatus | null>(null);
 
   function getInsertion(event: DragEvent<HTMLElement>) {
     const cards = event.currentTarget.querySelectorAll<HTMLLIElement>('[data-kanban-task-id]');
@@ -96,19 +100,40 @@ export function StudyKanban({ tasks, selectedTaskId, disabled, completedTaskId, 
       <p role="status" className="sr-only">{announcement}</p>
       {studyTaskStatuses.map(({ value: status, label }) => {
         const columnTasks = tasks.filter((task) => task.status === status);
-        const isTarget = !disabled && dropStatus === status;
+        const isTarget = !disabled && (dropStatus === status || gapTarget === status);
         const isSaving = savingStatus === status;
         return (
           <section key={status} aria-label={label}
             aria-busy={isSaving || undefined}
             data-drop-active={isTarget || isSaving || undefined}
             onDragOver={(event) => {
+              if (!disabled && gapSource.current && event.dataTransfer.types.includes(studyGapDragType)) {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = 'copy';
+                setGapTarget(status);
+                return;
+              }
               if (!dragOver(event, status, true)) return;
               const beforeId = getInsertion(event);
               setInsertion((current) => current?.status === status && current.beforeId === beforeId ? current : { status, beforeId });
             }}
-            onDragLeave={(event) => dragLeave(event, status)}
+            onDragLeave={(event) => {
+              if (!(event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget))) {
+                setGapTarget((current) => current === status ? null : current);
+              }
+              dragLeave(event, status);
+            }}
             onDrop={(event) => {
+              if (event.dataTransfer.types.includes(studyGapDragType)) {
+                event.preventDefault();
+                const gap = gapSource.current;
+                gapSource.current = null;
+                setGapTarget(null);
+                if (!disabled && gap && event.dataTransfer.getData(studyGapDragType) === gap.skillId) {
+                  void onGapDrop(gap, status);
+                }
+                return;
+              }
               const beforeId = insertion?.status === status ? insertion.beforeId : getInsertion(event);
               const sourceIndex = columnTasks.findIndex((task) => task.id === draggingId);
               setInsertion(undefined);

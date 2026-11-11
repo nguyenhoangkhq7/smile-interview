@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowRight, CalendarDays, ClipboardList, FileText, Flag,
@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 import type { ApplicationProfile } from '@/services/applicationProfiles';
 import { studyPlans, type ReportWeakness, type StudyPlanDetails, type StudyPlanView, type StudySkill } from '@/services/studyPlans';
 import {
-  formatStudyPercent as formatPercent, studyTaskStatuses, studyTaskTones,
+  formatStudyPercent as formatPercent, studyProgressTone, studyTaskStatuses, studyTaskTones,
   type NewStudyTask, type StudyProgress as PlanProgress, type StudyTask, type StudyTaskStatus, type StudyTaskUpdate,
 } from './studyPlan';
 import { StudyTaskCreateDialog } from './StudyTaskCreateDialog';
@@ -23,6 +23,7 @@ import type { MindMapPositions } from './useMindMapPosition';
 import { PracticeTaskInspector } from './PracticeTaskInspector';
 import { StudyPlanSettings } from './StudyPlanSettings';
 import { StudyKanban } from './StudyKanban';
+import { StudyGapCard, type StudyGap, type StudyGapActions } from './StudyGapCard';
 import styles from './practice.module.css';
 
 const panelStyle = 'flex min-w-0 flex-col rounded-2xl border border-slate-100 bg-card p-4 shadow-xs sm:p-5';
@@ -51,7 +52,7 @@ function PanelHeading({ icon: Icon, title, subtitle }: { icon: LucideIcon; title
   );
 }
 
-function ProgressTrack({ percent, className }: { percent: number | null; className: string }) {
+function ProgressTrack({ percent, target, className }: { percent: number | null; target: number; className: string }) {
   return (
     <div
       role={percent === null ? undefined : 'progressbar'}
@@ -60,27 +61,27 @@ function ProgressTrack({ percent, className }: { percent: number | null; classNa
       aria-valuenow={percent ?? undefined}
       className={cn('overflow-hidden rounded-full bg-(--practice-blue-strong)', className)}
     >
-      {percent !== null && <div className="h-full bg-(--practice-primary)" style={{ width: `${percent}%` }} />}
+      {percent !== null && <div className={cn('h-full rounded-full', studyProgressTone(percent, target).fill)} style={{ width: `${percent}%` }} />}
     </div>
   );
 }
 
 function ProgressSummary({ progress }: { progress: StudyProgress }) {
   const { targetCompletionPercent, done, total, percent, meetsTarget } = progress;
+  const tone = studyProgressTone(percent, targetCompletionPercent);
 
   return (
     <div className="w-full shrink-0 space-y-2.5 rounded-xl bg-(--practice-pale) p-4 lg:max-w-72">
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
         <span className="font-semibold">Tiến độ ôn tập</span>
-        <span className={cn('rounded-full px-2.5 py-1 text-xs',
-          meetsTarget ? 'bg-(--practice-green-bg) text-(--practice-green)' : 'bg-(--practice-blue) text-(--practice-muted)')}>
+        <span className={cn('rounded-full px-2.5 py-1 text-xs', tone.badge, tone.text)}>
           {percent === null ? 'Chưa theo dõi' : meetsTarget ? 'Đạt mục tiêu' : 'Chưa đạt mục tiêu'}
         </span>
       </div>
       {percent !== null && (
         <>
-          <strong className="block text-2xl tabular-nums text-(--practice-primary)">{formatPercent(percent)}</strong>
-          <ProgressTrack percent={percent} className="h-2" />
+          <strong className={cn('block text-2xl tabular-nums', tone.text)}>{formatPercent(percent)}</strong>
+          <ProgressTrack percent={percent} target={targetCompletionPercent} className="h-2" />
         </>
       )}
       <div className="flex flex-wrap justify-between gap-1 text-xs text-(--practice-muted)">
@@ -122,12 +123,14 @@ function BoardOverview({ profile, plan, progress, isMindMap }: {
         <div className="grid w-full shrink-0 grid-cols-2 gap-3 rounded-xl bg-(--practice-pale) p-4 text-xs lg:max-w-80">
           <div className="space-y-1.5">
             <p>Tiến độ hiện tại</p>
-            <strong className="block text-base text-(--practice-primary)">{progress.percent === null ? 'Chưa theo dõi' : formatPercent(progress.percent)}</strong>
-            <ProgressTrack percent={progress.percent} className="h-1.5" />
+            <strong className={cn('block text-base', studyProgressTone(progress.percent, progress.targetCompletionPercent).text)}>
+              {progress.percent === null ? 'Chưa theo dõi' : formatPercent(progress.percent)}
+            </strong>
+            <ProgressTrack percent={progress.percent} target={progress.targetCompletionPercent} className="h-1.5" />
             <p className="text-(--practice-muted)">{progress.total ? `${progress.done}/${progress.total} hoàn thành` : 'Chưa có đầu việc'}</p>
           </div>
           <div className="space-y-1.5 border-l border-(--practice-blue-strong) pl-3">
-            <p>Mục tiêu gợi ý</p>
+            <p>Mục tiêu đã đặt</p>
             <strong className="block text-base text-(--practice-green)">{formatPercent(progress.targetCompletionPercent)}</strong>
             <div className="h-1.5 overflow-hidden rounded-full bg-(--practice-blue-strong)" aria-hidden="true">
               <div className="h-full bg-(--practice-green)" style={{ width: `${progress.targetCompletionPercent}%` }} />
@@ -139,7 +142,7 @@ function BoardOverview({ profile, plan, progress, isMindMap }: {
   );
 }
 
-function GapList({ title, skills }: { title: string; skills: StudySkill[] }) {
+function GapList({ title, skills, actions }: { title: string; skills: StudySkill[]; actions?: StudyGapActions }) {
   if (!skills.length) return null;
   return (
     <div className="space-y-2">
@@ -149,46 +152,30 @@ function GapList({ title, skills }: { title: string; skills: StudySkill[] }) {
           .filter((item) => item.performance === 'BELOW')
           .sort((a, b) => b.source.attemptNumber - a.source.attemptNumber)[0];
         const source = evidence?.source ?? skill.lastChecked;
-        return (
-          <div key={skill.skillId} className="space-y-1 rounded-lg bg-(--practice-pale) p-2.5 text-xs [overflow-wrap:anywhere]">
-            <p className="font-semibold">{skillLabel(skill.skillId)}</p>
-            <p className="text-(--practice-muted)">{evidence?.rationale || skill.objectives[0]?.explanation}</p>
-            {source && <Link className="font-medium text-(--practice-primary) hover:underline"
-              href={`/interview/session/${encodeURIComponent(source.sessionId)}/result`}>
-              Xem kết quả lượt {source.attemptNumber}
-            </Link>}
-          </div>
-        );
+        const note = evidence?.rationale || skill.objectives[0]?.explanation;
+        return <StudyGapCard key={skill.skillId} gap={{ skillId: skill.skillId, notes: note ? [note] : [], source }} actions={actions} />;
       })}
     </div>
   );
 }
 
-function InterviewWeaknesses({ findings }: { findings: ReportWeakness[] }) {
+function InterviewWeaknesses({ findings, actions }: { findings: ReportWeakness[]; actions?: StudyGapActions }) {
   if (!findings.length) return <p className={mutedText}>Báo cáo phỏng vấn chưa ghi nhận điểm yếu.</p>;
   return (
     <div className="space-y-2">
       <h3 className="text-sm font-semibold">Điểm yếu sau phỏng vấn</h3>
       {findings.map(({ skillId, sessionId, attemptNumber, weaknesses }) => (
-        <div key={skillId} className="space-y-1.5 rounded-lg bg-(--practice-pale) p-2.5 text-xs wrap-anywhere">
-          <p className="font-semibold">{skillLabel(skillId)}</p>
-          <ul className="list-disc space-y-1 pl-4 text-(--practice-muted)">
-            {weaknesses.map((weakness) => <li key={weakness}>{weakness}</li>)}
-          </ul>
-          <Link className="font-medium text-(--practice-primary) hover:underline"
-            href={`/interview/session/${encodeURIComponent(sessionId)}/result`}>
-            Xem kết quả lượt {attemptNumber}
-          </Link>
-        </div>
+        <StudyGapCard key={skillId} gap={{ skillId, notes: weaknesses, source: { sessionId, attemptNumber } }} actions={actions} list />
       ))}
     </div>
   );
 }
 
-function KnowledgeGaps({ profile, request, compact = false }: {
+function KnowledgeGaps({ profile, request, compact = false, actions }: {
   profile: ApplicationProfile;
   request: ReturnType<typeof usePracticeKnowledgeGaps>;
   compact?: boolean;
+  actions?: StudyGapActions;
 }) {
   const hasResult = profile.attempts.some((attempt) => finishedAttempt(attempt) && attempt.answeredCount > 0);
   const attempt = activeAttempt(profile.attempts);
@@ -212,8 +199,10 @@ function KnowledgeGaps({ profile, request, compact = false }: {
             </div>
           ) : data && (data.completedAttempts > 0 || (data.reportWeaknesses?.length ?? 0) > 0) ? (
             <div className="space-y-3">
-              <InterviewWeaknesses findings={data.reportWeaknesses ?? []} />
-              <GapList title="Cần kiểm chứng thêm" skills={data.needsVerification} />
+              {actions && ((data.reportWeaknesses?.length ?? 0) > 0 || data.needsVerification.length > 0) &&
+                <p className="text-xs text-(--practice-muted)">Kéo thẻ vào cột ôn tập để tạo đầu việc.</p>}
+              <InterviewWeaknesses findings={data.reportWeaknesses ?? []} actions={actions} />
+              <GapList title="Cần kiểm chứng thêm" skills={data.needsVerification} actions={actions} />
               {data.notAssessedSkillIds.length > 0 && <p className={mutedText}>{data.notAssessedSkillIds.length} kỹ năng chưa đánh giá.</p>}
             </div>
           ) : (
@@ -251,16 +240,19 @@ interface TaskBoardProps {
   onMove: (task: StudyTask, status: StudyTaskStatus, beforeTaskId?: number | null) => Promise<boolean>;
   completedTaskId: number | null;
   disabled: boolean;
+  gapSource: StudyGapActions['source'];
+  onGapDrop: (gap: StudyGap, status: StudyTaskStatus) => Promise<boolean>;
 }
 
-function TaskBoard({ tasks, skillIds, selectedTaskId, onSelect, onCreate, onMove, disabled, completedTaskId }: TaskBoardProps) {
+function TaskBoard({ tasks, skillIds, selectedTaskId, onSelect, onCreate, onMove, disabled, completedTaskId, gapSource, onGapDrop }: TaskBoardProps) {
   return (
     <section className={workspacePanelStyle}>
       <div className="flex shrink-0 flex-wrap items-start justify-between gap-3">
         <PanelHeading icon={ClipboardList} title="Đầu việc ôn tập" subtitle="Kéo thả để đổi cột hoặc chọn thẻ để cập nhật trạng thái." />
         <StudyTaskCreateDialog skillIds={skillIds} onCreate={onCreate} disabled={disabled} />
       </div>
-      <StudyKanban tasks={tasks} selectedTaskId={selectedTaskId} onSelect={onSelect} onMove={onMove} disabled={disabled} completedTaskId={completedTaskId} />
+      <StudyKanban tasks={tasks} selectedTaskId={selectedTaskId} onSelect={onSelect} onMove={onMove} disabled={disabled}
+        completedTaskId={completedTaskId} gapSource={gapSource} onGapDrop={onGapDrop} />
     </section>
   );
 }
@@ -312,10 +304,10 @@ function PracticeGoal({ progress }: { progress: StudyProgress }) {
           <strong className="block text-[1.75rem] leading-none tabular-nums text-(--practice-primary)">{target}</strong>
         </div>
         <div className="space-y-1.5">
-          <p className="text-xs leading-5 tabular-nums text-(--practice-muted)">
+          <p className={cn('text-xs leading-5 tabular-nums', studyProgressTone(percent, targetCompletionPercent).text)}>
             Hiện tại: {percent === null ? 'Chưa theo dõi' : formatPercent(percent)}
           </p>
-          <ProgressTrack percent={percent} className="h-1.5" />
+          <ProgressTrack percent={percent} target={targetCompletionPercent} className="h-1.5" />
         </div>
       </div>
     </section>
@@ -327,6 +319,7 @@ export function PracticePlanBoard({ profile, initialPlan }: {
   initialPlan: StudyPlanView;
 }) {
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
+  const gapSource = useRef<StudyGap | null>(null);
   const [view, setView] = useState<PlanView>('kanban');
   const [completedTaskId, setCompletedTaskId] = useState<number | null>(null);
   const [mindMapPositions, setMindMapPositions] = useState<MindMapPositions>({});
@@ -351,6 +344,20 @@ export function PracticePlanBoard({ profile, initialPlan }: {
     return Boolean(result);
   }
 
+  function createTaskFromGap(gap: StudyGap, status: StudyTaskStatus) {
+    const referenceUrl = gap.source
+      ? new URL(`/interview/session/${encodeURIComponent(gap.source.sessionId)}/result`, window.location.origin).href
+      : undefined;
+    return createTask({
+      title: `Ôn tập ${skillLabel(gap.skillId)}`.slice(0, 255),
+      skillId: skillIds.includes(gap.skillId) ? gap.skillId : undefined,
+      status,
+      notes: gap.notes.join('\n\n').slice(0, 10000) || undefined,
+      checklist: [],
+      referenceUrl: referenceUrl && referenceUrl.length <= 2048 ? referenceUrl : undefined,
+    });
+  }
+
   async function updateTask(task: StudyTask, update: StudyTaskUpdate) {
     const { title, skillId, notes, status, sortOrder } = task;
     const result = await save(() => studyPlans.updateTask(profile.id, task.id, { title, skillId, notes, status, sortOrder, ...update }));
@@ -366,10 +373,11 @@ export function PracticePlanBoard({ profile, initialPlan }: {
   }
 
   async function deleteTask(task: StudyTask) {
-    if (!window.confirm(`Xóa đầu việc “${task.title}” cùng checklist và tài liệu?`)) return;
-    if (await save(() => studyPlans.deleteTask(profile.id, task.id))) {
+    const result = await save(() => studyPlans.deleteTask(profile.id, task.id));
+    if (result) {
       setSelectedTaskId((id) => id === task.id ? null : id);
     }
+    return Boolean(result);
   }
 
   async function updatePlan(input: StudyPlanDetails) {
@@ -444,9 +452,10 @@ export function PracticePlanBoard({ profile, initialPlan }: {
         </>
       ) : (
         <div className={styles.workspace}>
-          <KnowledgeGaps profile={profile} request={gaps} />
+          <KnowledgeGaps profile={profile} request={gaps}
+            actions={{ source: gapSource, disabled, add: (gap) => createTaskFromGap(gap, 'TODO') }} />
           <TaskBoard tasks={tasks} skillIds={skillIds} selectedTaskId={selectedTaskId} onCreate={createTask} onSelect={setSelectedTaskId}
-            onMove={moveTask} completedTaskId={completedTaskId} disabled={disabled} />
+            onMove={moveTask} completedTaskId={completedTaskId} disabled={disabled} gapSource={gapSource} onGapDrop={createTaskFromGap} />
           {inspector || <TaskNotes />}
         </div>
       )}

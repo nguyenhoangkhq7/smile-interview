@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
-import { CircleCheck, ClipboardList, Pencil, StickyNote, Trash2, X } from 'lucide-react';
+import { CircleCheck, ClipboardList, Pencil, StickyNote, X } from 'lucide-react';
 import { skillLabel } from '@/components/features/applications/applicationUi';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { studyTaskStatuses, studyTaskTones, type StudyTask, type StudyTaskUpdate } from './studyPlan';
 import { StudyTaskChecklist, type StudyTaskChecklistActions } from './StudyTaskChecklist';
 import { StudyTaskResources, type StudyTaskResourceActions } from './StudyTaskResources';
+import { DeleteStudyTaskDialog } from './DeleteStudyTaskDialog';
 
 interface PracticeTaskInspectorProps {
   task: StudyTask;
@@ -17,7 +18,7 @@ interface PracticeTaskInspectorProps {
   disabled: boolean;
   skillIds: readonly string[];
   onUpdate: (update: StudyTaskUpdate) => Promise<boolean>;
-  onDelete: () => void;
+  onDelete: () => Promise<boolean>;
   checklist: StudyTaskChecklistActions;
   resources: StudyTaskResourceActions;
   onClose?: () => void;
@@ -111,9 +112,7 @@ export function PracticeTaskInspector({ task, className, disabled, skillIds, onU
               <Pencil aria-hidden="true" /> Sửa đầu việc
             </Button>
           )}
-          <Button type="button" variant="ghost" size="icon" aria-label="Xóa đầu việc" disabled={disabled} onClick={onDelete}>
-            <Trash2 aria-hidden="true" />
-          </Button>
+          <DeleteStudyTaskDialog title={task.title} disabled={disabled} onConfirm={onDelete} />
         </div>
       </div>
     </aside>

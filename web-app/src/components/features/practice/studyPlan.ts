@@ -52,6 +52,15 @@ export const studyTaskTones = {
 const percentFormat = new Intl.NumberFormat('vi-VN', { style: 'percent', maximumFractionDigits: 2 });
 export const formatStudyPercent = (value: number) => percentFormat.format(value / 100);
 
+export const suggestedStudyTarget = 80;
+
+export function studyProgressTone(percent: number | null, target: number) {
+  if (percent === null) return { text: 'text-(--practice-muted)', fill: '', badge: 'bg-(--practice-blue)' };
+  if (percent <= 35) return { text: 'text-red-700', fill: 'bg-red-600', badge: 'bg-red-100' };
+  if (percent <= target) return { text: 'text-amber-800', fill: 'bg-amber-500', badge: 'bg-amber-100' };
+  return { text: 'text-(--practice-green)', fill: 'bg-(--practice-green)', badge: 'bg-(--practice-green-bg)' };
+}
+
 export function getStudyReferenceUrl(value: string) {
   try {
     const url = new URL(value);
