@@ -5,7 +5,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { FolderOpen, AlertTriangle, MessageSquare, BarChart3, CheckCircle2, Download, CornerDownRight, ShieldCheck, BrainCircuit } from 'lucide-react';
 import { historyService, SessionHistoryItem } from '@/services/historyService';
-import { cvJdMatchingService, HITLReportResponse } from '@/services/cvJdMatching';
+import type { HITLReportResponse } from '@/services/cvJdMatching';
 import { exportQuestionBankToCSV } from '@/lib/exportUtils';
 import styles from './legacyResult.module.css';
 
@@ -25,13 +25,6 @@ export function LegacyInterviewResult({ id }: { id: string }) {
         setSession(data);
         if (data?.interviewReport) {
           setReport(data.interviewReport);
-        } else if (data?.aiInterviewSessionId) {
-          try {
-            const live = await cvJdMatchingService.getInterviewReport(id);
-            if (active) setReport(live);
-          } catch (e) {
-            console.warn('[ResultPage] HITL report not available yet', e);
-          }
         }
       } catch (err) {
         console.error('Lỗi khi tải kết quả phỏng vấn:', err);
