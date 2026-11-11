@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type MouseEvent } from 'react';
+import { useEffect, useRef, useState, type DragEvent, type MouseEvent } from 'react';
 import { Circle, CircleCheck, Clock, Focus, GripVertical, LayoutGrid, Maximize, Minus, Network, Plus, RotateCcw } from 'lucide-react';
 import { skillLabel } from '@/components/features/applications/applicationUi';
 import { Button } from '@/components/ui/button';
@@ -136,18 +136,26 @@ interface PracticeMindMapProps {
   onResetPositions: () => void;
   disabled: boolean;
   completedTaskId: number | null;
+  filterTaskIds: ReadonlySet<number>;
+  matchingTaskIds: ReadonlySet<number>;
+  hasTaskFilters: boolean;
   onSelect: (id: number) => void;
   onMove: (task: StudyTask, status: StudyTaskStatus) => Promise<boolean>;
+  onChangeParent: (task: StudyTask, parentTaskId: number | null) => Promise<boolean>;
 }
 
-export function PracticeMindMap({ title, subtitle, tasks, skillIds, onCreate, gaps, selectedTaskId, positions, onPosition, onResetPositions, disabled, completedTaskId, onSelect, onMove }: PracticeMindMapProps) {
+export function PracticeMindMap({ title, subtitle, tasks, skillIds, onCreate, gaps, selectedTaskId, positions, onPosition, onResetPositions, disabled, completedTaskId, filterTaskIds, matchingTaskIds, hasTaskFilters, onSelect, onMove, onChangeParent }: PracticeMindMapProps) {
   const map = useRef<HTMLDivElement>(null);
   const viewport = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1);
   const [windowBox, setWindowBox] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const [fullscreenAvailable, setFullscreenAvailable] = useState(false);
-  const drag = useStudyTaskDrag({ disabled, onSelect, onMove });
+  const [filterStatus, setFilterStatus] = useState<StudyTaskStatus | null>(null);
+  const [nestTargetId, setNestTargetId] = useState<number | null>(null);
+  const [nestAnimation, setNestAnimation] = useState<{ sourceId: number; targetId: number } | null>(null);
+  const nestAnimationTimer = useRef<number | null>(null);
+  const drag = useStudyTaskDrag({ disabled, onMove });
   const { branches, defaultPoints, height: layoutHeight, width: layoutWidth, rootY } = layoutMap(tasks, gaps);
   let placedWidth = layoutWidth;
   let placedHeight = layoutHeight;
@@ -179,7 +187,15 @@ export function PracticeMindMap({ title, subtitle, tasks, skillIds, onCreate, ga
   );
   const done = branches.reduce((count, branch) => count + branch.done, 0);
   const percent = tasks.length ? done / tasks.length * 100 : 0;
+  const filterActive = filterStatus !== null || hasTaskFilters;
   const selectedChildId = tasks.find((task) => task.id === selectedTaskId && task.parentTaskId != null)?.id;
+  const selectedTaskPathIds = new Set<number>();
+  let selectedAncestor = selectedTaskId == null ? undefined : tasks.find((task) => task.id === selectedTaskId);
+  while (selectedAncestor) {
+    selectedTaskPathIds.add(selectedAncestor.id);
+    const parentId = selectedAncestor.parentTaskId;
+    selectedAncestor = parentId == null ? undefined : tasks.find((task) => task.id === parentId);
+  }
 
   function nodePoint(id: MindMapNodeId, fallback: MindMapPoint) {
     return position.draft?.id === id ? position.draft.point : positions[id] ?? fallback;
@@ -206,6 +222,10 @@ export function PracticeMindMap({ title, subtitle, tasks, skillIds, onCreate, ga
       observer.disconnect();
       view.removeEventListener('scroll', measure);
     };
+  }, []);
+
+  useEffect(() => () => {
+    if (nestAnimationTimer.current !== null) window.clearTimeout(nestAnimationTimer.current);
   }, []);
 
   useEffect(() => {
@@ -237,6 +257,36 @@ export function PracticeMindMap({ title, subtitle, tasks, skillIds, onCreate, ga
     });
   }
 
+  async function nestTaskOnDrop(event: DragEvent<HTMLButtonElement>, target: StudyTask) {
+    const source = tasks.find((task) => task.id === drag.draggingId);
+    if (!source) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setNestTargetId(null);
+    let ancestor: number | null | undefined = target.parentTaskId;
+    while (ancestor != null) {
+      if (ancestor === source.id) return;
+      ancestor = tasks.find((task) => task.id === ancestor)?.parentTaskId;
+    }
+    if (source.id === target.id || source.parentTaskId === target.id) return;
+    drag.finishDrag();
+    const saved = await onChangeParent(source, target.id);
+    if (!saved) return;
+    setNestAnimation({ sourceId: source.id, targetId: target.id });
+    if (nestAnimationTimer.current !== null) window.clearTimeout(nestAnimationTimer.current);
+    nestAnimationTimer.current = window.setTimeout(() => setNestAnimation(null), 900);
+  }
+
+  async function detachDroppedTask(event: DragEvent<HTMLDivElement>) {
+    const source = tasks.find((task) => task.id === drag.draggingId);
+    if (!source || source.parentTaskId == null) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setNestTargetId(null);
+    drag.finishDrag();
+    await onChangeParent(source, null);
+  }
+
   async function toggleFullscreen() {
     try {
       if (document.fullscreenElement === map.current) await document.exitFullscreen();
@@ -249,46 +299,69 @@ export function PracticeMindMap({ title, subtitle, tasks, skillIds, onCreate, ga
   return (
     <div ref={map} className="relative flex min-h-0 min-w-0 flex-col bg-[#fafbfe] fullscreen:h-dvh">
       <p role="status" className="sr-only">{drag.announcement}</p>
-      <p id="mind-map-position-help" className="sr-only">Kéo tay nắm để sắp xếp thẻ. Bạn cũng có thể dùng các phím mũi tên khi tay nắm được chọn.</p>
+      <p id="mind-map-position-help" className="sr-only">Dùng tay nắm trên gốc hoặc nhánh kỹ năng để sắp xếp sơ đồ. Kéo trực tiếp task để đổi trạng thái hoặc lồng task.</p>
       {tasks.length > 0 && (
-        <div role="group" aria-label="Thả đầu việc để đổi trạng thái"
-          className="grid shrink-0 grid-cols-3 gap-1.5 border-b border-(--practice-blue-strong) bg-card p-2 sm:gap-2">
+        <div role="group" aria-label="Lọc theo trạng thái hoặc thả để đổi trạng thái"
+          className="shrink-0 border-b border-(--practice-blue-strong) bg-card px-2 py-2.5 sm:px-3">
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
           {studyTaskStatuses.map(({ value, label }) => {
             const saving = drag.savingStatus === value;
             const highlighted = saving || (!disabled && drag.dropStatus === value);
+            const StatusIcon = taskIcons[value];
+            const count = tasks.filter((task) => task.status === value && (!hasTaskFilters || matchingTaskIds.has(task.id))).length;
+            const selected = filterStatus === value;
             return (
-              <div key={value} role="region" aria-label={`Thả vào ${label}`} aria-busy={saving || undefined}
-                data-drop-active={highlighted || undefined}
+              <button key={value} type="button" aria-pressed={selected}
+                aria-label={selected ? `Bỏ lọc trạng thái ${label}` : `Lọc task trạng thái ${label}; cũng có thể thả task vào đây để đổi trạng thái`}
+                aria-busy={saving || undefined} data-drop-active={highlighted || undefined}
+                data-filter-selected={selected || undefined}
+                onClick={() => setFilterStatus((current) => current === value ? null : value)}
                 onDragOver={(event) => drag.dragOver(event, value)}
                 onDragLeave={(event) => drag.dragLeave(event, value)}
                 onDrop={(event) => void drag.drop(event, value, label)}
-                className={cn(styles.kanbanColumn, 'flex min-h-9 min-w-0 items-center justify-center gap-1.5 rounded-lg border border-dashed px-1 text-center text-xs font-semibold',
-                  highlighted ? 'border-(--practice-primary) bg-(--practice-orange)/50' : 'border-(--practice-blue-strong) bg-(--practice-pale)')}>
-                <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: studyTaskTones[value].color }} aria-hidden="true" />
-                {saving ? 'Đang chuyển…' : label}
-              </div>
+                className={cn(styles.mindMapStatusFilter, 'flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-xl border px-2 text-center text-xs font-semibold sm:gap-2 sm:text-sm',
+                  selected ? 'bg-card shadow-sm' : 'border-transparent bg-(--practice-pale) hover:bg-(--practice-blue)')}
+                style={{ color: studyTaskTones[value].color, ...(selected ? { borderColor: studyTaskTones[value].color } : {}) }}>
+                <StatusIcon size={15} className="shrink-0" aria-hidden="true" />
+                <span className="truncate">{saving ? 'Đang chuyển…' : label}</span>
+                <span className="rounded-full bg-white/80 px-1.5 py-0.5 text-[10px] tabular-nums sm:text-[11px]">{count}</span>
+              </button>
             );
           })}
+          </div>
+          <p className="mt-1.5 text-center text-[10px] text-(--practice-muted)">{filterStatus ? `Đang lọc: ${studyTaskStatuses.find(({ value }) => value === filterStatus)?.label} · nhấn lại để bỏ lọc` : 'Nhấn trạng thái để làm nổi bật task · kéo vào đây để đổi trạng thái'}</p>
         </div>
       )}
       <div ref={viewport} role="region" aria-label="Sơ đồ ôn tập, có thể cuộn" tabIndex={0}
         className="relative min-h-0 flex-1 overflow-auto overscroll-contain bg-[#f8f9fb] bg-[radial-gradient(#d8c9c6_1px,transparent_1px)] bg-size-[20px_20px] focus-visible:outline-2 focus-visible:outline-offset-[-2px]">
-        <div ref={content} className="relative mx-auto overflow-clip" style={{ width: width * zoom, height: height * zoom }}>
+        <div ref={content} data-filter-active={filterActive || undefined} data-selection-active={selectedTaskId !== null || undefined}
+          className={cn(styles.mindMapScene, 'relative mx-auto overflow-clip')} style={{ width: width * zoom, height: height * zoom }}
+          onDragOver={(event) => { if (drag.draggingId != null) { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; } }}
+          onDrop={(event) => void detachDroppedTask(event)}>
           <div className="absolute inset-0 origin-top-left" style={{ width, height, transform: `scale(${zoom})` }}>
             <svg width={width} height={height} aria-hidden="true" className="pointer-events-none absolute inset-0 fill-none">
               {branches.map(({ skillId, nodes, y, done, color, tone }) => {
                 const branchPoint = nodePoint(skillNodeId(skillId), { x: skill.x, y });
                 return (
                   <g key={skillId ?? ''}>
-                    <path d={connection(rootPoint.x + root.width, rootPoint.y, branchPoint.x, branchPoint.y)}
+                    <path d={connection(rootPoint.x + root.width, rootPoint.y, branchPoint.x, branchPoint.y)} data-mindmap-context data-selection-context
                       className={styles.mindMapConnection}
                       stroke={done === nodes.length ? studyTaskTones.DONE.color : tone?.lineColor ?? color} strokeWidth="2.25" />
                     {nodes.map(({ task, point: defaultPoint, parentId }) => {
                       const point = nodePoint(taskNodeId(task.id), defaultPoint);
                       const parent = parentId === undefined ? undefined : defaultPoints.get(parentId);
                       const start = parent && parentId !== undefined ? nodePoint(taskNodeId(parentId), parent) : branchPoint;
+                      const isNewNesting = nestAnimation?.sourceId === task.id && nestAnimation.targetId === parentId;
+                      const filterMatch = (!filterStatus || task.status === filterStatus) && (!hasTaskFilters || matchingTaskIds.has(task.id));
+                      const filterContext = hasTaskFilters && filterTaskIds.has(task.id) && !matchingTaskIds.has(task.id);
                       return <path key={task.id} d={connection(start.x + (parent ? leaf.width : skill.width), start.y, point.x, point.y)}
                         className={styles.mindMapConnection}
+                        data-task-status={task.status}
+                        data-selection-context={selectedTaskPathIds.has(task.id) || undefined}
+                        data-task-selected={selectedTaskId === task.id || undefined}
+                        data-task-dimmed={selectedTaskId !== null && !selectedTaskPathIds.has(task.id) || undefined}
+                        data-task-filter-state={filterMatch ? 'match' : filterContext ? 'context' : 'hidden'}
+                        data-nested-arrival={isNewNesting || undefined}
                         stroke={studyTaskTones[task.status].color} strokeDasharray={task.status === 'TODO' ? '4 3' : undefined}
                         strokeWidth={task.id === selectedTaskId ? 3 : 1.5} />;
                     })}
@@ -296,7 +369,7 @@ export function PracticeMindMap({ title, subtitle, tasks, skillIds, onCreate, ga
                 );
               })}
             </svg>
-            <div className={cn('absolute -translate-y-1/2 rounded-xl border border-[#f2e9e6] bg-card p-4 shadow-[0_12px_28px_-9px_#b027003b]', position.draft?.id === 'root' && 'z-10')}
+            <div data-mindmap-context data-selection-context className={cn('absolute -translate-y-1/2 rounded-xl border border-[#f2e9e6] bg-card p-4 shadow-[0_12px_28px_-9px_#b027003b]', position.draft?.id === 'root' && 'z-10')}
               style={{ left: rootPoint.x, top: rootPoint.y, width: root.width }}>
               <div className="flex items-center justify-between gap-2 pl-5 text-(--practice-primary)">
                 <span className="flex items-center gap-1.5 rounded-full bg-[#fce9e3] px-2 py-0.5 text-[11px] font-bold tracking-wide uppercase">
@@ -324,7 +397,7 @@ export function PracticeMindMap({ title, subtitle, tasks, skillIds, onCreate, ga
               const branchTitle = skillId ? skillLabel(skillId) : 'Chưa gắn kỹ năng';
               return (
                 <div key={skillId ?? ''}>
-                  <div className={cn('absolute -translate-y-1/2 rounded-xl border-l-4 bg-card px-4 py-2.5 shadow-[0_3px_7px_#141c2420]', position.draft?.id === branchId && 'z-10')}
+                  <div data-mindmap-context data-selection-context className={cn('absolute -translate-y-1/2 rounded-xl border-l-4 bg-card px-4 py-2.5 shadow-[0_3px_7px_#141c2420]', position.draft?.id === branchId && 'z-10')}
                     style={{ left: branchPoint.x, top: branchPoint.y, width: skill.width, borderColor: gapTone?.lineColor ?? color }}>
                     <span className="absolute top-1/2 left-0 size-3 -translate-x-2/3 -translate-y-1/2 rounded-full border-[1.5px] bg-card"
                       style={{ borderColor: gapTone?.lineColor ?? color }} />
@@ -347,9 +420,17 @@ export function PracticeMindMap({ title, subtitle, tasks, skillIds, onCreate, ga
                     const label = studyTaskStatuses.find(({ value }) => value === task.status)?.label;
                     const id = taskNodeId(task.id);
                     const point = nodePoint(id, defaultPoint);
+                    const filterMatch = (!filterStatus || task.status === filterStatus) && (!hasTaskFilters || matchingTaskIds.has(task.id));
+                    const filterContext = hasTaskFilters && filterTaskIds.has(task.id) && !matchingTaskIds.has(task.id);
+                    const filterState = filterMatch ? 'match' : filterContext ? 'context' : 'hidden';
                     return (
                       <div key={task.id} className={cn(styles.kanbanCardSlot, 'absolute -translate-y-1/2', position.draft?.id === id && 'z-10')}
                         data-task-id={task.id}
+                        data-task-status={task.status}
+                        data-task-selected={selectedTaskId === task.id || undefined}
+                        data-task-dimmed={selectedTaskId !== null && !selectedTaskPathIds.has(task.id) || undefined}
+                        data-selection-context={selectedTaskPathIds.has(task.id) && selectedTaskId !== task.id || undefined}
+                        data-task-filter-state={filterState}
                         data-arrival={drag.arrival?.id === task.id && drag.arrival.status === task.status ? drag.arrival.direction : undefined}
                         onAnimationEnd={(event) => {
                           if (event.target === event.currentTarget) drag.finishArrival(task);
@@ -357,15 +438,28 @@ export function PracticeMindMap({ title, subtitle, tasks, skillIds, onCreate, ga
                         style={{ left: point.x, top: point.y, width: leaf.width }}>
                         <button type="button" aria-pressed={task.id === selectedTaskId} onClick={() => onSelect(task.id)}
                           data-completed={task.id === completedTaskId || undefined}
-                          draggable={!disabled} onDragStart={(event) => drag.startDrag(event, task)} onDragEnd={drag.finishDrag}
-                          className={cn(styles.kanbanCard, 'relative flex h-11 w-full items-center gap-2 rounded-xl border border-transparent bg-card py-1 pl-2.5 pr-9 text-left shadow-sm select-none hover:border-(--practice-blue-strong) focus-visible:outline-2 aria-pressed:border-blue-400 aria-pressed:ring-2 aria-pressed:ring-blue-100',
+                          data-filter-match={filterActive ? filterMatch : undefined}
+                          style={filterMatch ? { color: tone.color } : undefined}
+                          data-nest-target={nestTargetId === task.id || undefined}
+                          draggable={!disabled} onDragStart={(event) => drag.startDrag(event, task)} onDragEnd={() => { setNestTargetId(null); drag.finishDrag(); }}
+                          onDragOver={(event) => {
+                            if (disabled || drag.draggingId == null) return;
+                            event.preventDefault();
+                            event.dataTransfer.dropEffect = 'move';
+                            if (drag.draggingId !== task.id) setNestTargetId(task.id);
+                          }}
+                          onDragLeave={(event) => {
+                            if (!(event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget))) setNestTargetId(null);
+                          }}
+                          onDrop={(event) => void nestTaskOnDrop(event, task)}
+                          className={cn(styles.kanbanCard, 'relative flex h-11 w-full items-center gap-2 rounded-xl border border-transparent bg-card py-1 pl-2.5 pr-2 text-left shadow-sm select-none hover:border-(--practice-blue-strong) focus-visible:outline-2 aria-pressed:border-blue-400 aria-pressed:ring-2 aria-pressed:ring-blue-100',
                             disabled ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing', drag.draggingId === task.id && 'opacity-45')}>
                           <span className="absolute top-1/2 -left-1 size-2 -translate-y-1/2 rounded-full" style={{ backgroundColor: tone.color }} />
                           <Icon size={14} className="shrink-0" style={{ color: tone.color }} aria-hidden="true" />
                           <span className={cn('line-clamp-2 min-w-0 flex-1 text-xs leading-4 font-semibold [overflow-wrap:anywhere]', task.status === 'DONE' && 'text-(--practice-muted) line-through')} title={task.title}>{task.title}</span>
                           <span className={cn('shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold', tone.badge)}>{label}</span>
+                          {task.gapNeedsConfirmation && <span role="img" aria-label="Kỹ năng đã cải thiện, task chờ xác nhận" title="Kỹ năng đã cải thiện · task chờ xác nhận" className="shrink-0 text-emerald-700"><CircleCheck size={14} aria-hidden="true" /></span>}
                         </button>
-                        <NodeHandle id={id} title={task.title} point={point} position={position} />
                         <StudyTaskCreateDialog parent={task} skillIds={skillIds} onCreate={onCreate} disabled={disabled} />
                       </div>
                     );

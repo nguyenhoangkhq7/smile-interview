@@ -10,10 +10,9 @@ Dịch vụ AI phục vụ bài báo nghiên cứu khoa học:
 
 ```
 ai-service/
-├── matching_cv/                        # [Module 1]: trích xuất, SBERT, đồ thị và ước lượng trọng số JD
-├── module1_matcher/
-│   ├── schemas.py                      # Hợp đồng Module1Output dùng chung với Module 2
-│   └── router.py                       # POST /api/v1/match & POST /api/v1/pipeline/analyze
+├── matching_cv/                        # [Module 1]: trích xuất, SBERT, đồ thị, trọng số JD và API matching
+│   ├── app/schemas/module1.py          # Hợp đồng output dùng chung với Module 2
+│   └── app/api/v1/endpoints/unified.py # POST /api/v1/match & POST /api/v1/pipeline/analyze
 │
 ├── skill_gap/                                # [Module 2]: Skill-Gap Detection (Xác định khoảng trống năng lực)
 │   ├── domain/                         # SkillNode, StaticGapAuditReport, SkillGapResult
