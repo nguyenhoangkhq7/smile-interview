@@ -33,7 +33,9 @@ def test_independent_response_tasks_are_still_rejected(text):
 
 @pytest.mark.parametrize("word_count, rejected", [(VOICE_MAX_WORDS, False), (VOICE_MAX_WORDS + 1, True)])
 def test_voice_length_boundary(word_count, rejected):
-    question = Question(text=" ".join(["API"] * (word_count - 1) + ["chậm?"]),
+    question = Question(surprising_fact_C="CV only mentions basic API setup",
+                        hypothesis_A="Candidate may not know how to isolate slow database queries",
+                        text=" ".join(["API"] * (word_count - 1) + ["chậm?"]),
                         criterion_ids=["c1"], mode="DEBUGGING", depth=3, evidence_scope="slow-api")
     context = {"mode": "DEBUGGING", "question_depth": 3, "interaction_mode": "VOICE"}
     errors = question_errors(question, context, ["c1"])

@@ -26,6 +26,8 @@ def _response_request(item: str) -> bool:
 
 def question_errors(question: Question, context: dict[str, object], criteria: list[str]) -> list[str]:
     errors = []
+    if not question.surprising_fact_C.strip() or not question.hypothesis_A.strip():
+        errors.append("Abductive CoT requires nonempty surprising_fact_C and hypothesis_A before writing the question")
     if question.mode != context["mode"]:
         errors.append("mode must equal required_question_contract.mode exactly")
     if question.depth != context["question_depth"]:

@@ -207,7 +207,7 @@ def test_wrong_answers_can_be_not_demonstrated_without_saying_dont_know(audit):
     first = answer(engine, start(engine, [task_skill()]).snapshot, "incorrect application")
     second = answer(engine, first.snapshot, "incorrect foundation reasoning")
     state = next(iter(second.snapshot.objectives.values()))
-    assert state.inability_count == 0
+    assert not second.snapshot.turns[-1].judgment.explicit_inability
     assert state.assessment == Assessment.NOT_DEMONSTRATED
 
 
@@ -502,9 +502,9 @@ def test_rubric_fingerprint_is_stable_across_questions_but_detects_standard_chan
     provider, engine, _ = audit
     provider.limit_criteria = True
     initial = start(engine, [task_skill()])
-    fingerprint = current(initial).objective.rubric_fingerprint
+    fingerprint = rubric_fingerprint(current(initial).objective)
     followup = answer(engine, initial.snapshot)
-    assert current(followup).objective.rubric_fingerprint == fingerprint
+    assert rubric_fingerprint(current(followup).objective) == fingerprint
     modified = current(followup).objective.model_copy(deep=True)
     modified.criteria[0].at_target = "A materially different standard"
     assert rubric_fingerprint(modified) != fingerprint

@@ -69,7 +69,6 @@ class BlueprintBuilder:
         ground_depth(objective, requirement, self.policy)
         self._validate_modes(objective, requirement)
         self._ground_criteria(objective)
-        objective.rubric_fingerprint = rubric_fingerprint(objective)
 
     def _validate_modes(self, objective: Objective, requirement: GroundedRequirement) -> None:
         task_modes = {Mode(mode) for mode, pattern in self.policy.mode_patterns.items()
@@ -111,29 +110,40 @@ def plan(blueprint: Blueprint, skills: list[InterviewSkill], config: InterviewCo
     return _allocate(first + additional, by_skill, config, policy)
 
 
-def _allocate(objectives, by_skill, config, policy):
+def _allocate(
+    objectives: list[Objective],
+    by_skill: dict[str, InterviewSkill],
+    config: InterviewConfig,
+    policy: InterviewPolicy,
+) -> tuple[dict[str, ObjectiveState], list[str]]:
     states, queue, remaining = {}, [], config.duration_seconds
-    mode_usage = Counter()
-    core_skills = {obj.skill_id for obj in objectives if by_skill[obj.skill_id].importance_weight >= policy.core_importance
-                   and obj.requirement_kind != "OPTIONAL"}
-    initial_limit = min(config.max_questions, max(len(core_skills), 1,
-                        config.max_questions - ceil(config.max_questions * policy.reserve_followup_fraction)))
+    mode_usage: Counter[Mode] = Counter()
+    core_skills = {
+        obj.skill_id for obj in objectives
+        if by_skill[obj.skill_id].importance_weight >= policy.core_importance
+        and obj.requirement_kind != "OPTIONAL"
+    }
+    initial_limit = min(
+        config.max_questions,
+        max(len(core_skills), 1, config.max_questions - ceil(config.max_questions * policy.reserve_followup_fraction)),
+    )
     compatible = 0
     for obj in objectives:
         modes = [item.mode for item in obj.suitable_modes]
         mode, mode_reason = select_mode(obj, config, policy, mode_usage)
-        state = ObjectiveState(objective=obj, difficulty=obj.target_depth,
-                               current_question_depth=obj.target_depth, mode_selection_reason=mode_reason)
+        state = ObjectiveState(
+            objective=obj,
+            current_question_depth=obj.target_depth,
+            mode_selection_reason=mode_reason,
+        )
         compatible += int(mode in modes)
-        reason = "MODE_FILTER" if mode not in modes else None
         optional_reserve = (
             bool(core_skills)
             and obj.requirement_kind == "OPTIONAL"
             and by_skill[obj.skill_id].importance_weight < policy.core_importance
             and len(queue) * config.max_questions_per_objective >= config.max_questions
         )
-        if reason is None and (len(queue) >= initial_limit or obj.estimated_seconds > remaining or optional_reserve):
-            reason = "PLAN_BUDGET"
+        reason = _check_plan_exclusion(mode, modes, len(queue), initial_limit, obj.estimated_seconds, remaining, optional_reserve)
         if reason:
             state.lifecycle, state.excluded_reason = "EXCLUDED", reason
         else:
@@ -147,6 +157,22 @@ def _allocate(objectives, by_skill, config, policy):
     if not queue:
         raise ValueError("Thời lượng không đủ cho một mục tiêu; hãy tăng thời lượng")
     return states, queue
+
+
+def _check_plan_exclusion(
+    mode: Mode,
+    modes: list[Mode],
+    queue_len: int,
+    initial_limit: int,
+    estimated_seconds: int,
+    remaining_seconds: int,
+    optional_reserve: bool,
+) -> str | None:
+    if mode not in modes:
+        return "MODE_FILTER"
+    if queue_len >= initial_limit or estimated_seconds > remaining_seconds or optional_reserve:
+        return "PLAN_BUDGET"
+    return None
 
 
 def select_mode(objective: Objective, config: InterviewConfig, policy: InterviewPolicy,

@@ -8,10 +8,11 @@ silently replacing the recovered corpus.
 
 `dataset.py` exposes `dspy.Example(context=..., question=Question(...))` and
 `dspy.Example(context=..., judgment=Judgment(...))` matching the production V2
-signatures. Source metadata is retained for audit, never supplied as extra model
-output labels. Question demonstrations are shortened to one task. Historical CV
-context is kept separately; only CV quotes enter `cv_evidence`. Depth is assigned
-from the task, independently of the original JD proficiency score.
+signatures. Question outputs include Abductive Chain-of-Thought fields
+(`surprising_fact_C` and `hypothesis_A`) restored from `source_reasoning` before
+the focused question `text`. Question demonstrations are shortened to one task.
+Historical CV context is kept separately; only CV quotes enter `cv_evidence`.
+Depth is assigned from the task, independently of the original JD proficiency score.
 
 The old probability outputs, update labels and corresponding metrics are removed.
 Judgment labels now distinguish supported/contradictory evidence from incomplete

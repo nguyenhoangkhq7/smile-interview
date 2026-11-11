@@ -166,11 +166,4 @@ export const cvJdMatchingService = {
     return data;
   },
 
-  async getInterviewReport(sessionId: string): Promise<HITLReportResponse> {
-    const { data } = await axiosClient.get<HITLReportResponse>(
-      `/api/v1/sessions/${encodeURIComponent(sessionId)}/interview/report`,
-      { headers: getAuthHeaders(false) }
-    );
-    return data;
-  },
 };

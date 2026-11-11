@@ -56,11 +56,6 @@
             <artifactId>spring-boot-starter-webflux</artifactId>
         </dependency>
 
-        <!-- Spring WebSocket & STOMP for Realtime Audio/Interview sessions -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-websocket</artifactId>
-        </dependency>
 
         <!-- Amazon S3 Client (AWS SDK v2) -->
         <dependency>

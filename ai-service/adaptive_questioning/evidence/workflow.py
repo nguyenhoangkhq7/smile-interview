@@ -61,7 +61,10 @@ class EvidenceWorkflow:
         state = snapshot.objectives[turn.objective_id]
         ids = turn.question.criterion_ids
         targets = [criterion for criterion in state.objective.criteria if criterion.criterion_id in ids]
-        objective = state.objective.model_dump(mode="json", exclude={"suitable_modes"})
+        objective = state.objective.model_dump(
+            mode="json",
+            exclude={"suitable_modes", "estimated_seconds", "rubric_version", "depth_evidence_spans", "jd_evidence_spans"}
+        )
         objective["criteria"] = [criterion.model_dump(mode="json") for criterion in targets]
         context = {
             "interaction_mode": snapshot.config.interaction_mode,
@@ -178,7 +181,6 @@ class EvidenceWorkflow:
             raise ValueError("Cannot generate beyond the objective budget")
         state.lifecycle = "ACTIVE"
         state.current_question_depth = question_depth(state, action)
-        state.difficulty = state.current_question_depth  # deprecated compatibility field, now L1–L4
         criteria = self._targets(state, action, snapshot)
         if not criteria:
             raise ValueError("No independent criteria available for question generation")
@@ -189,7 +191,7 @@ class EvidenceWorkflow:
             return
         snapshot.pending_turn = Turn(turn_id=str(uuid4()), objective_id=state.objective.objective_id,
                                      skill_id=state.objective.skill_id, mode=state.selected_mode,
-                                     action=action, difficulty=state.difficulty,
+                                     action=action,
                                      question_depth=state.current_question_depth, question=question)
         snapshot.pending_turn.introduction = turn_introduction(snapshot, snapshot.pending_turn)
 
@@ -197,12 +199,15 @@ class EvidenceWorkflow:
         state = snapshot.objectives[snapshot.queue[0]]
         skill = next(s for s in snapshot.skills if s.jd_skill_id == state.objective.skill_id)
         targets = self._targets(state, action, snapshot)
-        objective = state.objective.model_dump(mode="json")
+        objective = state.objective.model_dump(
+            mode="json",
+            exclude={"suitable_modes", "estimated_seconds", "rubric_version", "depth_evidence_spans", "jd_evidence_spans"}
+        )
         objective["criteria"] = [c.model_dump(mode="json") for c in state.objective.criteria if c.criterion_id in targets]
         objective["extension_criterion_ids"] = [key for key in objective["extension_criterion_ids"] if key in targets]
         context = {"objective": objective, "mode": state.selected_mode,
                    "interaction_mode": snapshot.config.interaction_mode,
-                   "action": action, "difficulty": state.difficulty,
+                   "action": action,
                    "question_depth": state.current_question_depth, "depth_definitions": DEPTH_DEFINITIONS,
                    "target_criteria": targets, "probe_reason": state.probe_reason,
                    "criterion_progress": progress_for(state, targets[0]),
