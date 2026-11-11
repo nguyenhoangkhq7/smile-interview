@@ -51,7 +51,9 @@ class ScriptedProvider:
         values = json.loads(context)
         self.question_number += 1
         ids = values["target_criteria"]
-        return Question(text=f"How would you diagnose this concrete incident {self.question_number}?",
+        return Question(surprising_fact_C=f"Observed unverified evidence gap for {ids[0]}",
+                        hypothesis_A=f"Candidate needs to demonstrate concrete reasoning at depth {values['question_depth']}",
+                        text=f"How would you diagnose this concrete incident {self.question_number}?",
                         criterion_ids=ids[:1] if self.limit_criteria else ids,
                         mode=values["mode"], depth=values["question_depth"],
                         evidence_scope=values.get("required_evidence_scope", f"incident-{self.question_number}"))

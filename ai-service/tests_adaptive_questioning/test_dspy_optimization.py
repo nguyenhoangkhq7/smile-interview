@@ -76,11 +76,12 @@ def test_gold_cases_meet_runtime_contracts():
         assert judge_evaluation_metric(example, dspy.Prediction(judgment=example.judgment)) == 1
 
 
-@pytest.mark.parametrize("change", ["criterion", "depth", "mode", "bundled", "off_topic", "long"])
+@pytest.mark.parametrize("change", ["abductive", "criterion", "depth", "mode", "bundled", "off_topic", "long"])
 def test_question_metric_rejects_invalid_or_unfocused_questions(change):
     example = get_gold_question_examples()[0]
     question = example.question.model_copy(deep=True)
-    if change == "criterion": question.criterion_ids = ["other:c1"]
+    if change == "abductive": question.hypothesis_A = "   "
+    elif change == "criterion": question.criterion_ids = ["other:c1"]
     elif change == "depth": question.depth = 1
     elif change == "mode": question.mode = "DESIGN"
     elif change == "bundled": question.text += " Bạn cấu hình logging thế nào?"
@@ -144,7 +145,7 @@ def test_artifact_formatting_changes_across_platforms_remain_loadable(tmp_path):
     compiler.seed_default_compiled_artifacts(tmp_path)
     for filename in ("question_generator.json", "reflective_judge.json"):
         path = tmp_path / filename
-        content = json.dumps(json.loads(path.read_text()), ensure_ascii=False, indent=4)
+        content = json.dumps(json.loads(path.read_text(encoding="utf-8")), ensure_ascii=False, indent=4)
         path.write_bytes(content.replace("\n", "\r\n").encode("utf-8"))
     assert len(compiler.load_compiled_modules(tmp_path)[0].demos) == 3
 

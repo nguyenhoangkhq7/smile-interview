@@ -60,7 +60,6 @@ def apply_judgment(state: ObjectiveState, turn: Turn, policy: InterviewPolicy | 
     state.clarification_spent |= turn.action == Action.CLARIFY
     state.easier_spent |= turn.action == Action.EASIER
     state.deeper_spent |= turn.action == Action.DEEPER
-    state.inability_count += int(judgment.explicit_inability)  # legacy telemetry, never a decision rule
     if turn.question.assistance == "HINT":
         state.assisted_criteria = sorted(set(state.assisted_criteria) | set(turn.question.criterion_ids))
     for observation in judgment.observations:

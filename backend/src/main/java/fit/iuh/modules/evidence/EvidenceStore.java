@@ -101,6 +101,12 @@ public class EvidenceStore {
         run.setConfigJson(input.config().toString());
         run.setSnapshotJson(input.result().path("snapshot").toString());
         run.setPublicJson(input.result().path("public").toString());
+        if (input.result().hasNonNull("blueprint")) {
+            run.setBlueprintJson(input.result().path("blueprint").toString());
+        }
+        if (input.result().hasNonNull("dynamic_state")) {
+            run.setDynamicStateJson(input.result().path("dynamic_state").toString());
+        }
         return run;
     }
 

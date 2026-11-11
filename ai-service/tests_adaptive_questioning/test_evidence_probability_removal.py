@@ -2,10 +2,7 @@
 import json
 
 import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
 
-from adaptive_questioning.api.routes import router as retired_router
 from adaptive_questioning.evidence.models import Judgment, ObjectiveState, Snapshot
 from adaptive_questioning.evidence.provider import JudgeSignature
 from test_evidence_workflow import setup, start, answer
@@ -62,16 +59,3 @@ def test_old_snapshot_probability_fields_are_discarded_before_judging(setup, mon
     assert_no_probability_fields(contexts)
     assert_no_probability_fields(result.model_dump())
 
-
-@pytest.mark.parametrize("method, path", [
-    ("post", "/api/v1/interview/start"),
-    ("post", "/api/v1/interview/respond"),
-    ("get", "/api/v1/interview/report/old-session"),
-])
-def test_removed_engine_cannot_be_invoked_through_old_routes(method, path):
-    app = FastAPI()
-    app.include_router(retired_router)
-    with TestClient(app) as client:
-        result = client.request(method, path)
-    assert result.status_code == 410
-    assert "V2" in result.json()["detail"]

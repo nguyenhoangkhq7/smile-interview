@@ -1,11 +1,14 @@
 """Pure report projection; internal rubric never leaks through pending turns."""
-from .models import Assessment, CriterionProgress, CriterionReport, ObjectiveReport, PublicSession, PublicTurn, Report, Snapshot
+from .models import (
+    Assessment, Criterion, CriterionProgress, CriterionReport, ObjectiveReport,
+    ObjectiveState, PublicSession, PublicTurn, Report, Snapshot
+)
 from .assessment import criterion_resolved
 from .policy_config import InterviewPolicy
 from .conversation import brief_feedback
 
 
-def _study_recommendations(state) -> list[str]:
+def _study_recommendations(state: ObjectiveState) -> list[str]:
     if not state.turns_spent or state.assessment == Assessment.NOT_ASSESSED:
         return []
     obj = state.objective
@@ -14,8 +17,9 @@ def _study_recommendations(state) -> list[str]:
     for c in obj.criteria:
         cid = c.criterion_id
         res = state.criterion_results.get(cid)
+        progress = state.criterion_progress.get(cid, CriterionProgress())
         had_struggle = (
-            state.criterion_progress.get(cid, CriterionProgress()).easier_spent
+            progress.easier_spent
             or cid in state.assisted_criteria
             or any(e.criterion_id == cid and (e.performance == "BELOW" or e.explicit_inability) for e in history)
         )
@@ -28,20 +32,28 @@ def _study_recommendations(state) -> list[str]:
     return list(dict.fromkeys(recommendations))
 
 
-def criterion_report(state, criterion, policy):
+def criterion_report(state: ObjectiveState, criterion: Criterion, policy: InterviewPolicy | None = None) -> CriterionReport:
+    active_policy = policy or InterviewPolicy()
     key = criterion.criterion_id
     progress = state.criterion_progress.get(key, CriterionProgress())
     result = state.criterion_results.get(key)
     assessment = Assessment.INSUFFICIENT if progress.turns_spent else Assessment.NOT_ASSESSED
-    if criterion_resolved(state, key, policy):
+    if criterion_resolved(state, key, active_policy):
         assessment = _positive_assessment(state, key) if result and result.performance in {"AT_TARGET", "ABOVE"} else Assessment.BELOW
-    return CriterionReport(criterion_id=key, description=criterion.description, assessment=assessment,
-                           turns_spent=progress.turns_spent,
-                           stop_reason=("SUFFICIENT_EVIDENCE" if assessment in {Assessment.AT, Assessment.ABOVE, Assessment.BELOW}
-                                        else progress.stop_reason or (state.stop_reason if state.lifecycle == "CLOSED" else None)))
+    stop_reason = (
+        "SUFFICIENT_EVIDENCE" if assessment in {Assessment.AT, Assessment.ABOVE, Assessment.BELOW}
+        else progress.stop_reason or (state.stop_reason if state.lifecycle == "CLOSED" else None)
+    )
+    return CriterionReport(
+        criterion_id=key,
+        description=criterion.description,
+        assessment=assessment,
+        turns_spent=progress.turns_spent,
+        stop_reason=stop_reason,
+    )
 
 
-def _positive_assessment(state, key):
+def _positive_assessment(state: ObjectiveState, key: str) -> Assessment:
     extension = state.objective.extension_depth
     evidence = [e for e in state.evidence_history if e.criterion_id == key and e.independent
                 and e.question_depth == extension and e.observation in {"SUPPORTS", "CONTRADICTS"}]
@@ -50,8 +62,8 @@ def _positive_assessment(state, key):
     return Assessment.AT
 
 
-def objective_report(state, policy=None):
-    policy = policy or InterviewPolicy()
+def objective_report(state: ObjectiveState, policy: InterviewPolicy | None = None) -> ObjectiveReport:
+    active_policy = policy or InterviewPolicy()
     obj = state.objective
     history = state.evidence_history or list(state.criterion_results.values())
     evidence = [e for e in history if e.independent and e.question_depth in {None, obj.target_depth}
@@ -67,13 +79,13 @@ def objective_report(state, policy=None):
         assessment=state.assessment, lifecycle=state.lifecycle,
         stop_reason=state.stop_reason, excluded_reason=state.excluded_reason,
         covered_criteria=[key for key in state.criterion_results if key not in state.contradictions],
-        missing_criteria=[c.description for c in obj.criteria if not criterion_resolved(state, c.criterion_id, policy)],
+        missing_criteria=[c.description for c in obj.criteria if not criterion_resolved(state, c.criterion_id, active_policy)],
         strengths=[e.rationale for e in target_results if e.performance in {"AT_TARGET", "ABOVE"} and e.criterion_id not in state.contradictions],
         weaknesses=weaknesses,
         study_recommendations=_study_recommendations(state),
         evidence=evidence,
         evidence_turn_ids=list(dict.fromkeys(e.turn_id for e in evidence)),
-        criteria=[criterion_report(state, c, policy) for c in obj.criteria],
+        criteria=[criterion_report(state, c, active_policy) for c in obj.criteria],
     )
 
 

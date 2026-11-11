@@ -52,8 +52,18 @@ def _context(record: dict) -> str:
     return encode_context(context)
 
 
+def _question(record: dict) -> Question:
+    reasoning = record.get("source_reasoning", {})
+    payload = {
+        "surprising_fact_C": reasoning.get("surprising_fact_C", ""),
+        "hypothesis_A": reasoning.get("hypothesis_A", ""),
+        **record["question"],
+    }
+    return Question.model_validate(payload)
+
+
 def get_gold_question_examples(split: Split = "all") -> list[dspy.Example]:
-    return [dspy.Example(context=_context(record), question=Question.model_validate(record["question"]))
+    return [dspy.Example(context=_context(record), question=_question(record))
             .with_inputs("context") for record in corpus_records("questions", split)]
 
 

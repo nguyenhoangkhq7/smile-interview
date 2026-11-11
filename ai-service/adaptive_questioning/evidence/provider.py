@@ -40,7 +40,15 @@ class BlueprintSignature(dspy.Signature):
 
 class QuestionSignature(dspy.Signature):
     """Write ONE Vietnamese interview task for the supplied objective, mode, action and
-    question_depth L1–L4 using the supplied shared depth_definitions. Echo mode and depth
+    question_depth L1–L4 using the supplied shared depth_definitions.
+    First perform Abductive Chain-of-Thought (C -> A) before writing the question text:
+    1) surprising_fact_C: identify the concrete observed discrepancy, unverified gap, or
+       contradiction between cv_evidence / prior turn answer (unresolved_aspects) and the
+       targeted criterion requirement at question_depth.
+    2) hypothesis_A: formulate a specific abductive hypothesis explaining the hidden
+       root cause or competency gap behind surprising_fact_C that this turn will test.
+    Then craft question.text to directly test hypothesis_A for the targeted criterion.
+    Echo mode and depth
     exactly in the Question result. Never substitute proficiency for question depth.
     required_question_contract lists the exact metadata values to copy into the result;
     preserve full criterion IDs verbatim. For CLARIFY, copy its evidence_scope exactly.
