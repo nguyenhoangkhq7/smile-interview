@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { historyService, SessionHistoryItem } from '@/services/historyService';
-import { AnswerRequest, EvidenceSession, InterviewConfig, evidenceInterview, interviewError } from '@/services/evidenceInterview';
+import { AnswerRequest, ConversationAction, ConversationRequest, EvidenceSession, InterviewConfig, conversationPhase, evidenceInterview, interviewError } from '@/services/evidenceInterview';
 
 const EXPIRY_RETRY_DELAY_MS = 5000;
 
@@ -20,6 +20,7 @@ export function useEvidenceInterview(id: string, readOnly = false) {
   const retry = useRef<AnswerRequest | null>(null);
   const stopRequest = useRef<{ id: string; version: number } | null>(null);
   const inFlight = useRef(false);
+  const conversationRetry = useRef<ConversationRequest | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -51,7 +52,21 @@ export function useEvidenceInterview(id: string, readOnly = false) {
   }, []);
 
   const start = (config: InterviewConfig) => run(() => evidenceInterview.start(id, config));
-  const submit = (response = answer) => run(async () => {
+  const converse = useCallback((action: ConversationAction, introduction = '') => run(async () => {
+    if (!session?.conversation) throw new Error('Chưa có lượt hội thoại.');
+    const previous = conversationRetry.current;
+    const messageId = session.conversation.message.message_id;
+    if (!previous || previous.action !== action || previous.introduction !== introduction
+        || previous.expected_state_version !== session.state_version || previous.message_id !== messageId) {
+      conversationRetry.current = { request_id: crypto.randomUUID(), message_id: messageId,
+        expected_state_version: session.state_version, action, introduction };
+    }
+    const next = await evidenceInterview.converse(id, conversationRetry.current!);
+    conversationRetry.current = null; setAnswer('');
+    return next;
+  }), [id, run, session]);
+  const submit = (response = answer) => conversationPhase(session) === 'SELF_INTRODUCTION'
+    ? converse('SUBMIT_INTRODUCTION', response) : run(async () => {
     if (!session?.pending_turn || !response.trim()) throw new Error('Hãy nhập câu trả lời.');
     const previous = retry.current;
     if (!previous || previous.candidate_response !== response || previous.turn_id !== session.pending_turn.turn_id) {
@@ -86,13 +101,17 @@ export function useEvidenceInterview(id: string, readOnly = false) {
     let nextAttemptAt = 0;
     const tick = () => {
       const now = Date.now();
-      const remaining = Math.max(0, Math.ceil((Date.parse(session.deadline_at) - now) / 1000));
+      const phase = conversationPhase(session);
+      const prelude = phase === 'OPENING' || phase === 'SELF_INTRODUCTION';
+      const deadline = prelude ? session.conversation!.expires_at : session.deadline_at;
+      const remaining = Math.max(0, Math.ceil((Date.parse(deadline) - now) / 1000));
       setSecondsLeft(remaining);
       // Earlier grading errors must never prevent expiry. Serialize with answer submission
       // and retry transient stop failures using the same idempotent request ID.
       if (!remaining && !inFlight.current && now >= nextAttemptAt) {
         nextAttemptAt = now + EXPIRY_RETRY_DELAY_MS;
-        void stop();
+        if (prelude) void converse('SKIP_INTRODUCTION');
+        else void stop();
       }
     };
     tick();
@@ -104,7 +123,7 @@ export function useEvidenceInterview(id: string, readOnly = false) {
       window.removeEventListener('focus', tick);
       document.removeEventListener('visibilitychange', tick);
     };
-  }, [session, stop, readOnly]);
+  }, [session, stop, converse, readOnly]);
 
-  return { session, metadata, loading, legacy, busy, error, answer, setAnswer, secondsLeft, reload, start, submit, stop };
+  return { session, metadata, loading, legacy, busy, error, answer, setAnswer, secondsLeft, reload, start, submit, stop, converse };
 }

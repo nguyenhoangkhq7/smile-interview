@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import dynamic from 'next/dynamic';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { useNewInterview } from '@/hooks/useNewInterview';
@@ -72,6 +73,8 @@ export default function NewInterviewPage() {
     handleReset,
     handleStartInterview,
   } = useNewInterview();
+
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
 
   const currentStep: InterviewFlowStep = generating
     ? 'interview'
@@ -163,7 +166,10 @@ export default function NewInterviewPage() {
                 onFileChange={handleFileChange}
                 onTrigger={triggerFileSelect}
                 onClearCv={() => setCvFile(null)}
-                onClearJd={() => setJdFile(null)}
+                onClearJd={() => {
+                  setJdFile(null);
+                  setJdTitle('');
+                }}
                 onViewPdf={(url, title) => {
                   setViewerUrl(url);
                   setViewerTitle(title);
@@ -230,11 +236,70 @@ export default function NewInterviewPage() {
             </div>
           )}
 
-          {analysis && <section className="mb-6 space-y-4 rounded-2xl border bg-card p-6">
-            <h2 className="text-lg font-semibold">Đặt tên hồ sơ ứng tuyển</h2>
-            <div className="grid gap-4 sm:grid-cols-2"><label className="space-y-2 text-sm font-medium">Tên hồ sơ<input maxLength={200} className="w-full rounded-lg border bg-background p-3" placeholder={roleTitle} value={profileTitle} onChange={e => setProfileTitle(e.target.value)} /></label><label className="space-y-2 text-sm font-medium">Công ty (không bắt buộc)<input maxLength={200} className="w-full rounded-lg border bg-background p-3" placeholder="Ví dụ: Công ty A" value={company} onChange={e => setCompany(e.target.value)} /></label></div>
-            <p className="text-sm text-muted-foreground">CV/JD và bản phân tích này sẽ được giữ làm mốc chung cho các lượt phỏng vấn.</p>
-          </section>}
+          {analysis && (
+            <section className="mb-6 space-y-4 rounded-2xl border bg-card p-6 animate-fade-up">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
+                <div className="space-y-1">
+                  <h2 className="text-lg font-semibold text-foreground">Đặt tên hồ sơ ứng tuyển</h2>
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-muted-foreground">Vị trí:</span>
+                    {!isEditingTitle ? (
+                      <span className="font-semibold text-foreground flex items-center gap-2">
+                        {profileTitle || roleTitle}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!profileTitle) setProfileTitle(roleTitle);
+                            setIsEditingTitle(true);
+                          }}
+                          className="text-xs text-brand-orange hover:underline font-normal cursor-pointer"
+                        >
+                          (Đổi tên vị trí)
+                        </button>
+                      </span>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <input
+                          maxLength={200}
+                          className="rounded-md border border-border bg-background px-2.5 py-1 text-sm text-foreground focus:border-brand-orange focus:outline-none"
+                          placeholder={roleTitle}
+                          value={profileTitle}
+                          onChange={(e) => setProfileTitle(e.target.value)}
+                          autoFocus
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => setIsEditingTitle(false)}
+                        >
+                          Xong
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground max-w-sm">
+                  Tiêu đề vị trí đã được tự động lấy từ JD. Bạn chỉ cần nhập tên công ty (nếu muốn) trước khi lưu hồ sơ.
+                </p>
+              </div>
+
+              <div>
+                <label htmlFor="company-name-input" className="block space-y-1.5 text-sm font-medium">
+                  <span>Công ty ứng tuyển <span className="text-xs text-muted-foreground font-normal">(không bắt buộc)</span></span>
+                  <input
+                    id="company-name-input"
+                    maxLength={200}
+                    className="w-full rounded-lg border border-border bg-background p-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-brand-orange focus:outline-none focus:ring-1 focus:ring-brand-orange transition-all"
+                    placeholder="Ví dụ: Công ty A"
+                    value={company}
+                    onChange={(e) => setCompany(e.target.value)}
+                    autoFocus={!isEditingTitle}
+                  />
+                </label>
+              </div>
+            </section>
+          )}
           {analysis && (
             <div className="bg-card border border-border rounded-2xl p-6 md:p-8 shadow-xl animate-fade-up">
               <SkillGapResultPanel

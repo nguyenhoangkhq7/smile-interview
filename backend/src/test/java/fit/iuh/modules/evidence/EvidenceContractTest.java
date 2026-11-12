@@ -6,6 +6,20 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class EvidenceContractTest {
+    @Test void conversationCommandUsesTheSameVersionedJsonContract() throws Exception {
+        var mapper = new ObjectMapper();
+        var command = mapper.readValue("""
+            {"request_id":"00000000-0000-0000-0000-000000000001","message_id":"intro",
+             "expected_state_version":2,"action":"SUBMIT_INTRODUCTION","introduction":"Em là Nam."}
+            """, EvidenceDtos.Conversation.class);
+        assertThat(command.expectedVersion()).isEqualTo(2);
+        assertThat(command.messageId()).isEqualTo("intro");
+        try (var factory = jakarta.validation.Validation.buildDefaultValidatorFactory()) {
+            assertThat(factory.getValidator().validate(command)).isEmpty();
+            assertThat(factory.getValidator().validate(new EvidenceDtos.Conversation(
+                    command.requestId(), "intro", 2, "CLIENT_SUPPLIED_SPEECH", ""))).isNotEmpty();
+        }
+    }
     @Test void adaptiveDefaultsAllowMoreThanThreeQuestionsAndKeepExplicitLegacyCaps() throws Exception {
         assertThat(EvidenceDtos.Config.defaults().maxPerObjective()).isEqualTo(8);
         var mapper = new ObjectMapper();

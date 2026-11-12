@@ -198,8 +198,8 @@ CANONICAL_ALIASES: dict[str, str] = {
     "pytest": "pytest",
 }
 
-# Regex to safely preserve characters: alphanumeric, +, #, ., -
-SAFE_CHAR_REGEX = re.compile(r"[^a-z0-9+#.\-]+")
+# Preserve Unicode letters/numbers so Vietnamese skill IDs retain their words.
+SAFE_CHAR_REGEX = re.compile(r"[^\w+#.\-]+|_+")
 CONSECUTIVE_HYPHENS_REGEX = re.compile(r"-{2,}")
 
 

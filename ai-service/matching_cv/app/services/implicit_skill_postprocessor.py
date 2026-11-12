@@ -4,6 +4,7 @@ and invariant-safe stats.
 """
 import hashlib
 import re
+import unicodedata
 from collections import Counter
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Literal, Optional, Set, Tuple
@@ -54,8 +55,8 @@ class ImplicitSkillPostprocessor:
     @staticmethod
     def slugify_skill(label: str) -> str:
         """Compute deterministic slug from skill_label."""
-        slug = re.sub(r"[^a-z0-9\-\.]+", "-", label.lower()).strip("-.")
-        if not slug or not re.match(r"^[a-z0-9]", slug):
+        slug = re.sub(r"[^\w\-\.]+|_+", "-", unicodedata.normalize("NFKC", label).lower()).strip("-.")
+        if not slug or not slug[0].isalnum():
             return f"unmapped:{slug if slug else 'unknown'}"
         return slug
 

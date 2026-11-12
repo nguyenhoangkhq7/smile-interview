@@ -6,6 +6,9 @@ export type QuestionStrategy = 'NONE' | 'COMPARE_SUBSTITUTE' | 'PROBE_DEPTH' | '
 
 export interface SkillGapResult {
   jd_skill_id: string;
+  jd_skill_name?: string | null;
+  matched_cv_skill_name?: string | null;
+  jd_evidence_spans?: string[];
   semantic_alignment: SemanticAlignment;
   matched_cv_skill_id?: string | null;
   is_substituted: boolean;

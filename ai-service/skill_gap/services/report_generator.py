@@ -28,6 +28,8 @@ class StaticSkillAuditItem(BaseModel):
     """Fact-based static audit record for a single JD skill requirement."""
 
     jd_skill_id: str
+    jd_skill_name: Optional[str] = None
+    matched_cv_skill_name: Optional[str] = None
     matched_cv_skill_id: Optional[str] = None
     semantic_alignment: SemanticAlignment
     is_substituted: bool = False
@@ -196,6 +198,8 @@ def generate_static_gap_report(
         items.append(
             StaticSkillAuditItem(
                 jd_skill_id=res.jd_skill_id,
+                jd_skill_name=res.jd_skill_name,
+                matched_cv_skill_name=res.matched_cv_skill_name,
                 matched_cv_skill_id=res.matched_cv_skill_id,
                 semantic_alignment=res.semantic_alignment,
                 is_substituted=res.is_substituted,

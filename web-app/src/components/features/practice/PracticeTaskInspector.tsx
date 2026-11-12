@@ -69,7 +69,7 @@ export function PracticeTaskInspector({ task, className, disabled, skillIds, onU
       <div role="region" aria-label="Nội dung ghi chú và đầu việc" tabIndex={0}
         className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 text-sm focus-visible:outline-2 focus-visible:-outline-offset-2 sm:px-5 xl:[scrollbar-gutter:stable]">
         {task.gapNeedsConfirmation && <div role="status" className="space-y-1 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-emerald-950">
-          <p className="font-semibold">Kỹ năng {skillLabel(task.gapSourceSkillId ?? task.skillId ?? '')} đã cải thiện</p>
+          <p className="font-semibold">{task.gapSourceObjectiveId ? 'Các tiêu chí ôn tập đã có bằng chứng đạt yêu cầu' : `Kỹ năng ${skillLabel(task.gapSourceSkillId ?? task.skillId ?? '')} đã cải thiện`}</p>
           <p className="text-xs leading-relaxed">Task vẫn được giữ mở để bạn quyết định. Nếu không cần ôn thêm, hãy xác nhận đã xử lý.</p>
         </div>}
         <div className="space-y-2">

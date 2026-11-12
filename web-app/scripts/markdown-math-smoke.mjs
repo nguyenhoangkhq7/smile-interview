@@ -1,4 +1,4 @@
-// Regression for the exact skill-gap table reported by the user.
+// The internal audit table remains available in the HR workspace.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import puppeteer from 'puppeteer';
@@ -12,7 +12,7 @@ try {
   page.on('pageerror', error => errors.push(error.message));
   await page.setViewport({ width: 1365, height: 1000 });
   await page.evaluateOnNewDocument(() => localStorage.setItem('auth-storage', JSON.stringify({
-    state: { user: { id: 'test', username: 'Test', role: 'USER' },
+    state: { user: { id: 'test', username: 'Test', role: 'HR' },
       token: `e30.${btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 }))}.fixture`, isAuthenticated: true }, version: 0,
   })));
   await page.setRequestInterception(true);
@@ -22,15 +22,11 @@ try {
     const send = body => request.respond({ status: 200, headers: { 'content-type': 'application/json',
       'access-control-allow-origin': base, 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' }, body: JSON.stringify(body) });
     if (request.method() === 'OPTIONS') return send({});
-    if (url.pathname.endsWith('/competency')) return send({ completedAttempts: 0, incompatibleAssessments: 0,
-      lastAssessment: null, summary: { totalSkills: 0, meetingTarget: 0, belowTarget: 0, needsVerification: 0, incomplete: 0, notAssessed: 0 }, skills: [] });
-    return send({ id: 'math', title: 'Frontend Developer', company: 'Công ty A', roleTitle: 'Frontend',
-      cvFilename: 'CV.pdf', jdTitle: 'Frontend JD', createdAt: new Date().toISOString(), skills: [],
-      analysis: { markdown_summary: report }, attempts: [] });
+    if (url.pathname === '/api/auth/me') return send({ username: 'Test', role: 'HR' });
+    return send({ id: 'math', roleTitle: 'Frontend Developer', status: 'Completed', turns: [],
+      skillGapJson: '[]', gapReportJson: JSON.stringify({ markdown_summary: report }) });
   });
-  await page.goto(`${base}/applications/math#documents`, { waitUntil: 'networkidle0' });
-  await page.waitForFunction(() => [...document.querySelectorAll('summary')].some(e => e.textContent === 'Xem bản phân tích đầy đủ'));
-  await page.evaluate(() => [...document.querySelectorAll('summary')].find(e => e.textContent === 'Xem bản phân tích đầy đủ').click());
+  await page.goto(`${base}/hr-dashboard/math`, { waitUntil: 'networkidle0' });
   await page.waitForSelector('table .katex');
   assert.equal(await page.$$eval('table th', elements => elements.length), 11);
   assert.equal(await page.$$eval('table tbody tr', elements => elements.length), 1);

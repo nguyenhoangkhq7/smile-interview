@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, ArrowRight, BookOpen, CalendarDays, ChartNoAxesCombined, CircleCheck, ClipboardList, Gauge, Layers, RotateCcw, Target, TriangleAlert } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, CalendarDays, ChartNoAxesCombined, ClipboardList, Gauge, Layers, RotateCcw, Target, TriangleAlert } from 'lucide-react';
 import { formatProfileDate } from '@/components/features/applications/applicationUi';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -25,8 +25,8 @@ function AttainmentGauge({ value }: { value: number | null }) {
           {value === null ? '—' : `${value}%`}
         </div>
       </div>
-      <p className="text-sm font-bold">Tỷ lệ đạt mục tiêu</p>
-      <p className="text-xs text-muted-foreground">{value === null ? 'Chưa đủ dữ liệu' : 'Trong các mục tiêu đã được đánh giá'}</p>
+      <p className="text-sm font-bold">Nội dung đáp ứng yêu cầu</p>
+      <p className="text-xs text-muted-foreground">{value === null ? 'Chưa đủ dữ liệu' : 'Tính trên những nội dung đã được đánh giá'}</p>
     </div>
   );
 }
@@ -44,12 +44,10 @@ export function InterviewResultDashboard({ session, metadata }: { session: Evide
   const coverage = percent(session.report.evidence_coverage);
   const reason = session.report.termination_reason;
   const metrics = [
-    { label: 'Bao phủ bằng chứng', value: coverage === null ? '—' : `${coverage}%`, Icon: Gauge, tone: 'bg-blue-50 text-blue-800' },
+    { label: 'Nội dung đã đánh giá', value: coverage === null ? '—' : `${coverage}%`, Icon: Gauge, tone: 'bg-blue-50 text-blue-800' },
     { label: 'Kỹ năng đã kiểm tra', value: data.skills.filter(skill => skill.checked > 0).length, Icon: Layers, tone: 'bg-violet-50 text-violet-800' },
     { label: 'Kỹ năng cần cải thiện', value: data.skills.filter(skill => skill.status === 'weak').length, Icon: TriangleAlert, tone: 'bg-orange-50 text-orange-800' },
     { label: 'Kỹ năng chưa kiểm tra', value: data.skills.filter(skill => skill.status === 'unchecked').length, Icon: Target, tone: 'bg-amber-50 text-amber-900' },
-    { label: 'Câu có bằng chứng đạt', value: data.questions.filter(question => question.status === 'strong').length, Icon: CircleCheck, tone: 'bg-emerald-50 text-emerald-800' },
-    { label: 'Câu cần cải thiện', value: data.questions.filter(question => question.status === 'weak').length, Icon: ClipboardList, tone: 'bg-rose-50 text-rose-800' },
   ];
 
   async function retryInterview() {
@@ -76,7 +74,7 @@ export function InterviewResultDashboard({ session, metadata }: { session: Evide
         <section id="overview" className={cn(resultPanel, 'scroll-mt-36 bg-gradient-to-br from-white via-white to-[#fff2ed] sm:p-7')}>
           <div className="grid items-center gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,.65fr)_minmax(0,1fr)]">
             <div className="space-y-3">
-              <p className="inline-flex items-center gap-1.5 rounded-full bg-orange-100 px-2.5 py-1 text-xs font-bold text-orange-950"><ChartNoAxesCombined size={15} /> Kết quả phỏng vấn theo bằng chứng</p>
+              <p className="inline-flex items-center gap-1.5 rounded-full bg-orange-100 px-2.5 py-1 text-xs font-bold text-orange-950"><ChartNoAxesCombined size={15} /> Kết quả phỏng vấn</p>
               <h1 className="text-2xl leading-tight font-extrabold tracking-tight wrap-anywhere sm:text-4xl">{metadata?.applicationProfileTitle || metadata?.roleTitle || 'Kết quả phỏng vấn'}</h1>
               {metadata?.roleTitle && metadata.roleTitle !== metadata.applicationProfileTitle && <p className="text-sm text-muted-foreground">{metadata.roleTitle}</p>}
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
@@ -88,13 +86,13 @@ export function InterviewResultDashboard({ session, metadata }: { session: Evide
             <AttainmentGauge value={attainment} />
             <div className="space-y-3 rounded-xl border border-orange-100 bg-white/75 p-4">
               <h2 className="font-bold">Tổng kết phiên</h2>
-              <p className="text-sm leading-relaxed text-slate-700">{reason ? resultReasons[reason] ?? reason : 'Lượt phỏng vấn đã kết thúc.'}</p>
-              <p className="text-sm text-slate-600">Độ bao phủ bằng chứng {coverage === null ? 'chưa xác định' : `${coverage}%`}. Kết luận áp dụng cho phần đã kiểm tra.</p>
+              <p className="text-sm leading-relaxed text-slate-700">{reason ? resultReasons[reason] ?? 'Lượt phỏng vấn đã kết thúc.' : 'Lượt phỏng vấn đã kết thúc.'}</p>
+              <p className="text-sm text-slate-600">{coverage === null ? 'Chưa xác định được tỷ lệ nội dung đã đánh giá.' : `Đã có thông tin đánh giá cho ${coverage}% nội dung dự kiến.`} Kết quả chỉ áp dụng cho phần đã kiểm tra.</p>
               <Link href="#feedback" className={cn(buttonVariants({ size: 'sm' }), primary)}>Xem nhận xét AI <ArrowRight aria-hidden="true" /></Link>
             </div>
           </div>
         </section>
-        <dl className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {metrics.map(({ label, value, Icon, tone }) => (
             <div key={label} className="min-w-0 rounded-xl border border-slate-200/70 bg-card p-3 shadow-xs">
               <span className={cn('mb-2 grid size-8 place-items-center rounded-lg', tone)}><Icon size={17} aria-hidden="true" /></span>

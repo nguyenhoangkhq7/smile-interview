@@ -1,5 +1,7 @@
 # Phỏng vấn V2 bằng giọng nói qua OpenRouter
 
+Phiên mới có lời mở đầu, phần tự giới thiệu không chấm điểm và lời tạm biệt trước trang kết quả cho cả TEXT/VOICE. Xem [luồng hội thoại và hợp đồng lưu trạng thái](interview-lifecycle.md). Các mô tả câu hỏi bên dưới áp dụng cho giai đoạn chuyên môn; phiên cũ giữ nguyên luồng đang chạy.
+
 Luồng: micro → nhận diện giọng nói → bản nháp câu trả lời → API V2 hiện có → câu hỏi tiếp theo → TTS streaming → Simli video/audio realtime.
 
 ## Nhận diện ưu tiên độ chính xác
@@ -25,14 +27,14 @@ Live check có tính phí: `python -B scripts/verify-voice-openrouter.py --audio
 Trước khi bắt đầu, người dùng chọn **Bằng văn bản** hoặc **Bằng giọng nói**. `config.interaction_mode` (`TEXT` / `VOICE`) được lưu trong config/snapshot/public state và khóa khi phiên đã bắt đầu. Phiên V2 cũ không có trường này mặc định là `TEXT`; không cần migration DB vì cấu hình đang được lưu dạng JSON.
 
 - **TEXT**: chỉ hiển thị câu hỏi, ô trả lời/code và lịch sử. Không mount hook micro, không tải avatar và không gọi STT/TTS. Backend chặn endpoint giọng nói đối với phiên text.
-- **VOICE**: avatar, trạng thái, điều khiển cuộc trò chuyện và phụ đề chỉ đọc cho lời người dùng. Không có ô nhập text, editor, câu hỏi viết hoặc lịch sử chat trong màn phỏng vấn đang diễn ra. Trạng thái **Đang nghe bạn nói** xuất hiện ngay khi phát hiện tiếng nói; phụ đề cập nhật khi STT trả về từng đoạn. Câu trả lời vừa gửi được giữ trên màn hình tới khi người dùng bắt đầu trả lời câu tiếp theo.
+- **VOICE**: ba vùng chính gồm avatar AI, câu hỏi AI đang hỏi và bản ghi câu trả lời voice chỉ đọc của người dùng. Câu hỏi lấy từ cùng turn đã lưu dùng cho TTS, có cả lời chuyển tiếp khi có. Không có ô nhập text, editor hoặc lịch sử chat trên màn chính. Trạng thái nghe nằm trong thanh điều khiển nhỏ; phụ đề cập nhật khi STT trả về từng đoạn. Câu trả lời vừa gửi được giữ trên màn hình tới khi người dùng bắt đầu trả lời câu tiếp theo.
 - **Coding/Debugging trong VOICE**: người dùng giải thích hướng giải, thuật toán, luồng xử lý, trường hợp biên, độ phức tạp, cách kiểm tra hoặc chẩn đoán lỗi bằng lời. Generator được hướng dẫn hỏi tình huống cụ thể, giữ độ sâu kỹ thuật nhưng không đòi code/editor/bảng/biểu đồ. Judge nhận `interaction_mode` để đánh giá lời giải thích, không trừ điểm chỉ vì không nộp code. Nếu tiêu chí thật sự đòi bằng chứng thực thi thì ghi thiếu bằng chứng, không suy diễn đã kiểm chứng code. Chế độ TEXT vẫn làm bài coding bằng code.
 
 Hai giao diện chỉ dùng chung phần quản lý phiên, đánh giá và báo cáo; mã giọng nói được lazy-load riêng.
 
 Avatar hiện dùng **Simli Compose**, thay hoàn toàn model GLB/Three.js cũ. Cần `SIMLI_API_KEY` và `SIMLI_FACE_ID` trên AI service. Xem [hướng dẫn cấu hình và kiểm thử Simli](simli-avatar.md).
 
-Giao diện voice chia hai vùng trên desktop: avatar/trạng thái bên trái, phụ đề bên phải. Thanh điều khiển tập trung micro, nghe lại và gửi câu trả lời; kết thúc phiên nằm riêng bên dưới và vẫn có xác nhận. Header chỉ giữ tiêu đề, tiến độ, thời gian còn lại và nút cài đặt. Các tùy chọn chuyển lượt nằm trong hộp **Tùy chỉnh cuộc trò chuyện**, không chiếm chỗ trên màn hình chính. Mobile xếp dọc, thu nhỏ avatar và giới hạn vùng phụ đề có cuộn. Có trạng thái tải avatar, nhận diện/đang xử lý, tạm dừng, gửi thành công và lỗi kèm thao tác thử lại. Phụ đề cũ không được hiển thị thay cho một bản ghi mới đang lỗi.
+Giao diện desktop đặt avatar bên trái, câu hỏi và câu trả lời xếp chồng bên phải. Mobile xếp ba vùng theo chiều dọc; nội dung dài cuộn trong từng vùng. Thanh phụ bên dưới giữ trạng thái và các nút micro, nghe lại, gửi xong, tùy chỉnh. Tiến độ, thời gian còn lại, tùy chọn chuyển lượt và kết thúc phiên được gom vào **Tùy chỉnh cuộc trò chuyện**; kết thúc vẫn có xác nhận. Lỗi mới hiện các thao tác thử lại. Contract STT cũ yêu cầu xác nhận sẽ mở hộp riêng; không chiếm màn chính khi không có vấn đề. Phụ đề cũ không được hiển thị thay cho bản ghi mới đang lỗi.
 
 Tất cả STT/TTS gọi OpenRouter bằng khóa trên AI service. Frontend chỉ gọi backend có JWT; backend kiểm tra chủ phiên, câu hỏi, version và hạn phiên trước khi sử dụng model. Việc bật giọng nói không tạo một engine đánh giá thứ hai, không thay đổi rubric hoặc cách tính báo cáo.
 

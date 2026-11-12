@@ -232,6 +232,7 @@ class Snapshot(BaseModel):
     turns: list[Turn] = Field(default_factory=list)
     is_finished: bool = False
     termination_reason: str | None = None
+    conversation: "ConversationState | None" = None
 
 
 class StartRequest(BaseModel):
@@ -240,6 +241,37 @@ class StartRequest(BaseModel):
     config: InterviewConfig = Field(default_factory=InterviewConfig)
     blueprint: Blueprint | None = None
     policy: InterviewPolicy | None = None
+    opening: "InterviewOpening | None" = None
+
+
+class InterviewOpening(BaseModel):
+    interviewer_name: str = Field(default="Minh", max_length=100)
+    company: str = Field(default="", max_length=200)
+    company_description: str = Field(default="", max_length=600)
+    role_title: str = Field(default="vị trí ứng tuyển", max_length=200)
+
+
+class ConversationMessage(BaseModel):
+    message_id: str
+    text: str
+
+
+class ConversationState(BaseModel):
+    phase: Literal["OPENING", "SELF_INTRODUCTION", "INTERVIEW", "CLOSING", "FINISHED"]
+    message: ConversationMessage
+    opening: InterviewOpening
+    expires_at: datetime
+    introduction: str = ""
+    introduction_skipped: bool = False
+    opening_text: str = ""
+
+
+class ConversationRequest(BaseModel):
+    snapshot: Snapshot
+    message_id: str
+    expected_state_version: int
+    action: Literal["NEXT", "SUBMIT_INTRODUCTION", "SKIP_INTRODUCTION"]
+    introduction: str = Field(default="", max_length=10000)
 
 
 class TransitionRequest(BaseModel):
@@ -310,6 +342,7 @@ class PublicSession(BaseModel):
     pending_turn: PublicTurn | None
     turns: list[PublicTurn]
     report: Report
+    conversation: ConversationState | None = None
 
 
 class TransitionResult(BaseModel):
@@ -362,6 +395,7 @@ class DynamicSessionState(BaseModel):
     objectives: dict[str, DynamicObjectiveState]
     is_finished: bool = False
     termination_reason: str | None = None
+    conversation: ConversationState | None = None
 
 
 class CompactTransitionRequest(BaseModel):
@@ -426,6 +460,7 @@ def decompose_snapshot(snapshot: Snapshot) -> tuple[StaticSpec, DynamicSessionSt
         objectives=dynamic_objectives,
         is_finished=snapshot.is_finished,
         termination_reason=snapshot.termination_reason,
+        conversation=snapshot.conversation.model_copy(deep=True) if snapshot.conversation else None,
     )
     return static, dynamic
 
@@ -473,4 +508,5 @@ def recompose_snapshot(static: StaticSpec, dynamic: DynamicSessionState) -> Snap
         turns=[t.model_copy(deep=True) for t in dynamic.turns],
         is_finished=dynamic.is_finished,
         termination_reason=dynamic.termination_reason,
+        conversation=dynamic.conversation.model_copy(deep=True) if dynamic.conversation else None,
     )

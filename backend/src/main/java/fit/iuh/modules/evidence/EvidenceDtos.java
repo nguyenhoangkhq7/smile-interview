@@ -32,4 +32,11 @@ public final class EvidenceDtos {
     public record Stop(
             @JsonProperty("request_id") @NotNull UUID requestId,
             @JsonProperty("expected_state_version") @Min(1) long expectedVersion) {}
+
+    public record Conversation(
+            @JsonProperty("request_id") @NotNull UUID requestId,
+            @JsonProperty("message_id") @NotBlank String messageId,
+            @JsonProperty("expected_state_version") @Min(1) long expectedVersion,
+            @NotBlank @Pattern(regexp = "NEXT|SUBMIT_INTRODUCTION|SKIP_INTRODUCTION") String action,
+            @Size(max = 10000) String introduction) {}
 }

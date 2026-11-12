@@ -12,7 +12,7 @@ import { usePracticeKnowledgeGaps } from '@/hooks/usePracticeProfiles';
 import { useStudyPlan } from '@/hooks/useStudyPlan';
 import { cn } from '@/lib/utils';
 import type { ApplicationProfile } from '@/services/applicationProfiles';
-import { studyPlans, type ReportWeakness, type StudyPlanDetails, type StudyPlanView, type StudySkill } from '@/services/studyPlans';
+import { studyPlans, type ObjectiveSuggestion, type ReportWeakness, type StudyPlanDetails, type StudyPlanView, type StudySkill } from '@/services/studyPlans';
 import {
   formatStudyPercent as formatPercent, studyProgressTone,
   type NewStudyTask, type StudyProgress as PlanProgress, type StudyTask, type StudyTaskStatus, type StudyTaskUpdate,
@@ -25,6 +25,7 @@ import { StudyPlanSettings } from './StudyPlanSettings';
 import { Dialog } from '@/components/ui/dialog';
 import { StudyKanban } from './StudyKanban';
 import { StudyGapCard, type StudyGap, type StudyGapActions } from './StudyGapCard';
+import { StudyGapTaskDialog } from './StudyGapTaskDialog';
 import styles from './practice.module.css';
 
 const panelStyle = 'flex min-w-0 flex-col rounded-2xl border border-slate-100 bg-card p-4 shadow-xs sm:p-5';
@@ -117,6 +118,16 @@ function InterviewWeaknesses({ findings, actions }: { findings: ReportWeakness[]
   );
 }
 
+function ObjectiveGaps({ suggestions, actions }: { suggestions: ObjectiveSuggestion[]; actions?: StudyGapActions }) {
+  const visible = suggestions.filter(objective => objective.criteria.some(criterion => criterion.kind !== 'MET'));
+  if (!visible.length) return <p className={mutedText}>Chưa có nội dung cần ôn từ các mục tiêu đã đánh giá.</p>;
+  return <div className="space-y-3">
+    <p className="text-xs leading-5 text-(--practice-muted)">Chọn mục tiêu để xem và chỉnh checklist. Tiêu chí chưa đánh giá không được xem là điểm yếu.</p>
+    {visible.map(objective => <StudyGapCard key={objective.objectiveId}
+      gap={{ skillId: objective.skillId, notes: [], source: objective.source, objective }} actions={actions} />)}
+  </div>;
+}
+
 function KnowledgeGaps({ profile, request, compact = false, actions }: {
   profile: ApplicationProfile;
   request: ReturnType<typeof usePracticeKnowledgeGaps>;
@@ -145,10 +156,12 @@ function KnowledgeGaps({ profile, request, compact = false, actions }: {
             </div>
           ) : data && (data.completedAttempts > 0 || (data.reportWeaknesses?.length ?? 0) > 0) ? (
             <div className="space-y-3">
-              {actions && ((data.reportWeaknesses?.length ?? 0) > 0 || data.needsVerification.length > 0) &&
-                <p className="text-xs text-(--practice-muted)">Kéo thẻ vào cột ôn tập để tạo đầu việc.</p>}
+              {actions && <p className="text-xs text-(--practice-muted)">Bấm thêm hoặc kéo thẻ vào cột để chuẩn bị đầu việc.</p>}
+              {data.objectiveSuggestions ? <ObjectiveGaps suggestions={data.objectiveSuggestions} actions={actions} /> : <>
               <InterviewWeaknesses findings={data.reportWeaknesses ?? []} actions={actions} />
+              <GapList title="Cần ôn tập" skills={data.weak} actions={actions} />
               <GapList title="Cần kiểm chứng thêm" skills={data.needsVerification} actions={actions} />
+              </>}
               {data.notAssessedSkillIds.length > 0 && <p className={mutedText}>{data.notAssessedSkillIds.length} kỹ năng chưa đánh giá.</p>}
             </div>
           ) : (
@@ -210,6 +223,7 @@ export function PracticePlanBoard({ profile, initialPlan }: {
   initialPlan: StudyPlanView;
 }) {
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
+  const [gapDraft, setGapDraft] = useState<{ objective: ObjectiveSuggestion; status: StudyTaskStatus } | null>(null);
   const gapSource = useRef<StudyGap | null>(null);
   const [view, setView] = useState<PlanView>('kanban');
   const [completedTaskId, setCompletedTaskId] = useState<number | null>(null);
@@ -228,7 +242,9 @@ export function PracticePlanBoard({ profile, initialPlan }: {
   const improvementSkillIds = new Set([
     ...(knowledgeGapData?.weak.map(({ skillId }) => skillId) ?? []),
     ...(knowledgeGapData?.needsVerification.map(({ skillId }) => skillId) ?? []),
-    ...(knowledgeGapData?.reportWeaknesses.map(({ skillId }) => skillId) ?? []),
+    ...(knowledgeGapData?.objectiveSuggestions
+      ? knowledgeGapData.objectiveSuggestions.filter(objective => objective.criteria.some(c => c.selectedByDefault)).map(objective => objective.skillId)
+      : knowledgeGapData?.reportWeaknesses.map(({ skillId }) => skillId) ?? []),
   ]);
   const latestAssessmentAttemptNumber = plan.sourceSessionId
     ? profile.attempts.find((attempt) => attempt.id === plan.sourceSessionId && attempt.status === 'Completed')?.number ?? 0
@@ -236,7 +252,15 @@ export function PracticePlanBoard({ profile, initialPlan }: {
   const notAssessedSkillIds = new Set(knowledgeGapData?.notAssessedSkillIds ?? []);
   const tasks = storedTasks.map((task) => ({
     ...task,
-    gapNeedsConfirmation: Boolean(
+    gapNeedsConfirmation: task.gapSourceObjectiveId ? Boolean(
+      task.status !== 'DONE' && task.checklist.some(item => item.sourceCriterionId)
+      && task.checklist.filter(item => item.sourceCriterionId).every(item => {
+        const criterion = knowledgeGapData?.objectiveSuggestions?.find(o => o.objectiveId === task.gapSourceObjectiveId)
+          ?.criteria.find(c => c.criterionId === item.sourceCriterionId);
+        return criterion && ['DEMONSTRATED_AT_TARGET', 'DEMONSTRATED_ABOVE_TARGET'].includes(criterion.assessment)
+          && (criterion.lastAssessment?.attemptNumber ?? 0) > (item.sourceAttemptNumber ?? task.gapSourceAttemptNumber ?? 0);
+      })
+    ) : Boolean(
       knowledgeGapData?.completedAttempts && task.status !== 'DONE' && task.gapSourceSkillId
       && latestAssessmentAttemptNumber > (task.gapSourceAttemptNumber ?? 0)
       && !improvementSkillIds.has(task.gapSourceSkillId)
@@ -308,6 +332,10 @@ export function PracticePlanBoard({ profile, initialPlan }: {
   }
 
   function createTaskFromGap(gap: StudyGap, status: StudyTaskStatus) {
+    if (gap.objective) {
+      setGapDraft({ objective: gap.objective, status });
+      return Promise.resolve(true);
+    }
     const referenceUrl = gap.source
       ? new URL(`/interview/session/${encodeURIComponent(gap.source.sessionId)}/result`, window.location.origin).href
       : undefined;
@@ -467,6 +495,8 @@ export function PracticePlanBoard({ profile, initialPlan }: {
           {selectedTask && inspectorSide === 'right' && inspector}
         </div>
       )}
+      {gapDraft && <StudyGapTaskDialog key={gapDraft.objective.objectiveId} objective={gapDraft.objective}
+        status={gapDraft.status} disabled={disabled} onCreate={createTask} onClose={() => setGapDraft(null)} />}
       <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
           <StudyPlanSettings plan={plan} attempts={profile.attempts} disabled={disabled} onSave={updatePlan} onClose={() => setSettingsOpen(false)} />
       </Dialog>

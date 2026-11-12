@@ -274,27 +274,44 @@ export function UploadStep({
           </div>
 
           {jdSource === 'upload' && (
-            <DropZone zone="jd" file={jdFile} dragActive={dragOverJd} error={jdError}
-              accept=".pdf" hint="PDF • Tối đa 10MB"
-              icon={<Briefcase size={36} />}
-              inputRef={fileInputJdRef}
-              onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
-              onFileChange={onFileChange} onClear={onClearJd} onTrigger={() => onTrigger('jd')}
-            />
+            <div className="space-y-3">
+              <DropZone zone="jd" file={jdFile} dragActive={dragOverJd} error={jdError}
+                accept=".pdf" hint="PDF • Tối đa 10MB"
+                icon={<Briefcase size={36} />}
+                inputRef={fileInputJdRef}
+                onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
+                onFileChange={onFileChange} onClear={onClearJd} onTrigger={() => onTrigger('jd')}
+              />
+              {jdFile && (
+                <div>
+                  <label htmlFor="jd-upload-title-input" className="block text-xs font-medium text-foreground mb-1">
+                    Tiêu đề JD / Vị trí ứng tuyển <span className="text-muted-foreground font-normal">(Tùy chọn)</span>
+                  </label>
+                  <input
+                    id="jd-upload-title-input"
+                    type="text"
+                    value={jdTitle}
+                    onChange={(e) => setJdTitle(e.target.value)}
+                    placeholder={jdFile.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ')}
+                    className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground transition-all focus:border-brand-orange focus:outline-none focus:ring-1 focus:ring-brand-orange"
+                  />
+                </div>
+              )}
+            </div>
           )}
 
           {jdSource === 'text' && (
             <div className="space-y-3">
               <div>
                 <label htmlFor="jd-title-input" className="block text-xs font-medium text-foreground mb-1">
-                  Tên gợi nhớ JD / Vị trí &amp; Công ty <span className="text-muted-foreground font-normal">(Tùy chọn)</span>
+                  Tiêu đề JD / Vị trí ứng tuyển <span className="text-muted-foreground font-normal">(Tùy chọn)</span>
                 </label>
                 <input
                   id="jd-title-input"
                   type="text"
                   value={jdTitle}
                   onChange={(e) => setJdTitle(e.target.value)}
-                  placeholder="Ví dụ: Backend Java - FPT Software, Frontend React - VNG..."
+                  placeholder="Ví dụ: Backend Java, Frontend React, Kỹ sư phần mềm..."
                   className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground transition-all focus:border-brand-orange focus:outline-none focus:ring-1 focus:ring-brand-orange"
                 />
               </div>

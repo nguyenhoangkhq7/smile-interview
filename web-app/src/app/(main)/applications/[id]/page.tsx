@@ -10,10 +10,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ApplicationProfile, applicationProfiles } from '@/services/applicationProfiles';
 import { evidenceInterview, interviewError } from '@/services/evidenceInterview';
-import { MarkdownContent } from '@/components/common/MarkdownContent';
+import { CandidateCvJdSummary } from '@/components/features/applications/CandidateCvJdSummary';
 import { CurrentCompetencyPanel } from '@/components/features/applications/CurrentCompetencyPanel';
-import { GnnScoreMetric } from '@/components/features/interview/GnnScoreMetric';
-import { activeAttempt, AttemptBadge, finishedAttempt, formatProfileDate, skillLabel } from '@/components/features/applications/applicationUi';
+import { activeAttempt, AttemptBadge, finishedAttempt, formatProfileDate } from '@/components/features/applications/applicationUi';
 
 const tabClass = 'gap-1.5 px-1 text-xs sm:gap-2 sm:px-0 sm:text-sm group-data-horizontal/tabs:after:bottom-0 after:bg-brand-orange data-active:text-brand-orange';
 
@@ -35,19 +34,14 @@ function InterviewHistory({ profile }: { profile: ApplicationProfile }) {
 }
 
 function Documents({ profile }: { profile: ApplicationProfile }) {
-  const counts = { MATCH: 0, PARTIAL: 0, MISSING: 0 };
-  profile.skills.forEach(skill => { counts[skill.semantic_alignment]++; });
   return <div className="space-y-5">
-    <section className="rounded-2xl border bg-card p-5 sm:p-6"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-lg font-semibold">Tài liệu của hồ sơ</h2><p className="mt-1 text-sm text-muted-foreground">CV và JD dùng chung cho tất cả lượt phỏng vấn.</p></div><Link href="/interview/new" className="text-sm font-medium text-brand-orange hover:underline">Tạo hồ sơ với tài liệu mới<ChevronRight className="ml-1 inline" size={14} /></Link></div>
+    <section className="rounded-2xl border bg-card p-5 sm:p-6"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-lg font-semibold">Tài liệu của hồ sơ</h2></div><Link href="/interview/new" className="text-sm font-medium text-brand-orange hover:underline">Tạo hồ sơ với tài liệu mới<ChevronRight className="ml-1 inline" size={14} /></Link></div>
       <div className="mt-5 grid gap-3 sm:grid-cols-2">{[
         { label: 'CV của bạn', name: profile.cvFilename }, { label: 'Mô tả công việc', name: profile.jdTitle },
       ].map(item => <div key={item.label} className="flex min-w-0 items-center gap-3 rounded-xl border bg-muted/20 p-4"><span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-card text-muted-foreground"><FileText size={19} /></span><div className="min-w-0"><p className="text-xs text-muted-foreground">{item.label}</p><p className="mt-1 break-words text-sm font-medium">{item.name}</p></div></div>)}</div>
     </section>
-    <section className="rounded-2xl border bg-card p-5 sm:p-6"><h2 className="text-lg font-semibold">Phân tích CV–JD ban đầu</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">Đối chiếu thông tin trong tài liệu. Kết quả năng lực qua câu trả lời phỏng vấn nằm ở tab Năng lực hiện tại.</p>
-      <div className="mt-5 sm:w-56"><GnnScoreMetric score={profile.analysis.matching_score} /></div>
-      <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 rounded-xl bg-muted/40 px-4 py-3 text-sm"><span><strong className="mr-1 text-brand-green">{counts.MATCH}</strong> Phù hợp</span><span><strong className="mr-1 text-amber-700">{counts.PARTIAL}</strong> Liên quan</span><span><strong className="mr-1">{counts.MISSING}</strong> Chưa có bằng chứng</span></div>
-      <div role="region" aria-label="Đối chiếu kỹ năng CV–JD" tabIndex={0} className="mt-4 max-h-80 divide-y overflow-y-auto overscroll-contain pr-1">{profile.skills.map(skill => <div key={skill.jd_skill_id} className="flex flex-wrap items-center justify-between gap-2 py-3"><span className="text-sm font-medium">{skillLabel(skill.jd_skill_id)}</span><span className={`text-xs ${skill.semantic_alignment === 'MATCH' ? 'text-brand-green' : 'text-muted-foreground'}`}>{skill.semantic_alignment === 'MATCH' ? 'Có bằng chứng phù hợp trong CV' : skill.semantic_alignment === 'PARTIAL' ? 'Có bằng chứng liên quan trong CV' : 'Chưa có bằng chứng tương ứng trong CV'}</span></div>)}</div>
-      {profile.analysis.markdown_summary && <details className="mt-4 min-w-0 border-t pt-4"><summary className="cursor-pointer text-sm font-medium">Xem bản phân tích đầy đủ</summary><div className="mt-4 max-h-[65dvh] overflow-auto overscroll-contain rounded-xl border p-4"><MarkdownContent content={profile.analysis.markdown_summary} /></div></details>}
+    <section className="rounded-2xl border bg-card p-5 sm:p-6"><h2 className="text-lg font-semibold">Phân tích CV–JD ban đầu</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">Đối chiếu tài liệu; kết quả phỏng vấn ở tab Năng lực.</p>
+      <div className="mt-5"><CandidateCvJdSummary skills={profile.skills} report={profile.analysis} /></div>
     </section>
   </div>;
 }
@@ -101,7 +95,7 @@ function ProfileDetail({ id }: { id: string }) {
 
       <Tabs value={tab} onValueChange={value => { if (typeof value === 'string') { setTab(value); window.history.replaceState(null, '', `#${value}`); } }} className="gap-5">
         <div className="border-b"><TabsList variant="line" aria-label="Nội dung hồ sơ ứng tuyển" className="h-12 w-full gap-2 p-0 sm:w-fit sm:gap-5"><TabsTrigger value="competency" className={tabClass}><ChartNoAxesCombined size={16} /><span className="sm:hidden">Năng lực</span><span className="hidden sm:inline">Năng lực hiện tại</span></TabsTrigger><TabsTrigger value="history" className={tabClass}><History size={16} /><span className="sm:hidden">Lịch sử</span><span className="hidden sm:inline">Lịch sử phỏng vấn</span><span className="hidden rounded-md bg-muted px-1.5 py-0.5 text-xs tabular-nums sm:inline">{profile.attempts.length}</span></TabsTrigger><TabsTrigger value="documents" className={tabClass}><FileText size={16} />CV & JD</TabsTrigger></TabsList></div>
-        <TabsContent value="competency"><CurrentCompetencyPanel profileId={id} refreshKey={profile.attempts.map(a => `${a.id}:${a.status}`).join('|')} /></TabsContent>
+        <TabsContent value="competency"><CurrentCompetencyPanel profileId={id} baselineSkills={profile.skills} refreshKey={profile.attempts.map(a => `${a.id}:${a.status}`).join('|')} /></TabsContent>
         <TabsContent value="history"><InterviewHistory profile={profile} /></TabsContent>
         <TabsContent value="documents"><Documents profile={profile} /></TabsContent>
       </Tabs>

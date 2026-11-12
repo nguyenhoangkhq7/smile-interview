@@ -2,10 +2,32 @@ import axiosClient from '@/lib/axiosClient';
 import type {
   NewStudyTask, StudyChecklistItem, StudyProgress, StudyTask, StudyTaskFields, StudyResource,
 } from '@/components/features/practice/studyPlan';
-import type { CurrentCompetency } from './applicationProfiles';
+import type { CompetencySource, CompetencyStatus, CurrentCompetency } from './applicationProfiles';
 
 type TaskRecord = Omit<StudyTask, 'checklist' | 'resources'>;
 export type StudySkill = CurrentCompetency['skills'][number];
+
+export interface CriterionSuggestion {
+  criterionId: string;
+  description: string;
+  essential: boolean;
+  assessment: CompetencyStatus;
+  kind: 'REVIEW' | 'VERIFY' | 'REINFORCE' | 'UNASSESSED' | 'MET';
+  selectedByDefault: boolean;
+  reason: string;
+  goal: string;
+  source: CompetencySource | null;
+  lastAssessment: CompetencySource | null;
+}
+
+export interface ObjectiveSuggestion {
+  skillId: string;
+  objectiveId: string;
+  claim: string;
+  assessment: CompetencyStatus;
+  source: CompetencySource | null;
+  criteria: CriterionSuggestion[];
+}
 
 export interface ReportWeakness {
   skillId: string;
@@ -20,6 +42,7 @@ export interface KnowledgeGaps {
   needsVerification: StudySkill[];
   notAssessedSkillIds: string[];
   reportWeaknesses: ReportWeakness[];
+  objectiveSuggestions?: ObjectiveSuggestion[];
 }
 
 export interface StudyPlanDetails {
@@ -66,11 +89,11 @@ export const studyPlans = {
   async updatePlan(profileId: string, input: StudyPlanDetails) {
     return toPlanView((await axiosClient.put<PlanResponse>(planPath(profileId), input)).data);
   },
-  async createTask(profileId: string, { checklist, referenceUrl, gapOrigin, ...task }: NewStudyTask) {
+  async createTask(profileId: string, { checklist, checklistOrigins, referenceUrl, gapOrigin, ...task }: NewStudyTask) {
     return (await axiosClient.post<TaskRecord>(`${planPath(profileId)}/tasks`, {
       ...task,
       gapOrigin,
-      checklist: checklist.map((content, sortOrder) => ({ content, sortOrder })),
+      checklist: checklist.map((content, sortOrder) => ({ content, sortOrder, ...checklistOrigins?.[sortOrder] })),
       resource: referenceUrl ? { title: 'Tài liệu tham khảo', url: referenceUrl } : undefined,
     })).data;
   },

@@ -1,15 +1,23 @@
 """Ground blueprint identifiers and allocate a bounded, deterministic initial plan."""
 from uuid import NAMESPACE_URL, uuid5
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextvars import copy_context
 from math import ceil
 import re
 import hashlib
 import json
+from time import monotonic
 
 from .models import Blueprint, GroundedRequirement, InterviewConfig, InterviewSkill, Mode, Objective, ObjectiveState
 from .depth import DEPTH_DEFINITIONS, ground_depth
 from .policy_config import InterviewPolicy
 from .provider import AssessmentProvider, encode_context
+from .preparation_cache import PreparationCache
+from .telemetry import event
+
+BLUEPRINT_BATCH_SIZE = 3
+BLUEPRINT_WORKERS = 3
 
 
 def requirements_for(skills: list[InterviewSkill]) -> dict[str, GroundedRequirement]:
@@ -39,14 +47,79 @@ def requirements_for(skills: list[InterviewSkill]) -> dict[str, GroundedRequirem
 
 
 class BlueprintBuilder:
-    def __init__(self, provider: AssessmentProvider, policy: InterviewPolicy | None = None):
+    def __init__(self, provider: AssessmentProvider, policy: InterviewPolicy | None = None,
+                 cache: PreparationCache | None = None):
         self.provider = provider
         self.policy = policy or InterviewPolicy()
+        self.cache = cache
 
     def build(self, skills: list[InterviewSkill]) -> Blueprint:
         requirements = requirements_for(skills)
-        blueprint = self.provider.blueprint(encode_context({"requirements": requirements, "depth_definitions": DEPTH_DEFINITIONS}))
-        return self.validate(blueprint, skills)
+        items = list(requirements.items())
+        batches = [dict(items[index:index + BLUEPRINT_BATCH_SIZE])
+                   for index in range(0, len(items), BLUEPRINT_BATCH_SIZE)]
+        event("blueprint.started", requirements=len(items), batches=len(batches), workers=BLUEPRINT_WORKERS)
+        if len(batches) <= 1:
+            results = [self._prepare_batch(1, 1, requirements)]
+        else:
+            results = self._parallel_batches(batches)
+        blueprint = Blueprint(objectives=[objective for batch in results for objective in batch.objectives])
+        try:
+            return self.validate(blueprint, skills)
+        except ValueError:
+            if self.cache:
+                self.cache.discard([self._batch_context(batch) for batch in batches])
+            raise
+
+    def _parallel_batches(self, batches: list[dict[str, GroundedRequirement]]) -> list[Blueprint]:
+        executor = ThreadPoolExecutor(max_workers=BLUEPRINT_WORKERS)
+        pending = {executor.submit(copy_context().run, self._prepare_batch, index + 1, len(batches), batch): index
+                   for index, batch in enumerate(batches)}
+        results = {}
+        try:
+            for future in as_completed(pending):
+                results[pending[future]] = future.result()
+                event("blueprint.progress", completed=len(results), total=len(batches))
+        except Exception:
+            # Running batches may still populate the cache; queued calls must not
+            # delay a retryable failure or send another burst to the provider.
+            executor.shutdown(wait=False, cancel_futures=True)
+            raise
+        executor.shutdown()
+        return [results[index] for index in range(len(batches))]
+
+    def _prepare_batch(self, index: int, total: int, requirements: dict[str, GroundedRequirement]) -> Blueprint:
+        started = monotonic()
+        event("blueprint.batch_started", batch=index, total=total, requirements=len(requirements))
+        try:
+            result = self._build_batch(requirements)
+            event("blueprint.batch_completed", batch=index, total=total,
+                  elapsed_seconds=round(monotonic() - started, 2))
+            return result
+        except Exception as error:
+            event("blueprint.batch_failed", batch=index, total=total, error_type=type(error).__name__,
+                  elapsed_seconds=round(monotonic() - started, 2))
+            raise
+
+    def _build_batch(self, requirements: dict[str, GroundedRequirement]) -> Blueprint:
+        context = self._batch_context(requirements)
+        if self.cache:
+            return self.cache.get_or_compute(context, lambda: self._generate_batch(context))
+        return self._generate_batch(context)
+
+    def _batch_context(self, requirements: dict[str, GroundedRequirement]) -> str:
+        return encode_context({
+            "requirements": requirements, "depth_definitions": DEPTH_DEFINITIONS,
+            "allow_extension_probes": self.policy.allow_extension_probes,
+        })
+
+    def _generate_batch(self, context: str) -> Blueprint:
+        blueprint = self.provider.blueprint(context)
+        requirements = json.loads(context)["requirements"]
+        ids = [objective.requirement_id for objective in blueprint.objectives]
+        if len(ids) != len(set(ids)) or set(ids) != set(requirements):
+            raise ValueError("Blueprint must cover every requirement exactly once")
+        return blueprint
 
     def validate(self, blueprint: Blueprint, skills: list[InterviewSkill]) -> Blueprint:
         requirements = requirements_for(skills)
@@ -66,6 +139,8 @@ class BlueprintBuilder:
         objective.inferred = requirement["inferred"]
         objective.jd_evidence_spans = requirement["jd_evidence_spans"]
         objective.requirement_kind = requirement["requirement_kind"]
+        if not self.policy.allow_extension_probes:
+            objective.extension_depth = None
         ground_depth(objective, requirement, self.policy)
         self._validate_modes(objective, requirement)
         self._ground_criteria(objective)

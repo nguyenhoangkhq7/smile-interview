@@ -15,10 +15,10 @@ def fixed_matching_result(monkeypatch):
         return MatchedDocuments(cv_text, jd_text, Module1Output(
             matcher_source="MATCHING_CV",
             cv_skills=[
-                ExtractedCVSkill(skill_id="kubernetes", type="explicit", confidence=0.9, evidence_spans=[]),
+                ExtractedCVSkill(skill_id="kubernetes", skill_name="Vận hành Kubernetes", type="explicit", confidence=0.9, evidence_spans=[]),
             ],
             jd_skills=[
-                ExtractedJDSkill(skill_id="kubernetes", type="explicit", confidence=0.9, evidence_spans=["Kubernetes"]),
+                ExtractedJDSkill(skill_id="kubernetes", skill_name="Quản trị Kubernetes", type="explicit", confidence=0.9, evidence_spans=["Kubernetes"]),
                 ExtractedJDSkill(skill_id="rabbitmq", type="explicit", confidence=0.9, evidence_spans=["RabbitMQ"]),
             ],
             match_results=[
@@ -28,3 +28,4 @@ def fixed_matching_result(monkeypatch):
         ))
 
     monkeypatch.setattr("matching_cv.app.container.match_documents", match_documents)
+    monkeypatch.setattr("matching_cv.app.api.v1.endpoints.unified.match_documents", match_documents)

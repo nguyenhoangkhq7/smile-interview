@@ -13,14 +13,14 @@ export const resultReasons: Record<string, string> = {
   TIME_BUDGET: 'Hết thời gian',
   QUESTION_BUDGET: 'Đã hết số câu hỏi của phiên',
   USER_STOP: 'Bạn đã kết thúc phiên sớm',
-  PLAN_COMPLETE: 'Đã xử lý các mục tiêu trong kế hoạch',
+  PLAN_COMPLETE: 'Đã hoàn thành các nội dung phỏng vấn dự kiến',
   MODE_FILTER: 'Ngoài dạng phỏng vấn đã chọn',
-  PLAN_BUDGET: 'Ngoài ngân sách phiên',
-  LOCAL_BUDGET: 'Hết lượt cho mục tiêu này',
+  PLAN_BUDGET: 'Chưa được hỏi do giới hạn thời lượng hoặc số câu đã chọn',
+  LOCAL_BUDGET: 'Đã hết số câu dành cho nội dung này',
   SUFFICIENT_EVIDENCE: 'Đã đủ bằng chứng',
-  CRITERION_BUDGET: 'Đã hết lượt kiểm chứng tiêu chí',
-  NO_PROGRESS: 'Dừng hỏi tiếp vì chưa thu được thêm bằng chứng',
-  NO_INDEPENDENT_CRITERIA_IN_MODE: 'Không còn tiêu chí có thể kiểm chứng độc lập trong dạng phỏng vấn này',
+  CRITERION_BUDGET: 'Đã hết số câu dành cho tiêu chí này',
+  NO_PROGRESS: 'Chưa đủ thông tin mới để kết luận thêm',
+  NO_INDEPENDENT_CRITERIA_IN_MODE: 'Cần dạng phỏng vấn khác để đánh giá thêm nội dung này',
 };
 
 export const skillStatuses = {

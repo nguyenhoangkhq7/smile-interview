@@ -1,6 +1,7 @@
 """Service responsible for post-processing and validating skill extractions."""
 import hashlib
 import re
+import unicodedata
 from typing import Any, Dict, List, Literal, Optional
 
 from matching_cv.app.schemas.skill_extraction import (
@@ -36,13 +37,13 @@ class SkillPostprocessor:
     @staticmethod
     def slugify_skill(surface_form: str) -> str:
         """Compute canonical slug from surface_form with inflectional role normalization."""
-        slug = re.sub(r"[^a-z0-9\-\.]+", "-", surface_form.lower()).strip("-.")
+        slug = re.sub(r"[^\w\-\.]+|_+", "-", unicodedata.normalize("NFKC", surface_form).lower()).strip("-.")
         # Normalize inflectional plural role suffixes (e.g. frontends -> frontend)
         slug = re.sub(r"-backends$", "-backend", slug)
         slug = re.sub(r"-frontends$", "-frontend", slug)
         slug = re.sub(r"-pipelines$", "-pipeline", slug)
         slug = re.sub(r"-systems$", "-system", slug)
-        if not slug or not re.match(r"^[a-z0-9]", slug):
+        if not slug or not slug[0].isalnum():
             return f"unmapped:{slug if slug else 'unknown'}"
         return slug
 

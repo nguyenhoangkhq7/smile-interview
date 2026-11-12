@@ -48,6 +48,7 @@ public class StudyPlanService {
     private final InterviewRunRepository runs;
     private final CompetencyProjection projection;
     private final EvidenceJson json;
+    private final StudySuggestionProjection suggestions;
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public PlanView get(UUID profileId, User user) {
@@ -86,7 +87,7 @@ public class StudyPlanService {
                 }).toList(),
                 result.skills().stream().filter(skill -> "NOT_ASSESSED".equals(skill.assessment()))
                         .map(CompetencyProjection.Skill::skillId).toList(),
-                reportWeaknesses(attempts, savedRuns));
+                reportWeaknesses(attempts, savedRuns), suggestions.project(profile, result, attempts, savedRuns));
     }
 
     private List<ReportWeakness> reportWeaknesses(List<Session> attempts, List<InterviewRun> savedRuns) {
@@ -124,12 +125,20 @@ public class StudyPlanService {
         var gapOrigin = input.gapOrigin();
         if (gapOrigin != null) {
             validateSkill(profile, gapOrigin.skillId());
+            if (gapOrigin.objectiveId() != null) {
+                var definition = objectiveDefinition(profile, gapOrigin.objectiveId());
+                if (!gapOrigin.skillId().equals(definition.path("skill_id").asText())
+                        || !gapOrigin.skillId().equals(input.skillId()))
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Objective does not belong to the selected skill");
+            }
             if (gapOrigin.sessionId() != null && interviewAttempts(profile, null).stream().noneMatch(attempt ->
                     gapOrigin.sessionId().equals(attempt.getId())
                             && (gapOrigin.attemptNumber() == null || gapOrigin.attemptNumber().equals(attempt.getAttemptNumber())))) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Gap source session is outside this profile");
             }
         }
+        if (input.checklist() != null) for (var item : input.checklist())
+            validateChecklistOrigin(profile, gapOrigin == null ? null : gapOrigin.objectiveId(), item);
         if (input.resource() != null) validateUrl(input.resource().url());
         var plan = input.parentTaskId() == null ? ensurePlan(profile) : requirePlan(profileId);
         if (input.parentTaskId() != null && !repository.hasTask(plan.id(), input.parentTaskId())) {
@@ -227,6 +236,9 @@ public class StudyPlanService {
 
     public StudyTaskChecklistItem createChecklistItem(UUID profileId, long taskId, User user, ChecklistInput input) {
         requireTask(profileId, taskId, user);
+        var profile = ownedProfile(profileId, user, false);
+        var task = repository.tasks(requirePlan(profileId).id()).stream().filter(t -> t.id() == taskId).findFirst().orElseThrow();
+        validateChecklistOrigin(profile, task.gapSourceObjectiveId(), input);
         return repository.createChecklistItem(taskId, input);
     }
 
@@ -332,6 +344,31 @@ public class StudyPlanService {
             if (skillId.equals(skill.path("jd_skill_id").asText())) return;
         }
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Skill is outside this profile");
+    }
+
+    private com.fasterxml.jackson.databind.JsonNode objectiveDefinition(ApplicationProfile profile, String id) {
+        for (var definition : json.read(profile.getBlueprintJson() == null ? "{}" : profile.getBlueprintJson()).path("objectives"))
+            if (id.equals(definition.path("objective_id").asText())) return definition;
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Objective is outside this profile");
+    }
+
+    private void validateChecklistOrigin(ApplicationProfile profile, String objectiveId, ChecklistInput item) {
+        if (item.sourceCriterionId() == null) {
+            if (item.sourceSessionId() != null || item.sourceAttemptNumber() != null)
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Checklist source requires a criterion");
+            return;
+        }
+        if (objectiveId == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Criterion source requires an objective");
+        boolean found = false;
+        for (var criterion : objectiveDefinition(profile, objectiveId).path("criteria"))
+            found |= item.sourceCriterionId().equals(criterion.path("criterion_id").asText());
+        if (!found) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Criterion is outside this objective");
+        if (item.sourceSessionId() == null && item.sourceAttemptNumber() != null)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Source attempt requires a session");
+        if (item.sourceSessionId() != null && interviewAttempts(profile, null).stream().noneMatch(attempt ->
+                item.sourceSessionId().equals(attempt.getId())
+                        && (item.sourceAttemptNumber() == null || item.sourceAttemptNumber().equals(attempt.getAttemptNumber()))))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Criterion source session is outside this profile");
     }
 
     private static void validateUrl(String url) {

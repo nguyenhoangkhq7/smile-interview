@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
+import Link from 'next/link';
 import { Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -66,6 +67,8 @@ export function StudyTaskChecklist({ items, actions, disabled }: {
                   </Button>
                 </div>
               )}
+              {item.sourceSessionId && <Link href={`/interview/session/${encodeURIComponent(item.sourceSessionId)}/result`}
+                className="mt-1 block text-xs text-(--practice-primary) hover:underline">Nguồn: lượt {item.sourceAttemptNumber ?? 'phỏng vấn'}</Link>}
             </li>
           ))}
         </ul>

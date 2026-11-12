@@ -30,7 +30,15 @@ public final class StudyPlanDtos {
 
     public record KnowledgeGaps(int completedAttempts, List<CompetencyProjection.Skill> weak,
                                 List<CompetencyProjection.Skill> needsVerification,
-                                List<String> notAssessedSkillIds, List<ReportWeakness> reportWeaknesses) {}
+                                List<String> notAssessedSkillIds, List<ReportWeakness> reportWeaknesses,
+                                List<ObjectiveSuggestion> objectiveSuggestions) {}
+
+    public record ObjectiveSuggestion(String skillId, String objectiveId, String claim, String assessment,
+                                      CompetencyProjection.Source source, List<CriterionSuggestion> criteria) {}
+
+    public record CriterionSuggestion(String criterionId, String description, boolean essential, String assessment,
+                                      String kind, boolean selectedByDefault, String reason, String goal,
+                                      CompetencyProjection.Source source, CompetencyProjection.Source lastAssessment) {}
 
     public record ReportWeakness(String skillId, String sessionId, int attemptNumber, List<String> weaknesses) {}
 
@@ -42,7 +50,7 @@ public final class StudyPlanDtos {
 
     public record GapOriginInput(@NotBlank @Size(max = 128) String skillId,
                                  @Size(max = 128) String sessionId,
-                                 @Positive Integer attemptNumber) {}
+                                 @Positive Integer attemptNumber, @Size(max = 128) String objectiveId) {}
 
     public record TaskPositionInput(@NotNull @Pattern(regexp = "TODO|IN_PROGRESS|DONE") String status,
                                     @Positive Long beforeTaskId) {}
@@ -62,7 +70,9 @@ public final class StudyPlanDtos {
     }
 
     public record ChecklistInput(@NotBlank @Size(max = 500) String content, Boolean isCompleted,
-                                 @PositiveOrZero Integer sortOrder) {}
+                                 @PositiveOrZero Integer sortOrder,
+                                 @Size(max = 128) String sourceCriterionId,
+                                 @Size(max = 128) String sourceSessionId, @Positive Integer sourceAttemptNumber) {}
 
     public record ResourceInput(@NotBlank @Size(max = 255) String title, @NotBlank @Size(max = 2048) String url) {}
 

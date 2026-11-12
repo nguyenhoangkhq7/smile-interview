@@ -7,7 +7,8 @@ from pydantic import ValidationError
 
 from .assessment import TERMINAL, apply_judgment, eligible_criteria, next_action, validate_judgment
 from .errors import JudgmentUnavailableError, QuestionUnavailableError
-from .models import Action, Judgment, ObjectiveState, Question, Snapshot, StartRequest, TransitionRequest, TransitionResult, Turn
+from .models import Action, ConversationRequest, Judgment, ObjectiveState, Question, Snapshot, StartRequest, TransitionRequest, TransitionResult, Turn
+from . import lifecycle
 from .planning import BlueprintBuilder, plan, select_mode
 from .depth import DEPTH_DEFINITIONS, question_depth
 from .policy_config import InterviewPolicy
@@ -16,28 +17,71 @@ from .conversation import turn_introduction
 from .question_validation import question_errors
 from .provider import AssessmentProvider, encode_context
 from .reporting import public_session
+from .preparation_cache import PreparationCache
+from .telemetry import event
 
 logger = logging.getLogger(__name__)
 
 
 class EvidenceWorkflow:
-    def __init__(self, provider: AssessmentProvider, clock=None, policy: InterviewPolicy | None = None):
+    def __init__(self, provider: AssessmentProvider, clock=None, policy: InterviewPolicy | None = None,
+                 preparation_cache: PreparationCache | None = None):
         self.provider = provider
         self.clock = clock or (lambda: datetime.now(timezone.utc))
         self.policy = policy or InterviewPolicy()
+        self.preparation_cache = preparation_cache
 
     def start(self, request: StartRequest) -> TransitionResult:
         policy = request.policy or self.policy
-        builder = BlueprintBuilder(self.provider, policy)
+        event("preparation.started", skills=len(request.skills), reuse_blueprint=request.blueprint is not None)
+        builder = BlueprintBuilder(self.provider, policy, self.preparation_cache)
         blueprint = (builder.validate(request.blueprint.model_copy(deep=True), request.skills)
                      if request.blueprint is not None else builder.build(request.skills))
         objectives, queue = plan(blueprint, request.skills, request.config, policy)
+        event("preparation.planned", objectives=len(objectives), queued=len(queue))
         now = self.clock()
         snapshot = Snapshot(session_id=request.session_id, config=request.config,
                             skills=request.skills, objectives=objectives, queue=queue, policy=policy.model_copy(deep=True),
                             started_at=now, deadline_at=now + timedelta(seconds=request.config.duration_seconds))
-        self._ask(snapshot, Action.INITIAL)
+        if request.opening is not None:
+            snapshot.conversation = lifecycle.begin(request.opening, now)
+            event("preparation.ready", phase="OPENING")
+        else:
+            self._ask(snapshot, Action.INITIAL)
         return self._result(snapshot)
+
+    def converse(self, request: ConversationRequest) -> TransitionResult:
+        snapshot = request.snapshot.model_copy(deep=True)
+        conversation = snapshot.conversation
+        if (conversation is None or snapshot.state_version != request.expected_state_version
+                or conversation.message.message_id != request.message_id):
+            raise ValueError("Stale conversation identifier or version")
+        if conversation.phase == "CLOSING" and request.action == "NEXT":
+            conversation.phase = "FINISHED"
+        elif conversation.phase == "OPENING" and request.action == "NEXT":
+            conversation.phase = "SELF_INTRODUCTION"
+            conversation.expires_at = self.clock() + timedelta(seconds=lifecycle.INTRODUCTION_SECONDS)
+        elif conversation.phase in {"OPENING", "SELF_INTRODUCTION"} and request.action == "SKIP_INTRODUCTION":
+            conversation.introduction_skipped = True
+            self._begin_technical(snapshot)
+        elif conversation.phase == "SELF_INTRODUCTION" and request.action == "SUBMIT_INTRODUCTION":
+            if not request.introduction.strip():
+                raise ValueError("Introduction must not be blank")
+            conversation.introduction = request.introduction.strip()
+            self._begin_technical(snapshot)
+        else:
+            raise ValueError("Action is not allowed in this conversation phase")
+        return self._result(snapshot)
+
+    def _begin_technical(self, snapshot: Snapshot) -> None:
+        conversation = snapshot.conversation
+        assert conversation is not None
+        conversation.phase = "INTERVIEW"
+        snapshot.deadline_at = self.clock() + timedelta(seconds=snapshot.config.duration_seconds)
+        self._ask(snapshot, Action.INITIAL)
+        if snapshot.pending_turn:
+            snapshot.pending_turn.introduction = (lifecycle.SKIP_BRIDGE if conversation.introduction_skipped
+                                                   else lifecycle.INTRODUCTION_BRIDGE)
 
     def respond(self, request: TransitionRequest) -> TransitionResult:
         snapshot = request.snapshot.model_copy(deep=True)
@@ -100,11 +144,14 @@ class EvidenceWorkflow:
     def stop(self, snapshot: Snapshot) -> TransitionResult:
         updated = snapshot.model_copy(deep=True)
         if not updated.is_finished:
-            self._finish(updated, "TIME_BUDGET" if self.clock() >= updated.deadline_at else "USER_STOP")
+            technical = updated.conversation is None or updated.conversation.phase == "INTERVIEW"
+            self._finish(updated, "TIME_BUDGET" if technical and self.clock() >= updated.deadline_at else "USER_STOP")
         return self._result(updated)
 
     @staticmethod
     def _check_request(snapshot: Snapshot, request: TransitionRequest) -> None:
+        if snapshot.conversation and snapshot.conversation.phase != "INTERVIEW":
+            raise ValueError("Interview is not accepting technical answers")
         if snapshot.is_finished or snapshot.pending_turn is None:
             raise ValueError("Interview has no pending question")
         if snapshot.state_version != request.expected_state_version:
@@ -170,6 +217,7 @@ class EvidenceWorkflow:
         return "NO_INDEPENDENT_CRITERIA_IN_MODE"
 
     def _ask(self, snapshot: Snapshot, action: Action) -> None:
+        event("question.started", action=action.value, answered=len(snapshot.turns))
         if self.clock() >= snapshot.deadline_at:
             self._finish(snapshot, "TIME_BUDGET")
             return
@@ -194,6 +242,7 @@ class EvidenceWorkflow:
                                      action=action,
                                      question_depth=state.current_question_depth, question=question)
         snapshot.pending_turn.introduction = turn_introduction(snapshot, snapshot.pending_turn)
+        event("question.ready", turn_id=snapshot.pending_turn.turn_id, mode=state.selected_mode.value)
 
     def _question_context(self, snapshot: Snapshot, action: Action) -> dict[str, object]:
         state = snapshot.objectives[snapshot.queue[0]]
@@ -284,14 +333,14 @@ class EvidenceWorkflow:
         for evidence in legacy:
             state.criterion_results.pop(evidence.criterion_id, None)
 
-    @staticmethod
-    def _finish(snapshot: Snapshot, reason: str) -> Snapshot:
+    def _finish(self, snapshot: Snapshot, reason: str) -> Snapshot:
         snapshot.is_finished, snapshot.termination_reason = True, reason
         for key in snapshot.queue:
             state = snapshot.objectives[key]
             state.lifecycle, state.stop_reason = "CLOSED", reason
         snapshot.queue.clear()
         snapshot.pending_turn = None
+        lifecycle.close(snapshot, reason, self.clock())
         return snapshot
 
     @staticmethod

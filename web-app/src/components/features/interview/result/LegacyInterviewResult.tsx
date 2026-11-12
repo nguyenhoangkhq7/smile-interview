@@ -4,6 +4,7 @@ import { MarkdownContent } from '@/components/common/MarkdownContent';
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { FolderOpen, AlertTriangle, MessageSquare, BarChart3, CheckCircle2, Download, CornerDownRight, ShieldCheck, BrainCircuit } from 'lucide-react';
+import { skillLabel } from '@/components/features/applications/applicationUi';
 import { historyService, SessionHistoryItem } from '@/services/historyService';
 import type { HITLReportResponse } from '@/services/cvJdMatching';
 import { exportQuestionBankToCSV } from '@/lib/exportUtils';
@@ -73,7 +74,7 @@ export function LegacyInterviewResult({ id }: { id: string }) {
   }
 
   const completionPct = report ? Math.round(report.completion_rate * 100) : session.overallScore ?? 0;
-  const summary = report?.markdown_summary || session.overallFeedback || 'Chưa có báo cáo tổng kết cho phiên này.';
+  const summary = report ? 'Kết quả dưới đây dựa trên các câu trả lời đã gửi. Nội dung chưa được kiểm tra cần được đánh giá thêm.' : session.overallFeedback || 'Chưa có báo cáo tổng kết cho phiên này.';
   const questions = session.questions ?? [];
 
   return (
@@ -119,27 +120,15 @@ export function LegacyInterviewResult({ id }: { id: string }) {
                   <thead>
                     <tr style={{ background: '#f8fafc', color: '#475569' }}>
                       <th style={{ padding: '0.5rem' }}>Kỹ năng</th>
-                      <th style={{ padding: '0.5rem' }}>CV ban đầu</th>
-                      <th style={{ padding: '0.5rem' }}>Đã kiểm chứng</th>
-                      <th style={{ padding: '0.5rem' }}>Yêu cầu JD</th>
-                      <th style={{ padding: '0.5rem' }}>Gap</th>
-                      <th style={{ padding: '0.5rem' }}>Mức</th>
-                      <th style={{ padding: '0.5rem' }}>Lượt</th>
+                      <th style={{ padding: '0.5rem' }}>Kết quả</th>
                       <th style={{ padding: '0.5rem' }}>Nhận định</th>
                     </tr>
                   </thead>
                   <tbody>
                     {report.evaluated_skills.map((s) => (
                       <tr key={s.jd_skill_id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '0.5rem', fontWeight: 600 }}>{s.jd_skill_id}</td>
-                        <td style={{ padding: '0.5rem' }}>{s.initial_cv_proficiency.toFixed(2)}</td>
-                        <td style={{ padding: '0.5rem', fontWeight: 700, color: s.is_verified ? '#15803d' : '#b45309' }}>
-                          {s.verified_proficiency.toFixed(2)}
-                        </td>
-                        <td style={{ padding: '0.5rem' }}>{s.required_jd_proficiency.toFixed(2)}</td>
-                        <td style={{ padding: '0.5rem' }}>{s.verified_skill_gap.toFixed(2)}</td>
-                        <td style={{ padding: '0.5rem' }}>{s.map_rubric_level}</td>
-                        <td style={{ padding: '0.5rem' }}>{s.local_turns_spent}</td>
+                        <td style={{ padding: '0.5rem', fontWeight: 600 }}>{skillLabel(s.jd_skill_id)}</td>
+                        <td style={{ padding: '0.5rem' }}>{s.is_verified ? 'Đã đánh giá' : 'Cần đánh giá thêm'}</td>
                         <td style={{ padding: '0.5rem', maxWidth: 280 }}>{s.consolidated_finding || s.verification_reason || '—'}</td>
                       </tr>
                     ))}
@@ -155,7 +144,7 @@ export function LegacyInterviewResult({ id }: { id: string }) {
             <h2 className={styles.sectionTitle} style={{ margin: 0 }}>Nhật ký hỏi – đáp</h2>
             {questions.length > 0 && (
               <button
-                onClick={() => exportQuestionBankToCSV(questions, session.id)}
+                onClick={() => exportQuestionBankToCSV(questions.map(question => ({ ...question, suggestedAnswer: '' })), session.id)}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
               >
                 <Download size={16} /> Xuất CSV
@@ -218,7 +207,7 @@ export function LegacyInterviewResult({ id }: { id: string }) {
                         </div>
                         <div className={styles.sectionBlock}>
                           <h4 style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-                            <BarChart3 size={16} style={{ color: '#4f46e5' }} /> Đánh giá của Judge
+                            <BarChart3 size={16} style={{ color: '#4f46e5' }} /> Nhận xét từ AI
                           </h4>
                           <div className={styles.aiFeedbackGrid}>
                             <div className={`${styles.feedbackBox} ${styles.feedbackStrength}`}>
@@ -229,12 +218,6 @@ export function LegacyInterviewResult({ id }: { id: string }) {
                             </div>
                           </div>
                         </div>
-                        {q.suggestedAnswer && (
-                          <div className={styles.sectionBlock}>
-                            <h4>Suy luận khởi tạo (Abductive)</h4>
-                            <div className={styles.suggestedAnswerBox}>{q.suggestedAnswer}</div>
-                          </div>
-                        )}
                       </div>
                     )}
                   </div>

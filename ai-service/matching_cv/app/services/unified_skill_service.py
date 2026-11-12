@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 def normalize_skill_name(text: str) -> str:
     """Normalize skill name for robust string comparison (alphanumeric, casefolded)."""
-    return re.sub(r"[^a-z0-9]+", " ", text.casefold()).strip()
+    return re.sub(r"[^\w]+|_+", " ", text.casefold()).strip()
 
 
 def deduplicate_explicit_implicit(

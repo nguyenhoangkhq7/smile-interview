@@ -22,15 +22,7 @@ export function searchText(value: string) {
   return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
 }
 
-export function skillLabel(value: string) {
-  const labels: Record<string, string> = {
-    html_css: 'HTML / CSS', html: 'HTML', css: 'CSS', javascript: 'JavaScript', typescript: 'TypeScript',
-    sql: 'SQL', postgresql: 'PostgreSQL', mysql: 'MySQL', java: 'Java', python: 'Python',
-    react: 'React', reactjs: 'React', nodejs: 'Node.js', git: 'Git', docker: 'Docker',
-    spring_boot: 'Spring Boot', rest_api: 'REST API', mongodb: 'MongoDB', aws: 'AWS',
-  };
-  return labels[value.toLowerCase()] || value.replace(/_/g, ' ');
-}
+export { skillLabel } from '@/lib/skillLabels';
 
 export function AttemptBadge({ attempt }: { attempt: InterviewAttempt }) {
   const color = attempt.status === 'In progress' ? 'bg-orange-50 text-orange-800 ring-orange-200/70'

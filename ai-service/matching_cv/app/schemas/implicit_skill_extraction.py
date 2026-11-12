@@ -162,7 +162,7 @@ class ImplicitExtractedSkill(BaseModel):
 
     skill_id: str = Field(
         ...,
-        pattern=r"^([a-z0-9][a-z0-9\-\.]*|unmapped:[a-z0-9\-\.]+)$",
+        pattern=r"^([\p{L}\p{N}][\p{L}\p{M}\p{N}\-\.]*|unmapped:[\p{L}\p{M}\p{N}\-\.]+)$",
         description="Deterministic slug of the skill label, e.g. 'leadership' or 'system-design'",
     )
     label: str = Field(

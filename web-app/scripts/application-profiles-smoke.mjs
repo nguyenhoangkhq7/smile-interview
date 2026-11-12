@@ -106,10 +106,10 @@ try {
   const historyTab = () => page.evaluate(() => [...document.querySelectorAll('[role="tab"]')].find(e => e.textContent.includes('Lịch sử phỏng vấn')).click());
   await visit('/applications'); await text('Bạn đang chuẩn bị ứng tuyển ở đâu?');
   await visit('/interview/new?sessionId=prepared'); await text('Đặt tên hồ sơ ứng tuyển');
-  await page.type('input[placeholder="Backend Developer"]', 'Backend Developer · Công ty A');
   await page.type('input[placeholder="Ví dụ: Công ty A"]', 'Công ty A');
   await click('Lưu hồ sơ ứng tuyển'); await text('Năng lực hiện tại theo JD');
-  assert.equal(creationPayload.title, 'Backend Developer · Công ty A');
+  assert.equal(creationPayload.title, 'Backend Developer');
+  assert.equal(creationPayload.company, 'Công ty A');
   await click('Bắt đầu lượt 1'); await text('Chuẩn bị phỏng vấn');
   await click('Bắt đầu phỏng vấn'); await page.waitForSelector('textarea');
   await click('Kết thúc phiên'); await text('Kết thúc lượt phỏng vấn?');
@@ -125,7 +125,7 @@ try {
   await text('EXPLAIN ANALYZE');
   await click('Đóng lịch sử');
   await click('Kết thúc phiên'); await click('Kết thúc lượt');
-  await text('Bạn đã kết thúc sớm.');
+  await text('Bạn đã kết thúc phiên sớm');
   await click('Về hồ sơ ứng tuyển'); await text('Năng lực hiện tại theo JD'); await historyTab(); await text('Kết thúc sớm'); await text('Đã hủy — chưa trả lời');
   await page.screenshot({ path: '.next/application-profile-desktop.png', fullPage: true });
   await click('Phỏng vấn lượt mới'); await text('Chuẩn bị phỏng vấn');

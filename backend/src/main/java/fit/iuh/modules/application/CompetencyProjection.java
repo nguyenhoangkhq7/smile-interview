@@ -189,7 +189,7 @@ public class CompetencyProjection {
         return new View("competency-1", completed, incompatible, lastAssessment, summary, skills);
     }
 
-    private static boolean compatible(JsonNode expected, JsonNode actual) {
+    public static boolean compatible(JsonNode expected, JsonNode actual) {
         if (!expected.path("objective_id").equals(actual.path("objective_id"))
                 || !expected.path("skill_id").equals(actual.path("skill_id"))
                 || !expected.path("criteria").equals(actual.path("criteria"))

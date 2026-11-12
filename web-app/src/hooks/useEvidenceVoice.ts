@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import { EvidenceSession, interviewError } from '@/services/evidenceInterview';
+import { EvidenceSession, conversationPhase, voiceTurn, interviewError } from '@/services/evidenceInterview';
 import { interviewVoice, VoiceTurn, type RecognitionResult } from '@/services/interviewVoice';
 import { encodeWav, VoiceDetector } from '@/lib/voiceAudio';
 import { SimliAvatar } from '@/lib/simliAvatar';
@@ -11,6 +11,7 @@ interface Options {
   setAnswer: (text: string) => void;
   videoRef: RefObject<HTMLVideoElement | null>; audioRef: RefObject<HTMLAudioElement | null>;
   submit: (text: string) => Promise<EvidenceSession | null | undefined>;
+  nextConversation?: () => Promise<EvidenceSession | null | undefined>;
 }
 interface VoiceState {
   enabled: boolean; paused: boolean; listening: boolean; speaking: boolean;
@@ -73,14 +74,15 @@ class VoiceConversation {
     if (!cfg.enabled) throw new Error('Máy chủ chưa bật giọng nói. Hãy cấu hình OpenRouter.');
     if (!cfg.avatar?.configured) throw new Error('Dịch vụ avatar Simli chưa được cấu hình trên máy chủ.');
     if (cfg.format !== 'pcm') throw new Error('Simli cần giọng đọc định dạng PCM trên máy chủ.');
-    const microphone = await navigator.mediaDevices.getUserMedia({ audio: {
+    const microphone = conversationPhase(this.current().session) === 'CLOSING' ? null : await navigator.mediaDevices.getUserMedia({ audio: {
       echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1,
     } });
-    if (this.closed) { microphone.getTracks().forEach(track => track.stop()); return; }
+    if (this.closed) { microphone?.getTracks().forEach(track => track.stop()); return; }
     this.microphone = microphone;
     const context = this.context!;
     const { videoRef, audioRef, session } = this.current();
-    if (!videoRef.current || !audioRef.current || !session?.pending_turn) throw new Error('Phòng phỏng vấn chưa sẵn sàng. Hãy tải lại trang.');
+    const activeTurn = voiceTurn(session);
+    if (!videoRef.current || !audioRef.current || !activeTurn) throw new Error('Phòng phỏng vấn chưa sẵn sàng. Hãy tải lại trang.');
     this.player = new SimliAvatar(videoRef.current, audioRef.current, playing => {
       this.playing = playing; this.emit({ speaking: playing });
     }, () => {
@@ -89,21 +91,23 @@ class VoiceConversation {
       this.update({ ...initial, error: 'Mất kết nối avatar Simli. Hãy kết nối lại; phần trả lời đã nhận diện vẫn được giữ.' });
     });
     const token = await interviewVoice.avatarSession(this.current().id,
-      { turn_id: session.pending_turn.turn_id, expected_state_version: session.state_version }, this.startupAbort.signal);
+      activeTurn, this.startupAbort.signal);
     if (this.closed) return;
     await this.player.start(token, this.startupAbort.signal);
     if (this.closed) return;
-    await context.audioWorklet.addModule('/audio/voice-capture.worklet.js');
+    if (microphone) await context.audioWorklet.addModule('/audio/voice-capture.worklet.js');
     if (this.closed) return;
-    this.source = context.createMediaStreamSource(microphone);
-    this.capture = new AudioWorkletNode(context, 'voice-capture');
-    this.silent = context.createGain(); this.silent.gain.value = 0;
-    this.source.connect(this.capture); this.capture.connect(this.silent); this.silent.connect(context.destination);
-    this.capture.port.onmessage = event => this.frame(event.data as Float32Array);
-    microphone.getAudioTracks()[0].onended = () => {
-      this.pause(true); this.emit({ error: 'Micro đã ngắt. Hãy tắt rồi bật lại giọng nói.' });
-    };
-    if (microphone.getAudioTracks().some(track => track.readyState === 'ended')) throw new Error('Micro đã ngắt trong lúc kết nối. Hãy thử lại.');
+    if (microphone) {
+      this.source = context.createMediaStreamSource(microphone);
+      this.capture = new AudioWorkletNode(context, 'voice-capture');
+      this.silent = context.createGain(); this.silent.gain.value = 0;
+      this.source.connect(this.capture); this.capture.connect(this.silent); this.silent.connect(context.destination);
+      this.capture.port.onmessage = event => this.frame(event.data as Float32Array);
+      microphone.getAudioTracks()[0].onended = () => {
+        this.pause(true); this.emit({ error: 'Micro đã ngắt. Hãy tắt rồi bật lại giọng nói.' });
+      };
+      if (microphone.getAudioTracks().some(track => track.readyState === 'ended')) throw new Error('Micro đã ngắt trong lúc kết nối. Hãy thử lại.');
+    }
     this.ready = true;
     this.emit({ enabled: true, avatarReady: true, error: '' });
     this.sync();
@@ -115,16 +119,22 @@ class VoiceConversation {
     if (this.closed || !this.player || !this.ready) return;
     const options = this.current(), session = options.session;
     this.draft = options.answer;
-    if (!session?.pending_turn || session.is_finished || session.session_id !== options.id) {
+    const phase = conversationPhase(session);
+    if (phase === 'CLOSING' && this.paused) { this.paused = false; this.emit({ paused: false }); }
+    const acceptingSpeech = phase === 'SELF_INTRODUCTION' || phase === 'INTERVIEW';
+    this.microphone?.getAudioTracks().forEach(track => { track.enabled = acceptingSpeech && !this.paused; });
+    const next = voiceTurn(session);
+    if (!session || !next || session.session_id !== options.id) {
       this.stop(); this.update(initial); return;
     }
-    const next = { turn_id: session.pending_turn.turn_id, expected_state_version: session.state_version };
     if (this.turn?.turn_id !== next.turn_id || this.turn.expected_state_version !== next.expected_state_version) {
       this.generation++; this.cancelTimer(); this.cancelSpeech(); this.recognitionAbort?.abort();
       this.queue = []; this.failed = null; this.detector.reset(); this.submitting = false;
       this.segments = []; this.contextFrames = []; this.contextMs = 0; this.segment = 0; this.baseDraft = options.answer;
       this.turn = next;
-      this.announcedTurn = '';
+      if (this.announcedTurn !== next.turn_id) this.announcedTurn = '';
+      // Reloading the introduction resumes listening without repeating the greeting.
+      if (conversationPhase(session) === 'SELF_INTRODUCTION') this.announcedTurn = next.turn_id;
       this.emit({ retryAvailable: false, error: '', listening: false, captions: '', review: null });
     }
     if (options.suspended || options.busy) {
@@ -139,7 +149,8 @@ class VoiceConversation {
   setSilence(ms: number) { this.silence = ms; }
   pause(value: boolean) {
     this.paused = value; this.cancelTimer(); this.flushRecording();
-    this.microphone?.getAudioTracks().forEach(track => { track.enabled = !value; });
+    const phase = conversationPhase(this.current().session);
+    this.microphone?.getAudioTracks().forEach(track => { track.enabled = !value && (phase === 'INTERVIEW' || phase === 'SELF_INTRODUCTION'); });
     if (value) this.cancelSpeech();
     this.emit({ paused: value, listening: false });
     if (!value) this.sync();
@@ -164,13 +175,17 @@ class VoiceConversation {
     this.announcedTurn = this.turn.turn_id;
     this.cancelTimer(); this.cancelSpeech(); this.flushRecording();
     const abort = new AbortController(); this.speechAbort = abort;
+    const phase = conversationPhase(this.current().session);
     this.emit({ loadingSpeech: true, error: '' });
     try {
       await this.context!.resume();
       const response = await interviewVoice.speech(this.current().id, this.turn, abort.signal);
       if (abort.signal.aborted || this.closed) return;
       this.emit({ loadingSpeech: false });
-      await this.player.play(response, abort.signal);
+      await this.player.play(response, abort.signal, phase === 'OPENING' || phase === 'CLOSING');
+      if (!abort.signal.aborted && !this.closed && (phase === 'OPENING' || phase === 'CLOSING')) {
+        await this.current().nextConversation?.();
+      }
     } catch (error) {
       if (!abort.signal.aborted) this.emit({ error: error instanceof Error ? error.message : 'Không thể đọc câu hỏi.' });
     } finally {
@@ -180,6 +195,8 @@ class VoiceConversation {
 
   private frame(samples: Float32Array) {
     const options = this.current();
+    const phase = conversationPhase(options.session);
+    if (phase !== 'INTERVIEW' && phase !== 'SELF_INTRODUCTION') return;
     if (this.closed || this.paused || this.submitting || options.busy || options.suspended || !this.turn) return;
     const result = this.detector.feed(samples, this.context!.sampleRate, this.playing ? 0.028 : 0.015, this.silence);
     if (result.started) {

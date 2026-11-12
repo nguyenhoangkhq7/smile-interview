@@ -332,7 +332,8 @@ def build_proficiency_side(
 
         if side == "JD" and lookup:
             w_val = lookup.get_weight(canon)
-            s_name = lookup.get_display_name(canon) or s_name or canon
+            if not s_name or s_name == canon:
+                s_name = lookup.get_display_name(canon) or s_name or canon
             imp_status = lookup.status if w_val is not None else None
             imp_ver = lookup.estimator_version if w_val is not None else None
 
@@ -672,6 +673,7 @@ def _unique_skills(skills: list[ProficiencySkill]) -> dict[str, ProficiencySkill
 
 class _SkillFields(TypedDict):
     skill_id: str
+    skill_name: Optional[str]
     type: SkillType
     confidence: float
     evidence_spans: list[str]
@@ -680,6 +682,7 @@ class _SkillFields(TypedDict):
 def _skill_fields(skill: ProficiencySkill) -> _SkillFields:
     return {
         "skill_id": skill.skill_id,
+        "skill_name": skill.skill_name,
         "type": SkillType(skill.type),
         "confidence": skill.confidence if skill.confidence is not None else 0.0,
         "evidence_spans": skill.evidence_spans,

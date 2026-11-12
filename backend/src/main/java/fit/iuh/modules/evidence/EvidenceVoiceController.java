@@ -41,19 +41,29 @@ public class EvidenceVoiceController {
     public String transcribe(@PathVariable String sessionId, @AuthenticationPrincipal User user,
                              @Valid @RequestBody Recording recording) {
         var state = active(sessionId, user, recording.turn_id(), recording.expected_state_version());
+        var phase = state.path("conversation").path("phase").asText("INTERVIEW");
+        if (!"INTERVIEW".equals(phase) && !"SELF_INTRODUCTION".equals(phase)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Chưa đến lượt trả lời.");
+        }
         // Vocabulary is resolved from persisted session data, never arbitrary client hints.
         return voice.transcribe(Map.of("audio", recording.audio(),
                 "phase", recording.phase() == null ? "final" : recording.phase(),
                 "terms", interviews.voiceTerms(sessionId, user),
-                "topic", state.path("pending_turn").path("question").asText("").substring(0,
-                    Math.min(2000, state.path("pending_turn").path("question").asText("").length()))));
+                "topic", "SELF_INTRODUCTION".equals(phase) ? "Giới thiệu bản thân và kinh nghiệm liên quan"
+                        : state.path("pending_turn").path("question").asText("").substring(0,
+                          Math.min(2000, state.path("pending_turn").path("question").asText("").length()))));
     }
 
     @PostMapping(value = "/avatar-session", produces = "application/json")
     public String avatarSession(@PathVariable String sessionId, @AuthenticationPrincipal User user,
                                 @Valid @RequestBody Turn turn, HttpServletResponse response) {
         var state = active(sessionId, user, turn.turn_id(), turn.expected_state_version());
-        long remaining = Duration.between(Instant.now(), Instant.parse(state.path("deadline_at").asText())).getSeconds();
+        var phase = state.path("conversation").path("phase").asText("INTERVIEW");
+        long remaining = Duration.between(Instant.now(), Instant.parse(deadline(state))).getSeconds();
+        // One connection covers the introduction, full technical budget and farewell.
+        if ("OPENING".equals(phase) || "SELF_INTRODUCTION".equals(phase))
+            remaining += state.path("config").path("duration_seconds").asLong(900);
+        if (state.path("conversation").isObject()) remaining += 120;
         response.setHeader("Cache-Control", "no-store");
         return voice.avatarSession(Map.of("max_session_length", Math.max(1, Math.min(7200, remaining))));
     }
@@ -63,7 +73,10 @@ public class EvidenceVoiceController {
                        @Valid @RequestBody Turn turn, HttpServletResponse response) {
         var state = active(sessionId, user, turn.turn_id(), turn.expected_state_version());
         // Speak the saved acknowledgment, bridge and question in one continuous request.
-        voice.speech(Map.of("text", spokenTurn(state.path("pending_turn"))), response);
+        var phase = state.path("conversation").path("phase").asText("INTERVIEW");
+        var text = "INTERVIEW".equals(phase) ? spokenTurn(state.path("pending_turn"))
+                : state.path("conversation").path("message").path("text").asText();
+        voice.speech(Map.of("text", text), response);
     }
 
     private String spokenTurn(JsonNode pending) {
@@ -74,6 +87,15 @@ public class EvidenceVoiceController {
 
     private JsonNode active(String sessionId, User user, String turnId, long version) {
         var state = voiceSession(sessionId, user);
+        var phase = state.path("conversation").path("phase").asText("INTERVIEW");
+        if (!"INTERVIEW".equals(phase)) {
+            if ("FINISHED".equals(phase) || !Instant.parse(deadline(state)).isAfter(Instant.now()))
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Lượt hội thoại đã kết thúc.");
+            if (state.path("state_version").asLong() != version || !state.path("conversation")
+                    .path("message").path("message_id").asText().equals(turnId))
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Lượt hội thoại đã thay đổi. Hãy tải lại phiên.");
+            return state;
+        }
         if (state.path("is_finished").asBoolean() || state.path("pending_turn").isNull()
                 || !Instant.parse(state.path("deadline_at").asText()).isAfter(Instant.now())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Phiên phỏng vấn đã kết thúc.");
@@ -83,6 +105,11 @@ public class EvidenceVoiceController {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Câu hỏi đã thay đổi. Hãy tải lại phiên.");
         }
         return state;
+    }
+
+    private String deadline(JsonNode state) {
+        return "INTERVIEW".equals(state.path("conversation").path("phase").asText("INTERVIEW"))
+                ? state.path("deadline_at").asText() : state.path("conversation").path("expires_at").asText();
     }
 
     private JsonNode voiceSession(String sessionId, User user) {

@@ -82,17 +82,17 @@ try {
   await page.waitForSelector('[role="alert"]');
   assert.match(await page.$eval('textarea', e => e.value), /EXPLAIN ANALYZE/);
   await click('Gửi câu trả lời');
-  await page.waitForSelector('::-p-text(Kết quả phỏng vấn theo bằng chứng)');
+  await page.waitForSelector('::-p-text(Kết quả phỏng vấn)');
   await page.goto(`${base}/interview/session/${id}/result`, { waitUntil: 'networkidle0' });
-  await page.waitForSelector('::-p-text(Kết quả phỏng vấn theo bằng chứng)');
+  await page.waitForSelector('::-p-text(Kết quả phỏng vấn)');
   await click('Chi tiết từng tiêu chí');
-  assert.match(await page.$eval('body', e => e.innerText), /Đọc kế hoạch thực thi: Đáp ứng yêu cầu đã kiểm tra \(4 lượt\)/);
-  assert.match(await page.$eval('body', e => e.innerText), /Dừng hỏi tiếp vì chưa thu được thêm bằng chứng/);
+  assert.match(await page.$eval('body', e => e.innerText), /Đọc kế hoạch thực thi: Đáp ứng yêu cầu đã kiểm tra/);
+  assert.match(await page.$eval('body', e => e.innerText), /Chưa đủ thông tin mới để kết luận thêm/);
   await page.screenshot({ path: '.next/evidence-smoke.png', fullPage: true });
   assert.equal(answers.length, 2);
   assert.deepEqual(errors, []);
   assert.deepEqual(voiceRequests, [], 'Text mode must never load an avatar or call voice APIs');
-  console.log('PASS: adaptive defaults, focused setup, reload, retry, criterion counts and stop reasons.');
+  console.log('PASS: adaptive defaults, focused setup, reload, retry, candidate criterion labels and stop reasons.');
 } finally {
   await browser.close();
 }
