@@ -26,7 +26,7 @@ export const resultReasons: Record<string, string> = {
 export const skillStatuses = {
   strong: { label: 'Đạt yêu cầu', tone: 'bg-emerald-50 text-emerald-800', bar: 'bg-emerald-600' },
   weak: { label: 'Cần cải thiện', tone: 'bg-orange-50 text-orange-900', bar: 'bg-orange-600' },
-  partial: { label: 'Chưa đủ bằng chứng', tone: 'bg-amber-50 text-amber-900', bar: 'bg-amber-500' },
+  partial: { label: 'Chưa đủ cơ sở kết luận', tone: 'bg-amber-50 text-amber-900', bar: 'bg-amber-500' },
   unchecked: { label: 'Chưa kiểm tra', tone: 'bg-slate-100 text-slate-700', bar: 'bg-slate-400' },
 } as const;
 
@@ -50,13 +50,25 @@ export function uniqueFindings(items: readonly string[]) {
 }
 
 export function buildResult({ report, turns }: EvidenceSession) {
+  // A session result describes completed questions, not the full interview plan.
+  // Evidence can also link a question to an objective other than its primary one.
+  const turnIds = new Set(turns.map(turn => turn.turn_id));
+  const askedObjectiveIds = new Set(turns.map(turn => turn.objective_id));
+  const interviewedObjectives = report.objectives.filter(objective =>
+    askedObjectiveIds.has(objective.objective_id)
+    || objective.evidence_turn_ids.some(id => turnIds.has(id))
+    || objective.evidence.some(item => turnIds.has(item.turn_id)));
   const bySkill = new Map<string, ObjectiveReport[]>();
   const byTurn = new Map<string, Observation[]>();
-  for (const objective of report.objectives) {
+  for (const turn of turns) {
+    if (turn.skill_id) bySkill.set(turn.skill_id, []);
+  }
+  for (const objective of interviewedObjectives) {
     const objectives = bySkill.get(objective.skill_id) ?? [];
     objectives.push(objective);
     bySkill.set(objective.skill_id, objectives);
     for (const item of objective.evidence) {
+      if (!turnIds.has(item.turn_id)) continue;
       const evidence = byTurn.get(item.turn_id) ?? [];
       evidence.push(item);
       byTurn.set(item.turn_id, evidence);
@@ -65,10 +77,15 @@ export function buildResult({ report, turns }: EvidenceSession) {
 
   const skills = Array.from(bySkill, ([id, objectives]) => {
     const statuses = objectives.map(objective => assessmentStatus(objective.assessment));
-    const status = statuses.includes('weak') ? 'weak' : statuses.every(value => value === 'strong') ? 'strong'
-      : statuses.every(value => value === 'unchecked') ? 'unchecked' : 'partial';
-    const checked = statuses.filter(value => value !== 'unchecked').length;
-    return { id, objectives, status, checked } as const;
+    const status = statuses.includes('weak') ? 'weak'
+      : statuses.length > 0 && statuses.every(value => value === 'strong') ? 'strong' : 'partial';
+    const evidenceIds = new Set(objectives.flatMap(objective => [
+      ...objective.evidence_turn_ids, ...objective.evidence.map(item => item.turn_id),
+    ]));
+    const objectiveIds = new Set(objectives.map(objective => objective.objective_id));
+    const questionCount = turns.filter(turn => turn.skill_id === id
+      || objectiveIds.has(turn.objective_id) || evidenceIds.has(turn.turn_id)).length;
+    return { id, objectives, status, questionCount } as const;
   });
 
   const questions = turns.map((turn, index) => {
@@ -81,10 +98,12 @@ export function buildResult({ report, turns }: EvidenceSession) {
   return {
     skills,
     questions,
-    strengths: uniqueFindings(report.objectives.flatMap(objective => objective.strengths)),
-    weaknesses: uniqueFindings(report.objectives.flatMap(objective => objective.weaknesses)),
-    recommendations: uniqueFindings([...(report.study_recommendations ?? []),
-      ...report.objectives.flatMap(objective => objective.study_recommendations ?? [])]),
+    assessedCount: interviewedObjectives.filter(objective => ['strong', 'weak'].includes(assessmentStatus(objective.assessment))).length,
+    achievedCount: interviewedObjectives.filter(objective => assessmentStatus(objective.assessment) === 'strong').length,
+    strengths: uniqueFindings(interviewedObjectives.flatMap(objective => objective.strengths)),
+    weaknesses: uniqueFindings(interviewedObjectives.flatMap(objective => objective.weaknesses)),
+    // Global recommendations also include untouched objectives in the plan.
+    recommendations: uniqueFindings(interviewedObjectives.flatMap(objective => objective.study_recommendations ?? [])),
   };
 }
 

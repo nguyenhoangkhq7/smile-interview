@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, ArrowRight, BookOpen, CalendarDays, ChartNoAxesCombined, ClipboardList, Gauge, Layers, RotateCcw, Target, TriangleAlert } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, CalendarDays, ChartNoAxesCombined, CircleCheck, Layers, MessageCircleQuestion, RotateCcw, TriangleAlert } from 'lucide-react';
 import { formatProfileDate } from '@/components/features/applications/applicationUi';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -16,7 +16,7 @@ import { ResultNavigation } from './ResultNavigation';
 
 const primary = 'rounded-full bg-[#b02700] text-white hover:bg-[#8c2100]';
 
-function AttainmentGauge({ value }: { value: number | null }) {
+function AttainmentGauge({ value, achieved, assessed }: { value: number | null; achieved: number; assessed: number }) {
   return (
     <div className="mx-auto flex w-full max-w-52 flex-col items-center gap-2 rounded-2xl border border-slate-200/70 bg-[#eef4ff] px-4 py-5 text-center">
       <div className="grid size-28 place-items-center rounded-full"
@@ -25,8 +25,8 @@ function AttainmentGauge({ value }: { value: number | null }) {
           {value === null ? '—' : `${value}%`}
         </div>
       </div>
-      <p className="text-sm font-bold">Nội dung đáp ứng yêu cầu</p>
-      <p className="text-xs text-muted-foreground">{value === null ? 'Chưa đủ dữ liệu' : 'Tính trên những nội dung đã được đánh giá'}</p>
+      <p className="text-sm font-bold">Nội dung đạt yêu cầu</p>
+      <p className="text-xs text-muted-foreground">{value === null ? 'Chưa đủ cơ sở kết luận' : `${achieved}/${assessed} nội dung đã có kết luận`}</p>
     </div>
   );
 }
@@ -40,14 +40,13 @@ export function InterviewResultDashboard({ session, metadata }: { session: Evide
   const encodedProfile = profileId && encodeURIComponent(profileId);
   const studyHref = encodedProfile ? `/practice/${encodedProfile}` : '/practice';
   const backHref = encodedProfile ? `/applications/${encodedProfile}#competency` : '/history';
-  const attainment = percent(session.report.target_attainment);
-  const coverage = percent(session.report.evidence_coverage);
+  const attainment = percent(data.assessedCount ? data.achievedCount / data.assessedCount : null);
   const reason = session.report.termination_reason;
   const metrics = [
-    { label: 'Nội dung đã đánh giá', value: coverage === null ? '—' : `${coverage}%`, Icon: Gauge, tone: 'bg-blue-50 text-blue-800' },
-    { label: 'Kỹ năng đã kiểm tra', value: data.skills.filter(skill => skill.checked > 0).length, Icon: Layers, tone: 'bg-violet-50 text-violet-800' },
-    { label: 'Kỹ năng cần cải thiện', value: data.skills.filter(skill => skill.status === 'weak').length, Icon: TriangleAlert, tone: 'bg-orange-50 text-orange-800' },
-    { label: 'Kỹ năng chưa kiểm tra', value: data.skills.filter(skill => skill.status === 'unchecked').length, Icon: Target, tone: 'bg-amber-50 text-amber-900' },
+    { label: 'Kỹ năng đã phỏng vấn', value: data.skills.length, Icon: Layers, tone: 'bg-blue-50 text-blue-800' },
+    { label: 'Đạt yêu cầu', value: data.skills.filter(skill => skill.status === 'strong').length, Icon: CircleCheck, tone: 'bg-emerald-50 text-emerald-800' },
+    { label: 'Cần cải thiện', value: data.skills.filter(skill => skill.status === 'weak').length, Icon: TriangleAlert, tone: 'bg-orange-50 text-orange-800' },
+    { label: 'Chưa đủ cơ sở kết luận', value: data.skills.filter(skill => skill.status === 'partial').length, Icon: MessageCircleQuestion, tone: 'bg-amber-50 text-amber-900' },
   ];
 
   async function retryInterview() {
@@ -67,7 +66,7 @@ export function InterviewResultDashboard({ session, metadata }: { session: Evide
   return (
     <div className="min-w-0 bg-[#f4f7fc] text-slate-900">
       <ResultNavigation studyHref={studyHref} />
-      <div className="mx-auto max-w-7xl space-y-7 px-4 pt-5 pb-10 sm:px-6">
+      <div className="mx-auto max-w-6xl space-y-6 px-4 pt-5 pb-10 sm:px-6">
         <Link href={backHref} className="inline-flex items-center gap-2 text-sm font-semibold text-[#a02707] hover:underline">
           <ArrowLeft size={16} aria-hidden="true" /> {profileId ? 'Về hồ sơ ứng tuyển' : 'Quay lại lịch sử'}
         </Link>
@@ -83,12 +82,12 @@ export function InterviewResultDashboard({ session, metadata }: { session: Evide
                 <span>{session.turns.length} câu đã trả lời</span>
               </div>
             </div>
-            <AttainmentGauge value={attainment} />
+            <AttainmentGauge value={attainment} achieved={data.achievedCount} assessed={data.assessedCount} />
             <div className="space-y-3 rounded-xl border border-orange-100 bg-white/75 p-4">
-              <h2 className="font-bold">Tổng kết phiên</h2>
+              <h2 className="font-bold">Buổi phỏng vấn của bạn</h2>
               <p className="text-sm leading-relaxed text-slate-700">{reason ? resultReasons[reason] ?? 'Lượt phỏng vấn đã kết thúc.' : 'Lượt phỏng vấn đã kết thúc.'}</p>
-              <p className="text-sm text-slate-600">{coverage === null ? 'Chưa xác định được tỷ lệ nội dung đã đánh giá.' : `Đã có thông tin đánh giá cho ${coverage}% nội dung dự kiến.`} Kết quả chỉ áp dụng cho phần đã kiểm tra.</p>
-              <Link href="#feedback" className={cn(buttonVariants({ size: 'sm' }), primary)}>Xem nhận xét AI <ArrowRight aria-hidden="true" /></Link>
+              <p className="text-sm leading-relaxed text-slate-600">Bạn đã trả lời {data.questions.length} câu hỏi về {data.skills.length} kỹ năng. Kết quả chỉ phản ánh những nội dung đã phỏng vấn trong buổi này.</p>
+              <Link href="#skills" className={cn(buttonVariants({ size: 'sm' }), primary)}>Xem kết quả kỹ năng <ArrowRight aria-hidden="true" /></Link>
             </div>
           </div>
         </section>
@@ -101,31 +100,20 @@ export function InterviewResultDashboard({ session, metadata }: { session: Evide
             </div>
           ))}
         </dl>
-        <ResultFeedback data={data} studyHref={studyHref} />
         <ResultSkills skills={data.skills} />
+        <ResultFeedback data={data} />
         <ResultQuestions questions={data.questions} />
         <ResultStudy data={data} studyHref={studyHref} />
-        <section id="next" className={resultSection}>
-          <h2 className="text-xl font-bold">Tiếp theo bạn nên làm gì?</h2>
-          <div className="grid gap-3 md:grid-cols-3">
-            <div className="space-y-3 rounded-2xl bg-[#a92705] p-5 text-white shadow-sm">
-              <BookOpen aria-hidden="true" /><h3 className="font-bold">Lập kế hoạch tự ôn tập</h3>
-              <p className="text-sm text-orange-50">Xem các kỹ năng cần cải thiện và sắp xếp đầu việc luyện tập.</p>
-              <Link href={studyHref} className={cn(buttonVariants({ variant: 'outline' }), 'rounded-full border-white bg-white text-[#8c2100] hover:bg-orange-50')}>Mở kế hoạch <ArrowRight aria-hidden="true" /></Link>
-            </div>
-            <div className={cn(resultPanel, 'space-y-3')}>
-              <RotateCcw className="text-orange-800" aria-hidden="true" /><h3 className="font-bold">Luyện tập phỏng vấn lại</h3>
-              <p className="text-sm text-muted-foreground">Bắt đầu một lượt mới để kiểm tra phần đã ôn.</p>
-              {profileId ? <Button variant="outline" disabled={busy} onClick={() => void retryInterview()}>{busy ? 'Đang tạo lượt…' : 'Phỏng vấn lượt mới'}</Button>
-                : <Link href="/interview/new" className={buttonVariants({ variant: 'outline' })}>Phỏng vấn mới</Link>}
-              {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-            </div>
-            <div className={cn(resultPanel, 'space-y-3')}>
-              <ClipboardList className="text-blue-800" aria-hidden="true" /><h3 className="font-bold">{profileId ? 'Theo dõi năng lực' : 'Xem lịch sử phỏng vấn'}</h3>
-              <p className="text-sm text-muted-foreground">{profileId ? 'Xem kết quả đánh giá tích lũy theo hồ sơ.' : 'Mở các lượt phỏng vấn đã lưu.'}</p>
-              <Link href={backHref} className={buttonVariants({ variant: 'outline' })}>{profileId ? 'Mở hồ sơ ứng tuyển' : 'Mở lịch sử'}</Link>
+        <section id="next" className={cn(resultPanel, resultSection, 'bg-orange-50/60')}>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="space-y-1"><h2 className="text-lg font-bold">Sẵn sàng cho buổi tiếp theo?</h2><p className="text-sm text-slate-600">Ôn lại phần cần cải thiện, sau đó phỏng vấn lại để theo dõi tiến bộ.</p></div>
+            <div className="flex flex-wrap gap-2">
+              <Link href={studyHref} className={cn(buttonVariants(), primary)}><BookOpen aria-hidden="true" />Mở kế hoạch ôn tập</Link>
+              {profileId ? <Button variant="outline" disabled={busy} onClick={() => void retryInterview()}><RotateCcw aria-hidden="true" />{busy ? 'Đang tạo lượt…' : 'Phỏng vấn lượt mới'}</Button>
+                : <Link href="/interview/new" className={buttonVariants({ variant: 'outline' })}><RotateCcw aria-hidden="true" />Phỏng vấn mới</Link>}
             </div>
           </div>
+          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         </section>
       </div>
     </div>
