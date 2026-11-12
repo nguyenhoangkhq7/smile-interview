@@ -77,3 +77,17 @@ def test_module1_output_rejects_missing_weight(context):
 
     with pytest.raises(Module1OutputError, match="Missing JD skill importance for kafka"):
         build_module1_output(context)
+
+
+def test_module1_keeps_display_name_separate_from_cached_ascii_id(context):
+    skill = context.unified_response.jd.explicit.skills[0]
+    skill.surface_forms = ['Phát triển AI Coding Agent']
+    skill.evidences[0].surface_form = skill.surface_forms[0]
+    skill.evidences[0].sentence = 'Yêu cầu Phát triển AI Coding Agent.'
+    context.unified_response.jd.raw_text = skill.evidences[0].sentence + '\nOperate kafka.'
+    context.jd_text = context.unified_response.jd.raw_text
+    context.skill_importance_output['records'][0]['skill_name'] = 'ph t tri n ai coding agent'
+    output = build_module1_output(context)
+    assert output.jd_skills[0].skill_id == 'postgresql'
+    assert output.jd_skills[0].skill_name == 'Phát triển AI Coding Agent'
+    assert output.jd_skills[0].evidence_spans == ['Yêu cầu Phát triển AI Coding Agent.']

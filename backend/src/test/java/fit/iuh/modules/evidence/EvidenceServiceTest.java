@@ -76,4 +76,26 @@ class EvidenceServiceTest {
         verify(store).sameStart(run, json.tree(config));
         verifyNoInteractions(ai, inputs);
     }
+
+    @Test void conversationChecksOwnerAndReplaysReceiptsBeforeAiCalls() {
+        session();
+        var command = new EvidenceDtos.Conversation(UUID.randomUUID(), "intro", 1, "NEXT", "");
+        assertThatThrownBy(() -> service.converse("s", User.builder().id(UUID.randomUUID()).build(), command))
+                .isInstanceOf(ResponseStatusException.class);
+        verifyNoInteractions(store, ai);
+        var saved = json.read("{\"state_version\":2}");
+        when(store.replay("s", command.requestId(), json.hash(command))).thenReturn(saved);
+        assertThat(service.converse("s", owner, command)).isEqualTo(saved);
+        verifyNoInteractions(ai, runs);
+    }
+
+    @Test void staleConversationCannotCallAi() {
+        session();
+        InterviewRun run = new InterviewRun(); run.setStateVersion(3);
+        when(runs.findById("s")).thenReturn(Optional.of(run));
+        assertThatThrownBy(() -> service.converse("s", owner,
+                new EvidenceDtos.Conversation(UUID.randomUUID(), "intro", 2, "NEXT", "")))
+                .isInstanceOf(ResponseStatusException.class);
+        verifyNoInteractions(ai);
+    }
 }

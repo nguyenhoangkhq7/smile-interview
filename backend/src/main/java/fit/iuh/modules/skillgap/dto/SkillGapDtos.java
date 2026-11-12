@@ -16,6 +16,8 @@ public final class SkillGapDtos {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record SkillGapResultDto(
             @JsonProperty("jd_skill_id") String jdSkillId,
+            @JsonProperty("jd_skill_name") String jdSkillName,
+            @JsonProperty("matched_cv_skill_name") String matchedCvSkillName,
             @JsonProperty("semantic_alignment") String semanticAlignment,
             @JsonProperty("matched_cv_skill_id") String matchedCvSkillId,
             @JsonProperty("is_substituted") boolean isSubstituted,

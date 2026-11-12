@@ -87,6 +87,36 @@ class EvidenceVoiceTest {
         verify(voice).speech(java.util.Map.of("text", "Câu hỏi đã lưu"), output);
     }
 
+    @Test void farewellCanBeSpokenAfterAssessmentEndsButCannotBeTranscribed() {
+        when(interviews.read("s", user)).thenReturn(json.read("""
+            {"state_version":5,"config":{"interaction_mode":"VOICE"},"is_finished":true,
+             "deadline_at":"2000-01-01T00:00:00Z","pending_turn":null,
+             "conversation":{"phase":"CLOSING","expires_at":"2099-01-01T00:00:00Z",
+               "message":{"message_id":"bye","text":"Cảm ơn bạn, chào bạn!"}}}
+            """));
+        var output = new MockHttpServletResponse();
+        controller.speech("s", user, new EvidenceVoiceController.Turn("bye", 5), output);
+        verify(voice).speech(Map.of("text", "Cảm ơn bạn, chào bạn!"), output);
+        assertThatThrownBy(() -> controller.transcribe("s", user,
+                new EvidenceVoiceController.Recording("bye", 5, "audio"))).isInstanceOf(ResponseStatusException.class);
+        verify(voice, never()).transcribe(any());
+        assertThatThrownBy(() -> controller.speech("s", user,
+                new EvidenceVoiceController.Turn("old", 5), output)).isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test void introductionUsesItsOwnDeadlineAndNeverUsesItAsTechnicalVocabulary() {
+        when(interviews.read("s", user)).thenReturn(json.read("""
+            {"state_version":2,"config":{"interaction_mode":"VOICE"},"is_finished":false,
+             "deadline_at":"2000-01-01T00:00:00Z","pending_turn":null,
+             "conversation":{"phase":"SELF_INTRODUCTION","expires_at":"2099-01-01T00:00:00Z",
+               "message":{"message_id":"intro","text":"Mời bạn giới thiệu bản thân."}}}
+            """));
+        when(interviews.voiceTerms("s", user)).thenReturn(java.util.List.of("Java"));
+        controller.transcribe("s", user, new EvidenceVoiceController.Recording("intro", 2, "audio"));
+        verify(voice).transcribe(Map.of("audio", "audio", "phase", "final", "terms", java.util.List.of("Java"),
+                "topic", "Giới thiệu bản thân và kinh nghiệm liên quan"));
+    }
+
     @Test void realHttpClientPreservesPcmBytesAndHeaders() throws Exception {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         byte[] pcm = {0, 1, -1, 127, 0, -128};

@@ -1,6 +1,7 @@
 """Ontology-free competency granularity classification and overlap analysis service (Pre-GNN Phase 2C)."""
 from dataclasses import dataclass
 import re
+import unicodedata
 from typing import Any, Dict, List, Literal, Optional, Set, Tuple
 
 CompetencyGranularity = Literal[
@@ -260,7 +261,7 @@ def normalize_inflectional_slug(label: str) -> str:
     Normalize minor grammatical inflectional variations (e.g. frontends -> frontend)
     to prevent spurious duplicate skill nodes while preserving surface forms.
     """
-    slug = re.sub(r"[^a-z0-9\-\.]+", "-", label.lower()).strip("-.")
+    slug = re.sub(r"[^\w\-\.]+|_+", "-", unicodedata.normalize("NFKC", label).lower()).strip("-.")
     # Lemmatize common plural suffixes on role head nouns
     slug = re.sub(r"-backends$", "-backend", slug)
     slug = re.sub(r"-frontends$", "-frontend", slug)

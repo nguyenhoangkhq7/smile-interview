@@ -19,6 +19,9 @@ export interface StudyChecklistItem {
   content: string;
   isCompleted: boolean;
   sortOrder: number;
+  sourceCriterionId?: string | null;
+  sourceSessionId?: string | null;
+  sourceAttemptNumber?: number | null;
 }
 
 export interface StudyResource {
@@ -34,6 +37,7 @@ export interface StudyTask extends StudyTaskFields {
   gapSourceSkillId?: string | null;
   gapSourceSessionId?: string | null;
   gapSourceAttemptNumber?: number | null;
+  gapSourceObjectiveId?: string | null;
   gapNeedsConfirmation?: boolean;
   checklist: readonly StudyChecklistItem[];
   resources: readonly StudyResource[];
@@ -42,8 +46,13 @@ export interface StudyTask extends StudyTaskFields {
 export interface NewStudyTask extends StudyTaskFields {
   parentTaskId?: number;
   checklist: readonly string[];
+  checklistOrigins?: readonly {
+    sourceCriterionId: string;
+    sourceSessionId?: string | null;
+    sourceAttemptNumber?: number | null;
+  }[];
   referenceUrl?: string;
-  gapOrigin?: { skillId: string; sessionId?: string | null; attemptNumber?: number | null };
+  gapOrigin?: { skillId: string; sessionId?: string | null; attemptNumber?: number | null; objectiveId?: string };
 }
 
 export type StudyTaskUpdate = Partial<StudyTaskFields>;

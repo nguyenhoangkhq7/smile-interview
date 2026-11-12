@@ -1,20 +1,20 @@
 'use client';
 import { useState } from 'react';
-import { MessageSquareText, Mic } from 'lucide-react';
+import { LoaderCircle, MessageSquareText, Mic } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { InterviewConfig, QuestionMode, defaultConfig, questionModes } from '@/services/evidenceInterview';
 
 export const modeLabels: Record<QuestionMode, string> = {
-  CODING: 'Coding', DEBUGGING: 'Debugging', DESIGN: 'Thiết kế hệ thống',
-  TECHNICAL_EXPLANATION: 'Giải thích kỹ thuật', BEHAVIORAL: 'Behavioral',
+  CODING: 'Lập trình', DEBUGGING: 'Tìm và sửa lỗi', DESIGN: 'Thiết kế hệ thống',
+  TECHNICAL_EXPLANATION: 'Giải thích kỹ thuật', BEHAVIORAL: 'Kinh nghiệm và cách ứng xử',
 };
 
 interface Props { busy: boolean; onStart: (config: InterviewConfig) => void }
 export function EvidenceSetup({ busy, onStart }: Props) {
   const [config, setConfig] = useState(defaultConfig);
-  return <section className="space-y-5 rounded-xl border p-6">
+  return <section aria-busy={busy} className="space-y-5 rounded-xl border p-6">
     <h1 className="text-2xl font-semibold">Chuẩn bị phỏng vấn</h1>
-    <p>Câu hỏi được chọn theo công việc trong JD, kỹ năng cần kiểm chứng và thời lượng của bạn.</p>
+    <p>Câu hỏi được chọn theo công việc trong JD, kỹ năng cần làm rõ và thời lượng của bạn.</p>
     <p className="text-sm text-muted-foreground">Mỗi lượt tập trung vào một nội dung. Người phỏng vấn sẽ hỏi tiếp khi cần làm rõ hoặc kiểm chứng câu trả lời, trong thời lượng và số câu bạn chọn.</p>
     <fieldset disabled={busy} className="space-y-3">
       <legend className="mb-3 font-semibold">Bạn muốn phỏng vấn bằng cách nào?</legend>
@@ -45,7 +45,9 @@ export function EvidenceSetup({ busy, onStart }: Props) {
         value={config.max_questions} onChange={e => setConfig({ ...config, max_questions: Number(e.target.value) })} />
     </label>
     <Button disabled={busy || config.max_questions < 1 || config.max_questions > 40 || config.duration_seconds < 60 || config.duration_seconds > 7200} onClick={() => onStart(config)}>
+      {busy && <LoaderCircle aria-hidden="true" className="animate-spin" />}
       {busy ? 'Đang chuẩn bị mục tiêu và câu hỏi…' : 'Bắt đầu phỏng vấn'}
     </Button>
+    <p role={busy ? 'status' : undefined} className="text-sm text-muted-foreground">Lần phỏng vấn đầu tiên có thể mất vài phút để chuẩn bị câu hỏi.</p>
   </section>;
 }

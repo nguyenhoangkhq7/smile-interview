@@ -35,6 +35,12 @@ public class EvidenceController {
         return service.stop(sessionId, user, stop).toString();
     }
 
+    @PostMapping("/conversation")
+    public String converse(@PathVariable String sessionId, @AuthenticationPrincipal User user,
+                           @Valid @RequestBody EvidenceDtos.Conversation command) {
+        return service.converse(sessionId, user, command).toString();
+    }
+
     @GetMapping("/report")
     public String report(@PathVariable String sessionId, @AuthenticationPrincipal User user) {
         return service.read(sessionId, user).path("report").toString();

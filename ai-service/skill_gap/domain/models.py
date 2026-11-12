@@ -8,12 +8,14 @@ UNASSIGNED_JOB_ID = "UNASSIGNED"
 
 class ExtractedCVSkill(BaseModel):
     skill_id: str
+    skill_name: Optional[str] = None
     type: SkillType
     confidence: float = Field(ge=0.0, le=1.0)
     evidence_spans: List[str]
 
 class ExtractedJDSkill(BaseModel):
     skill_id: str
+    skill_name: Optional[str] = None
     type: SkillType
     confidence: float = Field(ge=0.0, le=1.0)
     evidence_spans: List[str]
@@ -111,6 +113,8 @@ class ProficiencyResult(BaseModel):
 
 class SkillGapResult(BaseModel):
     jd_skill_id: str
+    jd_skill_name: Optional[str] = None
+    matched_cv_skill_name: Optional[str] = None
     semantic_alignment: SemanticAlignment
     matched_cv_skill_id: Optional[str]
     is_substituted: bool = Field(description="True nếu kỹ năng được bù đắp bởi kỹ năng tương đương (PARTIAL)")

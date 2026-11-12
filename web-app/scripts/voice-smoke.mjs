@@ -94,7 +94,7 @@ try {
     if (url.pathname.endsWith('/interview')) return send(session || {}, session ? 200 : 404);
     return send({});
   });
-  const click = async text => { const button = await page.waitForSelector(`button::-p-text(${text})`); await button.click(); };
+  const click = async text => { const button = await page.waitForFunction(label => [...document.querySelectorAll('button')].find(node => node.textContent.includes(label) || node.getAttribute('aria-label') === label), {}, text); await button.asElement().click(); };
   const feed = async () => page.evaluate(() => {
     const rate = window.__captureRate;
     // Sustained speech + silence pass through the production local VAD.
@@ -107,8 +107,8 @@ try {
   await click('Bắt đầu phỏng vấn');
   await page.waitForSelector('[data-interview-mode="VOICE"]');
   assert.equal(await page.$('textarea'), null, 'Voice mode has no text answer box');
-  assert.equal(await page.$('[aria-label="Nội dung câu hỏi"]'), null, 'Voice mode has no written chat question');
-  assert.equal(await page.evaluate(() => document.body.innerText.includes('Bạn xử lý transaction như thế nào?')), false);
+  assert.match(await page.$eval('[aria-label="Nội dung câu hỏi"]', node => node.textContent), /Bạn xử lý transaction như thế nào/);
+  assert.equal(await page.$$('section[aria-label="Câu hỏi của AI"]').then(nodes => nodes.length), 1, 'Exactly one AI question panel');
   await page.waitForNetworkIdle({ idleTime: 300 });
   await page.screenshot({ path: '.next/voice-room-ready.png', fullPage: true });
   await (await page.$('[aria-label="Người phỏng vấn"]')).screenshot({ path: '.next/simli-avatar-preview.png' });
@@ -138,7 +138,7 @@ try {
   await page.waitForSelector('video[data-ready="true"]');
   await page.waitForSelector('::-p-text(Người phỏng vấn đang nói)');
   await feed();
-  await page.waitForFunction(() => document.body.textContent.includes('Đã trả lời 1/10'));
+  await page.waitForSelector('[data-answered-count="1"]');
   assert.equal(answers.length, 1, 'Silence automatically submits exactly one V2 answer');
   assert.equal(answers[0].turn_id, 't1');
   assert.ok(await page.$eval('[aria-label="Nội dung lời nói"]', element => element.textContent.includes('Em dùng transaction')), 'The last submitted speech stays visible');
@@ -170,7 +170,7 @@ try {
   await page.waitForFunction(() => !document.querySelector('[role="dialog"]'));
   assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('aria-label')), 'Tùy chỉnh cuộc trò chuyện', 'Closing settings returns keyboard focus to its trigger');
   await click('Tôi đã trả lời xong');
-  await page.waitForFunction(() => document.body.textContent.includes('Đã trả lời 2/10'));
+  await page.waitForSelector('[data-answered-count="2"]');
   assert.equal(await page.$('textarea'), null, 'Oral programming must have no code or text editor');
   assert.equal(await page.$('button::-p-text(Mở editor coding)'), null);
   await click('Tiếp tục nghe');
@@ -183,7 +183,7 @@ try {
   const oral = 'Em duyệt từng phần tử, cộng vào tổng và kiểm tra mảng rỗng.';
   await feedSpeech(4.5);
   await page.waitForFunction(text => document.querySelector('[aria-label="Nội dung lời nói"]')?.textContent.includes(text), {}, oral);
-  assert.ok(await page.$('::-p-text(Đang nghe bạn nói)'), 'Microphone feedback stays active while captions arrive');
+  assert.match(await page.$eval('[role="status"]', node => node.textContent), /Đang nghe bạn/, 'Microphone feedback stays active while captions arrive');
   assert.equal(answers.length, 2, 'A caption segment must not submit an unfinished answer');
   assert.equal(await page.$('textarea, [contenteditable="true"]'), null, 'Captions are read-only');
   await page.screenshot({ path: '.next/voice-captions-speaking.png', fullPage: true });
@@ -211,8 +211,10 @@ try {
   const contextual = transcriptions.filter(item => item.turn_id === 't3' && item.phase === 'final').at(-1);
   assert.ok(Buffer.from(contextual.audio, 'base64').readUInt32LE(40) / 32000 > 9,
     'Final recognition receives the full contextual audio, not the last caption chunk');
+  await page.keyboard.press('Escape');
+  assert.ok(await page.$('[aria-label="Xác nhận lời nói"]'), 'Closing the review cannot silently discard recognized speech');
   await click('Dùng bản đối chiếu');
-  await page.waitForFunction(() => document.body.textContent.includes('Đã trả lời 3/10'));
+  await page.waitForSelector('[data-answered-count="3"]');
   assert.equal(answers[2].candidate_response, 'Em dùng reduce để cộng các phần tử và kiểm tra mảng rỗng.',
     'Only the selected final result is graded; preview captions are replaced, not appended');
   assert.ok(!answers[2].candidate_response.includes('BÀI LÀM'));
@@ -230,6 +232,7 @@ try {
   await page.screenshot({ path: '.next/voice-room-settings-mobile.png', fullPage: true });
   await click('Xong');
   await page.waitForFunction(() => !document.querySelector('[role="dialog"]'));
+  await click('Tùy chỉnh cuộc trò chuyện');
   await click('Kết thúc phiên');
   await click('Kết thúc lượt');
   await page.waitForFunction(() => window.__voiceStream.getAudioTracks()[0].readyState === 'ended');

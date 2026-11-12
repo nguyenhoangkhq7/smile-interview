@@ -185,6 +185,32 @@ class StudyPlanHttpTest {
                 "sourceSessionId", "unrelated-session")), 400);
     }
 
+    @Test void objectiveTaskPersistsCriterionOriginsAndRejectsForeignCriteria() throws Exception {
+        saveInterview(true);
+        var gaps = body(send("GET", "/knowledge-gaps", owner, null), 200);
+        assertThat(gaps.at("/objectiveSuggestions/0/objectiveId").asText()).isEqualTo("sql-task");
+        assertThat(gaps.at("/objectiveSuggestions/0/criteria/0/selectedByDefault").asBoolean()).isTrue();
+        var input = new java.util.HashMap<String, Object>();
+        input.put("title", "Luyện đọc execution plan"); input.put("skillId", "sql"); input.put("status", "TODO");
+        input.put("gapOrigin", Map.of("skillId", "sql", "objectiveId", "sql-task", "sessionId", sessionId, "attemptNumber", 1));
+        input.put("checklist", java.util.List.of(Map.of("content", "Giải thích execution plan", "sourceCriterionId", "sql-c1",
+                "sourceSessionId", sessionId, "sourceAttemptNumber", 1)));
+        var task = body(send("POST", "/tasks", owner, input), 201);
+        assertThat(task.path("gapSourceObjectiveId").asText()).isEqualTo("sql-task");
+        var item = body(send("GET", "", owner, null), 200).at("/tasks/0/checklist/0");
+        assertThat(item.path("sourceCriterionId").asText()).isEqualTo("sql-c1");
+        assertThat(item.path("sourceSessionId").asText()).isEqualTo(sessionId);
+        var path = "/tasks/" + task.path("id").asLong() + "/checklist/" + item.path("id").asLong();
+        body(send("PUT", path, owner, Map.of("content", "Nội dung đã sửa", "isCompleted", true)), 200);
+        assertThat(body(send("GET", "", owner, null), 200).at("/tasks/0/checklist/0/sourceCriterionId").asText()).isEqualTo("sql-c1");
+        input.put("checklist", java.util.List.of(Map.of("content", "Invalid criterion", "sourceCriterionId", "foreign")));
+        body(send("POST", "/tasks", owner, input), 400);
+        input.put("checklist", java.util.List.of(Map.of("content", "Invalid source", "sourceCriterionId", "sql-c1", "sourceSessionId", "foreign")));
+        body(send("POST", "/tasks", owner, input), 400);
+        input.put("gapOrigin", Map.of("skillId", "sql", "objectiveId", "foreign"));
+        body(send("POST", "/tasks", owner, input), 400);
+    }
+
     @Test void simultaneousFirstTasksShareOneActivePlan() throws Exception {
         var request = request("/tasks", owner).header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(json.tree(task(null, "TODO")).toString())).build();

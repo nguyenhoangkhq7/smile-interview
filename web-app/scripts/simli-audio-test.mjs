@@ -57,4 +57,21 @@ const cancelled = new SimliAvatar(media(), media(), () => {}, () => {}, async ()
 }));
 await assert.rejects(() => cancelled.start('token', aborted.signal), { name: 'AbortError' });
 assert.equal(abortedStops, 1, 'A cancelled connection must dispose the SDK instance');
+const completionHandlers = new Map();
+const completed = new SimliAvatar(media(), media(), () => {}, () => {}, async () => ({
+  ...client, on(name, callback) { completionHandlers.set(name, callback); },
+  sendAudioData() { completionHandlers.get('speaking')?.(); },
+  ClearBuffer() { completionHandlers.get('silent')?.(); },
+}));
+await completed.start('token', new AbortController().signal);
+let finished = false;
+const finishAbort = new AbortController();
+const playback = completed.play(new Response(pcm, { headers: { 'X-Audio-Format': 'pcm', 'X-Audio-Sample-Rate': '24000' } }), finishAbort.signal, true)
+  .then(() => { finished = true; });
+await new Promise(resolve => setTimeout(resolve, 50));
+assert.equal(finished, false, 'Downloading all TTS audio must not finish the conversation');
+completionHandlers.get('silent')();
+await playback;
+assert.equal(finished, true, 'A settled Simli silent event confirms playback completion');
+completed.close();
 console.log('PASS: PCM 16 kHz conversion, arbitrary chunks, Simli-only playback, interruption, late audio, startup failure and cleanup.');

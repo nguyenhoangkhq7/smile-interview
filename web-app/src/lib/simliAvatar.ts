@@ -31,6 +31,9 @@ export class SimliAvatar {
   private closed = false;
   private connected = false;
   private epoch = 0;
+  private speakingNow = false;
+  private speechStarts = 0;
+  private lastSilentAt = 0;
   constructor(private video: HTMLVideoElement, private audio: HTMLAudioElement,
     private playing: (value: boolean) => void, private disconnected: () => void,
     private create: Factory = factory) {}
@@ -40,8 +43,14 @@ export class SimliAvatar {
     const client = await this.create(token, this.video, this.audio);
     this.client = client;
     if (this.closed || signal.aborted) { await client.stop(); throw new DOMException('Aborted', 'AbortError'); }
-    client.on('speaking', () => { if (!this.closed && !this.audio.muted) this.playing(true); });
-    client.on('silent', () => { if (!this.closed) this.playing(false); });
+    client.on('speaking', () => {
+      if (!this.closed && !this.audio.muted) {
+        this.speakingNow = true; this.speechStarts++; this.playing(true);
+      }
+    });
+    client.on('silent', () => {
+      if (!this.closed) { this.speakingNow = false; this.lastSilentAt = performance.now(); this.playing(false); }
+    });
     const lost = () => { if (!this.closed && this.connected) { this.connected = false; this.disconnected(); } };
     client.on('stop', lost); client.on('error', lost);
     let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -74,7 +83,7 @@ export class SimliAvatar {
     this.video.pause(); this.audio.pause(); this.video.srcObject = null; this.audio.srcObject = null;
   }
 
-  async play(response: Response, signal: AbortSignal) {
+  async play(response: Response, signal: AbortSignal, waitForPlayback = false) {
     if (!this.connected || !this.client) throw new Error('Avatar Simli chưa kết nối.');
     if (response.headers.get('X-Audio-Format') !== 'pcm') throw new Error('Avatar Simli cần giọng đọc định dạng PCM.');
     const resampler = new SimliPcmResampler(Number(response.headers.get('X-Audio-Sample-Rate')));
@@ -83,6 +92,8 @@ export class SimliAvatar {
     const epoch = this.epoch;
     const cancelled = () => this.closed || !this.connected || signal.aborted || epoch !== this.epoch;
     const began = performance.now();
+    const starts = this.speechStarts;
+    let lastSentAt = began;
     let duration = 0;
     try {
       while (!cancelled()) {
@@ -96,10 +107,20 @@ export class SimliAvatar {
           const chunk = pcm.subarray(offset, offset + 3200);
           this.audio.muted = false;
           this.client.sendAudioData(chunk);
+          lastSentAt = performance.now();
           duration += chunk.length / 32;
         }
       }
       if (!cancelled()) resampler.finish();
     } finally { await reader.cancel().catch(() => {}); reader.releaseLock(); }
+    if (waitForPlayback && !cancelled()) {
+      const timeoutAt = performance.now() + Math.max(15000, duration + 10000);
+      while (!cancelled()) {
+        if (this.speechStarts > starts && !this.speakingNow && this.lastSilentAt >= lastSentAt
+            && performance.now() - this.lastSilentAt >= 300) return;
+        if (performance.now() >= timeoutAt) throw new Error('Chưa xác nhận được avatar đã đọc xong. Bạn có thể nghe lại hoặc tiếp tục bằng nút bên dưới.');
+        await new Promise(resolve => setTimeout(resolve, 30));
+      }
+    }
   }
 }

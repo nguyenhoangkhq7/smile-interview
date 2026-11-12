@@ -5,6 +5,7 @@ import uuid
 from typing import Any, Dict, List, Optional
 
 from fastapi import UploadFile
+from starlette.concurrency import run_in_threadpool
 
 from matching_cv.app.schemas.hetero_graph import (
     GraphConstructionMode,
@@ -262,7 +263,9 @@ class PipelineOrchestrator:
 
         if graph_mode != "evidence_only":
             try:
-                semantic_outcome = self.semantic_stage.execute(
+                # Loading/downloading SBERT and encoding must not block other requests.
+                semantic_outcome = await run_in_threadpool(
+                    self.semantic_stage.execute,
                     unified_response=unified_response,
                     cv_text=cv_text,
                     jd_text=jd_text,

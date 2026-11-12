@@ -171,6 +171,7 @@ export function useNewInterview() {
         if (!session) return;
         setSessionId(session.id);
         setRoleTitle(session.roleTitle);
+        setProfileTitle(session.roleTitle);
         setIngested(true);
         if (session.skillGapResults && session.skillGapReport) {
           setAnalysis({
@@ -368,6 +369,7 @@ export function useNewInterview() {
 
     const newSessionId = `session-${Date.now()}`;
     setRoleTitle(initialRole);
+    setProfileTitle(initialRole);
 
     try {
       await historyService.saveSession({

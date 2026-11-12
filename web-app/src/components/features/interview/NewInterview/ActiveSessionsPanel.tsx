@@ -45,7 +45,7 @@ function StageBadge({ session }: { session: ActiveSession }) {
     return (
       <Badge variant="outline" className="text-[10px] gap-1 font-bold bg-amber-500/10 text-amber-700 border-amber-200">
         <Sparkles size={10} />
-        Đã đánh giá {session.competencyFitScore !== undefined ? `(${session.competencyFitScore}%)` : ''}
+        Đã phân tích CV/JD
       </Badge>
     );
   }

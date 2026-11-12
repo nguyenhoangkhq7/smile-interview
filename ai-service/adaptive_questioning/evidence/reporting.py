@@ -123,4 +123,5 @@ def public_session(snapshot: Snapshot) -> PublicSession:
         is_finished=snapshot.is_finished, deadline_at=snapshot.deadline_at,
         config=snapshot.config, pending_turn=public_turn(snapshot.pending_turn),
         turns=[public_turn(turn) for turn in snapshot.turns], report=report(snapshot),
+        conversation=snapshot.conversation,
     )

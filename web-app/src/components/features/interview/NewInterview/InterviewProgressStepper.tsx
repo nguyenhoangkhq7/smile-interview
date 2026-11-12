@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { UploadCloud, Sparkles, Mic, Check } from 'lucide-react';
+import { UploadCloud, Sparkles, Save, Check } from 'lucide-react';
 
 export type InterviewFlowStep = 'upload' | 'assessment' | 'interview';
 
@@ -27,7 +27,7 @@ export function InterviewProgressStepper({
       id: 'upload' as InterviewFlowStep,
       number: 1,
       title: 'Tải lên CV & JD',
-      subtitle: uploading ? 'Đang tải lên...' : 'Chọn hoặc upload tài liệu',
+      subtitle: uploading ? 'Đang tải lên...' : 'Chọn hoặc tải tài liệu',
       icon: UploadCloud,
       isCompleted: currentStep !== 'upload' || hasAssessment,
       isCurrent: currentStep === 'upload',
@@ -35,12 +35,12 @@ export function InterviewProgressStepper({
     {
       id: 'assessment' as InterviewFlowStep,
       number: 2,
-      title: 'Đánh giá tương thích',
+      title: 'Đối chiếu kỹ năng',
       subtitle: analyzing
         ? 'AI đang phân tích...'
         : hasAssessment
         ? 'Đã có kết quả'
-        : 'Đối chiếu năng lực & kỹ năng',
+        : 'So sánh CV với công việc',
       icon: Sparkles,
       isCompleted: currentStep === 'interview',
       isCurrent: currentStep === 'assessment',
@@ -48,9 +48,9 @@ export function InterviewProgressStepper({
     {
       id: 'interview' as InterviewFlowStep,
       number: 3,
-      title: 'Phòng phỏng vấn AI',
-      subtitle: generating ? 'Đang tạo câu hỏi...' : 'Phỏng vấn 1-1 với AI',
-      icon: Mic,
+      title: 'Lưu hồ sơ',
+      subtitle: generating ? 'Đang lưu hồ sơ...' : 'Sẵn sàng để luyện phỏng vấn',
+      icon: Save,
       isCompleted: false,
       isCurrent: currentStep === 'interview',
     },

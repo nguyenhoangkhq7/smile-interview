@@ -8,11 +8,14 @@ const asModule = source => {
   return `data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`;
 };
 const audioModule = asModule(await fs.readFile(new URL('../src/lib/voiceAudio.ts', import.meta.url), 'utf8'));
+const serviceSource = await fs.readFile(new URL('../src/services/evidenceInterview.ts', import.meta.url), 'utf8');
+const lifecycleModule = asModule(serviceSource.slice(serviceSource.indexOf('export function conversationPhase'), serviceSource.indexOf('export interface AnswerRequest')));
 const source = (await fs.readFile(new URL('../src/hooks/useEvidenceVoice.ts', import.meta.url), 'utf8'))
   .split('export function useEvidenceVoice')[0].replace(/^import .*;\r?\n/gm, '');
 globalThis.__recognizer = {};
 const { VoiceConversation } = await import(asModule(`
 import { encodeWav, VoiceDetector } from '${audioModule}';
+import { conversationPhase, voiceTurn } from '${lifecycleModule}';
 const interviewVoice = globalThis.__recognizer;
 const interviewError = error => error.message;
 ${source}

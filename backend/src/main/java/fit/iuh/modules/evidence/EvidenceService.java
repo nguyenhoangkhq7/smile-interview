@@ -6,13 +6,14 @@ import fit.iuh.modules.session.entity.Session;
 import fit.iuh.modules.session.repository.SessionRepository;
 import fit.iuh.modules.session.repository.SessionTurnRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import java.util.Map;
 import java.util.Objects;
 
-@Service @RequiredArgsConstructor
+@Service @RequiredArgsConstructor @Slf4j
 public class EvidenceService {
     private final SessionRepository sessions;
     private final SessionTurnRepository turns;
@@ -40,9 +41,13 @@ public class EvidenceService {
 
     public JsonNode start(String sessionId, User user, EvidenceDtos.Config config) {
         Session session = owned(sessionId, user);
+        log.info("Interview start requested session_id={} interaction_mode={}", sessionId, config.interactionMode());
         JsonNode configNode = json.tree(config);
         var existing = runs.findById(sessionId);
-        if (existing.isPresent()) return store.sameStart(existing.get(), configNode);
+        if (existing.isPresent()) {
+            log.info("Interview start reused session_id={} state_version={}", sessionId, existing.get().getStateVersion());
+            return store.sameStart(existing.get(), configNode);
+        }
         if (session.getAiInterviewSessionId() != null || !turns.findBySessionIdOrderByIdAsc(sessionId).isEmpty()) {
             throw EvidenceStore.conflict("Legacy session must continue with its original engine; clone to use V2");
         }
@@ -51,13 +56,21 @@ public class EvidenceService {
         start.put("config", config);
         start.put("skills", inputs.skills(session));
         var profile = session.getApplicationProfile();
+        start.put("opening", Map.of("company", profile == null ? "" : Objects.requireNonNullElse(profile.getCompany(), ""),
+                "role_title", Objects.requireNonNullElse(session.getRoleTitle(), "vị trí ứng tuyển")));
         if (profile != null && profile.getBlueprintJson() != null) {
             start.put("blueprint", json.read(profile.getBlueprintJson()));
             start.put("policy", json.read(profile.getPolicyJson()));
         }
         JsonNode payload = json.tree(start);
+        log.info("Interview preparation started session_id={} skills={} reuse_blueprint={}",
+                sessionId, payload.path("skills").size(), start.containsKey("blueprint"));
         JsonNode result = ai.compute("start", payload);
-        return store.commit(new EvidenceStore.Commit(sessionId, 0, null, null, configNode, result));
+        JsonNode committed = store.commit(new EvidenceStore.Commit(sessionId, 0, null, null, configNode, result));
+        log.info("Interview preparation committed session_id={} state_version={} phase={} has_question={}",
+                sessionId, committed.path("state_version").asLong(),
+                committed.path("conversation").path("phase").asText("INTERVIEW"), committed.hasNonNull("pending_turn"));
+        return committed;
     }
 
     public JsonNode respond(String sessionId, User user, EvidenceDtos.Answer answer) {
@@ -84,6 +97,20 @@ public class EvidenceService {
         if (visible.path("is_finished").asBoolean()) return visible;
         JsonNode result = ai.compute("stop", json.read(run.getSnapshotJson()));
         return store.commit(new EvidenceStore.Commit(sessionId, run.getStateVersion(), stop.requestId(),
+                hash, json.read(run.getConfigJson()), result));
+    }
+
+    public JsonNode converse(String sessionId, User user, EvidenceDtos.Conversation command) {
+        owned(sessionId, user);
+        String hash = json.hash(command);
+        JsonNode cached = store.replay(sessionId, command.requestId(), hash);
+        if (cached != null) return cached;
+        InterviewRun run = current(sessionId, command.expectedVersion());
+        var payload = Map.of("snapshot", json.read(run.getSnapshotJson()), "message_id", command.messageId(),
+                "expected_state_version", command.expectedVersion(), "action", command.action(),
+                "introduction", Objects.requireNonNullElse(command.introduction(), ""));
+        JsonNode result = ai.compute("conversation", payload);
+        return store.commit(new EvidenceStore.Commit(sessionId, run.getStateVersion(), command.requestId(),
                 hash, json.read(run.getConfigJson()), result));
     }
 

@@ -90,14 +90,13 @@ function SkillCard({ skill }: { skill: ResultData['skills'][number] }) {
               <div key={objective.objective_id} className="space-y-2 text-sm wrap-anywhere">
                 <h4 className="font-semibold">{objective.claim}</h4>
                 <p className={cn('inline-block rounded-md px-2 py-1 text-xs', skillStatuses[assessmentStatus(objective.assessment)].tone)}>{assessmentLabels[objective.assessment]}</p>
-                {reason && <p className="text-muted-foreground">{resultReasons[reason] ?? reason}</p>}
-                {objective.inferred && <p className="text-xs text-muted-foreground">Mục tiêu được suy luận từ mô tả công việc.</p>}
+                {reason && <p className="text-muted-foreground">{resultReasons[reason] ?? 'Nội dung này chưa được đánh giá đầy đủ trong lượt phỏng vấn.'}</p>}
                 {objective.criteria?.length ? (
                   <ul className="space-y-1 rounded-lg bg-slate-50 p-3">
                     {objective.criteria.map(criterion => (
                       <li key={criterion.criterion_id}>
-                        <p>{criterion.description}: {assessmentLabels[criterion.assessment]} ({criterion.turns_spent} lượt)</p>
-                        {criterion.stop_reason && <p className="text-xs text-muted-foreground">{resultReasons[criterion.stop_reason] ?? criterion.stop_reason}</p>}
+                        <p>{criterion.description}: {assessmentLabels[criterion.assessment]}</p>
+                        {criterion.stop_reason && <p className="text-xs text-muted-foreground">{resultReasons[criterion.stop_reason] ?? 'Nội dung này chưa được đánh giá đầy đủ trong lượt phỏng vấn.'}</p>}
                       </li>
                     ))}
                   </ul>
@@ -140,7 +139,7 @@ export function ResultSkills({ skills }: { skills: ResultData['skills'] }) {
   );
 }
 
-const questionLabels = { strong: 'Có bằng chứng đạt', weak: 'Cần cải thiện', partial: 'Chưa có kết luận' } as const;
+const questionLabels = { strong: 'Thể hiện tốt', weak: 'Cần cải thiện', partial: 'Chưa có kết luận' } as const;
 
 export function ResultQuestions({ questions }: { questions: ResultData['questions'] }) {
   const [filter, setFilter] = useState<Filter>('all');

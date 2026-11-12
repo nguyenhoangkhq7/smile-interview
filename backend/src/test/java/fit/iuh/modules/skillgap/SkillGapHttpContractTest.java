@@ -20,6 +20,7 @@ class SkillGapHttpContractTest {
         String response = """
                 {"analysis_id":"test","skills":[{
                   "jd_skill_id":"postgresql","semantic_alignment":"MATCH",
+                  "jd_skill_name":"Tối ưu PostgreSQL","matched_cv_skill_name":"Quản trị PostgreSQL",
                   "is_substituted":false,"gap_magnitude":0,"severity":0,"priority":0,
                   "required_proficiency":4,"candidate_proficiency":4,"cv_evidence_spans":["SQL"],
                   "suggested_strategy":"PROBE_DEPTH","degraded":false,"flags":[],
@@ -52,6 +53,8 @@ class SkillGapHttpContractTest {
             var result = new SkillGapClient(properties).analyzeGap("test", "CV tiếng Việt", "JD tiếng Việt");
             var original = mapper.readTree(response);
             var roundtrip = mapper.valueToTree(result);
+            assertThat(roundtrip.path("skills").get(0).path("jd_skill_name").asText()).isEqualTo("Tối ưu PostgreSQL");
+            assertThat(roundtrip.path("skills").get(0).path("matched_cv_skill_name").asText()).isEqualTo("Quản trị PostgreSQL");
             assertThat(roundtrip.path("skills").get(0).path("job_tasks"))
                     .isEqualTo(original.path("skills").get(0).path("job_tasks"));
             assertThat(mapper.readTree(analysisRequest.get()).path("analysis_id").asText()).isEqualTo("test");
@@ -61,6 +64,8 @@ class SkillGapHttpContractTest {
                     .isEqualTo(original.path("skills").get(0).path("job_tasks"));
             // Spring Boot 4's MVC and RestClient use Jackson 3 by default.
             var webMapper = tools.jackson.databind.json.JsonMapper.builder().build();
+            assertThat(mapper.readTree(webMapper.writeValueAsString(result)).path("skills").get(0).path("jd_skill_name").asText())
+                    .isEqualTo("Tối ưu PostgreSQL");
             assertThat(mapper.readTree(webMapper.writeValueAsString(result)).path("skills").get(0).path("job_tasks"))
                     .isEqualTo(original.path("skills").get(0).path("job_tasks"));
         } finally { server.stop(0); }

@@ -85,15 +85,16 @@ public class StudyPlanRepository {
     public StudyTask createTask(long planId, TaskInput input, Long parentTaskId, GapOriginInput gapOrigin) {
         return taskFields("""
                 INSERT INTO study_tasks (plan_id, parent_task_id, title, skill_id, notes, status, sort_order, completed_at,
-                    gap_source_skill_id, gap_source_session_id, gap_source_attempt_number)
+                    gap_source_skill_id, gap_source_session_id, gap_source_attempt_number, gap_source_objective_id)
                 VALUES (:plan, :parent, :title, :skill, :notes, :status, :sort,
                     CASE WHEN :status = 'DONE' THEN CURRENT_TIMESTAMP END,
-                    :gapSkill, :gapSession, :gapAttempt)
+                    :gapSkill, :gapSession, :gapAttempt, :gapObjective)
                 RETURNING *
                 """, input).param("plan", planId).param("parent", parentTaskId)
                 .param("gapSkill", gapOrigin == null ? null : gapOrigin.skillId())
                 .param("gapSession", gapOrigin == null ? null : gapOrigin.sessionId())
                 .param("gapAttempt", gapOrigin == null ? null : gapOrigin.attemptNumber())
+                .param("gapObjective", gapOrigin == null ? null : gapOrigin.objectiveId())
                 .query(StudyTask.class).single();
     }
 
@@ -138,10 +139,14 @@ public class StudyPlanRepository {
 
     public StudyTaskChecklistItem createChecklistItem(long taskId, ChecklistInput input) {
         return checklistFields("""
-                INSERT INTO study_task_checklist_items (task_id, content, is_completed, sort_order, completed_at)
-                VALUES (:task, :content, :completed, :sort, CASE WHEN :completed THEN CURRENT_TIMESTAMP END)
+                INSERT INTO study_task_checklist_items (task_id, content, is_completed, sort_order, completed_at,
+                    source_criterion_id, source_session_id, source_attempt_number)
+                VALUES (:task, :content, :completed, :sort, CASE WHEN :completed THEN CURRENT_TIMESTAMP END,
+                    :criterion, :session, :attempt)
                 RETURNING *
-                """, taskId, input).query(StudyTaskChecklistItem.class).single();
+                """, taskId, input).param("criterion", input.sourceCriterionId())
+                .param("session", input.sourceSessionId()).param("attempt", input.sourceAttemptNumber())
+                .query(StudyTaskChecklistItem.class).single();
     }
 
     public Optional<StudyTaskChecklistItem> updateChecklistItem(long taskId, long itemId, ChecklistInput input) {
