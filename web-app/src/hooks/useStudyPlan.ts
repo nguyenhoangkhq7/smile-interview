@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { interviewError } from '@/services/evidenceInterview';
 import { studyPlans, type StudyPlanView } from '@/services/studyPlans';
 
@@ -17,7 +18,9 @@ export function useStudyPlan(profileId: string, initialPlan: StudyPlanView) {
     try {
       return { value: await action() };
     } catch (error) {
-      setError(interviewError(error));
+      const message = interviewError(error);
+      setError(message);
+      toast.error(message);
       return null;
     } finally {
       locked.current = false;

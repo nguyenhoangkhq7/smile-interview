@@ -8,12 +8,11 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle, Dia
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import { getStudyReferenceUrl, studyTaskStatuses, type NewStudyTask } from './studyPlan';
+import { getStudyReferenceUrl, type NewStudyTask } from './studyPlan';
 import styles from './practice.module.css';
 
 const inputStyle = 'h-10 rounded-xl border-(--practice-blue-strong) bg-(--practice-pale)/60 px-3 text-sm focus-visible:border-(--practice-primary)';
-const actionStyle = 'h-9 rounded-full bg-(--practice-primary) px-4 font-semibold text-white hover:bg-(--practice-primary-hover)';
-const statusTones = { TODO: 'bg-(--practice-primary)', IN_PROGRESS: 'bg-orange-500', DONE: 'bg-(--practice-green)' };
+const actionStyle = 'h-9 rounded-full bg-[#315f86] px-4 font-semibold text-white hover:bg-[#294f70]';
 
 function ChecklistFields() {
   const [items, setItems] = useState<number[]>([]);
@@ -93,12 +92,11 @@ function StudyTaskForm({ skillIds, onCreate, disabled, parent, branch }: CreateS
       return;
     }
 
-    const status = studyTaskStatuses.find(({ value: option }) => option === data.get('status'))?.value ?? 'TODO';
     setError(undefined);
     setSaveFailed(false);
     const saved = await onCreate({
       title,
-      status,
+      status: 'TODO',
       parentTaskId: parent?.id,
       skillId: branch?.skillId === undefined ? value('skill') || undefined : branch.skillId,
       notes: value('notes') || undefined,
@@ -129,18 +127,6 @@ function StudyTaskForm({ skillIds, onCreate, disabled, parent, branch }: CreateS
             <ChevronDown size={16} className="pointer-events-none absolute inset-y-0 right-3 my-auto text-(--practice-muted)" aria-hidden="true" />
           </div>
         </div>
-        <fieldset className="space-y-1.5">
-          <legend className="font-medium">Trạng thái ban đầu</legend>
-          <div className="grid grid-cols-3 gap-2">
-            {studyTaskStatuses.map(({ value, label }) => (
-              <label key={value} className="flex min-w-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-(--practice-blue-strong) bg-(--practice-pale)/60 px-1.5 py-2 text-center text-xs font-medium has-checked:border-(--practice-primary) has-checked:bg-(--practice-orange)/25 has-checked:text-(--practice-primary) has-focus-visible:outline-2 sm:text-sm">
-                <input name="status" type="radio" value={value} defaultChecked={value === 'TODO'} className="sr-only" />
-                <span className={cn('size-2 shrink-0 rounded-full', statusTones[value])} aria-hidden="true" />
-                {label}
-              </label>
-            ))}
-          </div>
-        </fieldset>
         <div className="space-y-1.5">
           <label htmlFor={`${id}-notes`} className="block font-medium">Ghi chú ôn tập ban đầu</label>
           <Textarea id={`${id}-notes`} name="notes" rows={3} maxLength={2000}

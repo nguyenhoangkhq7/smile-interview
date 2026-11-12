@@ -1,6 +1,6 @@
 import pytest
 
-from module1_matcher.schemas import Module1Output
+from matching_cv.app.schemas.module1 import Module1Output
 from skill_gap.domain.models import ExtractedCVSkill, ExtractedJDSkill, MatchResult
 
 

@@ -5,9 +5,8 @@ from io import BytesIO
 
 from fastapi import UploadFile
 
-from module1_matcher.schemas import Module1Output
-
 from matching_cv.app.core.config import settings
+from matching_cv.app.schemas.module1 import Module1Output
 from matching_cv.app.services.cached_extraction_service import cached_extraction_service
 from matching_cv.app.services.gnn_inference_service import gnn_inference_service
 from matching_cv.app.services.pipeline_extraction import PipelineExtractionService

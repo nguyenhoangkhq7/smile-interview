@@ -5,11 +5,10 @@ type Arrival = { id: number; status: StudyTaskStatus; direction: 'left' | 'right
 
 interface StudyTaskDragOptions {
   disabled: boolean;
-  onSelect: (id: number) => void;
   onMove: (task: StudyTask, status: StudyTaskStatus, beforeTaskId?: number | null) => Promise<boolean>;
 }
 
-export function useStudyTaskDrag({ disabled, onSelect, onMove }: StudyTaskDragOptions) {
+export function useStudyTaskDrag({ disabled, onMove }: StudyTaskDragOptions) {
   const dragSource = useRef<StudyTask | null>(null);
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [dropStatus, setDropStatus] = useState<StudyTaskStatus | null>(null);
@@ -51,7 +50,6 @@ export function useStudyTaskDrag({ disabled, onSelect, onMove }: StudyTaskDragOp
     finishDrag();
     if (disabled || (beforeTaskId === undefined && task.status === status) || event.dataTransfer.getData('text/plain') !== String(task.id)) return;
 
-    onSelect(task.id);
     const from = studyTaskStatuses.findIndex(({ value }) => value === task.status);
     const to = studyTaskStatuses.findIndex(({ value }) => value === status);
     if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {

@@ -28,7 +28,7 @@ from matching_cv.app.schemas.standardized_output import (
 )
 from matching_cv.app.services.extraction_adapter import ExtractionDataAdapter
 from matching_cv.research.data.canonical_skill_normalizer import normalize_canonical_skill
-from module1_matcher.schemas import Module1Output
+from matching_cv.app.schemas.module1 import Module1Output
 from skill_gap.domain.enums import SkillType
 from skill_gap.domain.models import ExtractedCVSkill, ExtractedJDSkill, MatchResult
 

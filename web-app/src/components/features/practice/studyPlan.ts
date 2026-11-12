@@ -31,6 +31,10 @@ export interface StudyResource {
 export interface StudyTask extends StudyTaskFields {
   id: number;
   parentTaskId?: number | null;
+  gapSourceSkillId?: string | null;
+  gapSourceSessionId?: string | null;
+  gapSourceAttemptNumber?: number | null;
+  gapNeedsConfirmation?: boolean;
   checklist: readonly StudyChecklistItem[];
   resources: readonly StudyResource[];
 }
@@ -39,6 +43,7 @@ export interface NewStudyTask extends StudyTaskFields {
   parentTaskId?: number;
   checklist: readonly string[];
   referenceUrl?: string;
+  gapOrigin?: { skillId: string; sessionId?: string | null; attemptNumber?: number | null };
 }
 
 export type StudyTaskUpdate = Partial<StudyTaskFields>;

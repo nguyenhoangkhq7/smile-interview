@@ -26,8 +26,179 @@
   transition: border-color 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
 }
 
+.kanbanCard[data-nest-target] {
+  border-color: var(--practice-primary);
+  background-color: color-mix(in srgb, var(--practice-orange) 28%, white);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--practice-primary) 20%, transparent);
+}
+
+.mindMapStatusFilter {
+  border-color: var(--practice-blue-strong);
+  transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.mindMapStatusFilter:hover {
+  transform: translateY(-1px);
+}
+
+.mindMapStatusFilter[data-filter-selected] {
+  box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 14%, transparent), 0 3px 10px color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.mindMapStatusFilter[data-drop-active] {
+  border-color: var(--practice-primary);
+  background: color-mix(in srgb, var(--practice-orange) 45%, white);
+  box-shadow: inset 0 0 0 1px var(--practice-primary), 0 0 0 3px color-mix(in srgb, var(--practice-primary) 14%, transparent);
+}
+
+.mindMapScene[data-filter-active] [data-mindmap-context] {
+  opacity: 0.2;
+  filter: saturate(0.35);
+  transition: opacity 180ms ease, filter 180ms ease;
+}
+
+.mindMapScene[data-filter-active] [data-task-filter-state="hidden"] {
+  opacity: 0.12;
+  filter: saturate(0.25);
+  transition: opacity 180ms ease, filter 180ms ease;
+}
+
+.mindMapScene[data-filter-active] [data-task-filter-state="context"] {
+  opacity: 0.5;
+  filter: saturate(0.55);
+  transition: opacity 180ms ease, filter 180ms ease;
+}
+
+.mindMapScene[data-filter-active] [data-task-filter-state="match"] {
+  opacity: 1;
+  filter: none;
+}
+
+.mindMapScene [data-task-status] .kanbanCard[data-filter-match] {
+  border-color: currentColor;
+  box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 24%, transparent), 0 0 17px color-mix(in srgb, currentColor 32%, transparent);
+}
+
+.mindMapScene [data-task-status] .kanbanCard[data-filter-match]:hover {
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 28%, transparent), 0 0 22px color-mix(in srgb, currentColor 38%, transparent);
+}
+
+.mindMapScene[data-selection-active] [data-selection-context] {
+  opacity: 0.38;
+  filter: saturate(0.55);
+}
+
+.mindMapScene[data-selection-active] [data-task-dimmed] {
+  opacity: 0.18;
+  filter: saturate(0.35);
+}
+
+.mindMapScene[data-selection-active] [data-task-selected] {
+  z-index: 5;
+  opacity: 1;
+  filter: none;
+}
+
+.mindMapScene[data-selection-active] [data-task-selected] .kanbanCard {
+  border-color: var(--practice-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--practice-primary) 24%, transparent), 0 0 18px color-mix(in srgb, var(--practice-primary) 28%, transparent);
+}
+
+.kanbanNestingTarget {
+  border-color: color-mix(in srgb, var(--practice-primary) 72%, white);
+  background: color-mix(in srgb, var(--practice-orange) 30%, white);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--practice-primary) 16%, transparent);
+}
+
+.kanbanNestPlaceholder {
+  min-height: 2.5rem;
+  border-color: color-mix(in srgb, var(--practice-primary) 58%, white);
+  background: color-mix(in srgb, var(--practice-orange) 35%, transparent);
+  animation: kanban-nest-placeholder-in 180ms ease-out both;
+}
+
+.kanbanNestedArrival {
+  animation: kanban-nested-arrival 520ms cubic-bezier(0.2, 0.8, 0.25, 1) both;
+}
+
 .kanbanColumn {
   transition: background-color 180ms ease, border-color 180ms ease;
+}
+
+.kanbanCompleteButton {
+  position: absolute;
+  z-index: 20;
+  top: 0.75rem;
+  left: 0.5rem;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-0.375rem) scale(0.92);
+  transition: opacity 140ms ease, transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.kanbanTaskCard:has(> .kanbanCard:hover) .kanbanCompleteButton,
+.kanbanTaskCard:has(> .kanbanCard:focus-visible) .kanbanCompleteButton,
+.kanbanTaskCard:has(> .kanbanCompleteButton:hover) .kanbanCompleteButton,
+.kanbanTaskCard:has(> .kanbanCompleteButton:focus-visible) .kanbanCompleteButton {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0) scale(1);
+}
+
+.kanbanTaskCard > .kanbanCard {
+  padding-left: 0.25rem;
+  transition: padding-left 200ms cubic-bezier(0.2, 0.8, 0.2, 1), border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.kanbanTaskCard:has(> .kanbanCard:hover) > .kanbanCard,
+.kanbanTaskCard:has(> .kanbanCard:focus-visible) > .kanbanCard,
+.kanbanTaskCard:has(> .kanbanCompleteButton:hover) > .kanbanCard,
+.kanbanTaskCard:has(> .kanbanCompleteButton:focus-visible) > .kanbanCard {
+  padding-left: 1.75rem;
+}
+
+.kanbanWithInspector {
+  position: relative;
+  min-width: 0;
+}
+
+.hasKanbanInspector > aside {
+  position: absolute;
+  z-index: 30;
+  top: 0;
+  right: 0;
+  min-width: 0;
+  min-height: 26rem;
+  width: min(24rem, calc(100% - 1rem));
+  height: calc(68dvh + 7rem);
+  max-height: calc(68dvh + 7rem);
+  overflow: hidden;
+  border: 1px solid var(--practice-blue-strong);
+  border-radius: 1rem;
+  box-shadow: 0 4px 14px rgb(20 28 36 / 7%);
+}
+
+.hasKanbanInspector[data-inspector-side="left"] > aside {
+  right: auto;
+  left: 0;
+}
+
+.kanbanWithInspector[data-selection-active] .kanbanTaskCard[data-task-dimmed] {
+  opacity: 0.24;
+  filter: saturate(0.45);
+  transition: opacity 180ms ease, filter 180ms ease;
+}
+
+.kanbanWithInspector[data-selection-active] .kanbanTaskCard[data-task-selected] {
+  z-index: 2;
+  opacity: 1;
+  filter: none;
+  border-color: var(--practice-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--practice-primary) 22%, transparent), 0 8px 18px rgb(20 28 36 / 12%);
+}
+
+.kanbanWithInspector[data-selection-active] .kanbanTaskCard[data-task-selected] > .kanbanCard {
+  border-color: color-mix(in srgb, var(--practice-primary) 45%, var(--practice-blue-strong));
 }
 
 .kanbanInsertion,
@@ -73,6 +244,10 @@
     transition: stroke 240ms ease, stroke-width 240ms ease;
   }
 
+  .mindMapConnection[data-nested-arrival] {
+    animation: mind-map-nest 900ms cubic-bezier(0.2, 0.8, 0.25, 1) both;
+  }
+
   .kanbanCard {
     transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
   }
@@ -116,6 +291,17 @@
     }
   }
 
+  @keyframes kanban-nest-placeholder-in {
+    from { opacity: 0.25; transform: translateY(-4px) scaleY(0.7); }
+    to { opacity: 1; transform: translateY(0) scaleY(1); }
+  }
+
+  @keyframes kanban-nested-arrival {
+    0% { opacity: 0.45; transform: translateX(8px) scale(0.97); }
+    55% { opacity: 1; transform: translateX(0) scale(1.015); }
+    100% { transform: translateX(0) scale(1); }
+  }
+
   @keyframes drop-zone-glow {
     from { box-shadow: inset 0 0 0 3px var(--practice-orange); }
     to { box-shadow: inset 0 0 0 0 transparent; }
@@ -126,34 +312,66 @@
     35% { box-shadow: 0 0 0 4px var(--practice-green-bg); }
     100% { box-shadow: 0 0 0 8px transparent; }
   }
+
+  @keyframes mind-map-nest {
+    0% { opacity: 0.35; stroke-width: 7; filter: drop-shadow(0 0 5px var(--practice-primary)); }
+    35% { opacity: 1; stroke-width: 4; filter: drop-shadow(0 0 4px var(--practice-primary)); }
+    100% { opacity: 1; stroke-width: 1.5; filter: drop-shadow(0 0 0 transparent); }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mindMapStatusFilter,
+  .mindMapScene[data-filter-active] [data-mindmap-context],
+  .mindMapScene[data-filter-active] [data-task-filter-state] {
+    transition: none;
+  }
 }
 
 .mindMapWorkspace {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: clamp(21rem, 65dvh, 40rem);
+  position: relative;
+  height: clamp(21rem, 65dvh, 40rem);
   overflow: hidden;
   border: 1px solid var(--practice-blue-strong);
   border-radius: 1rem;
 }
 
+.mindMapWorkspace > :first-child {
+  height: 100%;
+}
+
 .hasInspector > aside {
-  border-block-start: 1px solid var(--practice-blue-strong);
+  position: absolute;
+  z-index: 30;
+  inset-block: 0;
+  right: 0;
+  width: min(24rem, calc(100% - 1rem));
+  overflow: hidden;
+  border-inline-start: 1px solid var(--practice-blue-strong);
+  background: var(--card, white);
+  box-shadow: -8px 0 24px -14px #141c2460;
 }
 
 @media (min-width: 64rem) {
   .mindMapWorkspace {
-    grid-template-rows: clamp(35rem, 70dvh, 49rem);
+    height: clamp(35rem, 70dvh, 49rem);
   }
 
-  .mindMapWorkspace.hasInspector {
-    grid-template-columns: minmax(0, 1fr) minmax(19rem, 30%);
+  .mindMapWorkspace.inspectorOnLeft {
+    --inspector-shadow: 8px 0 24px -14px #141c2460;
   }
 
-  .hasInspector > aside {
-    border-block-start: 0;
-    border-inline-start: 1px solid var(--practice-blue-strong);
-    box-shadow: -8px 0 24px -20px #141c2460;
+  .mindMapWorkspace.inspectorOnLeft > aside {
+    right: auto;
+    left: 0;
+    border-inline-start: 0;
+    border-inline-end: 1px solid var(--practice-blue-strong);
+    box-shadow: var(--inspector-shadow);
+  }
+
+  .hasKanbanInspector[data-inspector-side="left"] > aside {
+    right: auto;
+    left: 0;
   }
 }
 

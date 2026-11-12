@@ -12,6 +12,21 @@ import { StudyTaskChecklist, type StudyTaskChecklistActions } from './StudyTaskC
 import { StudyTaskResources, type StudyTaskResourceActions } from './StudyTaskResources';
 import { DeleteStudyTaskDialog } from './DeleteStudyTaskDialog';
 
+const statusButtonStyles = {
+  TODO: {
+    idle: 'border-stone-200 bg-stone-50 text-stone-700 hover:bg-stone-100',
+    active: 'border-stone-500 bg-stone-200 text-stone-900 ring-2 ring-stone-200',
+  },
+  IN_PROGRESS: {
+    idle: 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100',
+    active: 'border-blue-500 bg-blue-100 text-blue-900 ring-2 ring-blue-200',
+  },
+  DONE: {
+    idle: 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
+    active: 'border-emerald-600 bg-emerald-100 text-emerald-900 ring-2 ring-emerald-200',
+  },
+} as const;
+
 interface PracticeTaskInspectorProps {
   task: StudyTask;
   className?: string;
@@ -53,6 +68,10 @@ export function PracticeTaskInspector({ task, className, disabled, skillIds, onU
       </div>
       <div role="region" aria-label="Nội dung ghi chú và đầu việc" tabIndex={0}
         className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 text-sm focus-visible:outline-2 focus-visible:-outline-offset-2 sm:px-5 xl:[scrollbar-gutter:stable]">
+        {task.gapNeedsConfirmation && <div role="status" className="space-y-1 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-emerald-950">
+          <p className="font-semibold">Kỹ năng {skillLabel(task.gapSourceSkillId ?? task.skillId ?? '')} đã cải thiện</p>
+          <p className="text-xs leading-relaxed">Task vẫn được giữ mở để bạn quyết định. Nếu không cần ôn thêm, hãy xác nhận đã xử lý.</p>
+        </div>}
         <div className="space-y-2">
           <div className="flex flex-wrap gap-1.5 text-xs font-semibold">
             {task.skillId && <span className="rounded-md bg-(--practice-orange)/60 px-2 py-0.5 text-(--practice-primary)">Kỹ năng: {skillLabel(task.skillId)}</span>}
@@ -66,8 +85,8 @@ export function PracticeTaskInspector({ task, className, disabled, skillIds, onU
             {studyTaskStatuses.map(({ value, label }) => (
               <button key={value} type="button" aria-pressed={value === task.status} disabled={disabled}
                 onClick={() => { if (value !== task.status) void onUpdate({ status: value }); }}
-                className={cn('cursor-pointer rounded-lg px-1 py-1.5 text-xs font-semibold focus-visible:outline-2',
-                  value === task.status ? studyTaskTones[value].badge : 'bg-card text-(--practice-muted) hover:bg-(--practice-blue)')}>
+                className={cn('cursor-pointer rounded-lg border px-1 py-1.5 text-xs font-semibold transition focus-visible:outline-2 disabled:cursor-not-allowed disabled:opacity-60',
+                  value === task.status ? statusButtonStyles[value].active : statusButtonStyles[value].idle)}>
                 {label}
               </button>
             ))}
@@ -103,7 +122,7 @@ export function PracticeTaskInspector({ task, className, disabled, skillIds, onU
         {task.status !== 'DONE' && (
           <Button type="button" className="w-full rounded-full bg-(--practice-primary) hover:bg-(--practice-primary-hover)"
             disabled={disabled} onClick={() => void onUpdate({ status: 'DONE' })}>
-            <CircleCheck aria-hidden="true" /> Chuyển sang Đã xong
+            <CircleCheck aria-hidden="true" /> {task.gapNeedsConfirmation ? 'Xác nhận đã xử lý' : 'Chuyển sang Đã xong'}
           </Button>
         )}
         <div className="flex justify-between gap-2">

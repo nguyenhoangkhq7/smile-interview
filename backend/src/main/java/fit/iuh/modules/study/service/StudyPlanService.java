@@ -121,12 +121,21 @@ public class StudyPlanService {
     public StudyTask createTask(UUID profileId, User user, CreateTaskInput input) {
         var profile = ownedProfile(profileId, user, true);
         validateSkill(profile, input.skillId());
+        var gapOrigin = input.gapOrigin();
+        if (gapOrigin != null) {
+            validateSkill(profile, gapOrigin.skillId());
+            if (gapOrigin.sessionId() != null && interviewAttempts(profile, null).stream().noneMatch(attempt ->
+                    gapOrigin.sessionId().equals(attempt.getId())
+                            && (gapOrigin.attemptNumber() == null || gapOrigin.attemptNumber().equals(attempt.getAttemptNumber())))) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Gap source session is outside this profile");
+            }
+        }
         if (input.resource() != null) validateUrl(input.resource().url());
         var plan = input.parentTaskId() == null ? ensurePlan(profile) : requirePlan(profileId);
         if (input.parentTaskId() != null && !repository.hasTask(plan.id(), input.parentTaskId())) {
             throw notFound("Parent study task not found");
         }
-        var task = repository.createTask(plan.id(), input.task(), input.parentTaskId());
+        var task = repository.createTask(plan.id(), input.task(), input.parentTaskId(), gapOrigin);
         if (input.checklist() != null) {
             for (var item : input.checklist()) repository.createChecklistItem(task.id(), item);
         }
@@ -137,8 +146,30 @@ public class StudyPlanService {
     public StudyTask updateTask(UUID profileId, long taskId, User user, TaskInput input) {
         var profile = ownedProfile(profileId, user, true);
         validateSkill(profile, input.skillId());
-        return repository.updateTask(requirePlan(profileId).id(), taskId, input)
+        long planId = requirePlan(profileId).id();
+        if ("DONE".equals(input.status())) requireChildrenComplete(repository.tasks(planId), taskId);
+        return repository.updateTask(planId, taskId, input)
                 .orElseThrow(() -> notFound("Study task not found"));
+    }
+
+    public void updateTaskParent(UUID profileId, long taskId, User user, Long parentTaskId, String status) {
+        ownedProfile(profileId, user, true);
+        long planId = requirePlan(profileId).id();
+        var tasks = repository.tasks(planId);
+        if (tasks.stream().noneMatch(task -> task.id() == taskId)) throw notFound("Study task not found");
+        if ("DONE".equals(status)) requireChildrenComplete(tasks, taskId);
+        if (parentTaskId != null) {
+            var byId = tasks.stream().collect(Collectors.toMap(StudyTask::id, task -> task));
+            if (!byId.containsKey(parentTaskId)) throw notFound("Parent study task not found");
+            long ancestor = parentTaskId;
+            while (true) {
+                if (ancestor == taskId) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A task cannot be nested inside itself or its descendants");
+                var parent = byId.get(ancestor);
+                if (parent == null || parent.parentTaskId() == null) break;
+                ancestor = parent.parentTaskId();
+            }
+        }
+        repository.updateTaskParent(planId, taskId, parentTaskId, status);
     }
 
     public void moveTask(UUID profileId, long taskId, User user, TaskPositionInput input) {
@@ -147,6 +178,7 @@ public class StudyPlanService {
         var tasks = repository.tasks(planId);
         var moved = tasks.stream().filter(task -> task.id() == taskId).findFirst()
                 .orElseThrow(() -> notFound("Study task not found"));
+        if ("DONE".equals(input.status())) requireChildrenComplete(tasks, taskId);
         var destination = new java.util.ArrayList<>(tasks.stream()
                 .filter(task -> task.id() != taskId && task.status().equals(input.status())).toList());
         int index = destination.size();
@@ -165,6 +197,26 @@ public class StudyPlanService {
             if (task.sortOrder() != i || !task.status().equals(input.status())) {
                 repository.moveTask(planId, task.id(), input.status(), i);
             }
+        }
+    }
+
+    private void requireChildrenComplete(List<StudyTask> tasks, long taskId) {
+        var descendants = new LinkedHashSet<Long>();
+        descendants.add(taskId);
+        boolean expanded;
+        do {
+            expanded = false;
+            for (var task : tasks) {
+                if (task.parentTaskId() != null && descendants.contains(task.parentTaskId())) {
+                    expanded |= descendants.add(task.id());
+                }
+            }
+        } while (expanded);
+
+        boolean hasIncompleteChild = tasks.stream().anyMatch(task -> task.id() != taskId
+                && descendants.contains(task.id()) && !"DONE".equals(task.status()));
+        if (hasIncompleteChild) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Hoàn thành các đầu việc con trước khi đánh dấu đầu việc cha là đã xong.");
         }
     }
 

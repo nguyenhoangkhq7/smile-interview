@@ -2,6 +2,7 @@ package fit.iuh.modules.study.repository;
 
 import fit.iuh.modules.study.dto.StudyPlanDtos.Attachment;
 import fit.iuh.modules.study.dto.StudyPlanDtos.ChecklistInput;
+import fit.iuh.modules.study.dto.StudyPlanDtos.GapOriginInput;
 import fit.iuh.modules.study.dto.StudyPlanDtos.PlanInput;
 import fit.iuh.modules.study.dto.StudyPlanDtos.PlanTotals;
 import fit.iuh.modules.study.dto.StudyPlanDtos.ResourceInput;
@@ -81,13 +82,19 @@ public class StudyPlanRepository {
                 .param("plan", planId).param("task", taskId).query(Boolean.class).single();
     }
 
-    public StudyTask createTask(long planId, TaskInput input, Long parentTaskId) {
+    public StudyTask createTask(long planId, TaskInput input, Long parentTaskId, GapOriginInput gapOrigin) {
         return taskFields("""
-                INSERT INTO study_tasks (plan_id, parent_task_id, title, skill_id, notes, status, sort_order, completed_at)
+                INSERT INTO study_tasks (plan_id, parent_task_id, title, skill_id, notes, status, sort_order, completed_at,
+                    gap_source_skill_id, gap_source_session_id, gap_source_attempt_number)
                 VALUES (:plan, :parent, :title, :skill, :notes, :status, :sort,
-                    CASE WHEN :status = 'DONE' THEN CURRENT_TIMESTAMP END)
+                    CASE WHEN :status = 'DONE' THEN CURRENT_TIMESTAMP END,
+                    :gapSkill, :gapSession, :gapAttempt)
                 RETURNING *
-                """, input).param("plan", planId).param("parent", parentTaskId).query(StudyTask.class).single();
+                """, input).param("plan", planId).param("parent", parentTaskId)
+                .param("gapSkill", gapOrigin == null ? null : gapOrigin.skillId())
+                .param("gapSession", gapOrigin == null ? null : gapOrigin.sessionId())
+                .param("gapAttempt", gapOrigin == null ? null : gapOrigin.attemptNumber())
+                .query(StudyTask.class).single();
     }
 
     public Optional<StudyTask> updateTask(long planId, long taskId, TaskInput input) {
@@ -97,6 +104,17 @@ public class StudyPlanRepository {
                     completed_at = CASE WHEN :status = 'DONE' THEN COALESCE(completed_at, CURRENT_TIMESTAMP) END
                 WHERE plan_id = :plan AND id = :task RETURNING *
                 """, input).param("plan", planId).param("task", taskId).query(StudyTask.class).optional();
+    }
+
+    public boolean updateTaskParent(long planId, long taskId, Long parentTaskId, String status) {
+        return jdbc.sql("""
+                UPDATE study_tasks SET parent_task_id = :parent,
+                    status = COALESCE(:status, status), updated_at = CURRENT_TIMESTAMP,
+                    completed_at = CASE WHEN :status = 'DONE' THEN COALESCE(completed_at, CURRENT_TIMESTAMP)
+                                        WHEN :status IN ('TODO', 'IN_PROGRESS') THEN NULL ELSE completed_at END
+                WHERE plan_id = :plan AND id = :task
+                """)
+                .param("parent", parentTaskId).param("status", status).param("plan", planId).param("task", taskId).update() == 1;
     }
 
     private JdbcClient.StatementSpec taskFields(String sql, TaskInput input) {

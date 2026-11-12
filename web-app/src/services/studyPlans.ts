@@ -66,9 +66,10 @@ export const studyPlans = {
   async updatePlan(profileId: string, input: StudyPlanDetails) {
     return toPlanView((await axiosClient.put<PlanResponse>(planPath(profileId), input)).data);
   },
-  async createTask(profileId: string, { checklist, referenceUrl, ...task }: NewStudyTask) {
+  async createTask(profileId: string, { checklist, referenceUrl, gapOrigin, ...task }: NewStudyTask) {
     return (await axiosClient.post<TaskRecord>(`${planPath(profileId)}/tasks`, {
       ...task,
+      gapOrigin,
       checklist: checklist.map((content, sortOrder) => ({ content, sortOrder })),
       resource: referenceUrl ? { title: 'Tài liệu tham khảo', url: referenceUrl } : undefined,
     })).data;
@@ -78,6 +79,9 @@ export const studyPlans = {
   },
   async moveTask(profileId: string, taskId: number, status: StudyTaskFields['status'], beforeTaskId: number | null) {
     await axiosClient.put(`${taskPath(profileId, taskId)}/position`, { status, beforeTaskId });
+  },
+  async updateTaskParent(profileId: string, taskId: number, parentTaskId: number | null, status?: StudyTaskFields['status']) {
+    await axiosClient.put(`${taskPath(profileId, taskId)}/parent`, { parentTaskId, status });
   },
   async deleteTask(profileId: string, taskId: number) {
     await axiosClient.delete(taskPath(profileId, taskId));

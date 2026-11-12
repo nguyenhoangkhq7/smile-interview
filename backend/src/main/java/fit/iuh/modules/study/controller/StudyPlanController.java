@@ -74,6 +74,13 @@ public class StudyPlanController {
         service.moveTask(profileId, taskId, user, input);
     }
 
+    @PutMapping(PLAN + "/tasks/{taskId}/parent")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void updateTaskParent(@PathVariable UUID profileId, @PathVariable long taskId,
+                                 @AuthenticationPrincipal User user, @Valid @RequestBody TaskParentInput input) {
+        service.updateTaskParent(profileId, taskId, user, input.parentTaskId(), input.status());
+    }
+
     @DeleteMapping(PLAN + "/tasks/{taskId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteTask(@PathVariable UUID profileId, @PathVariable long taskId, @AuthenticationPrincipal User user) {

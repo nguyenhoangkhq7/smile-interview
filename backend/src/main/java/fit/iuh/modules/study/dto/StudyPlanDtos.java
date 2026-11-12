@@ -40,14 +40,22 @@ public final class StudyPlanDtos {
                             @Size(max = 10000) String notes, @NotNull @Pattern(regexp = "TODO|IN_PROGRESS|DONE")
                             String status, @PositiveOrZero Integer sortOrder) {}
 
+    public record GapOriginInput(@NotBlank @Size(max = 128) String skillId,
+                                 @Size(max = 128) String sessionId,
+                                 @Positive Integer attemptNumber) {}
+
     public record TaskPositionInput(@NotNull @Pattern(regexp = "TODO|IN_PROGRESS|DONE") String status,
                                     @Positive Long beforeTaskId) {}
+
+    public record TaskParentInput(@Positive Long parentTaskId,
+                                  @Pattern(regexp = "TODO|IN_PROGRESS|DONE") String status) {}
 
     public record CreateTaskInput(@NotBlank @Size(max = 255) String title, String skillId,
                                   @Size(max = 10000) String notes, @NotNull @Pattern(regexp = "TODO|IN_PROGRESS|DONE")
                                   String status, @PositiveOrZero Integer sortOrder,
                                   @Size(max = 50) List<@NotNull @Valid ChecklistInput> checklist,
-                                  @Valid ResourceInput resource, @Positive Long parentTaskId) {
+                                  @Valid ResourceInput resource, @Positive Long parentTaskId,
+                                  @Valid GapOriginInput gapOrigin) {
         public TaskInput task() {
             return new TaskInput(title, skillId, notes, status, sortOrder);
         }
