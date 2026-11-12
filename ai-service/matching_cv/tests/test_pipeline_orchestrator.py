@@ -2,6 +2,8 @@
 import io
 import json
 import os
+import asyncio
+import threading
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi import UploadFile
@@ -33,6 +35,7 @@ from matching_cv.app.schemas.unified_skill_extraction import (
     UnifiedExtractionSummary,
 )
 from matching_cv.app.container import pipeline_orchestrator
+from matching_cv.app.services.pipeline_semantic_stage import SemanticStageError
 
 FRONTEND_FIXTURE_PATH = os.path.join("tests", "fixtures", "02_Frontend_run.json")
 
@@ -66,6 +69,34 @@ def frontend_unified_resp() -> UnifiedExtractFileResponse:
 # -----------------------------------------------------------------------------
 # 1. INPUT VALIDATION TESTS (STAGE 0)
 # -----------------------------------------------------------------------------
+
+
+def test_slow_embedding_load_keeps_event_loop_responsive(valid_cv_file, valid_jd_file, frontend_unified_resp):
+    """A cold SBERT load must allow concurrent requests to keep running."""
+    started, release = threading.Event(), threading.Event()
+
+    def slow_embedding(**kwargs):
+        started.set()
+        release.wait(timeout=2)
+        raise SemanticStageError(RuntimeError("simulated model load failure"), 1)
+
+    async def scenario():
+        pending = asyncio.create_task(pipeline_orchestrator.execute_pipeline(
+            cv_file=valid_cv_file, jd_file=valid_jd_file,
+        ))
+        try:
+            assert await asyncio.to_thread(started.wait, 1)
+            # This coroutine must resume while the synchronous model load is blocked.
+            assert not pending.done()
+        finally:
+            release.set()
+            result = await pending
+        assert result.failure.error_code == "EMBEDDING_FAILURE"
+
+    with patch("matching_cv.app.services.unified_skill_service.unified_skill_service.extract_unified_from_files",
+               new=AsyncMock(return_value=frontend_unified_resp)), \
+         patch.object(pipeline_orchestrator.semantic_stage, "execute", side_effect=slow_embedding):
+        asyncio.run(scenario())
 
 @pytest.mark.anyio
 async def test_validation_missing_cv_file(valid_jd_file):

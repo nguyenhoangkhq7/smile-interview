@@ -63,6 +63,14 @@ python main.py
 ```
 Dịch vụ sẽ lắng nghe tại `http://localhost:8000`. Swagger UI có tại `http://localhost:8000/docs`.
 
+Lần chạy đầu, tải trước model SBERT vào volume cache trước khi phân tích CV/JD để thời gian tải không nằm trong timeout 180 giây của backend. Chạy từ thư mục gốc repository:
+
+```bash
+docker compose run --rm --no-deps ai-service python -c "from matching_cv.app.core.config import settings; from matching_cv.app.core.model_loader import model_loader; model_loader.load_model(settings.STAGE3_MODEL_NAME, revision=settings.STAGE3_MODEL_REVISION)"
+```
+
+Chờ lệnh hoàn tất rồi gửi yêu cầu phân tích. Volume `sbert_cache` giữ model qua các lần tạo lại container. Có thể thêm `HF_TOKEN` vào `ai-service/.env` để dùng hạn mức tải có xác thực.
+
 ### Chạy kiểm thử tự động (Unit & Integration Tests):
 ```bash
 pytest tests_skill_gap tests_adaptive_questioning -q
