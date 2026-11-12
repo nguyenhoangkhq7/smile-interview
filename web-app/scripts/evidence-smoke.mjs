@@ -85,7 +85,7 @@ try {
   await page.waitForSelector('::-p-text(Kết quả phỏng vấn)');
   await page.goto(`${base}/interview/session/${id}/result`, { waitUntil: 'networkidle0' });
   await page.waitForSelector('::-p-text(Kết quả phỏng vấn)');
-  await click('Chi tiết từng tiêu chí');
+  await click('Xem đánh giá chi tiết');
   assert.match(await page.$eval('body', e => e.innerText), /Đọc kế hoạch thực thi: Đáp ứng yêu cầu đã kiểm tra/);
   assert.match(await page.$eval('body', e => e.innerText), /Chưa đủ thông tin mới để kết luận thêm/);
   await page.screenshot({ path: '.next/evidence-smoke.png', fullPage: true });
