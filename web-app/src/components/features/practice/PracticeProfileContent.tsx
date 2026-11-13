@@ -6,7 +6,6 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { usePracticePlanDetail, usePracticeProfiles, usePracticeRequest } from '@/hooks/usePracticeProfiles';
 import { studyPlans } from '@/services/studyPlans';
-import { PracticeStats } from './PracticeOverview';
 import { PracticePlanBoard } from './PracticePlanBoard';
 import { PracticePlanList } from './PracticePlanList';
 import { toPracticePlan } from './practicePlans';
@@ -52,7 +51,6 @@ export function PracticeProfilesContent() {
 
   return (
     <>
-      <PracticeStats plans={plans} />
       {progress.state.status === 'error' && <ProfileStatus message="Không tải được tiến độ ôn tập." onRetry={progress.retry} />}
       {plans.length ? <PracticePlanList plans={plans} /> : <NoPracticeProfiles />}
     </>

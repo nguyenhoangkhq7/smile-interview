@@ -241,11 +241,100 @@
   }
 
   .mindMapConnection {
-    transition: stroke 240ms ease, stroke-width 240ms ease;
+    transition: stroke 240ms ease, stroke-width 200ms ease, opacity 200ms ease;
   }
 
   .mindMapConnection[data-nested-arrival] {
     animation: mind-map-nest 900ms cubic-bezier(0.2, 0.8, 0.25, 1) both;
+  }
+
+  .mindMapConnection[data-edge-entering] {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: mind-map-edge-draw 520ms cubic-bezier(0.2, 0.8, 0.25, 1) forwards;
+  }
+
+  .mindMapFlowLight {
+    stroke-dasharray: 10 26;
+    stroke-linecap: round;
+    animation: mind-map-flow 2.4s linear infinite;
+    transition: opacity 200ms ease;
+  }
+
+  .mindMapDonePulse {
+    animation: mind-map-done-pulse 3.2s ease-in-out infinite;
+  }
+
+  .mindMapCameraAnimated {
+    transition: transform 280ms cubic-bezier(0.2, 0.8, 0.25, 1);
+  }
+
+  .mindMapCanvasEnter {
+    animation: mind-map-canvas-enter 240ms ease-out both;
+  }
+
+  .mindMapOverviewEnter {
+    animation: mind-map-overview-enter 180ms cubic-bezier(0.2, 0.8, 0.25, 1) both;
+  }
+
+  .mindMapNode {
+    transition: transform 180ms cubic-bezier(0.2, 0.8, 0.25, 1), box-shadow 180ms ease, border-color 180ms ease, opacity 180ms ease;
+  }
+
+  @media (hover: hover) {
+    .mindMapScene:not([data-hand-active]) .mindMapNode:hover {
+      transform: translateY(-2px);
+    }
+  }
+
+  .mindMapNode[data-node-selected] {
+    transform: scale(1.015);
+  }
+
+  .mindMapNode[data-node-dragging] {
+    transform: scale(1.015);
+    box-shadow: 0 18px 34px -10px rgb(20 28 36 / 24%);
+    transition: box-shadow 120ms ease;
+  }
+
+  .mindMapNode[data-node-settled] {
+    animation: mind-map-node-settle 200ms cubic-bezier(0.2, 0.8, 0.25, 1);
+  }
+
+  .mindMapNode[data-node-entering] {
+    animation: mind-map-node-enter 240ms cubic-bezier(0.2, 0.8, 0.25, 1) both;
+  }
+
+  .mindMapProgressFill {
+    transition: width 380ms cubic-bezier(0.2, 0.8, 0.25, 1), background-color 240ms ease;
+  }
+
+  .mindMapToolbarDrawer {
+    display: grid;
+    grid-template-columns: 0fr;
+    opacity: 0;
+    transform: translateX(-6px);
+    pointer-events: none;
+    transition:
+      grid-template-columns 280ms cubic-bezier(0.2, 0.8, 0.25, 1),
+      opacity 200ms ease,
+      transform 280ms cubic-bezier(0.2, 0.8, 0.25, 1);
+  }
+
+  .mindMapToolbarDrawer[data-open="true"] {
+    grid-template-columns: 1fr;
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: auto;
+  }
+
+  .mindMapToolbarDrawerInner {
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    gap: 0.125rem;
+    min-width: 0;
+    white-space: nowrap;
   }
 
   .kanbanCard {
@@ -318,14 +407,73 @@
     35% { opacity: 1; stroke-width: 4; filter: drop-shadow(0 0 4px var(--practice-primary)); }
     100% { opacity: 1; stroke-width: 1.5; filter: drop-shadow(0 0 0 transparent); }
   }
+
+  @keyframes mind-map-flow {
+    from { stroke-dashoffset: 36; }
+    to { stroke-dashoffset: 0; }
+  }
+
+  @keyframes mind-map-done-pulse {
+    0%, 100% { opacity: 0.92; }
+    50% { opacity: 0.62; }
+  }
+
+  @keyframes mind-map-edge-draw {
+    to { stroke-dashoffset: 0; }
+  }
+
+  @keyframes mind-map-canvas-enter {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes mind-map-overview-enter {
+    from { opacity: 0; transform: translateY(6px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  @keyframes mind-map-node-settle {
+    0% { transform: scale(1.015); }
+    100% { transform: scale(1); }
+  }
+
+  @keyframes mind-map-node-enter {
+    from { opacity: 0; transform: scale(0.93); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  @keyframes mind-map-inspector-in {
+    from { opacity: 0; transform: translateX(12px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .mindMapStatusFilter,
   .mindMapScene[data-filter-active] [data-mindmap-context],
-  .mindMapScene[data-filter-active] [data-task-filter-state] {
+  .mindMapScene[data-filter-active] [data-task-filter-state],
+  .mindMapConnection,
+  .mindMapCameraAnimated,
+  .mindMapNode,
+  .mindMapProgressFill,
+  .mindMapToolbarDrawer {
     transition: none;
   }
+
+  .mindMapFlowLight,
+  .mindMapDonePulse,
+  .mindMapCanvasEnter,
+  .mindMapOverviewEnter {
+    animation: none;
+  }
+}
+
+.mindMapScene[data-hover-active] .mindMapConnection:not([data-hover-context]) {
+  opacity: 0.25;
+}
+
+.mindMapScene[data-hover-active] .mindMapFlowLight:not([data-hover-context]) {
+  opacity: 0.15;
 }
 
 .mindMapWorkspace {
@@ -350,6 +498,7 @@
   border-inline-start: 1px solid var(--practice-blue-strong);
   background: var(--card, white);
   box-shadow: -8px 0 24px -14px #141c2460;
+  animation: mind-map-inspector-in 190ms ease-out both;
 }
 
 @media (min-width: 64rem) {
@@ -383,3 +532,75 @@
     gap: 1.25rem;
   }
 }
+
+/* ==========================================================================
+   Progress Gradient Component & Animations
+   ========================================================================== */
+
+.progressGradientTrack {
+  position: relative;
+  overflow: hidden;
+  background-color: #e7eef9;
+  border-radius: 9999px;
+  box-shadow: inset 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+.progressGradientFill {
+  height: 100%;
+  border-radius: 9999px;
+  position: relative;
+  overflow: hidden;
+  transition: width 900ms cubic-bezier(0.2, 0.8, 0.25, 1);
+}
+
+.progressGradientFillRed {
+  background: linear-gradient(90deg, #dc2626 0%, #ef4444 48%, #fca5a5 100%);
+  box-shadow: 0 1px 8px rgba(220, 38, 38, 0.35);
+}
+
+.progressGradientFillYellow {
+  background: linear-gradient(90deg, #d97706 0%, #f59e0b 48%, #fde68a 100%);
+  box-shadow: 0 1px 8px rgba(217, 119, 6, 0.35);
+}
+
+.progressGradientFillGreen {
+  background: linear-gradient(90deg, #059669 0%, #10b981 48%, #a7f3d0 100%);
+  box-shadow: 0 1px 8px rgba(16, 185, 129, 0.35);
+}
+
+/* Shimmer wave effect */
+.progressGradientFill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.45) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: translateX(-100%);
+  animation: progressShimmer 2.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes progressShimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  60%, 100% {
+    transform: translateX(200%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progressGradientFill {
+    transition: none;
+  }
+  .progressGradientFill::after {
+    animation: none;
+  }
+}
+
