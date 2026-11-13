@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Geist } from 'next/font/google';
+import { Inter } from 'next/font/google';
 import '../globals.css';
 import 'katex/dist/katex.min.css';
 import { cn } from "@/lib/utils";
@@ -7,7 +7,12 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import AuthSessionMonitor from '@/components/auth/AuthSessionMonitor';
 
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
+// Inter Variable fallback for Atlassian Sans (Atlassian Sans is built on Inter Variable)
+const inter = Inter({
+  subsets: ['latin', 'vietnamese'],
+  variable: '--font-inter',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: {
@@ -24,7 +29,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="vi" className={cn("font-sans", geist.variable)}>
+    <html lang="vi" className={cn("font-sans", inter.variable)}>
       <body className="flex min-h-screen flex-col font-sans bg-background">
         <TooltipProvider>
           <AuthSessionMonitor />

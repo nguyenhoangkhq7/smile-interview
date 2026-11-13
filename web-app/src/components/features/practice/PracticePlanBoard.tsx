@@ -14,8 +14,8 @@ import { cn } from '@/lib/utils';
 import type { ApplicationProfile } from '@/services/applicationProfiles';
 import { studyPlans, type ObjectiveSuggestion, type ReportWeakness, type StudyPlanDetails, type StudyPlanView, type StudySkill } from '@/services/studyPlans';
 import {
-  formatStudyPercent as formatPercent, studyProgressTone,
-  type NewStudyTask, type StudyProgress as PlanProgress, type StudyTask, type StudyTaskStatus, type StudyTaskUpdate,
+  formatStudyPercent as formatPercent,
+  type NewStudyTask, type StudyChecklistItem, type StudyProgress as PlanProgress, type StudyTask, type StudyTaskStatus, type StudyTaskUpdate,
 } from './studyPlan';
 import { StudyTaskCreateDialog } from './StudyTaskCreateDialog';
 import { PracticeMindMap } from './PracticeMindMap';
@@ -61,30 +61,69 @@ function PanelHeading({ icon: Icon, title, subtitle }: { icon: LucideIcon; title
   );
 }
 
-function ProgressTrack({ percent, target, className }: { percent: number | null; target: number; className: string }) {
+type ProgressLevel = 'red' | 'yellow' | 'green';
+
+function getProgressLevel(percent: number | null): ProgressLevel {
+  const value = percent ?? 0;
+  if (value <= 30) return 'red';
+  if (value <= 70) return 'yellow';
+  return 'green';
+}
+
+function ProgressTrack({ percent, className }: { percent: number | null; className?: string }) {
+  const value = percent ?? 0;
+  const clamped = Math.min(100, Math.max(0, value));
+  const level = getProgressLevel(percent);
+
+  const fillClassByLevel: Record<ProgressLevel, string> = {
+    red: styles.progressGradientFillRed,
+    yellow: styles.progressGradientFillYellow,
+    green: styles.progressGradientFillGreen,
+  };
+
   return (
     <div
       role={percent === null ? undefined : 'progressbar'}
       aria-hidden={percent === null || undefined}
       aria-label={percent === null ? undefined : 'Tiến độ ôn tập hiện tại'}
       aria-valuenow={percent ?? undefined}
-      className={cn('overflow-hidden rounded-full bg-(--practice-blue-strong)', className)}
+      className={cn(styles.progressGradientTrack, 'relative h-2.5 w-full overflow-hidden rounded-full p-[1px]', className)}
     >
-      {percent !== null && <div className={cn('h-full rounded-full transition-[width] duration-700 ease-out', studyProgressTone(percent, target).fill)} style={{ width: `${percent}%` }} />}
+      {percent !== null && (
+        <div
+          className={cn(styles.progressGradientFill, fillClassByLevel[level])}
+          style={{ width: `${clamped}%` }}
+        />
+      )}
     </div>
   );
 }
 
 function ProgressSummary({ progress }: { progress: StudyProgress }) {
   const { done, total, percent } = progress;
+  const level = getProgressLevel(percent);
+  const displayPercent = percent === null ? '0%' : formatPercent(percent);
+
+  const textColorByLevel: Record<ProgressLevel, string> = {
+    red: 'text-red-600',
+    yellow: 'text-amber-500',
+    green: 'text-emerald-600',
+  };
 
   return (
-    <div className="flex w-[min(42vw,13rem)] shrink-0 items-center gap-2 rounded-lg bg-(--practice-pale) px-2.5 py-2">
-      <strong className="text-base leading-tight tabular-nums text-(--practice-primary)">{percent === null ? '0%' : formatPercent(percent)}</strong>
-      <div className="min-w-0 flex-1 space-y-1">
-        <ProgressTrack percent={percent} target={100} className="h-2" />
-        <p className="truncate text-[10px] text-(--practice-muted)">{done}/{total} hoàn thành</p>
+    <div className="flex shrink-0 flex-col justify-center gap-1.5 rounded-2xl border border-slate-200/80 bg-slate-50/70 px-3.5 py-2 shadow-2xs w-[min(48vw,16.5rem)] sm:w-[17rem]">
+      {/* Tầng 1: Phần trăm và số lượng nằm cùng một hàng */}
+      <div className="flex items-baseline justify-between gap-2">
+        <span className={cn('text-base sm:text-lg font-black leading-none tabular-nums tracking-tight', textColorByLevel[level])}>
+          {displayPercent}
+        </span>
+        <span className="text-[11px] font-medium text-slate-500 tabular-nums">
+          {done}/{total} đầu việc hoàn thành
+        </span>
       </div>
+
+      {/* Tầng 2: Thanh tiến trình nằm phía dưới, chiếm toàn bộ chiều rộng */}
+      <ProgressTrack percent={percent} className="h-2 w-full" />
     </div>
   );
 }
@@ -119,8 +158,8 @@ function InterviewWeaknesses({ findings, actions }: { findings: ReportWeakness[]
 }
 
 function ObjectiveGaps({ suggestions, actions }: { suggestions: ObjectiveSuggestion[]; actions?: StudyGapActions }) {
-  const visible = suggestions.filter(objective => objective.criteria.some(criterion => criterion.kind !== 'MET'));
-  if (!visible.length) return <p className={mutedText}>Chưa có nội dung cần ôn từ các mục tiêu đã đánh giá.</p>;
+  const visible = suggestions.filter(objective => objective.criteria.some(criterion => criterion.selectedByDefault));
+  if (!visible.length) return <p className={mutedText}>Không có lỗ hổng kiến thức nào cần luyện tập.</p>;
   return <div className="space-y-3">
     <p className="text-xs leading-5 text-(--practice-muted)">Chọn mục tiêu để xem và chỉnh checklist. Tiêu chí chưa đánh giá không được xem là điểm yếu.</p>
     {visible.map(objective => <StudyGapCard key={objective.objectiveId}
@@ -198,6 +237,7 @@ interface TaskBoardProps {
   onCreate: (task: NewStudyTask) => Promise<boolean>;
   onMove: (task: StudyTask, status: StudyTaskStatus, beforeTaskId?: number | null) => Promise<boolean>;
   onChangeParent: (task: StudyTask, parentTaskId: number | null, status?: StudyTaskStatus) => Promise<boolean>;
+  onToggleChecklist: (taskId: number, item: StudyChecklistItem) => Promise<boolean>;
   completedTaskId: number | null;
   disabled: boolean;
   hasActiveFilters: boolean;
@@ -205,14 +245,14 @@ interface TaskBoardProps {
   onGapDrop: (gap: StudyGap, status: StudyTaskStatus) => Promise<boolean>;
 }
 
-function TaskBoard({ tasks, skillIds, selectedTaskId, onSelect, onCreate, onMove, onChangeParent, disabled, hasActiveFilters, completedTaskId, gapSource, onGapDrop }: TaskBoardProps) {
+function TaskBoard({ tasks, skillIds, selectedTaskId, onSelect, onCreate, onMove, onChangeParent, onToggleChecklist, disabled, hasActiveFilters, completedTaskId, gapSource, onGapDrop }: TaskBoardProps) {
   return (
     <section className={workspacePanelStyle}>
       <div className="flex shrink-0 flex-wrap items-start justify-between gap-3">
         <PanelHeading icon={ClipboardList} title="Đầu việc ôn tập" subtitle="Kéo thẻ vào thẻ khác để lồng; kéo ra tiêu đề cột để tách." />
         <StudyTaskCreateDialog skillIds={skillIds} onCreate={onCreate} disabled={disabled} />
       </div>
-      <StudyKanban tasks={tasks} selectedTaskId={selectedTaskId} onSelect={onSelect} onCreate={onCreate} onMove={onMove} onChangeParent={onChangeParent} disabled={disabled}
+      <StudyKanban tasks={tasks} selectedTaskId={selectedTaskId} onSelect={onSelect} onCreate={onCreate} onMove={onMove} onChangeParent={onChangeParent} onToggleChecklist={onToggleChecklist} disabled={disabled}
         hasActiveFilters={hasActiveFilters} completedTaskId={completedTaskId} gapSource={gapSource} onGapDrop={onGapDrop} />
     </section>
   );
@@ -225,6 +265,7 @@ export function PracticePlanBoard({ profile, initialPlan }: {
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const [gapDraft, setGapDraft] = useState<{ objective: ObjectiveSuggestion; status: StudyTaskStatus } | null>(null);
   const gapSource = useRef<StudyGap | null>(null);
+  const gapsDetailsRef = useRef<HTMLDetailsElement>(null);
   const [view, setView] = useState<PlanView>('kanban');
   const [completedTaskId, setCompletedTaskId] = useState<number | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -250,6 +291,11 @@ export function PracticePlanBoard({ profile, initialPlan }: {
     ? profile.attempts.find((attempt) => attempt.id === plan.sourceSessionId && attempt.status === 'Completed')?.number ?? 0
     : profile.attempts.filter((attempt) => attempt.status === 'Completed').reduce((latest, attempt) => Math.max(latest, attempt.number), 0);
   const notAssessedSkillIds = new Set(knowledgeGapData?.notAssessedSkillIds ?? []);
+  const gapCount = knowledgeGapData
+    ? (knowledgeGapData.objectiveSuggestions
+        ? knowledgeGapData.objectiveSuggestions.filter((objective) => objective.criteria.some((criterion) => criterion.selectedByDefault)).length
+        : ((knowledgeGapData.weak?.length ?? 0) + (knowledgeGapData.needsVerification?.length ?? 0) + (knowledgeGapData.reportWeaknesses?.length ?? 0)))
+    : 0;
   const tasks = storedTasks.map((task) => ({
     ...task,
     gapNeedsConfirmation: task.gapSourceObjectiveId ? Boolean(
@@ -325,6 +371,42 @@ export function PracticePlanBoard({ profile, initialPlan }: {
     return () => window.clearTimeout(timer);
   }, [completedTaskId]);
 
+  useEffect(() => {
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+
+      const details = gapsDetailsRef.current;
+      if (details?.open && !details.contains(target)) {
+        details.open = false;
+      }
+
+      if (
+        selectedTaskId !== null &&
+        !target.closest('[data-task-inspector], [data-kanban-task-id], [data-task-id], [role="dialog"], [data-slot="dialog-overlay"], [data-slot="dialog-content"], [data-slot="dialog-portal"]')
+      ) {
+        setSelectedTaskId(null);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+      if (gapsDetailsRef.current?.open) {
+        gapsDetailsRef.current.open = false;
+      }
+      if (selectedTaskId !== null && !document.querySelector('[role="dialog"]')) {
+        setSelectedTaskId(null);
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedTaskId]);
+
   async function createTask(task: NewStudyTask) {
     const result = await save(() => studyPlans.createTask(profile.id, task));
     if (result) setSelectedTaskId(null);
@@ -332,6 +414,7 @@ export function PracticePlanBoard({ profile, initialPlan }: {
   }
 
   function createTaskFromGap(gap: StudyGap, status: StudyTaskStatus) {
+    if (gapsDetailsRef.current) gapsDetailsRef.current.open = false;
     if (gap.objective) {
       setGapDraft({ objective: gap.objective, status });
       return Promise.resolve(true);
@@ -368,6 +451,10 @@ export function PracticePlanBoard({ profile, initialPlan }: {
     const result = await save(() => studyPlans.updateTaskParent(profile.id, task.id, parentTaskId, status));
     if (result && task.status !== 'DONE' && status === 'DONE') setCompletedTaskId(task.id);
     return Boolean(result);
+  }
+
+  async function toggleChecklistItem(taskId: number, item: StudyChecklistItem) {
+    return Boolean(await save(() => studyPlans.updateChecklist(profile.id, taskId, { ...item, isCompleted: !item.isCompleted })));
   }
 
   async function deleteTask(task: StudyTask) {
@@ -409,65 +496,155 @@ export function PracticePlanBoard({ profile, initialPlan }: {
           {needsRefresh && <Button type="button" size="sm" variant="outline" disabled={pending} onClick={() => void reload()}>Tải lại kế hoạch</Button>}
         </div>
       )}
-      <header className="sticky top-0 z-30 flex flex-wrap items-center gap-1.5 rounded-xl border border-slate-200 bg-card/95 p-2 shadow-xs backdrop-blur sm:flex-nowrap sm:gap-2 sm:px-3">
+      <header className="sticky top-0 z-30 flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200/80 bg-card/95 p-2 shadow-xs backdrop-blur-md sm:flex-nowrap sm:px-3">
         <div className="mr-auto min-w-0 flex-1 sm:flex-none">
-          <h1 className="truncate text-base font-bold leading-tight sm:text-lg">{plan.title}</h1>
-          <Link href={`/applications/${profile.id}`} className="text-[11px] text-(--practice-muted) hover:text-(--practice-primary) hover:underline">
+          <h1 className="truncate text-base font-extrabold leading-tight tracking-tight sm:text-lg text-slate-900">{plan.title}</h1>
+          <Link href={`/applications/${profile.id}`} className="text-[11px] font-medium text-(--practice-muted) hover:text-(--practice-primary) hover:underline">
             {profile.roleTitle || 'Kế hoạch ôn tập'} · Xem hồ sơ
           </Link>
         </div>
         <ProgressSummary progress={progress} />
-        <details className="relative order-3 sm:order-none">
-          <summary aria-label="Lỗ hổng kiến thức" title="Lỗ hổng kiến thức" className="flex size-9 cursor-pointer list-none items-center justify-center rounded-lg border border-slate-200 hover:bg-(--practice-pale)">
-            <Radar size={17} aria-hidden="true" />
+        <details ref={gapsDetailsRef} className="relative order-3 sm:order-none group">
+          <summary
+            aria-label="Lỗ hổng kiến thức"
+            title={`Lỗ hổng kiến thức (${gapCount} nội dung)`}
+            className="flex flex-col items-center justify-center size-10 cursor-pointer list-none rounded-xl border border-slate-200/80 bg-slate-50/70 hover:bg-slate-100/90 transition-all text-slate-700 hover:border-slate-300 focus-visible:outline-2 focus-visible:outline-(--practice-primary) [&::-webkit-details-marker]:hidden"
+          >
+            <Radar size={15} className={cn(gapCount > 0 && "text-(--practice-primary)")} aria-hidden="true" />
+            <span
+              className={cn(
+                "text-[10px] font-bold leading-none mt-0.5 tabular-nums",
+                gapCount > 0 ? "text-(--practice-primary)" : "text-slate-400"
+              )}
+            >
+              {gaps.state.status === 'loading' ? '·' : gapCount}
+            </span>
           </summary>
-          <div className="absolute right-0 top-11 z-50 max-h-[65vh] w-[min(90vw,24rem)] overflow-y-auto rounded-xl border border-slate-200 bg-card p-3 shadow-xl">
-            <KnowledgeGaps profile={profile} request={gaps} compact
-              actions={{ source: gapSource, disabled, add: (gap) => createTaskFromGap(gap, 'TODO') }} />
+          <div className="absolute right-0 top-12 z-50 max-h-[65vh] w-[min(90vw,24rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-card p-3 shadow-xl">
+            <KnowledgeGaps
+              profile={profile}
+              request={gaps}
+              compact
+              actions={{ source: gapSource, disabled, add: (gap) => createTaskFromGap(gap, 'TODO') }}
+            />
           </div>
         </details>
-        <div role="group" aria-label="Chế độ xem kế hoạch" className="order-2 flex w-fit items-center gap-0.5 rounded-lg bg-(--practice-blue) p-0.5 sm:order-none">
+        <div
+          role="group"
+          aria-label="Chế độ xem kế hoạch"
+          className="relative order-2 inline-flex items-center rounded-xl bg-slate-100 p-0.5 border border-slate-200/60 shadow-inner sm:order-none"
+        >
+          <span
+            aria-hidden="true"
+            className={cn(
+              "absolute top-0.5 bottom-0.5 w-[calc(50%-2px)] rounded-lg bg-card shadow-xs transition-all duration-300 ease-[cubic-bezier(0.2,0.8,0.25,1)] pointer-events-none",
+              view === 'kanban' ? "left-0.5" : "left-[calc(50%+1px)]"
+            )}
+          />
           {planViews.map(({ value, label, Icon }) => (
-            <Button key={value} type="button" variant="ghost" size="icon-sm" aria-label={label} title={label} aria-pressed={view === value} onClick={() => setView(value)}
-              className="size-8 rounded-md aria-pressed:bg-card aria-pressed:text-(--practice-primary) aria-pressed:shadow-xs">
-              <Icon size={16} aria-hidden="true" />
-            </Button>
+            <button
+              key={value}
+              type="button"
+              aria-label={label}
+              title={label}
+              aria-pressed={view === value}
+              onClick={() => setView(value)}
+              className={cn(
+                "relative z-10 flex h-8 items-center gap-1.5 rounded-lg px-2.5 sm:px-3 text-xs font-semibold transition-colors duration-200 cursor-pointer",
+                view === value
+                  ? "text-(--practice-primary)"
+                  : "text-slate-500 hover:text-slate-800"
+              )}
+            >
+              <Icon size={15} aria-hidden="true" />
+              <span className="hidden sm:inline">{label}</span>
+            </button>
           ))}
         </div>
-        <Button type="button" variant="outline" size="icon-sm" aria-label="Cài đặt kế hoạch" title="Cài đặt" className="order-1 size-9 rounded-lg sm:order-none" disabled={disabled} onClick={() => setSettingsOpen(true)}>
-          <Settings2 size={17} aria-hidden="true" />
+        <Button
+          type="button"
+          variant="outline"
+          size="icon-sm"
+          aria-label="Cài đặt kế hoạch"
+          title="Cài đặt"
+          className="order-1 size-10 rounded-xl border-slate-200/80 bg-slate-50/70 hover:bg-slate-100 text-slate-700 sm:order-none transition-colors"
+          disabled={disabled}
+          onClick={() => setSettingsOpen(true)}
+        >
+          <Settings2 size={16} aria-hidden="true" />
         </Button>
       </header>
-      <section aria-label="Bộ lọc đầu việc" className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-card px-3 py-2 shadow-xs">
-        <label className="relative min-w-[12rem] flex-1 sm:max-w-xs">
-          <span className="sr-only">Tìm theo tên đầu việc</span>
-          <Search size={15} aria-hidden="true" className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-(--practice-muted)" />
-          <Input type="search" value={taskFilters.query} onChange={(event) => setTaskFilters((current) => ({ ...current, query: event.target.value }))}
-            placeholder="Tìm task theo tên…" className="h-9 rounded-lg bg-(--practice-pale) pl-8 text-sm" />
-        </label>
-        <label>
-          <span className="sr-only">Lọc theo kỹ năng</span>
-          <select value={taskFilters.skillId} onChange={(event) => setTaskFilters((current) => ({ ...current, skillId: event.target.value }))}
-            className="h-9 min-w-36 rounded-lg border border-slate-200 bg-card px-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-(--practice-primary)">
+      <section aria-label="Bộ lọc đầu việc" className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200/70 bg-card/90 px-3.5 py-2 shadow-xs backdrop-blur-sm">
+        <div className="relative min-w-[11rem] flex-1 sm:max-w-xs">
+          <label htmlFor="practice-task-search" className="sr-only">Tìm theo tên đầu việc</label>
+          <Search size={14} aria-hidden="true" className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-slate-400" />
+          <Input
+            id="practice-task-search"
+            type="search"
+            value={taskFilters.query}
+            onChange={(event) => setTaskFilters((current) => ({ ...current, query: event.target.value }))}
+            placeholder="Tìm theo tên đầu việc…"
+            className="h-8.5 rounded-xl border-0 bg-slate-100/70 pl-8 pr-3 text-xs placeholder:text-slate-400 focus-visible:bg-card focus-visible:ring-1 focus-visible:ring-(--practice-primary)"
+          />
+        </div>
+        <div className="relative">
+          <label htmlFor="practice-skill-filter" className="sr-only">Lọc theo kỹ năng</label>
+          <select
+            id="practice-skill-filter"
+            value={taskFilters.skillId}
+            onChange={(event) => setTaskFilters((current) => ({ ...current, skillId: event.target.value }))}
+            className="h-8.5 rounded-xl border-0 bg-slate-100/70 px-2.5 pr-7 text-xs font-medium text-slate-700 outline-none cursor-pointer hover:bg-slate-100 focus-visible:ring-1 focus-visible:ring-(--practice-primary) transition-colors"
+          >
             <option value="">Tất cả kỹ năng</option>
             <option value={noTaskSkill}>Chưa gắn kỹ năng</option>
             {skillOptions.map((skillId) => <option key={skillId} value={skillId}>{skillLabel(skillId)}</option>)}
           </select>
-        </label>
-        <Button type="button" variant={taskFilters.improvementOnly ? 'secondary' : 'outline'} size="sm" aria-pressed={taskFilters.improvementOnly}
-          disabled={gaps.state.status !== 'ready'} title={gaps.state.status === 'ready' ? 'Chỉ hiện task thuộc kỹ năng yếu hoặc cần kiểm chứng' : 'Đang tải dữ liệu kỹ năng cần cải thiện'}
+        </div>
+        <button
+          type="button"
+          aria-pressed={taskFilters.improvementOnly}
+          disabled={gaps.state.status !== 'ready'}
+          title={gaps.state.status === 'ready' ? 'Chỉ hiện task thuộc kỹ năng yếu hoặc cần kiểm chứng' : 'Đang tải dữ liệu kỹ năng cần cải thiện'}
           onClick={() => setTaskFilters((current) => ({ ...current, improvementOnly: !current.improvementOnly }))}
-          className="h-9 rounded-lg aria-pressed:border-(--practice-primary) aria-pressed:bg-(--practice-orange) aria-pressed:text-(--practice-primary)">
-          <Radar size={15} aria-hidden="true" /> Kỹ năng cần cải thiện
-        </Button>
-        <Button type="button" variant={taskFilters.checklistOpenOnly ? 'secondary' : 'outline'} size="sm" aria-pressed={taskFilters.checklistOpenOnly}
+          className={cn(
+            "flex h-8.5 items-center gap-1.5 rounded-xl px-2.5 text-xs font-medium transition-all duration-150 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50",
+            taskFilters.improvementOnly
+              ? "bg-(--practice-orange) text-(--practice-primary) ring-1 ring-(--practice-primary)/30 font-semibold"
+              : "bg-slate-100/70 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+          )}
+        >
+          <Radar size={13} aria-hidden="true" />
+          <span>Kỹ năng cần cải thiện</span>
+        </button>
+        <button
+          type="button"
+          aria-pressed={taskFilters.checklistOpenOnly}
           onClick={() => setTaskFilters((current) => ({ ...current, checklistOpenOnly: !current.checklistOpenOnly }))}
-          className="h-9 rounded-lg aria-pressed:border-(--practice-primary) aria-pressed:bg-(--practice-orange) aria-pressed:text-(--practice-primary)">
-          <ListChecks size={15} aria-hidden="true" /> Checklist còn việc
-        </Button>
-        <span role="status" className="ml-auto text-xs tabular-nums text-(--practice-muted)">Hiện {matchingTasks.length}/{tasks.length}</span>
-        {hasActiveTaskFilters && <Button type="button" variant="ghost" size="sm" onClick={() => setTaskFilters({ query: '', skillId: '', improvementOnly: false, checklistOpenOnly: false })}
-          className="h-8 rounded-lg px-2 text-(--practice-muted)"><X size={14} aria-hidden="true" /> Xóa lọc</Button>}
+          className={cn(
+            "flex h-8.5 items-center gap-1.5 rounded-xl px-2.5 text-xs font-medium transition-all duration-150 cursor-pointer",
+            taskFilters.checklistOpenOnly
+              ? "bg-blue-100 text-blue-800 ring-1 ring-blue-300 font-semibold"
+              : "bg-slate-100/70 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+          )}
+        >
+          <ListChecks size={13} aria-hidden="true" />
+          <span>Checklist còn việc</span>
+        </button>
+        <div className="ml-auto flex items-center gap-2">
+          <span role="status" className="text-xs font-medium tabular-nums text-slate-400">
+            Hiện {matchingTasks.length}/{tasks.length}
+          </span>
+          {hasActiveTaskFilters && (
+            <button
+              type="button"
+              onClick={() => setTaskFilters({ query: '', skillId: '', improvementOnly: false, checklistOpenOnly: false })}
+              className="flex h-7 items-center gap-1 rounded-lg px-2 text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
+            >
+              <X size={13} aria-hidden="true" />
+              <span>Xóa lọc</span>
+            </button>
+          )}
+        </div>
       </section>
       {isMindMap ? (
         <>
@@ -491,7 +668,7 @@ export function PracticePlanBoard({ profile, initialPlan }: {
           className={cn(styles.kanbanWithInspector, selectedTask && styles.hasKanbanInspector)}>
           {selectedTask && inspectorSide === 'left' && inspector}
           <TaskBoard tasks={visibleTasks} skillIds={skillIds} selectedTaskId={selectedTaskId} onCreate={createTask} onSelect={setSelectedTaskId}
-            onMove={moveTask} onChangeParent={changeTaskParent} completedTaskId={completedTaskId} disabled={disabled} hasActiveFilters={hasActiveTaskFilters} gapSource={gapSource} onGapDrop={createTaskFromGap} />
+            onMove={moveTask} onChangeParent={changeTaskParent} onToggleChecklist={toggleChecklistItem} completedTaskId={completedTaskId} disabled={disabled} hasActiveFilters={hasActiveTaskFilters} gapSource={gapSource} onGapDrop={createTaskFromGap} />
           {selectedTask && inspectorSide === 'right' && inspector}
         </div>
       )}

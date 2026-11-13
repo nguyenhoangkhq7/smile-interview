@@ -1,4 +1,4 @@
-import { useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 
 export type MindMapPoint = { x: number; y: number };
 export type MindMapNodeId = 'root' | `skill:${string}` | `task:${number}`;
@@ -11,9 +11,16 @@ export function useMindMapPosition(
 ) {
   const gesture = useRef<{ id: MindMapNodeId; pointerId: number; offset: MindMapPoint; start: MindMapPoint } | null>(null);
   const [draft, setDraft] = useState<{ id: MindMapNodeId; point: MindMapPoint } | null>(null);
+  const [settledId, setSettledId] = useState<MindMapNodeId | null>(null);
+  const settleTimer = useRef<number | null>(null);
+
+  useEffect(() => () => {
+    if (settleTimer.current !== null) window.clearTimeout(settleTimer.current);
+  }, []);
 
   function start(event: PointerEvent<HTMLButtonElement>, id: MindMapNodeId, point: MindMapPoint) {
     if (event.button !== 0 || gesture.current) return;
+    event.stopPropagation();
     const pointer = toCanvas(event.clientX, event.clientY);
     gesture.current = {
       id, pointerId: event.pointerId, start: point,
@@ -44,7 +51,11 @@ export function useMindMapPosition(
   function finish(event: PointerEvent<HTMLButtonElement>) {
     const update = readPointer(event);
     if (update && (update.point.x !== update.active.start.x || update.point.y !== update.active.start.y)) {
-      onPosition(update.active.id, update.point);
+      const movedId = update.active.id;
+      onPosition(movedId, update.point);
+      setSettledId(movedId);
+      if (settleTimer.current !== null) window.clearTimeout(settleTimer.current);
+      settleTimer.current = window.setTimeout(() => setSettledId(null), 220);
     }
     cancel(event);
   }
@@ -61,5 +72,5 @@ export function useMindMapPosition(
     onPosition(id, constrain(id, { x: point.x + offset.x, y: point.y + offset.y }));
   }
 
-  return { draft, start, move, cancel, finish, nudge };
+  return { draft, settledId, start, move, cancel, finish, nudge };
 }

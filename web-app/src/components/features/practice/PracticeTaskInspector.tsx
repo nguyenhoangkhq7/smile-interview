@@ -57,7 +57,7 @@ export function PracticeTaskInspector({ task, className, disabled, skillIds, onU
   }
 
   return (
-    <aside aria-label="Chi tiết đầu việc" className={cn('flex min-h-0 min-w-0 flex-col bg-card', className)}>
+    <aside data-task-inspector="true" aria-label="Chi tiết đầu việc" className={cn('flex min-h-0 min-w-0 flex-col bg-card', className)}>
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-100 px-4 py-3 sm:px-5">
         <h2 className="flex items-center gap-2 text-sm font-bold tracking-wide uppercase">
           <ClipboardList size={18} className="text-(--practice-primary)" aria-hidden="true" /> Chi tiết / Ghi chú

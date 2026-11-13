@@ -7,7 +7,7 @@
     radial-gradient(circle at top right, rgba(59, 130, 246, 0.06), transparent 28%),
     linear-gradient(180deg, #fffaf5 0%, #fefcf9 100%);
   color: #0f172a;
-  font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+  font-family: var(--font-inter), 'Inter', system-ui, -apple-system, sans-serif;
   display: flex;
   flex-direction: column;
 }
