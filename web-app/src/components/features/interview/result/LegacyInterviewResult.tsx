@@ -1,5 +1,6 @@
 'use client';
 import { MarkdownContent } from '@/components/common/MarkdownContent';
+import { BrandLoading } from '@/components/common/BrandLoading';
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -54,7 +55,7 @@ export function LegacyInterviewResult({ id }: { id: string }) {
   if (loading) {
     return (
       <div className={styles.container}>
-        <p style={{ padding: '4rem', textAlign: 'center', color: '#64748b' }}>Đang tải báo cáo phỏng vấn...</p>
+        <BrandLoading label="Đang tải báo cáo phỏng vấn…" description="Đang tổng hợp kết quả đã lưu của bạn." />
       </div>
     );
   }

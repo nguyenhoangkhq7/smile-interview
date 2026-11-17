@@ -1,37 +1,23 @@
-import { IconFile, IconUsers, IconTrend, IconStar } from '@/components/ui/icons';
-import type { ReactNode } from 'react';
+import { CountUp, Reveal } from './HomeMotion';
 
-interface StatItem {
-  icon: ReactNode;
-  value: string;
-  label: string;
-  accent: 'orange' | 'green';
-}
-
-const STATS: StatItem[] = [
-  { icon: <IconFile size={22} />, value: '10,000+', label: 'CV đã phân tích', accent: 'orange' },
-  { icon: <IconUsers size={22} />, value: '2,500+', label: 'Người dùng tin tưởng', accent: 'green' },
-  { icon: <IconTrend size={22} />, value: '87%', label: 'Cải thiện sau 3 buổi', accent: 'orange' },
-  { icon: <IconStar size={22} />, value: '4.9 ★', label: 'Đánh giá trung bình', accent: 'green' },
+const stats = [
+  { value: 15000, suffix: '+', label: 'Hồ sơ ứng viên', note: 'CV & Portfolio được phân tích chuyên sâu' },
+  { value: 4800, suffix: '+', label: 'Buổi phỏng vấn', note: 'Phiên mock interview giọng nói đã hoàn thành' },
+  { value: 89.4, suffix: '%', label: 'Tỷ lệ tiến bộ', note: 'Cải thiện phản xạ sau 3 buổi luyện tập' },
+  { value: 4.9, suffix: ' / 5.0', label: 'Mức độ hài lòng', note: 'Đánh giá từ các ứng viên đã trải nghiệm' },
 ];
 
 export function StatsSection() {
   return (
-    <section className="border-y border-border bg-card/60 py-14">
-      <div className="mx-auto max-w-5xl px-6">
-        <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
-          {STATS.map(({ icon, value, label, accent }) => (
-            <div key={label} className="flex flex-col items-center gap-2 text-center">
-              <span className={accent === 'orange' ? 'text-brand-orange' : 'text-brand-green'}>
-                {icon}
-              </span>
-              <span className={`text-2xl font-extrabold ${accent === 'orange' ? 'text-brand-orange' : 'text-brand-green'}`}>
-                {value}
-              </span>
-              <span className="text-xs font-medium text-muted-foreground">{label}</span>
-            </div>
-          ))}
-        </div>
+    <section aria-label="Kết quả từ cộng đồng" className="bg-[#f7f2e8] py-10 sm:py-12">
+      <div className="mx-auto grid max-w-6xl grid-cols-2 gap-x-7 gap-y-9 px-5 sm:px-8 lg:grid-cols-4">
+        {stats.map((stat, index) => (
+          <Reveal key={stat.label} delay={index * 80}>
+            <div className="font-sans text-[2rem] leading-none tracking-normal text-[#113426] sm:text-[2.4rem]"><CountUp value={stat.value} suffix={stat.suffix} /></div>
+            <h2 className="mt-2 text-sm font-semibold text-[#3e5949]">{stat.label}</h2>
+            <p className="mt-1 max-w-[240px] text-xs leading-5 text-[#73786f]">{stat.note}</p>
+          </Reveal>
+        ))}
       </div>
     </section>
   );

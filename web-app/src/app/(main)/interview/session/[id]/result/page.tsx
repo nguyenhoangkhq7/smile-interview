@@ -6,6 +6,7 @@ import { InterviewOutcome } from '@/components/features/interview/InterviewOutco
 import { InterviewResultDashboard } from '@/components/features/interview/result/InterviewResultDashboard';
 import { LegacyInterviewResult } from '@/components/features/interview/result/LegacyInterviewResult';
 import { useEvidenceInterview } from '@/hooks/useEvidenceInterview';
+import { BrandLoading } from '@/components/common/BrandLoading';
 
 export default function InterviewResultPage() {
   const { id } = useParams<{ id: string }>();
@@ -15,7 +16,9 @@ export default function InterviewResultPage() {
 function InterviewResult({ sessionId }: { sessionId: string }) {
   const { session, metadata, loading, error, reload } = useEvidenceInterview(sessionId, true);
 
-  if (loading) return <p role="status" className="mx-auto max-w-6xl p-8">Đang tải kết quả phỏng vấn…</p>;
+  if (loading) return <main className="mx-auto max-w-6xl px-4 py-8">
+    <BrandLoading label="Đang tải kết quả phỏng vấn…" description="Đang chuẩn bị báo cáo và nhận xét của bạn." />
+  </main>;
   if (error) return (
     <div role="alert" className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 p-8">
       <p>{error}</p>

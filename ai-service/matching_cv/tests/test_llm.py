@@ -81,6 +81,7 @@ async def test_extract_explicit_skills_default_sends_production_prompt():
     mock_create = AsyncMock(return_value=mock_completion)
 
     with patch("matching_cv.app.core.config.settings.OPENROUTER_API_KEY", "sk-mock-key"), \
+         patch("matching_cv.app.core.config.settings.MATCHING_CV_DSPY_EXPLICIT_ENABLED", False), \
          patch("matching_cv.app.services.llm_service.AsyncOpenAI") as mock_openai_cls:
 
         mock_instance = MagicMock()
@@ -120,6 +121,7 @@ async def test_extract_explicit_skills_meta_default_and_variant():
     mock_create = AsyncMock(return_value=mock_completion)
 
     with patch("matching_cv.app.core.config.settings.OPENROUTER_API_KEY", "sk-mock-key"), \
+         patch("matching_cv.app.core.config.settings.MATCHING_CV_DSPY_EXPLICIT_ENABLED", False), \
          patch("matching_cv.app.services.llm_service.AsyncOpenAI") as mock_openai_cls:
 
         mock_instance = MagicMock()
@@ -152,3 +154,28 @@ async def test_extract_explicit_skills_meta_default_and_variant():
         assert meta_variant["prompt_variant"] == "C1"
         assert meta_variant["temperature"] == 0.0
         assert meta_variant["schema_version"] == "1.0.0"
+
+
+@pytest.mark.anyio
+async def test_extract_explicit_skills_routes_to_dspy_by_default():
+    from datetime import datetime, timezone
+    from matching_cv.app.services.llm_service import LLMService
+
+    fake_dspy_service = MagicMock()
+    fake_dspy_service.extract = AsyncMock(return_value={"explicit_skills": []})
+    fake_dspy_service.prompt_sha256 = "dspy-module-digest"
+
+    with patch("matching_cv.app.core.config.settings.OPENROUTER_API_KEY", "sk-mock-key"), \
+         patch("matching_cv.app.core.config.settings.MATCHING_CV_DSPY_EXPLICIT_ENABLED", True), \
+         patch(
+             "matching_cv.app.services.dspy_explicit_skill_service.dspy_explicit_skill_service",
+             fake_dspy_service,
+         ):
+        result = await LLMService().extract_explicit_skills("Yêu cầu Python.", "JD")
+
+    fake_dspy_service.extract.assert_awaited_once_with("Yêu cầu Python.", "JD")
+    metadata = result["extraction_meta"]
+    assert metadata["prompt_sha256"] == "dspy-module-digest"
+    assert metadata["prompt_variant"] == "dspy_explicit_v1"
+    assert metadata["schema_version"] == "dspy_explicit_v1"
+    datetime.fromisoformat(metadata["extracted_at"])

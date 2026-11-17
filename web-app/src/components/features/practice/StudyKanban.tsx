@@ -17,6 +17,7 @@ interface StudyKanbanProps {
   disabled: boolean;
   hasActiveFilters: boolean;
   completedTaskId: number | null;
+  attentionTaskIds?: ReadonlySet<number>;
   onSelect: (id: number) => void;
   onMove: (task: StudyTask, status: StudyTaskStatus, beforeTaskId?: number | null) => Promise<boolean>;
   onChangeParent: (task: StudyTask, parentTaskId: number | null, status?: StudyTaskStatus) => Promise<boolean>;
@@ -35,6 +36,7 @@ interface StudyTaskCardProps {
   draggingId: number | null;
   draggable: boolean;
   completedTaskId: number | null;
+  attentionTaskIds?: ReadonlySet<number>;
   nestTargetId: number | null;
   nestingTaskId: number | null;
   onSelect: (task: StudyTask) => void;
@@ -45,7 +47,7 @@ interface StudyTaskCardProps {
   onToggleChecklist: (taskId: number, item: StudyChecklistItem) => Promise<boolean>;
 }
 
-function StudyTaskCard({ task, children, childrenById, selectedTaskId, selectedTaskPathIds, draggingId, draggable, completedTaskId, nestTargetId, nestingTaskId, onSelect, onDragStart, onDragEnd, onDropOnTask, onComplete, onToggleChecklist }: StudyTaskCardProps) {
+function StudyTaskCard({ task, children, childrenById, selectedTaskId, selectedTaskPathIds, draggingId, draggable, completedTaskId, attentionTaskIds, nestTargetId, nestingTaskId, onSelect, onDragStart, onDragEnd, onDropOnTask, onComplete, onToggleChecklist }: StudyTaskCardProps) {
   const [checklistOpen, setChecklistOpen] = useState(true);
   const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
   const pointerMovedRef = useRef(false);
@@ -54,7 +56,9 @@ function StudyTaskCard({ task, children, childrenById, selectedTaskId, selectedT
   const checklistLabel = task.checklist.length ? `${completed}/${task.checklist.length} mục checklist hoàn thành` : 'Chưa có checklist';
 
   return (
-    <div data-task-selected={selectedTaskId === task.id || undefined}
+    <div data-task-card-id={task.id}
+      data-attention={attentionTaskIds?.has(task.id) ? 'true' : undefined}
+      data-task-selected={selectedTaskId === task.id || undefined}
       data-task-dimmed={selectedTaskId !== null && !selectedTaskPathIds.has(task.id) || undefined}
       onDragOver={(event) => {
         if (!draggable || draggingId == null) return;
@@ -167,14 +171,14 @@ function StudyTaskCard({ task, children, childrenById, selectedTaskId, selectedT
       {(children.length > 0 || nestTargetId === task.id) && <div className="mt-2 space-y-2 border-l-2 border-(--practice-blue-strong) pl-2">
         {children.map((child) => <StudyTaskCard key={child.id} task={child} children={childrenById.get(child.id) ?? []} childrenById={childrenById}
           selectedTaskId={selectedTaskId}
-          draggingId={draggingId} draggable={draggable} completedTaskId={completedTaskId} nestTargetId={nestTargetId} nestingTaskId={nestingTaskId} selectedTaskPathIds={selectedTaskPathIds} onSelect={(selectedTask) => onSelect(selectedTask)}
+          draggingId={draggingId} draggable={draggable} completedTaskId={completedTaskId} attentionTaskIds={attentionTaskIds} nestTargetId={nestTargetId} nestingTaskId={nestingTaskId} selectedTaskPathIds={selectedTaskPathIds} onSelect={(selectedTask) => onSelect(selectedTask)}
           onDragStart={onDragStart} onDragEnd={onDragEnd} onDropOnTask={onDropOnTask} onComplete={onComplete} onToggleChecklist={onToggleChecklist} />)}
       </div>}
     </div>
   );
 }
 
-export function StudyKanban({ tasks, selectedTaskId, disabled, hasActiveFilters, completedTaskId, onSelect, onMove, onChangeParent, onToggleChecklist, onCreate, gapSource, onGapDrop }: StudyKanbanProps) {
+export function StudyKanban({ tasks, selectedTaskId, disabled, hasActiveFilters, completedTaskId, attentionTaskIds, onSelect, onMove, onChangeParent, onToggleChecklist, onCreate, gapSource, onGapDrop }: StudyKanbanProps) {
   const { draggingId, dropStatus, savingStatus, announcement, arrival, startDrag, finishDrag, dragOver, dragLeave, drop, finishArrival } =
     useStudyTaskDrag({ disabled, onMove });
   const [insertion, setInsertion] = useState<{ status: StudyTaskStatus; beforeId: number | null }>();
@@ -364,7 +368,7 @@ export function StudyKanban({ tasks, selectedTaskId, disabled, hasActiveFilters,
                     }}>
                     <StudyTaskCard task={task} children={childrenById.get(task.id) ?? []} childrenById={childrenById}
                       selectedTaskId={selectedTaskId} draggingId={draggingId} draggable={!disabled} completedTaskId={completedTaskId}
-                      nestTargetId={nestTargetId} nestingTaskId={nestingTaskId} selectedTaskPathIds={selectedTaskPathIds}
+                      attentionTaskIds={attentionTaskIds} nestTargetId={nestTargetId} nestingTaskId={nestingTaskId} selectedTaskPathIds={selectedTaskPathIds}
                       onSelect={(selectedTask) => {
                         if (suppressSelectRef.current || draggingId !== null) return;
                         onSelect(selectedTask.id);

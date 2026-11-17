@@ -1,0 +1,128 @@
+{
+  "extract": {
+    "traces": [],
+    "train": [],
+    "demos": [
+      {
+        "document_type": "JD",
+        "document_text": "Applicants need a PMP certification. Experience writing functional tests is required.",
+        "explicit_skills": [
+          {
+            "mention": "PMP certification",
+            "kind": "certification",
+            "category": "Certification",
+            "source_sentence": "Applicants need a PMP certification."
+          },
+          {
+            "mention": "functional tests",
+            "kind": "skill",
+            "category": "Engineering Practice",
+            "source_sentence": "Experience writing functional tests is required."
+          }
+        ]
+      },
+      {
+        "document_type": "CV",
+        "document_text": "Coursework: Algorithms, Operating Systems, and Database Systems. Capstone project used Java to build a scheduling app.",
+        "explicit_skills": [
+          {
+            "mention": "Java",
+            "kind": "skill",
+            "category": "Technology/Tool",
+            "source_sentence": "Capstone project used Java to build a scheduling app."
+          }
+        ]
+      },
+      {
+        "document_type": "JD",
+        "document_text": "Yêu cầu tốt nghiệp chuyên ngành Khoa học máy tính. Ứng viên cần thành thạo Python và xây dựng REST API.",
+        "explicit_skills": [
+          {
+            "mention": "Python",
+            "kind": "skill",
+            "category": "Technology/Tool",
+            "source_sentence": "Ứng viên cần thành thạo Python và xây dựng REST API."
+          },
+          {
+            "mention": "REST API",
+            "kind": "skill",
+            "category": "Technical Concept",
+            "source_sentence": "Ứng viên cần thành thạo Python và xây dựng REST API."
+          }
+        ]
+      },
+      {
+        "document_type": "JD",
+        "document_text": "We are a video streaming company with millions of users. The role requires JavaScript and React experience.",
+        "explicit_skills": [
+          {
+            "mention": "JavaScript",
+            "kind": "skill",
+            "category": "Technology/Tool",
+            "source_sentence": "The role requires JavaScript and React experience."
+          },
+          {
+            "mention": "React",
+            "kind": "skill",
+            "category": "Technology/Tool",
+            "source_sentence": "The role requires JavaScript and React experience."
+          }
+        ]
+      },
+      {
+        "document_type": "JD",
+        "document_text": "Must have a degree in information technology. The position title is Senior Software Engineer.",
+        "explicit_skills": []
+      },
+      {
+        "document_type": "CV",
+        "document_text": "EDUCATION\nB.S. in Computer Science, State University.\nEXPERIENCE\nBuilt data pipelines with Python and Airflow.",
+        "explicit_skills": [
+          {
+            "mention": "Python",
+            "kind": "skill",
+            "category": "Technology/Tool",
+            "source_sentence": "Built data pipelines with Python and Airflow."
+          },
+          {
+            "mention": "Airflow",
+            "kind": "skill",
+            "category": "Technology/Tool",
+            "source_sentence": "Built data pipelines with Python and Airflow."
+          },
+          {
+            "mention": "data pipelines",
+            "kind": "skill",
+            "category": "Technical Concept",
+            "source_sentence": "Built data pipelines with Python and Airflow."
+          }
+        ]
+      }
+    ],
+    "signature": {
+      "instructions": "Extract only explicit, job-relevant competencies from a CV or JD.\n\nInclude only concrete skills, tools, techniques, standards, certifications,\nor genuinely required/used domain competencies. Do not extract education\nqualifications, degree names, majors, academic fields, coursework, job\ntitles, employer industries, company/product names, generic duties, or\nperformance results as skills. For example, \"Computer Science\" in\n\"Bachelor's degree in Computer Science required\" is an academic field, not\na skill. \"IT - Software\" in an education/major requirement is also not a\nskill. Keep a domain only when the document explicitly requires or\ndemonstrates that domain as a competency, rather than merely describing\nthe employer or product context.\n\nEvery returned mention and source_sentence must be copied verbatim from\ndocument_text. Return an empty list when no qualifying competencies exist.\nDo not combine independent skills into a single mention. A phrase that is\nitself one named competency may remain intact. Preserve each distinct\nsource occurrence with its own evidence sentence.",
+      "fields": [
+        {
+          "prefix": "Document Type:",
+          "description": "CV or JD"
+        },
+        {
+          "prefix": "Document Text:",
+          "description": "Full extracted text of one CV or JD"
+        },
+        {
+          "prefix": "Explicit Skills:",
+          "description": "Verbatim skill mentions only; omit academic qualifications and non-skill entities"
+        }
+      ]
+    },
+    "lm": null
+  },
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.11",
+      "dspy": "3.5.0",
+      "cloudpickle": "3.1"
+    }
+  }
+}

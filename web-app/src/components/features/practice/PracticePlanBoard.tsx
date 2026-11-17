@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { toast } from 'sonner';
 import {
   ArrowRight, ClipboardList, LayoutGrid, ListChecks, Network, Radar, Search, Settings2, X, type LucideIcon,
 } from 'lucide-react';
@@ -74,6 +75,18 @@ function ProgressTrack({ percent, className }: { percent: number | null; classNa
   const value = percent ?? 0;
   const clamped = Math.min(100, Math.max(0, value));
   const level = getProgressLevel(percent);
+  const prevValueRef = useRef(value);
+  const [surging, setSurging] = useState(false);
+
+  useEffect(() => {
+    if (value > prevValueRef.current) {
+      setSurging(true);
+      const timer = window.setTimeout(() => setSurging(false), 500);
+      prevValueRef.current = value;
+      return () => window.clearTimeout(timer);
+    }
+    prevValueRef.current = value;
+  }, [value]);
 
   const fillClassByLevel: Record<ProgressLevel, string> = {
     red: styles.progressGradientFillRed,
@@ -87,6 +100,7 @@ function ProgressTrack({ percent, className }: { percent: number | null; classNa
       aria-hidden={percent === null || undefined}
       aria-label={percent === null ? undefined : 'Tiến độ ôn tập hiện tại'}
       aria-valuenow={percent ?? undefined}
+      data-nitro-surge={surging ? 'true' : undefined}
       className={cn(styles.progressGradientTrack, 'relative h-2.5 w-full overflow-hidden rounded-full p-[1px]', className)}
     >
       {percent !== null && (
@@ -239,13 +253,14 @@ interface TaskBoardProps {
   onChangeParent: (task: StudyTask, parentTaskId: number | null, status?: StudyTaskStatus) => Promise<boolean>;
   onToggleChecklist: (taskId: number, item: StudyChecklistItem) => Promise<boolean>;
   completedTaskId: number | null;
+  attentionTaskIds?: ReadonlySet<number>;
   disabled: boolean;
   hasActiveFilters: boolean;
   gapSource: StudyGapActions['source'];
   onGapDrop: (gap: StudyGap, status: StudyTaskStatus) => Promise<boolean>;
 }
 
-function TaskBoard({ tasks, skillIds, selectedTaskId, onSelect, onCreate, onMove, onChangeParent, onToggleChecklist, disabled, hasActiveFilters, completedTaskId, gapSource, onGapDrop }: TaskBoardProps) {
+function TaskBoard({ tasks, skillIds, selectedTaskId, onSelect, onCreate, onMove, onChangeParent, onToggleChecklist, disabled, hasActiveFilters, completedTaskId, attentionTaskIds, gapSource, onGapDrop }: TaskBoardProps) {
   return (
     <section className={workspacePanelStyle}>
       <div className="flex shrink-0 flex-wrap items-start justify-between gap-3">
@@ -253,9 +268,24 @@ function TaskBoard({ tasks, skillIds, selectedTaskId, onSelect, onCreate, onMove
         <StudyTaskCreateDialog skillIds={skillIds} onCreate={onCreate} disabled={disabled} />
       </div>
       <StudyKanban tasks={tasks} selectedTaskId={selectedTaskId} onSelect={onSelect} onCreate={onCreate} onMove={onMove} onChangeParent={onChangeParent} onToggleChecklist={onToggleChecklist} disabled={disabled}
-        hasActiveFilters={hasActiveFilters} completedTaskId={completedTaskId} gapSource={gapSource} onGapDrop={onGapDrop} />
+        hasActiveFilters={hasActiveFilters} completedTaskId={completedTaskId} attentionTaskIds={attentionTaskIds} gapSource={gapSource} onGapDrop={onGapDrop} />
     </section>
   );
+}
+
+function findIncompleteDescendants(tasks: readonly StudyTask[], parentId: number): StudyTask[] {
+  const descendants = new Set<number>([parentId]);
+  let expanded = true;
+  while (expanded) {
+    expanded = false;
+    for (const task of tasks) {
+      if (task.parentTaskId != null && descendants.has(task.parentTaskId) && !descendants.has(task.id)) {
+        descendants.add(task.id);
+        expanded = true;
+      }
+    }
+  }
+  return tasks.filter((task) => task.id !== parentId && descendants.has(task.id) && task.status !== 'DONE');
 }
 
 export function PracticePlanBoard({ profile, initialPlan }: {
@@ -268,6 +298,9 @@ export function PracticePlanBoard({ profile, initialPlan }: {
   const gapsDetailsRef = useRef<HTMLDetailsElement>(null);
   const [view, setView] = useState<PlanView>('kanban');
   const [completedTaskId, setCompletedTaskId] = useState<number | null>(null);
+  const [attentionTaskIds, setAttentionTaskIds] = useState<ReadonlySet<number>>(() => new Set());
+  const [focusRequest, setFocusRequest] = useState<{ taskId: number; seq: number } | null>(null);
+  const attentionTimerRef = useRef<number | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [mindMapPositions, setMindMapPositions] = useState<MindMapPositions>({});
   const [taskFilters, setTaskFilters] = useState<TaskFilterState>({ query: '', skillId: '', improvementOnly: false, checklistOpenOnly: false });
@@ -314,7 +347,6 @@ export function PracticePlanBoard({ profile, initialPlan }: {
     ),
   }));
   const selectedTask = tasks.find((task) => task.id === selectedTaskId);
-  const inspectorSide = selectedTask?.status === 'DONE' ? 'left' : 'right';
   const query = normalizeTaskSearch(taskFilters.query);
   const skillOptions = [...new Set(tasks.flatMap((task) => task.skillId ? [task.skillId] : []))]
     .sort((a, b) => skillLabel(a).localeCompare(skillLabel(b), 'vi'));
@@ -370,6 +402,22 @@ export function PracticePlanBoard({ profile, initialPlan }: {
     const timer = window.setTimeout(() => setCompletedTaskId(null), 650);
     return () => window.clearTimeout(timer);
   }, [completedTaskId]);
+
+  useEffect(() => () => {
+    if (attentionTimerRef.current !== null) window.clearTimeout(attentionTimerRef.current);
+  }, []);
+
+  useEffect(() => {
+    if (!focusRequest || isMindMap) return;
+    const frame = window.requestAnimationFrame(() => {
+      const card = document.querySelector<HTMLElement>(`[data-task-card-id="${focusRequest.taskId}"]`);
+      if (!card) return;
+      card.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+      const button = card.querySelector<HTMLButtonElement>('button[aria-label]');
+      button?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [focusRequest, isMindMap]);
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
@@ -433,7 +481,21 @@ export function PracticePlanBoard({ profile, initialPlan }: {
     });
   }
 
+  function guardParentDone(task: StudyTask, nextStatus?: StudyTaskStatus): boolean {
+    if (nextStatus !== 'DONE') return true;
+    const incomplete = findIncompleteDescendants(storedTasks, task.id);
+    if (incomplete.length === 0) return true;
+    toast.error('Hoàn thành các đầu việc con trước khi đánh dấu đầu việc cha là đã xong.');
+    setSelectedTaskId(null);
+    setAttentionTaskIds(new Set(incomplete.map((item) => item.id)));
+    if (attentionTimerRef.current !== null) window.clearTimeout(attentionTimerRef.current);
+    attentionTimerRef.current = window.setTimeout(() => setAttentionTaskIds(new Set()), 3200);
+    setFocusRequest({ taskId: incomplete[0].id, seq: Date.now() });
+    return false;
+  }
+
   async function updateTask(task: StudyTask, update: StudyTaskUpdate) {
+    if (!guardParentDone(task, update.status)) return false;
     const { title, skillId, notes, status, sortOrder } = task;
     const result = await save(() => studyPlans.updateTask(profile.id, task.id, { title, skillId, notes, status, sortOrder, ...update }));
     if (result && status !== 'DONE' && update.status === 'DONE') setCompletedTaskId(task.id);
@@ -441,6 +503,7 @@ export function PracticePlanBoard({ profile, initialPlan }: {
   }
 
   async function moveTask(task: StudyTask, status: StudyTaskStatus, beforeTaskId?: number | null) {
+    if (!guardParentDone(task, status)) return false;
     if (beforeTaskId === undefined) return updateTask(task, { status });
     const result = await save(() => studyPlans.moveTask(profile.id, task.id, status, beforeTaskId));
     if (result && task.status !== 'DONE' && status === 'DONE') setCompletedTaskId(task.id);
@@ -448,6 +511,7 @@ export function PracticePlanBoard({ profile, initialPlan }: {
   }
 
   async function changeTaskParent(task: StudyTask, parentTaskId: number | null, status?: StudyTaskStatus) {
+    if (!guardParentDone(task, status)) return false;
     const result = await save(() => studyPlans.updateTaskParent(profile.id, task.id, parentTaskId, status));
     if (result && task.status !== 'DONE' && status === 'DONE') setCompletedTaskId(task.id);
     return Boolean(result);
@@ -647,31 +711,57 @@ export function PracticePlanBoard({ profile, initialPlan }: {
         </div>
       </section>
       {isMindMap ? (
-        <>
-          <section aria-label="Mind Map" data-inspector-side={selectedTask ? inspectorSide : undefined}
-            data-selection-active={selectedTask ? true : undefined}
-            className={cn(styles.mindMapWorkspace, selectedTask && styles.hasInspector, selectedTask && inspectorSide === 'left' && styles.inspectorOnLeft)}>
-            <PracticeMindMap title={plan.title} subtitle={profile.roleTitle} tasks={tasks}
-              skillIds={skillIds} onCreate={createTask}
-              positions={mindMapPositions} onPosition={(id, point) => setMindMapPositions((current) => ({ ...current, [id]: point }))}
-              onResetPositions={() => setMindMapPositions({})}
-              gaps={gaps.state.status === 'ready' ? gaps.state.data : undefined}
-              selectedTaskId={selectedTaskId} onSelect={setSelectedTaskId} disabled={disabled}
-              filterTaskIds={visibleTaskIds} matchingTaskIds={matchingTaskIds} hasTaskFilters={hasActiveTaskFilters}
-              onMove={moveTask} onChangeParent={(task, parentTaskId) => changeTaskParent(task, parentTaskId)} completedTaskId={completedTaskId} />
-            {inspector}
-          </section>
-        </>
+        <section
+          aria-label="Mind Map"
+          className={cn(styles.mindMapWorkspace, selectedTask && 'opacity-70 transition-opacity duration-200')}
+        >
+          <PracticeMindMap
+            title={plan.title}
+            subtitle={profile.roleTitle}
+            tasks={tasks}
+            skillIds={skillIds}
+            onCreate={createTask}
+            positions={mindMapPositions}
+            onPosition={(id, point) => setMindMapPositions((current) => ({ ...current, [id]: point }))}
+            onResetPositions={() => setMindMapPositions({})}
+            gaps={gaps.state.status === 'ready' ? gaps.state.data : undefined}
+            selectedTaskId={selectedTaskId}
+            onSelect={setSelectedTaskId}
+            disabled={disabled}
+            filterTaskIds={visibleTaskIds}
+            matchingTaskIds={matchingTaskIds}
+            hasTaskFilters={hasActiveTaskFilters}
+            onMove={moveTask}
+            onChangeParent={(task, parentTaskId) => changeTaskParent(task, parentTaskId)}
+            completedTaskId={completedTaskId}
+            attentionTaskIds={attentionTaskIds}
+            focusTaskRequest={focusRequest}
+          />
+        </section>
       ) : (
-        <div data-inspector-side={selectedTask ? inspectorSide : undefined} data-selection-active={selectedTask ? true : undefined}
+        <div
           data-selected-task-id={selectedTaskId ?? undefined}
-          className={cn(styles.kanbanWithInspector, selectedTask && styles.hasKanbanInspector)}>
-          {selectedTask && inspectorSide === 'left' && inspector}
-          <TaskBoard tasks={visibleTasks} skillIds={skillIds} selectedTaskId={selectedTaskId} onCreate={createTask} onSelect={setSelectedTaskId}
-            onMove={moveTask} onChangeParent={changeTaskParent} onToggleChecklist={toggleChecklistItem} completedTaskId={completedTaskId} disabled={disabled} hasActiveFilters={hasActiveTaskFilters} gapSource={gapSource} onGapDrop={createTaskFromGap} />
-          {selectedTask && inspectorSide === 'right' && inspector}
+          className={cn(styles.kanbanWithInspector, selectedTask && 'opacity-70 transition-opacity duration-200')}
+        >
+          <TaskBoard
+            tasks={visibleTasks}
+            skillIds={skillIds}
+            selectedTaskId={selectedTaskId}
+            onCreate={createTask}
+            onSelect={setSelectedTaskId}
+            onMove={moveTask}
+            onChangeParent={changeTaskParent}
+            onToggleChecklist={toggleChecklistItem}
+            completedTaskId={completedTaskId}
+            attentionTaskIds={attentionTaskIds}
+            disabled={disabled}
+            hasActiveFilters={hasActiveTaskFilters}
+            gapSource={gapSource}
+            onGapDrop={createTaskFromGap}
+          />
         </div>
       )}
+      {inspector}
       {gapDraft && <StudyGapTaskDialog key={gapDraft.objective.objectiveId} objective={gapDraft.objective}
         status={gapDraft.status} disabled={disabled} onCreate={createTask} onClose={() => setGapDraft(null)} />}
       <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>

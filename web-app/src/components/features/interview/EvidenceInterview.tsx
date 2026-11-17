@@ -14,6 +14,7 @@ import { InterviewResultDashboard } from './result/InterviewResultDashboard';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { skillLabel } from '@/components/features/applications/applicationUi';
 import { MarkdownContent } from '@/components/common/MarkdownContent';
+import { BrandLoading } from '@/components/common/BrandLoading';
 
 const VoiceInterview = dynamic(() => import('./EvidenceVoiceInterview').then(module => module.EvidenceVoiceInterview),
   { ssr: false, loading: () => <p className="p-6 text-sm">Đang chuẩn bị phòng phỏng vấn giọng nói…</p> });
@@ -39,7 +40,9 @@ export function EvidenceInterview() {
   const { session, busy, error } = interview;
   const phase = conversationPhase(session);
   const conversationVisible = ['OPENING', 'SELF_INTRODUCTION', 'CLOSING'].includes(phase);
-  if (interview.loading) return <p className="p-8">Đang tải phiên phỏng vấn…</p>;
+  if (interview.loading) return <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
+    <BrandLoading label="Đang tải phiên phỏng vấn…" description="Đang chuẩn bị không gian luyện tập của bạn." className="min-h-[60vh]" />
+  </main>;
   if (interview.legacy) return <main className="mx-auto max-w-3xl space-y-4 p-8">
     <h1 className="text-xl font-semibold">Phiên phỏng vấn cũ</h1>
     <p>Phiên này chỉ hỗ trợ xem lại. Hãy tạo lượt phỏng vấn mới để tiếp tục luyện tập.</p>

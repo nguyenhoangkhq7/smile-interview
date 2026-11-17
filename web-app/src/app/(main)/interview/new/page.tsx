@@ -12,6 +12,7 @@ import {
   InterviewFlowStep,
 } from '@/components/features/interview/NewInterview/InterviewProgressStepper';
 import { Button } from '@/components/ui/button';
+import { BrandLoading } from '@/components/common/BrandLoading';
 import { CheckCircle, AlertTriangle } from 'lucide-react';
 
 const PdfViewerModal = dynamic(() => import('@/components/common/PdfViewerModal'), { ssr: false });
@@ -198,17 +199,11 @@ export default function NewInterviewPage() {
           )}
 
           {analyzing && (
-            <div className="bg-card border border-border rounded-2xl p-12 shadow-xl flex flex-col items-center justify-center gap-6 text-center animate-fade-up">
-              <div className="size-10 rounded-full border-4 border-t-purple-500 border-muted animate-spin" />
-              <div className="space-y-1">
-                <h3 className="text-lg font-bold text-foreground">
-                  Đang phân tích CV và yêu cầu công việc...
-                </h3>
-                <p className="text-xs text-muted-foreground">
-                  Quá trình này có thể mất vài phút. Vui lòng chờ trong giây lát.
-                </p>
-              </div>
-            </div>
+            <BrandLoading
+              label="Đang phân tích CV và yêu cầu công việc..."
+              description="Quá trình này có thể mất vài phút. Vui lòng chờ trong giây lát."
+              className="animate-fade-up"
+            />
           )}
 
           {ingested && !analyzing && !analysis && (

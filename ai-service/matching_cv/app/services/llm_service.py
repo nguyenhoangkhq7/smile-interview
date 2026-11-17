@@ -168,6 +168,29 @@ class LLMService:
                 "OPENROUTER_API_KEY chưa được cấu hình hợp lệ trong file .env."
             )
 
+        use_dspy = (
+            settings.MATCHING_CV_DSPY_EXPLICIT_ENABLED
+            and system_prompt is None
+            and (prompt_variant is None or prompt_variant.upper() == "DEFAULT")
+        )
+        if use_dspy:
+            from matching_cv.app.services.dspy_explicit_skill_service import (
+                dspy_explicit_skill_service,
+            )
+            from matching_cv.app.services.extraction_recovery import request_stage_context_var
+
+            request_stage_context_var.set("explicit")
+            result = await dspy_explicit_skill_service.extract(text, document_type)
+            result["extraction_meta"] = {
+                "prompt_sha256": dspy_explicit_skill_service.prompt_sha256,
+                "prompt_variant": "dspy_explicit_v1",
+                "model_configured": settings.OPENROUTER_MODEL,
+                "temperature": 0.0,
+                "schema_version": "dspy_explicit_v1",
+                "extracted_at": datetime.now(timezone.utc).isoformat(),
+            }
+            return result
+
         client = AsyncOpenAI(
             api_key=current_key,
             base_url=settings.OPENROUTER_BASE_URL,
