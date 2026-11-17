@@ -172,6 +172,8 @@ interface PracticeMindMapProps {
   onResetPositions: () => void;
   disabled: boolean;
   completedTaskId: number | null;
+  attentionTaskIds?: ReadonlySet<number>;
+  focusTaskRequest?: { taskId: number; seq: number } | null;
   filterTaskIds: ReadonlySet<number>;
   matchingTaskIds: ReadonlySet<number>;
   hasTaskFilters: boolean;
@@ -193,6 +195,8 @@ export function PracticeMindMap({
   onResetPositions,
   disabled,
   completedTaskId,
+  attentionTaskIds,
+  focusTaskRequest,
   filterTaskIds,
   matchingTaskIds,
   hasTaskFilters,
@@ -464,6 +468,27 @@ export function PracticeMindMap({
       }));
     }
   }, [selectedTaskId, tasks, defaultPoints, positions, scheduleCameraAnimation]);
+
+  // Focus & pan camera to an incomplete child task when requested
+  useEffect(() => {
+    if (!focusTaskRequest) return;
+    const view = viewport.current;
+    const fallback = defaultPoints.get(focusTaskRequest.taskId);
+    if (!view || !fallback) return;
+    const pt = positions[taskNodeId(focusTaskRequest.taskId)] ?? fallback;
+    scheduleCameraAnimation();
+    setCamera((prev) => ({
+      ...prev,
+      x: view.clientWidth / 2 - (pt.x + leaf.width / 2) * prev.zoom,
+      y: view.clientHeight / 2 - pt.y * prev.zoom,
+    }));
+    window.requestAnimationFrame(() => {
+      const btn = content.current?.querySelector<HTMLButtonElement>(
+        `[data-task-id="${focusTaskRequest.taskId}"] > button`,
+      );
+      btn?.focus({ preventScroll: true });
+    });
+  }, [focusTaskRequest, defaultPoints, positions, scheduleCameraAnimation]);
 
   // Wheel scroll (vertical/horizontal) & Ctrl/Meta+Wheel (or pinch) zoom-at-cursor
   useEffect(() => {
@@ -1039,6 +1064,7 @@ export function PracticeMindMap({
                         aria-pressed={task.id === selectedTaskId}
                         onClick={() => onSelect(task.id)}
                         data-completed={task.id === completedTaskId || undefined}
+                        data-attention={attentionTaskIds?.has(task.id) ? 'true' : undefined}
                         data-filter-match={filterActive ? filterMatch : undefined}
                         data-node-selected={task.id === selectedTaskId || undefined}
                         data-node-dragging={isDraggingPos || undefined}

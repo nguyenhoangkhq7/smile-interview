@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { BookOpen } from 'lucide-react';
+import { BookOpen, ChevronDown, UserRound } from 'lucide-react';
 import styles from './navbar.module.css';
 import { useAuthStore } from '@/store/authStore';
 
@@ -56,7 +56,11 @@ export default function Navbar() {
 
         {/* Logo */}
         <Link href="/" className={styles.logo}>
-          <Image src="/logo.png" alt="Smile Interview Logo" width={150} height={36} className={styles.logoImg} unoptimized />
+          <Image src="/logo.png" alt="" width={64} height={64} className={styles.logoImg} unoptimized />
+          <span className={styles.logoCopy}>
+            <span className={styles.brandName}>Smile Interview</span>
+            <span className={styles.brandTagline}>Career Mentorship</span>
+          </span>
         </Link>
 
         {/* Center Nav */}
@@ -90,14 +94,9 @@ export default function Navbar() {
                 onBlur={() => setTimeout(() => setDropdownOpen(false), 200)}
                 className={styles.dropdownTrigger}
               >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={styles.dropdownIconUser}>
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                  <circle cx="12" cy="7" r="4" />
-                </svg>
-                <span>{user.username}</span>
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={styles.dropdownIconChevron}>
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
+                <UserRound size={15} className={styles.dropdownIconUser} aria-hidden="true" />
+                <span className={styles.username}>{user.username}</span>
+                <ChevronDown size={13} className={styles.dropdownIconChevron} aria-hidden="true" />
               </button>
 
               {/* Dropdown Menu list */}
@@ -131,7 +130,7 @@ export default function Navbar() {
                     </Link>
 
                     {user.role === 'ADMIN' && (
-                      <Link href="/admin/rules" className={styles.dropdownItem}>
+                      <Link href="/admin/evaluations" className={styles.dropdownItem}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-orange-500" style={{ stroke: '#ea580c' }}>
                           <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
                           <circle cx="12" cy="12" r="3" />
@@ -164,7 +163,7 @@ export default function Navbar() {
         ) : (
           <div className={styles.authButtons}>
             <Link href="/login" className={styles.btnLogin}>Đăng nhập</Link>
-            <Link href="/register" className={styles.btnRegister}>Đăng ký</Link>
+            <Link href="/register" className={styles.btnRegister}>Bắt đầu miễn phí</Link>
           </div>
         )}
       </div>

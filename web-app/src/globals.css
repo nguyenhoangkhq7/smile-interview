@@ -7,7 +7,7 @@
 
 /* ── shadcn/ui Design Tokens — mapped to brand palette ── */
 @theme inline {
-  --font-sans: var(--font-inter), 'Inter', system-ui, -apple-system, sans-serif;
+  --font-sans: var(--font-atlassian-sans), 'Atlassian Sans', Inter, system-ui, sans-serif;
   --font-heading: var(--font-sans);
 
   /* Brand */
@@ -194,4 +194,39 @@
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Homepage motion: enter on scroll, gentle depth, and an interview waveform. */
+.home-reveal {
+  opacity: 0;
+  transform: translate3d(0, 20px, 0);
+  transition: opacity 650ms ease, transform 650ms cubic-bezier(.2,.7,.2,1);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+
+.home-reveal-visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+.home-parallax {
+  transform: translate3d(0, var(--parallax-y, 0px), 0);
+  will-change: transform;
+}
+
+@keyframes wave {
+  from { transform: scaleY(.55); opacity: .72; }
+  to { transform: scaleY(1); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+
+  .home-reveal { opacity: 1; transform: none; }
+  .home-parallax { transform: none; }
 }

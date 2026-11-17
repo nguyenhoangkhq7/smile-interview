@@ -51,6 +51,8 @@ ai-service/
 
 Module 2 dùng điểm năng lực CV/JD và độ thiếu hụt tất định; không khởi tạo phân phối xác suất năng lực. Module 3 không yêu cầu hoặc cập nhật `raw_belief`, `belief`, `tag` hay TV. Engine phỏng vấn cũ đã được gỡ; API AI `/api/v1/interview/*` trả HTTP 410. Dataset và bộ tối ưu DSPy được khôi phục, chuyển sang schema bằng chứng V2; xem [hướng dẫn compile/load](adaptive_questioning/optimization/README.md). Backend vẫn phục vụ báo cáo cũ đã lưu, không gọi AI để tính lại. Snapshot V2 cũ được đọc bằng cách bỏ qua các field đã loại bỏ; lần chuyển trạng thái thành công tiếp theo lưu cấu trúc mới. Xem [tài liệu V2](../docs/evidence-interview-v2.md).
 
+Module extract explicit skill trong `matching_cv` dùng DSPy Signature và metric F0.5 ưu tiên precision. Dataset có ví dụ phân biệt skill thực tế với bằng cấp/ngành học, chức danh, lĩnh vực của nhà tuyển dụng và coursework. Compile bộ few-shot ban đầu từ thư mục `ai-service` bằng `python -m matching_cv.dspy_modules.compiler`; module được lưu ở `matching_cv/dspy_modules/compiled_modules/explicit_skill_extractor.json`. So sánh prompt cũ với DSPy trên holdout bằng `python -m matching_cv.dspy_modules.benchmark` (cần OpenRouter key và gửi văn bản holdout cho model). Khi bật `MATCHING_CV_DSPY_EXPLICIT_ENABLED=true`, cache extract không có `extractor_version=explicit_dspy_v1` hoặc metadata schema `dspy_explicit_v1` sẽ bị bỏ qua để tránh dùng kết quả trước DSPy. Nếu chưa có artifact đã compile, runtime nạp bộ ví dụ gold cục bộ làm few-shot seed.
+
 ---
 
 ## 3. Khởi chạy & Kiểm thử

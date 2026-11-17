@@ -9,6 +9,7 @@ from typing import Any, Dict, Optional, Tuple
 
 from fastapi import HTTPException, status
 
+from matching_cv.app.core.config import settings
 from matching_cv.app.schemas.unified_skill_extraction import UnifiedExtractFileResponse
 from matching_cv.app.services.document_parser import DocumentParserService
 
@@ -19,6 +20,7 @@ DOCUMENT_CACHE_DIR = _PACKAGE_ROOT / "data/cache/stage6c3b/doc_extraction"
 PAIR_CACHE_DIR = _PACKAGE_ROOT / "data/cache/stage6b3_live"
 CANONICAL_MAPPING_PATH = _PACKAGE_ROOT / "docs/verification/stage6d2r/canonical_pair_label_mapping.json"
 COHORT_MANIFEST_PATH = _PACKAGE_ROOT / "docs/verification/stage6c3a/cohort100_manifest.json"
+DSPY_EXTRACTOR_VERSION = "explicit_dspy_v1"
 
 
 class CachedExtractionService:
@@ -124,7 +126,8 @@ class CachedExtractionService:
             if os.path.exists(pair_path):
                 with open(pair_path, "r", encoding="utf-8") as file:
                     payload = json.load(file)
-                return UnifiedExtractFileResponse.model_validate(payload), matched_pair_id, "CERTIFIED_CLEAN_COHORT"
+                if self._cache_version_is_usable(payload):
+                    return UnifiedExtractFileResponse.model_validate(payload), matched_pair_id, "CERTIFIED_CLEAN_COHORT"
 
         cv_id = hash_to_id.get(cv_hash) or (cv_filename.split(".")[0] if cv_filename.startswith("cv_") else None)
         jd_id = hash_to_id.get(jd_hash) or (jd_filename.split(".")[0] if jd_filename.startswith("jd_") else None)
@@ -140,6 +143,11 @@ class CachedExtractionService:
             cv_doc = json.load(file)
         with open(jd_path, "r", encoding="utf-8") as file:
             jd_doc = json.load(file)
+        if settings.MATCHING_CV_DSPY_EXPLICIT_ENABLED and not all(
+            self._cache_version_is_usable(doc) for doc in (cv_doc, jd_doc)
+        ):
+            logger.info("Ignoring legacy document extraction cache for active DSPy extractor version.")
+            return None, matched_pair_id, None
 
         cv_exp = cv_doc.get("extracted_skills", {}).get("explicit", [])
         cv_imp = cv_doc.get("extracted_skills", {}).get("implicit", [])
@@ -152,6 +160,21 @@ class CachedExtractionService:
             "jd": self._document_payload(jd_id, "JD", jd_hash, jd_text, jd_exp, jd_imp),
         }
         return UnifiedExtractFileResponse.model_validate(payload), matched_pair_id, "CACHED_DOCUMENT_CORPUS"
+
+    @staticmethod
+    def _cache_version_is_usable(payload: Dict[str, Any]) -> bool:
+        """Avoid serving pre-DSPy extraction records after the new extractor is enabled."""
+        if not settings.MATCHING_CV_DSPY_EXPLICIT_ENABLED:
+            return True
+        if payload.get("extractor_version") == DSPY_EXTRACTOR_VERSION:
+            return True
+        documents = [payload.get("cv"), payload.get("jd")]
+        return bool(documents) and all(
+            isinstance(document, dict)
+            and document.get("explicit", {}).get("extraction_meta", {}).get("schema_version")
+            == DSPY_EXTRACTOR_VERSION
+            for document in documents
+        )
 
     @staticmethod
     def _document_payload(

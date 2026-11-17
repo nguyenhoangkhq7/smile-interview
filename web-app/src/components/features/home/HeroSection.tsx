@@ -1,60 +1,61 @@
+import Image from 'next/image';
 import Link from 'next/link';
-import { IconUpload, IconArrow, IconCheck } from '@/components/ui/icons';
+import { ArrowDown, ArrowRight, AudioLines, CheckCircle2, CircleHelp } from 'lucide-react';
+import { Parallax, Reveal } from './HomeMotion';
 
-const TRUST_ITEMS = ['Miễn phí bắt đầu', 'Không cần thẻ tín dụng', 'Phân tích trong 30 giây'];
+const trustItems = ['Luyện tập mọi lúc 24/7', 'Phản hồi cá nhân hóa chuyên sâu'];
 
 export function HeroSection() {
   return (
-    <section className="relative overflow-hidden bg-[var(--color-bg-cream,#fdfbf7)] pb-24 pt-28">
-      {/* Decorative blobs */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-        <div className="absolute -right-40 -top-40 h-[600px] w-[600px] rounded-full bg-brand-orange/6 blur-3xl" />
-        <div className="absolute -bottom-20 -left-40 h-[500px] w-[500px] rounded-full bg-brand-green/6 blur-3xl" />
-      </div>
+    <section className="relative overflow-hidden bg-[#fef9ee] py-16 sm:py-20 lg:py-24">
+      <div aria-hidden className="pointer-events-none absolute -right-40 top-0 h-[30rem] w-[30rem] rounded-full bg-[#dce8dc]/55 blur-3xl" />
+      <div className="relative mx-auto grid max-w-6xl items-center gap-14 px-5 sm:px-8 lg:grid-cols-12 lg:gap-12">
+        <Reveal className="lg:col-span-7">
+          <h1 className="max-w-[700px] font-sans text-[clamp(2.5rem,4.5vw,3.8rem)] leading-[1.12] tracking-[-0.01em] text-[#113426]">
+            Phỏng vấn <em className="text-[#70321b]">tự tin hơn</em>. Sẵn sàng cho <em className="text-[#70321b]">bước tiến tiếp theo</em> trong sự nghiệp.
+          </h1>
+          <p className="mt-6 max-w-[590px] text-[15px] leading-7 text-[#59645d]">
+            Chuẩn bị cho những cơ hội nghề nghiệp tốt hơn với trải nghiệm luyện phỏng vấn cá nhân hóa. Phân tích CV, thực hành đối thoại trực tiếp và nhận phản hồi đa chiều để tiến bộ rõ rệt mỗi ngày.
+          </p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <Link href="/interview/new" className="group inline-flex items-center justify-center gap-2 rounded-md bg-[#294b3c] px-6 py-3.5 text-sm font-semibold text-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:bg-[#113426] hover:shadow-lg">
+              Bắt đầu luyện tập miễn phí <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
+            </Link>
+            <a href="#quy-trinh" className="inline-flex items-center justify-center gap-2 rounded-md bg-[#f3ede2] px-5 py-3.5 text-sm font-medium text-[#233b30] transition-colors hover:bg-[#e9e2d5]">
+              Khám phá cách hoạt động <ArrowDown size={15} />
+            </a>
+          </div>
+          <div className="mt-8 flex flex-wrap gap-x-5 gap-y-2.5 text-[11px] text-[#68726b]">
+            {trustItems.map((item) => <span key={item} className="inline-flex items-center gap-1.5"><CheckCircle2 size={13} className="text-[#4c6450]" />{item}</span>)}
+          </div>
+        </Reveal>
 
-      <div className="relative mx-auto max-w-4xl px-6 text-center">
-        {/* Title */}
-        <h1 className="mb-6 text-4xl font-extrabold leading-tight tracking-tight text-foreground sm:text-5xl lg:text-6xl">
-          Phỏng vấn giả lập bằng AI.{' '}
-          <span className="gradient-brand">Chuẩn xác, Tự nhiên,</span>{' '}
-          Chuyên nghiệp.
-        </h1>
-
-        {/* Subtitle */}
-        <p className="mx-auto mb-10 max-w-2xl text-lg leading-relaxed text-muted-foreground">
-          Upload CV và Job Description — AI phân tích mức độ phù hợp, đặt câu hỏi thực tế
-          bằng giọng nói 3D và cho bạn phản hồi chuyên sâu sau mỗi buổi luyện tập.
-        </p>
-
-        {/* CTAs */}
-        <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-          <Link
-            href="/interview/new"
-            className="inline-flex items-center gap-2.5 rounded-xl bg-brand-orange px-7 py-3.5 text-sm font-bold text-white shadow-lg shadow-brand-orange/25 transition-all hover:bg-brand-orange-hover hover:shadow-xl hover:shadow-brand-orange/30 active:scale-[0.98]"
-          >
-            <IconUpload size={18} />
-            Tải CV &amp; Bắt đầu ngay
-            <IconArrow size={16} />
-          </Link>
-          <Link
-            href="/history"
-            className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-7 py-3.5 text-sm font-semibold text-foreground shadow-sm transition-all hover:border-brand-orange/40 hover:bg-accent hover:text-brand-orange"
-          >
-            Xem lịch sử
-          </Link>
-        </div>
-
-        {/* Trust indicators */}
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
-          {TRUST_ITEMS.map((t) => (
-            <span key={t} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span className="flex size-4 items-center justify-center rounded-full bg-brand-green/15 text-brand-green">
-                <IconCheck size={10} />
-              </span>
-              {t}
-            </span>
-          ))}
-        </div>
+        <Reveal className="relative lg:col-span-5" delay={140}>
+          <Parallax>
+            <div className="relative aspect-[4/4.45] overflow-hidden rounded-lg bg-[#e7e2d7] shadow-[0_24px_60px_rgba(28,43,33,.14)]">
+              <Image
+                src="https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=1100&q=85"
+                alt="Ứng viên tự tin luyện phỏng vấn trong không gian làm việc sáng"
+                fill
+                priority
+                sizes="(max-width: 1024px) 90vw, 42vw"
+                className="object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#113426]/25 via-transparent to-transparent" />
+            </div>
+          </Parallax>
+          <div className="relative -mt-16 ml-5 mr-3 rounded-lg border border-white/80 bg-white p-4 shadow-xl sm:absolute sm:-bottom-7 sm:-left-10 sm:mt-0 sm:ml-0 sm:mr-0 sm:w-[calc(100%+2.5rem)] sm:p-5">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-wide text-[#607066]">
+              <span className="inline-flex items-center gap-2"><span className="size-2 rounded-full bg-[#4c6450]" />Phiên thử nghiệm trực tiếp</span>
+              <span className="rounded-full bg-[#e6f0e4] px-2.5 py-1 text-[#436555]">Tiến độ: 3/5 câu hỏi</span>
+            </div>
+            <p className="font-sans text-lg leading-snug text-[#113426]">“Hãy chia sẻ một tình huống bạn giải quyết bất đồng quan điểm trong đội ngũ dự án?”</p>
+            <div className="mt-4 flex items-center justify-between border-t border-[#eee9df] pt-3 text-xs text-[#68726b]">
+              <span className="inline-flex items-center gap-2"><AudioLines size={17} className="text-[#4c6450]" /> Độ lưu loát: <strong className="text-[#113426]">92% (Tự tin)</strong></span>
+              <span className="hidden sm:inline-flex items-center gap-1"><CircleHelp size={14} /> Khung STAR</span>
+            </div>
+          </div>
+        </Reveal>
       </div>
     </section>
   );

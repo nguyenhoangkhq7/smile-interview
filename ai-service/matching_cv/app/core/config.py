@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     OPENROUTER_VERIFIER_MODEL: str = ""
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
 
+    # Matching CV explicit extraction uses a compiled DSPy module by default.
+    MATCHING_CV_DSPY_EXPLICIT_ENABLED: bool = True
+
     # Stage 4 / Pre-GNN Pipeline Orchestration Settings
     PIPELINE_MAX_FILE_SIZE_BYTES: int = 15 * 1024 * 1024  # 15 MB
     PIPELINE_ALLOWED_EXTENSIONS: list[str] = [".pdf", ".txt"]

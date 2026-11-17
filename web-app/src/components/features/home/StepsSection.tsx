@@ -1,80 +1,32 @@
-import { IconUpload, IconBriefcase, IconMic, IconBarChart, IconArrow } from '@/components/ui/icons';
-import type { ReactNode } from 'react';
+import { FileText, Target, Mic2, ChartNoAxesCombined, LockKeyhole, SlidersHorizontal, AudioLines, ChartNoAxesColumnIncreasing } from 'lucide-react';
+import { Reveal } from './HomeMotion';
 
-interface Step {
-  step: string;
-  icon: ReactNode;
-  title: string;
-  desc: string;
-  accent: 'orange' | 'green';
-}
-
-const STEPS: Step[] = [
-  {
-    step: '01', icon: <IconUpload size={22} />, title: 'Tải CV lên',
-    desc: 'Upload CV PDF — AI phân tích kỹ năng và kinh nghiệm ngay lập tức.',
-    accent: 'orange',
-  },
-  {
-    step: '02', icon: <IconBriefcase size={22} />, title: 'Chọn Job Description',
-    desc: 'Tải JD hoặc dán trực tiếp. AI đối chiếu CV với yêu cầu vị trí.',
-    accent: 'green',
-  },
-  {
-    step: '03', icon: <IconMic size={22} />, title: 'Phỏng vấn giọng nói',
-    desc: 'Trả lời bằng giọng nói với avatar AI 3D. Trải nghiệm như phỏng vấn thật.',
-    accent: 'orange',
-  },
-  {
-    step: '04', icon: <IconBarChart size={22} />, title: 'Nhận kết quả chi tiết',
-    desc: 'Điểm số, phân tích điểm mạnh/yếu và gợi ý cải thiện cá nhân hóa.',
-    accent: 'green',
-  },
+const steps = [
+  { number: '01', title: 'Tải CV lên', description: 'Định dạng PDF hoặc Word. Hệ thống tự động bóc tách dự án, kỹ năng cốt lõi và kinh nghiệm.', note: 'Bảo mật dữ liệu tuyệt đối', Icon: FileText, NoteIcon: LockKeyhole },
+  { number: '02', title: 'Chọn Job Description', description: 'Dán nội dung JD để AI tổng hợp câu hỏi trọng tâm và đối chiếu yêu cầu vị trí.', note: 'Tùy biến cấp bậc Senior/Lead', Icon: Target, NoteIcon: SlidersHorizontal },
+  { number: '03', title: 'Phỏng vấn giọng nói', description: 'Đối thoại hai chiều tự nhiên với câu hỏi đào sâu linh hoạt như buổi phỏng vấn thật.', note: 'Nhận diện ngữ điệu & phản xạ', Icon: Mic2, NoteIcon: AudioLines },
+  { number: '04', title: 'Nhận kết quả & lộ trình', description: 'Báo cáo chi tiết điểm mạnh, lỗ hổng kiến thức và kế hoạch hành động từng ngày.', note: 'Bản đồ khắc phục rõ ràng', Icon: ChartNoAxesCombined, NoteIcon: ChartNoAxesColumnIncreasing },
 ];
 
 export function StepsSection() {
   return (
-    <section className="py-24">
-      <div className="mx-auto max-w-6xl px-6">
-        {/* Heading */}
-        <div className="mb-14 text-center">
-          <h2 className="mb-3 text-3xl font-extrabold tracking-tight sm:text-4xl">
-            4 bước để luyện tập{' '}
-            <span className="gradient-brand">hiệu quả</span>
-          </h2>
-          <p className="text-muted-foreground">Từ CV đến phản hồi chi tiết — chỉ trong vài phút.</p>
-        </div>
-
-        {/* Step Cards */}
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {STEPS.map(({ step, icon, title, desc, accent }, idx) => (
-            <div key={step} className="relative">
-              {/* Connector arrow */}
-              {idx < STEPS.length - 1 && (
-                <div className="absolute -right-4 top-8 z-10 hidden text-muted-foreground/40 lg:block">
-                  <IconArrow size={18} />
-                </div>
-              )}
-
-              <div className={`group relative overflow-hidden rounded-2xl border p-6 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5 ${
-                accent === 'orange'
-                  ? 'border-brand-orange/20 bg-brand-orange/5 hover:border-brand-orange/40'
-                  : 'border-brand-green/20 bg-brand-green/5 hover:border-brand-green/40'
-              }`}>
-                <span className="mb-1 block text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                  Bước {step}
-                </span>
-                <div className={`mb-4 inline-flex size-11 items-center justify-center rounded-xl ${
-                  accent === 'orange'
-                    ? 'bg-brand-orange/15 text-brand-orange'
-                    : 'bg-brand-green/15 text-brand-green'
-                }`}>
-                  {icon}
-                </div>
-                <p className="mb-2 font-bold text-foreground">{title}</p>
-                <p className="text-sm leading-relaxed text-muted-foreground">{desc}</p>
-              </div>
-            </div>
+    <section id="quy-trinh" className="scroll-mt-20 bg-[#fef9ee] py-20 sm:py-24">
+      <div className="mx-auto max-w-6xl px-5 sm:px-8">
+        <Reveal className="mb-10 max-w-2xl sm:mb-12">
+          <p className="text-[10px] font-semibold uppercase tracking-[.18em] text-[#647a68]">Quy trình tinh gọn</p>
+          <h2 className="mt-2 font-sans text-3xl leading-tight tracking-[-0.01em] text-[#113426] sm:text-4xl">4 bước chuẩn bị cho buổi phỏng vấn thành công</h2>
+          <p className="mt-3 max-w-xl text-sm leading-6 text-[#68726b]">Từ CV và bản mô tả công việc đến báo cáo năng lực cùng lộ trình ôn tập phù hợp với bạn.</p>
+        </Reveal>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {steps.map(({ number, title, description, note, Icon, NoteIcon }, index) => (
+            <Reveal key={number} delay={index * 90} className="h-full">
+              <article className="group flex h-full min-h-[226px] flex-col rounded-md border border-[#eee9df] bg-white p-5 transition duration-300 hover:-translate-y-1 hover:border-[#ccd8cc] hover:shadow-[0_16px_35px_rgba(25,52,38,.09)] sm:p-6">
+                <div className="mb-4 flex items-center justify-between"><span className="font-sans text-2xl text-[#335d47]">{number}</span><span className="flex size-9 items-center justify-center rounded-lg bg-[#f3ede2] text-[#335d47] transition-colors group-hover:bg-[#e4eee2]"><Icon size={17} /></span></div>
+                <h3 className="text-sm font-semibold text-[#113426]">{title}</h3>
+                <p className="mt-2 text-xs leading-5 text-[#73786f]">{description}</p>
+                <span className="mt-auto inline-flex items-center gap-1.5 pt-5 text-[10px] font-medium text-[#587060]"><NoteIcon size={12} />{note}</span>
+              </article>
+            </Reveal>
           ))}
         </div>
       </div>

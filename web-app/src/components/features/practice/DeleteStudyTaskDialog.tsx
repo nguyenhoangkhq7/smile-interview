@@ -1,14 +1,15 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactElement } from 'react';
 import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
-export function DeleteStudyTaskDialog({ title, disabled, onConfirm }: {
+export function DeleteStudyTaskDialog({ title, disabled, onConfirm, trigger }: {
   title: string;
   disabled: boolean;
   onConfirm: () => Promise<boolean>;
+  trigger?: ReactElement;
 }) {
   const [open, setOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -35,8 +36,8 @@ export function DeleteStudyTaskDialog({ title, disabled, onConfirm }: {
       setFailed(false);
       setOpen(nextOpen);
     }}>
-      <DialogTrigger render={<Button type="button" variant="ghost" size="icon" aria-label="Xóa đầu việc" disabled={disabled} />}>
-        <Trash2 aria-hidden="true" />
+      <DialogTrigger render={trigger ?? <Button type="button" variant="ghost" size="icon" aria-label="Xóa đầu việc" disabled={disabled} />}>
+        {!trigger && <Trash2 aria-hidden="true" />}
       </DialogTrigger>
       <DialogContent showCloseButton={false} initialFocus={cancel} overlayClassName="bg-slate-950/45"
         className="sm:max-w-md">
