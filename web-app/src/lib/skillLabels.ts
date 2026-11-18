@@ -1,3 +1,5 @@
+import type { SkillGapResult } from '@/services/cvJdMatching';
+
 const labels: Record<string, string> = {
   'html css': 'HTML / CSS', html: 'HTML', css: 'CSS', javascript: 'JavaScript', typescript: 'TypeScript',
   sql: 'SQL', postgresql: 'PostgreSQL', mysql: 'MySQL', java: 'Java', python: 'Python',
@@ -39,4 +41,10 @@ export function skillLabel(value: string, displayName?: string | null, evidenceS
   if (name && name !== value) return name;
   const known = labels[value.toLowerCase().replace(/[-_]/g, ' ')];
   return known || nameFromEvidence(value, evidenceSpans) || value.replace(/[-_]+/g, ' ');
+}
+
+export function jdSkillLabel(skill: Pick<SkillGapResult,
+  'jd_skill_id' | 'jd_skill_name' | 'jd_evidence_spans' | 'job_tasks'>) {
+  const taskSpans = skill.job_tasks?.flatMap(task => task.evidence_spans ?? []) ?? [];
+  return skillLabel(skill.jd_skill_id, skill.jd_skill_name, [...new Set([...(skill.jd_evidence_spans ?? []), ...taskSpans])]);
 }

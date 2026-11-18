@@ -16,8 +16,4 @@ public class InterviewRun {
     private String snapshotJson;
     @Column(columnDefinition = "text", nullable = false)
     private String publicJson;
-    @Column(columnDefinition = "text")
-    private String blueprintJson;
-    @Column(columnDefinition = "text")
-    private String dynamicStateJson;
 }

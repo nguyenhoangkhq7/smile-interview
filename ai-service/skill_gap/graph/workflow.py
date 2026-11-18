@@ -5,7 +5,6 @@ Implements parallel Fan-out / Fan-in execution:
   START ---> [node_segment_cv] ---\
         ---> [node_parse_jd]   ----+--> [node_estimate_proficiencies (Parallel N skills)]
                                          --> [node_detect_gaps (Deterministic 0ms)]
-                                         --> [node_build_audit_report (Fact-based XAI)]
                                          --> END
 """
 
@@ -24,12 +23,12 @@ from skill_gap.domain.models import (
     MatchResult,
     ProficiencyResult,
     SegmenterOutput,
+    SkillGapReportSummary,
     SkillGapResult,
 )
 from skill_gap.services.gap_detector import GapDetector
 from skill_gap.services.jd_requirement_parser import JDRequirementParser
 from skill_gap.services.proficiency_estimator import ProficiencyEstimator, ProficiencyEstimating
-from skill_gap.services.report_generator import StaticGapAuditReport, generate_static_gap_report
 from skill_gap.services.resume_segmenter import ResumeSegmenter
 
 
@@ -50,7 +49,6 @@ class SkillGapGraphState(TypedDict, total=False):
     # Parallel Fan-in outputs
     proficiencies: List[ProficiencyResult]
     gap_results: List[SkillGapResult]
-    audit_report: StaticGapAuditReport
 
 
 class SkillGapWorkflow:
@@ -84,7 +82,6 @@ class SkillGapWorkflow:
         builder.add_node("parse_jd", self._node_parse_jd)
         builder.add_node("estimate_proficiencies", self._node_estimate_proficiencies)
         builder.add_node("detect_gaps", self._node_detect_gaps)
-        builder.add_node("build_audit_report", self._node_build_audit_report)
 
         # Fan-out: Run Step 1 (CV Segmentation) and Step 2 (JD Parsing) in parallel
         builder.add_edge(START, "segment_cv")
@@ -93,10 +90,9 @@ class SkillGapWorkflow:
         # Fan-in: Wait for both branches before running Step 3 (Proficiency Estimation)
         builder.add_edge(["segment_cv", "parse_jd"], "estimate_proficiencies")
 
-        # Sequential deterministic post-processing (Step 4 & XAI Report)
+        # Sequential deterministic post-processing (Step 4)
         builder.add_edge("estimate_proficiencies", "detect_gaps")
-        builder.add_edge("detect_gaps", "build_audit_report")
-        builder.add_edge("build_audit_report", END)
+        builder.add_edge("detect_gaps", END)
 
         return builder.compile()
 
@@ -203,31 +199,11 @@ class SkillGapWorkflow:
         for result in gap_results:
             jd_skill = jd_skills.get(result.jd_skill_id)
             cv_skill = cv_skills.get(result.matched_cv_skill_id)
-            result.jd_evidence_spans = list(jd_skill.evidence_spans) if jd_skill else []
+            if jd_skill and not result.job_tasks:
+                result.jd_evidence_spans = list(jd_skill.evidence_spans)
             result.jd_skill_name = jd_skill.skill_name if jd_skill else None
             result.matched_cv_skill_name = cv_skill.skill_name if cv_skill else None
         return {"gap_results": gap_results}
-
-    def _node_build_audit_report(self, state: SkillGapGraphState) -> SkillGapGraphState:
-        print("[LangGraph] Bước 4: Tổng hợp Báo cáo Kiểm toán Chẩn đoán Tĩnh (Fact-based XAI Report)...")
-        analysis_id = state.get("analysis_id") or str(uuid.uuid4())
-        segment_output = state.get("segment_output")
-        jd_parser_output = state["jd_parser_output"]
-        proficiencies = state.get("proficiencies", [])
-        gap_results = state.get("gap_results", [])
-        matches = state.get("match_results", [])
-
-        report = generate_static_gap_report(
-            analysis_id=analysis_id,
-            gap_results=gap_results,
-            requirements=jd_parser_output.requirements,
-            proficiencies=proficiencies,
-            matches=matches,
-            segment_output=segment_output,
-            floor_threshold=self.config.thresholds.floor_threshold,
-            identity_threshold=self.config.thresholds.identity_threshold,
-        )
-        return {"audit_report": report}
 
     def invoke(
         self,
@@ -237,7 +213,7 @@ class SkillGapWorkflow:
         jd_skills: List[ExtractedJDSkill],
         match_results: List[MatchResult],
         analysis_id: Optional[str] = None,
-    ) -> Tuple[List[SkillGapResult], StaticGapAuditReport, SkillGapGraphState]:
+    ) -> Tuple[List[SkillGapResult], SkillGapReportSummary, SkillGapGraphState]:
         aid = analysis_id or str(uuid.uuid4())
         final_state: SkillGapGraphState = self.graph.invoke(
             {
@@ -249,8 +225,18 @@ class SkillGapWorkflow:
                 "match_results": list(match_results),
             }
         )
+        segment_output = final_state.get("segment_output")
+        jd_parser_output = final_state["jd_parser_output"]
+        gap_results = final_state["gap_results"]
+        degraded = bool(
+            (segment_output and segment_output.degraded)
+            or jd_parser_output.degraded
+            or (segment_output and segment_output.flags)
+            or jd_parser_output.flags
+            or any(g.degraded for g in gap_results)
+        )
         return (
-            final_state["gap_results"],
-            final_state["audit_report"],
+            gap_results,
+            SkillGapReportSummary(degraded=degraded),
             final_state,
         )

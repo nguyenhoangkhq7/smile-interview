@@ -1,0 +1,6 @@
+{
+  "operation": "respond",
+  "from": "05-q02",
+  "scenario": "Trả lời đúng với DDL PostgreSQL và lý do thứ tự cột để kiểm tra phục hồi lên target sau câu chẩn đoán.",
+  "answer": "CREATE INDEX idx_orders_status_created_at ON orders (status, created_at DESC);\n\nstatus đứng đầu vì điều kiện là so sánh bằng. Trong đoạn index tương ứng với status = 'pending', các mục đã theo thứ tự created_at giảm dần, nên PostgreSQL có thể dùng index để lọc và trả đúng thứ tự mà không cần Sort riêng. Em sẽ so sánh EXPLAIN (ANALYZE, BUFFERS) trước và sau vì planner vẫn phụ thuộc tỷ lệ đơn pending."
+}

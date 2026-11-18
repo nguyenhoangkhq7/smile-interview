@@ -9,9 +9,9 @@ from skill_gap.domain.models import (
     ExtractedCVSkill,
     ExtractedJDSkill,
     MatchResult,
-    SkillGapResult,
+    SkillGapReportSummary,
+    SkillGapSummary,
 )
-from skill_gap.services.report_generator import StaticGapAuditReport
 
 
 class AnalyzeSkillGapRequest(BaseModel):
@@ -33,22 +33,9 @@ class AnalyzeSkillGapRequest(BaseModel):
     )
 
 
-class AnalyzeSkillGapResponse(BaseModel):
-    """
-    Output payload from `POST /api/v1/skill-gap/analyze`.
-    The `skills` field matches `StartInterviewRequestWrapper.skills` (`List[SkillGapInput]`)
-    of Module 3 (`adaptive_questioning`) 100% without conversion.
-    """
-
-    analysis_id: str
-    total_skills: int
-    skills_requiring_probing: int
-    skills: List[SkillGapResult]
-
-
 class AnalyzeWithReportResponse(BaseModel):
-    """Combined output payload from `POST /api/v1/skill-gap/analyze-with-report`."""
+    """Skill Gap results and the analysis status used by the application."""
 
     analysis_id: str
-    skills: List[SkillGapResult]
-    report: StaticGapAuditReport
+    skills: List[SkillGapSummary]
+    report: SkillGapReportSummary

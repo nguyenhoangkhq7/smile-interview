@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import type { ObjectiveSuggestion, CriterionSuggestion } from '@/services/studyPlans';
+import { isCriterionRecommended, type ObjectiveSuggestion, type CriterionSuggestion } from '@/services/studyPlans';
 import type { NewStudyTask, StudyTaskStatus } from './studyPlan';
 
 const labels: Record<CriterionSuggestion['kind'], string> = {
@@ -42,7 +42,7 @@ export function StudyGapTaskDialog({ objective, status, disabled, onCreate, onCl
 }) {
   const [title, setTitle] = useState(`Ôn luyện: ${objective.claim}`.slice(0, 255));
   const [items, setItems] = useState(() => objective.criteria.map(criterion => ({
-    ...criterion, selected: criterion.selectedByDefault, content: criterion.description.slice(0, 500),
+    ...criterion, selected: isCriterionRecommended(criterion), content: criterion.description.slice(0, 500),
   })));
   const [notes, setNotes] = useState('');
   const [failed, setFailed] = useState(false);

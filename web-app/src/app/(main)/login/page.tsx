@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import styles from './login.module.css';
 import axiosClient from '@/lib/axiosClient';
 import { useAuthStore } from '@/store/authStore';
+import { analysisResultSearch } from '@/lib/authSession';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -19,10 +20,9 @@ export default function LoginPage() {
   // Redirect if already logged in
   useEffect(() => {
     if (isAuthenticated && user) {
-      if (user.role === 'ADMIN') {
-        router.replace('/admin/rules');
-      } else if (user.role === 'HR') {
-        router.replace('/hr-dashboard');
+      const result = analysisResultSearch();
+      if (result) {
+        router.replace('/interview/new' + result);
       } else {
         router.replace('/');
       }
@@ -54,13 +54,6 @@ export default function LoginPage() {
         data.token
       );
 
-      if (data.role === 'ADMIN') {
-        router.push('/admin/rules');
-      } else if (data.role === 'HR') {
-        router.push('/hr-dashboard');
-      } else {
-        router.push('/');
-      }
     } catch (err) {
       const axiosError = err as { response?: { data?: { detail?: string; message?: string } } };
       const msg =

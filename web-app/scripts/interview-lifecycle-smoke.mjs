@@ -34,7 +34,7 @@ async function scenario(mode, action) {
     session.is_finished = true; session.pending_turn = null;
     session.conversation.phase = 'CLOSING'; session.conversation.expires_at = future(120);
     session.conversation.message = { message_id: 'farewell', text: 'Cảm ơn bạn đã tham gia. Chúc bạn một ngày tốt lành, chào bạn!' };
-    session.report = { ...session.report, is_finished: true, termination_reason: reason };
+    session.report = { ...session.report, termination_reason: reason };
   };
   await page.setRequestInterception(true);
   page.on('request', async request => {
@@ -49,11 +49,12 @@ async function scenario(mode, action) {
     if (url.pathname.endsWith('/interview/start')) {
       session = { schema_version: 2, session_id: id, state_version: 1, is_finished: false,
         deadline_at: future(900), config: JSON.parse(request.postData()), pending_turn: null, turns: [],
-        report: { schema_version: 2, state_version: 1, is_finished: false, termination_reason: null,
-          progress: 0, evidence_coverage: 0, target_attainment: null, objectives: [] },
+        report: { termination_reason: null,
+          objectives: [{ objective_id: 'o1', skill_id: 'postgresql', claim: 'SQL', jd_evidence_spans: [],
+            assessment: 'NOT_ASSESSED', stop_reason: null, strengths: [], weaknesses: [], evidence: [] }] },
         conversation: { phase: 'OPENING', message: { message_id: 'greeting', text: openingText },
-          opening: { interviewer_name: 'Minh', company: 'Smile', role_title: 'Backend Developer', company_description: '' },
-          opening_text: openingText, introduction: '', introduction_skipped: false, expires_at: future(180) } };
+          opening: { interviewer_name: 'Minh', company: 'Smile' },
+          opening_text: openingText, introduction: '', expires_at: future(180) } };
       return send(session);
     }
     if (url.pathname.endsWith('/interview/conversation')) {
@@ -69,10 +70,10 @@ async function scenario(mode, action) {
         c.expires_at = future(action === 'timeout' ? 1 : 120);
       } else {
         assert.equal(session.turns.length, 0);
-        c.introduction = command.introduction; c.introduction_skipped = command.action === 'SKIP_INTRODUCTION';
+        c.introduction = command.action === 'SKIP_INTRODUCTION' ? '' : command.introduction;
         c.phase = 'INTERVIEW'; session.deadline_at = future(900);
-        session.pending_turn = { turn_id: 'technical-1', objective_id: 'o1', skill_id: 'postgresql', mode: 'DEBUGGING',
-          question, introduction: 'Cảm ơn bạn. Mình bắt đầu phần chuyên môn nhé.', answer: null, feedback: null };
+        session.pending_turn = { turn_id: 'technical-1', objective_id: 'o1', mode: 'DEBUGGING',
+          question, introduction: 'Cảm ơn bạn. Mình bắt đầu phần chuyên môn nhé.' };
       }
       session.state_version++; return send(session);
     }
@@ -80,7 +81,9 @@ async function scenario(mode, action) {
       const command = JSON.parse(request.postData()); answers.push(command);
       assert.equal(session.conversation.phase, 'INTERVIEW');
       assert.equal(command.turn_id, 'technical-1');
-      session.turns.push({ ...session.pending_turn, answer: command.candidate_response, feedback: 'Đã ghi nhận.' });
+      session.turns.push({ turn_id: session.pending_turn.turn_id, objective_id: session.pending_turn.objective_id,
+        mode: session.pending_turn.mode, question: session.pending_turn.question,
+        answer: command.candidate_response, feedback: 'Đã ghi nhận.' });
       session.state_version++; finish('PLAN_COMPLETE'); return send(session);
     }
     if (url.pathname.endsWith('/interview/stop')) {
@@ -181,7 +184,7 @@ async function scenario(mode, action) {
         await waitPhase('INTERVIEW');
         assert.match(await page.$eval('body', node => node.innerText), new RegExp(question.replace('?', '\\?')));
         assert.equal(session.turns.length, 0, 'Introduction does not spend a technical question');
-        if (action === 'skip' || action === 'timeout') assert.equal(session.conversation.introduction_skipped, true);
+        if (action === 'skip' || action === 'timeout') assert.equal(session.conversation.introduction, '');
         await click('Lịch sử');
         assert.match(await page.$eval('[role="dialog"]', node => node.textContent), /Mở đầu và giới thiệu bản thân/);
         await click('Đóng lịch sử');

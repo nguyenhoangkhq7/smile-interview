@@ -8,6 +8,7 @@ import fit.iuh.modules.session.repository.*;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.*;
@@ -24,6 +25,7 @@ class ApplicationProfilePersistenceTest {
     @Autowired JobDescriptionRepository jds;
     @Autowired EvidenceStore store;
     @Autowired EvidenceJson json;
+    @Autowired JdbcTemplate db;
     @Autowired ApplicationCompetencyService competency;
     @Autowired fit.iuh.modules.auth.security.JwtService jwt;
     @Autowired org.springframework.web.context.WebApplicationContext webContext;
@@ -68,6 +70,10 @@ class ApplicationProfilePersistenceTest {
                 json.tree(Map.of("snapshot", visible, "public", visible))));
         var stored = profiles.findById(profile.id()).orElseThrow();
         assertThat(json.read(stored.getBlueprintJson()).path("objectives")).hasSize(1);
+        assertThat(db.queryForObject("""
+                SELECT blueprint_json IS NULL AND dynamic_state_json IS NULL
+                FROM interview_runs WHERE session_id = ?
+                """, Boolean.class, sourceId)).isTrue();
         assertThat(stored.getCvText()).isEqualTo("CV baseline");
         assertThat(sessions.findById(sourceId).orElseThrow().getStatus()).isEqualTo("Cancelled");
         assertThat(json.tree(service.get(profile.id(), user)).path("createdAt").isTextual()).isTrue();
@@ -91,13 +97,13 @@ class ApplicationProfilePersistenceTest {
 
     @Test void competencyUpdatesFromCommittedInterviewAndIsAvailableThroughAuthenticatedHttp() throws Exception {
         var profile = service.create(user, new ApplicationProfileService.Create(sourceId, "SQL preparation", "A"));
-        assertThat(competency.get(profile.id(), user).summary().notAssessed()).isEqualTo(1);
+        assertThat(competency.get(profile.id(), user).skills().getFirst().assessment()).isEqualTo("NOT_ASSESSED");
         String baseline = profiles.findById(profile.id()).orElseThrow().getSkillGapJson();
         var snapshot = json.read("""
                 {"schema_version":2,"session_id":"%s","state_version":1,"is_finished":true,
                  "report":{"termination_reason":"PLAN_COMPLETE"},"policy":{},
                  "turns":[{"turn_id":"sql-turn","objective_id":"sql-task","answer":"Use EXPLAIN ANALYZE",
-                   "question":{"text":"How do you inspect a slow SQL query?","assistance":"NONE"}}],
+                   "question":{"text":"How do you inspect a slow SQL query?"}}],
                  "objectives":{"sql-task":{
                    "objective":{"objective_id":"sql-task","skill_id":"sql","claim":"Inspect SQL queries",
                      "rubric_fingerprint":"sql-v1","target_depth":3,
@@ -111,7 +117,7 @@ class ApplicationProfilePersistenceTest {
         store.commit(new EvidenceStore.Commit(sourceId, 0, null, null, json.read("{}"),
                 json.tree(Map.of("snapshot", snapshot, "public", snapshot))));
         var updated = competency.get(profile.id(), user);
-        assertThat(updated.summary().meetingTarget()).isEqualTo(1);
+        assertThat(updated.skills().getFirst().assessment()).isEqualTo("DEMONSTRATED_AT_TARGET");
         assertThat(updated.skills().getFirst().objectives().getFirst().criteria().getFirst().evidence().getFirst()
                 .source().sessionId()).isEqualTo(sourceId);
         assertThat(profiles.findById(profile.id()).orElseThrow().getSkillGapJson()).isEqualTo(baseline);
@@ -124,7 +130,7 @@ class ApplicationProfilePersistenceTest {
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(endpoint)
                 .header("Authorization", "Bearer " + jwt.generateToken(user)))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.summary.meetingTarget").value(1))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.lastAssessment.sessionId").value(sourceId));
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.skills[0].assessment").value("DEMONSTRATED_AT_TARGET"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.skills[0].objectives[0].lastAssessment.sessionId").value(sourceId));
     }
 }

@@ -1,0 +1,6 @@
+{
+  "operation": "respond",
+  "from": "03-intro",
+  "scenario": "Thiếu ý có chủ đích. Chẩn đoán đúng Seq Scan và Sort, để ngỏ thứ tự cột và chưa đưa SQL để quan sát hệ thống hỏi tiếp thế nào.",
+  "answer": "Seq Scan phải đọc bảng rồi lọc các đơn pending, còn Sort phải sắp các dòng phù hợp theo created_at. Nếu số dòng giữ lại lớn thì sắp xếp có thể tốn bộ nhớ hoặc tràn xuống đĩa. Em nghĩ nên thêm chỉ mục, nhưng chưa chốt cột nào đứng trước nên chưa đưa câu lệnh SQL."
+}

@@ -1,0 +1,14 @@
+{
+  "result": "PASS",
+  "verified_at_utc": "2026-11-18T07:00:33.942Z",
+  "checks": [
+    "MIXED thành công đủ 10 câu, đủ 5 dạng, kết thúc bằng QUESTION_BUDGET",
+    "Mọi request chuyển trạng thái lấy snapshot nguyên vẹn và tăng đúng một version khi thành công",
+    "Mỗi 503 đã được phục hồi bằng request nguyên văn và lưu đúng một turn",
+    "Ledger liên kết được với turn, trích dẫn lưu là chuỗi con có trong câu trả lời tương ứng",
+    "JSONL có seq liên tục, mỗi call có chính xác một return hoặc error",
+    "Timeline theo thứ tự request thực thi và khớp thứ tự trace",
+    "Snapshot cuối giữ nguyên báo cáo đã chốt ở CLOSING",
+    "POST trực tiếp đến cổng 8000 trả cùng kết quả FINISHED"
+  ]
+}

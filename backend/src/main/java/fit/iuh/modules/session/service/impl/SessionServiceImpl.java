@@ -45,6 +45,9 @@ public class SessionServiceImpl implements SessionService {
         log.info("[SessionService] Creating/Upserting session: id={}, userId={}, roleTitle={}", sessionId, userId, request.getRoleTitle());
 
         Session session = sessionRepository.lockById(sessionId).orElse(null);
+        if (session != null && !java.util.Objects.equals(session.getUserId(), userId)) {
+            throw new ResourceNotFoundException("Session not found");
+        }
         requireLegacyWrite(sessionId);
         if (session == null) {
             session = Session.builder()
@@ -84,25 +87,17 @@ public class SessionServiceImpl implements SessionService {
         }
 
         if (request.getResumeId() != null) {
-            Resume resume = resumeRepository.findById(request.getResumeId()).orElse(null);
-            if (resume != null) {
-                if (userId != null && resume.getUserId() == null) {
-                    resume.setUserId(userId);
-                    resumeRepository.save(resume);
-                }
-                session.setResume(resume);
-            }
+            Resume resume = resumeRepository.findById(request.getResumeId())
+                    .filter(item -> java.util.Objects.equals(item.getUserId(), userId))
+                    .orElseThrow(() -> new ResourceNotFoundException("Resume not found"));
+            session.setResume(resume);
         }
 
         if (request.getJdId() != null) {
-            JobDescription jd = jobDescriptionRepository.findById(request.getJdId()).orElse(null);
-            if (jd != null) {
-                if (userId != null && jd.getUserId() == null) {
-                    jd.setUserId(userId);
-                    jobDescriptionRepository.save(jd);
-                }
-                session.setJobDescription(jd);
-            }
+            JobDescription jd = jobDescriptionRepository.findById(request.getJdId())
+                    .filter(item -> java.util.Objects.equals(item.getUserId(), userId))
+                    .orElseThrow(() -> new ResourceNotFoundException("Job description not found"));
+            session.setJobDescription(jd);
         }
 
         session = sessionRepository.save(session);
@@ -120,8 +115,6 @@ public class SessionServiceImpl implements SessionService {
                         .suggestedAnswer(q.suggestedAnswer())
                         .topicTag(q.topicTag())
                         .isDeepDive(q.isDeepDive())
-                        .hrRating(q.hrRating())
-                        .hrFeedback(q.hrFeedback())
                         .build();
                 sessionTurnRepository.save(turn);
             }
@@ -147,15 +140,6 @@ public class SessionServiceImpl implements SessionService {
             return List.of();
         }
         return sessionRepository.findByUserIdOrderByStartedAtDesc(userId)
-                .stream()
-                .map(session -> SessionResponse.from(session, sessionTurnRepository.findBySessionIdOrderByIdAsc(session.getId())))
-                .toList();
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<SessionResponse> getAllSessions() {
-        return sessionRepository.findAllByOrderByStartedAtDesc()
                 .stream()
                 .map(session -> SessionResponse.from(session, sessionTurnRepository.findBySessionIdOrderByIdAsc(session.getId())))
                 .toList();
@@ -249,16 +233,6 @@ public class SessionServiceImpl implements SessionService {
                 .build();
         sessionRepository.save(cloned);
         return newSessionId;
-    }
-
-    @Override
-    @Transactional
-    public void updateTurnFeedback(String sessionId, Long turnId, Integer hrRating, String hrFeedback) {
-        SessionTurn turn = sessionTurnRepository.findById(turnId)
-                .orElseThrow(() -> new ResourceNotFoundException("Turn not found with id: " + turnId));
-        if (hrRating != null) turn.setHrRating(hrRating);
-        if (hrFeedback != null) turn.setHrFeedback(hrFeedback);
-        sessionTurnRepository.save(turn);
     }
 
     @Override

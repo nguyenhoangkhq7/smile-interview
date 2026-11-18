@@ -83,9 +83,20 @@ class EvidenceStoreTest {
 
     @Test
     void startLocksConfiguration() {
-        assertThat(store.sameStart(existing(1), json.read("{}")).path("state_version").asInt()).isEqualTo(1);
-        assertThatThrownBy(() -> store.sameStart(existing(1), json.read("{\"mode\":\"FOCUSED\"}")))
-                .isInstanceOf(ResponseStatusException.class);
+        var run = existing(1);
+        run.setConfigJson("""
+                {"mode":"FOCUSED","focused_question_mode":"DEBUGGING","max_questions":10,
+                 "duration_seconds":900,"max_questions_per_objective":3}
+                """);
+        var matching = json.tree(new EvidenceDtos.Config(null, "DEBUGGING", 10, 900, 3));
+        assertThat(store.sameStart(run, matching).path("state_version").asInt()).isEqualTo(1);
+        var otherFocus = json.tree(new EvidenceDtos.Config(null, "DESIGN", 10, 900, 3));
+        var otherCap = json.tree(new EvidenceDtos.Config(null, "DEBUGGING", 10, 900, 8));
+        for (var changed : java.util.List.of(otherFocus, otherCap)) {
+            assertThatThrownBy(() -> store.sameStart(run, changed))
+                    .isInstanceOfSatisfying(ResponseStatusException.class,
+                            ex -> assertThat(ex.getStatusCode().value()).isEqualTo(409));
+        }
     }
 
     @Test void legacyConfigDefaultsToTextButCannotSwitchToVoice() {

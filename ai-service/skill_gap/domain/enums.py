@@ -21,9 +21,3 @@ class RichnessLabel(str, Enum):
     RICH_CONTEXT = "RICH_CONTEXT"
     LIST_ONLY = "LIST_ONLY"
     AMBIGUOUS = "AMBIGUOUS"
-
-class QuestionStrategy(str, Enum):
-    NONE = "NONE"
-    COMPARE_SUBSTITUTE = "COMPARE_SUBSTITUTE"
-    PROBE_DEPTH = "PROBE_DEPTH"
-    LEARNING_AGILITY = "LEARNING_AGILITY"

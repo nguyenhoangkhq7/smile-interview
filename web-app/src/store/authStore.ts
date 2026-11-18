@@ -56,8 +56,17 @@ export const useAuthStore = create<AuthState>()(
       /**
        * Clears all auth state and removes the persisted entry from localStorage.
        */
-      logout: () =>
-        set({ user: null, token: null, isAuthenticated: false }),
+      logout: () => {
+        set({ user: null, token: null, isAuthenticated: false });
+        if (typeof navigator !== 'undefined' && navigator.serviceWorker) {
+          void navigator.serviceWorker.getRegistration('/').then(async registration => {
+            if (registration?.active?.scriptURL.endsWith('/analysis-push.js')) {
+              const subscription = await registration.pushManager.getSubscription();
+              await subscription?.unsubscribe();
+            }
+          }).catch(() => { /* Browser storage can be unavailable during logout. */ });
+        }
+      },
     }),
     {
       name: 'auth-storage',                    // localStorage key

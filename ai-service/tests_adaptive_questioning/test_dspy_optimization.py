@@ -30,9 +30,10 @@ def clear_teacher():
 ])
 def test_all_cases_and_original_split_survive(kind, getter):
     records = corpus_records(kind)
-    assert len(records) == len(getter()) == 20
+    assert len(records) == 20
+    assert len(getter()) == 24
     train, dev = getter("train"), getter("dev")
-    assert len(train) == 14 and len(dev) == 6
+    assert len(train) == 16 and len(dev) == 8
     assert [ex.context for ex in getter("val")] == [ex.context for ex in dev]
     assert not {ex.context for ex in train}.intersection(ex.context for ex in dev)
     assert all(list(ex.inputs().keys()) == ["context"] for ex in getter())
@@ -68,19 +69,24 @@ def test_current_training_data_has_no_probability_contracts():
 def test_gold_cases_meet_runtime_contracts():
     for example in get_gold_question_examples():
         context = json.loads(example.context)
-        assert not question_errors(example.question, context, context["target_criteria"])
+        for turn in context["history"]:
+            assert {"mode", "depth", "assistance"}.isdisjoint(turn["question"])
+        assert not question_errors(example.question, context)
         assert len(example.question.text.split()) <= 55
         assert question_generation_metric(example, dspy.Prediction(question=example.question)) == 0.7
     for example in get_gold_judge_examples():
-        validate_judgment(example.judgment, Turn.model_validate(json.loads(example.context)["turn"]))
+        context = json.loads(example.context)
+        assert "required_criterion_ids" not in context
+        assert {"mode", "depth", "assistance"}.isdisjoint(context["turn"]["question"])
+        validate_judgment(example.judgment, Turn.model_validate(context["turn"]))
         assert judge_evaluation_metric(example, dspy.Prediction(judgment=example.judgment)) == 1
 
 
-@pytest.mark.parametrize("change", ["abductive", "criterion", "depth", "mode", "bundled", "off_topic", "long"])
+@pytest.mark.parametrize("change", ["empty_scope", "criterion", "depth", "mode", "bundled", "off_topic", "long"])
 def test_question_metric_rejects_invalid_or_unfocused_questions(change):
     example = get_gold_question_examples()[0]
     question = example.question.model_copy(deep=True)
-    if change == "abductive": question.hypothesis_A = "   "
+    if change == "empty_scope": question.evidence_scope = "   "
     elif change == "criterion": question.criterion_ids = ["other:c1"]
     elif change == "depth": question.depth = 1
     elif change == "mode": question.mode = "DESIGN"
@@ -162,7 +168,7 @@ def test_bootstrap_keeps_train_split_threshold_and_explicit_teacher(monkeypatch)
     monkeypatch.setattr(dspy, "BootstrapFewShot", FakeBootstrap)
     compiler.compile_with_bootstrap_few_shot(student, judge_lm=teacher)
     assert len(calls) == 2
-    assert all(options["metric_threshold"] == 0.8 and len(trainset) == 14 for options, trainset in calls)
+    assert all(options["metric_threshold"] == 0.8 and len(trainset) == 16 for options, trainset in calls)
     seen = []
     def capture(*args, lm=None): seen.append(lm); return 1.0
     monkeypatch.setattr(compiler, "question_generation_metric", capture)
@@ -174,17 +180,18 @@ def test_bootstrap_keeps_train_split_threshold_and_explicit_teacher(monkeypatch)
     with pytest.raises(ValueError): compiler.compile_with_bootstrap_few_shot(student, metric_threshold=0.5)
 
 
-@pytest.mark.parametrize("depth_ok, expected", [(True, 1.0), (False, 0.0)])
-def test_semantic_teacher_can_reject_shallow_questions(depth_ok, expected):
+@pytest.mark.parametrize("depth_ok, fits, expected", [(True, True, 1.0), (False, True, 0.0), (True, False, 0.0)])
+def test_semantic_teacher_can_reject_shallow_questions(depth_ok, fits, expected):
     example = get_gold_question_examples()[0]
     teacher = dspy.utils.DummyLM([{"is_on_topic": True, "is_single_intent": True,
-                                  "is_depth_appropriate": depth_ok, "rationale": "Task depth checked"}])
+                                  "is_depth_appropriate": depth_ok, "fits_conversation": fits, "rationale": "Task depth checked"}])
     assert question_generation_metric(example, dspy.Prediction(question=example.question), lm=teacher) == expected
 
 
-def test_semantic_teacher_catches_unreported_solution_hints():
+@pytest.mark.parametrize("safe, grounded", [(False, True), (True, False)])
+def test_semantic_teacher_rejects_unusable_feedback(safe, grounded):
     example = get_gold_judge_examples()[1]
-    teacher = dspy.utils.DummyLM([{"supported": True, "safe_feedback": False,
+    teacher = dspy.utils.DummyLM([{"supported": True, "safe_feedback": safe, "grounded_feedback": grounded,
                                   "rationale": "Feedback reveals the solution"}])
     assert judge_evaluation_metric(example, dspy.Prediction(judgment=example.judgment), lm=teacher) == 0
 
@@ -203,7 +210,9 @@ def test_dev_evaluation_is_held_out_and_reports_failures():
         def __call__(self, context): return dspy.Prediction(**{self.field: self.values[context]})
     result = compiler.evaluate_modules_on_dev(Echo(get_gold_question_examples("dev"), "question"),
         Echo(get_gold_judge_examples("dev"), "judgment"))
-    assert result["question_examples_count"] == result["judge_examples_count"] == 6
+    assert result["question_examples_count"] == result["judge_examples_count"] == 8
+    assert result["paired_dialogue_count"] == 2
+    assert result["paired_dialogue_avg_score"] == pytest.approx(0.7)
     assert result["evaluation_errors"] == 0
     assert result["question_semantic_evaluator"] == "lexical_heuristic"
     with pytest.raises(ValueError): compiler.evaluate_modules_on_dev(None, None, split="train")

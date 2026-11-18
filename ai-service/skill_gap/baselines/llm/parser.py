@@ -1,6 +1,5 @@
 import difflib
-from typing import Dict, List, Optional, Set
-from pydantic import ValidationError
+from typing import Dict, List, Optional
 
 from skill_gap.baselines.base import BaselineSkillResult
 from skill_gap.baselines.llm.schemas import LLMZeroShotResponse

@@ -17,8 +17,6 @@ public interface SessionService {
 
     List<SessionResponse> getSessionsByUser(UUID userId);
 
-    List<SessionResponse> getAllSessions();
-
     SessionResponse updateSession(String sessionId, UpdateSessionRequest request);
 
     void deleteSession(String sessionId);
@@ -28,8 +26,6 @@ public interface SessionService {
     List<SessionTurn> getSessionTurns(String sessionId);
 
     String cloneSession(String sessionId);
-
-    void updateTurnFeedback(String sessionId, Long turnId, Integer hrRating, String hrFeedback);
 
     Map<String, Object> getRawTexts(UUID resumeId, UUID jdId);
 }

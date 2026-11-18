@@ -6,7 +6,7 @@ import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { useEvidenceInterview } from '@/hooks/useEvidenceInterview';
 import { EvidenceTextInterview } from './EvidenceTextInterview';
-import { EvidenceTurn, conversationPhase } from '@/services/evidenceInterview';
+import { EvidenceSession, EvidenceTurn, conversationPhase, turnSkillId } from '@/services/evidenceInterview';
 import { IntroductionHistory } from './InterviewConversation';
 import { EvidenceSetup, modeLabels } from './EvidenceSetup';
 import { InterviewOutcome } from './InterviewOutcome';
@@ -19,9 +19,9 @@ import { BrandLoading } from '@/components/common/BrandLoading';
 const VoiceInterview = dynamic(() => import('./EvidenceVoiceInterview').then(module => module.EvidenceVoiceInterview),
   { ssr: false, loading: () => <p className="p-6 text-sm">Đang chuẩn bị phòng phỏng vấn giọng nói…</p> });
 
-function Transcript({ turns }: { turns: EvidenceTurn[] }) {
+function Transcript({ session, turns }: { session: EvidenceSession; turns: EvidenceTurn[] }) {
   return <div className="space-y-3">{[...turns].reverse().map((turn, index) => <details className="rounded-xl border bg-card p-4" key={turn.turn_id} open={index === 0}>
-    <summary className="cursor-pointer text-sm font-semibold">Câu {turns.length - index} · {skillLabel(turn.skill_id)} · {modeLabels[turn.mode]}</summary>
+    <summary className="cursor-pointer text-sm font-semibold">Câu {turns.length - index} · {skillLabel(turnSkillId(session, turn))} · {modeLabels[turn.mode]}</summary>
     <div className="mt-4 space-y-4">
       <MarkdownContent content={turn.question} />
       <div className="rounded-lg bg-muted/40 p-4"><p className="mb-2 text-xs font-semibold text-muted-foreground">CÂU TRẢ LỜI CỦA BẠN</p>
@@ -62,7 +62,7 @@ export function EvidenceInterview() {
           ? <VoiceInterview interview={interview} suspended={confirmStop || Boolean(error)} onStop={() => setConfirmStop(true)} />
           : <EvidenceTextInterview interview={interview} onHistory={() => setHistoryOpen(true)} onStop={() => setConfirmStop(true)} />}
     </>}
-    <Dialog open={historyOpen} onOpenChange={setHistoryOpen}><DialogContent className="sm:max-w-3xl"><DialogHeader><DialogTitle>Lịch sử phỏng vấn</DialogTitle><DialogDescription>Câu mới nhất hiển thị trước. Mở từng câu để xem lại câu trả lời và nhận xét.</DialogDescription></DialogHeader><div role="region" aria-label="Nội dung lịch sử" tabIndex={0} className="max-h-[65dvh] min-w-0 space-y-3 overflow-y-auto overscroll-contain pr-1"><IntroductionHistory interview={interview} />{session?.turns.length ? <Transcript turns={session.turns} /> : <p className="py-8 text-center text-muted-foreground">Chưa có câu trả lời nào được gửi.</p>}</div><DialogFooter><Button variant="outline" onClick={() => setHistoryOpen(false)}>Đóng lịch sử</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={historyOpen} onOpenChange={setHistoryOpen}><DialogContent className="sm:max-w-3xl"><DialogHeader><DialogTitle>Lịch sử phỏng vấn</DialogTitle><DialogDescription>Câu mới nhất hiển thị trước. Mở từng câu để xem lại câu trả lời và nhận xét.</DialogDescription></DialogHeader><div role="region" aria-label="Nội dung lịch sử" tabIndex={0} className="max-h-[65dvh] min-w-0 space-y-3 overflow-y-auto overscroll-contain pr-1"><IntroductionHistory interview={interview} />{session?.turns.length ? <Transcript session={session} turns={session.turns} /> : <p className="py-8 text-center text-muted-foreground">Chưa có câu trả lời nào được gửi.</p>}</div><DialogFooter><Button variant="outline" onClick={() => setHistoryOpen(false)}>Đóng lịch sử</Button></DialogFooter></DialogContent></Dialog>
     <Dialog open={confirmStop} onOpenChange={open => !busy && setConfirmStop(open)}><DialogContent><DialogHeader><DialogTitle>Kết thúc lượt phỏng vấn?</DialogTitle><DialogDescription>{session?.turns.length ? 'Các câu trả lời đã gửi sẽ được giữ lại và dùng để tạo kết quả. Lượt này sẽ được ghi nhận là kết thúc sớm.' : 'Bạn chưa gửi câu trả lời nào. Lượt này sẽ được ghi nhận là đã hủy và chưa có dữ liệu đánh giá.'} Nội dung chưa nộp sẽ không được tính.</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" disabled={busy} onClick={() => setConfirmStop(false)}>Tiếp tục phỏng vấn</Button><Button disabled={busy} onClick={() => { setConfirmStop(false); void interview.stop(); }}>Kết thúc lượt</Button></DialogFooter></DialogContent></Dialog>
   </main>;
 }

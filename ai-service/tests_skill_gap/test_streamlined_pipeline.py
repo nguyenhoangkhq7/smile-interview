@@ -10,7 +10,7 @@ Verifies the final parsimonious scientific architecture:
 """
 import pytest
 import datetime
-from skill_gap.domain.enums import SkillType, SeniorityLevel, RichnessLabel, SemanticAlignment, QuestionStrategy
+from skill_gap.domain.enums import SkillType, SeniorityLevel, RichnessLabel, SemanticAlignment
 from skill_gap.domain.models import (
     ExtractedCVSkill, SpanMapping, JobBlock, SpanRichness,
     JDRequirement, ProficiencyResult, MatchResult, UNASSIGNED_JOB_ID
@@ -83,9 +83,7 @@ def test_grounded_context_penalty_and_deterministic_priority():
     # gap = (4.0 - 2.0) / 4.0 = 0.50
     assert res1.gap_magnitude == pytest.approx(0.50, 1e-6)
     # Severity = w_j * (P_JD/5.0) * gap = 0.5 * (4.0/5.0) * 0.50 = 0.20
-    assert res1.severity == pytest.approx(0.5 * (4.0 / 5.0) * 0.50, 1e-6)
-    assert res1.priority == res1.severity
-    assert res1.suggested_strategy == QuestionStrategy.PROBE_DEPTH
+    assert res1.priority == pytest.approx(0.5 * (4.0 / 5.0) * 0.50, 1e-6)
 
     # Case 2: Full fulfillment (gap == 0) yields Priority 0 and NONE strategy
     req2 = [JDRequirement(jd_skill_id="k8s", required_level=4.0, reasoning="Senior")]
@@ -96,7 +94,6 @@ def test_grounded_context_penalty_and_deterministic_priority():
 
     assert res2.gap_magnitude == 0.0
     assert res2.priority == 0.0
-    assert res2.suggested_strategy == QuestionStrategy.NONE
 
 
 # ===========================================================================

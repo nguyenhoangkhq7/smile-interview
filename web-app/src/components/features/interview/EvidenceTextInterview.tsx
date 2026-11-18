@@ -6,6 +6,7 @@ import { MarkdownContent } from '@/components/common/MarkdownContent';
 import type { useEvidenceInterview } from '@/hooks/useEvidenceInterview';
 import { skillLabel } from '@/components/features/applications/applicationUi';
 import { modeLabels } from './EvidenceSetup';
+import { turnSkillId } from '@/services/evidenceInterview';
 import { useTextInterviewConversation } from '@/hooks/useTextInterviewConversation';
 
 export type InterviewController = ReturnType<typeof useEvidenceInterview>;
@@ -24,7 +25,7 @@ export function EvidenceTextInterview({ interview, onHistory, onStop }: {
     </div>
     <section aria-label="Không gian phỏng vấn văn bản" className="grid gap-4 lg:h-[calc(100dvh-13rem)] lg:min-h-96 lg:grid-cols-2">
       <div className="flex min-h-0 min-w-0 flex-col rounded-2xl border bg-card">
-        <div className="border-b px-5 py-4"><p className="text-sm font-semibold">{conversation.interviewer}</p>{session.pending_turn && <p className="mt-1 text-sm text-muted-foreground">{skillLabel(session.pending_turn.skill_id)} · {modeLabels[session.pending_turn.mode]}</p>}</div>
+        <div className="border-b px-5 py-4"><p className="text-sm font-semibold">{conversation.interviewer}</p>{session.pending_turn && <p className="mt-1 text-sm text-muted-foreground">{skillLabel(turnSkillId(session, session.pending_turn))} · {modeLabels[session.pending_turn.mode]}</p>}</div>
         <div key={session.pending_turn?.turn_id} role="region" aria-label="Nội dung câu hỏi" tabIndex={0} className="max-h-[45dvh] min-h-0 overflow-y-auto overscroll-contain p-5 lg:max-h-none lg:flex-1">
           {conversation.phase === 'INTERVIEW' && (session.pending_turn?.introduction || session.turns.at(-1)?.feedback) && <div role="status" aria-label="Phản hồi và chuyển tiếp" className="mb-5 rounded-xl border bg-muted/30 p-4 text-sm leading-relaxed">
             <MarkdownContent content={session.pending_turn?.introduction || session.turns.at(-1)?.feedback || ''} />

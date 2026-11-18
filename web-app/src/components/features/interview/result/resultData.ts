@@ -1,4 +1,4 @@
-import type { Assessment, EvidenceSession, ObjectiveReport, Observation } from '@/services/evidenceInterview';
+import type { Assessment, EvidenceSession, ObjectiveReport, PublicEvidence } from '@/services/evidenceInterview';
 
 export const assessmentLabels: Record<Assessment, string> = {
   NOT_ASSESSED: 'Chưa được kiểm tra',
@@ -54,15 +54,12 @@ export function buildResult({ report, turns }: EvidenceSession) {
   // Evidence can also link a question to an objective other than its primary one.
   const turnIds = new Set(turns.map(turn => turn.turn_id));
   const askedObjectiveIds = new Set(turns.map(turn => turn.objective_id));
+  const skillByObjective = new Map(report.objectives.map(objective => [objective.objective_id, objective.skill_id]));
   const interviewedObjectives = report.objectives.filter(objective =>
     askedObjectiveIds.has(objective.objective_id)
-    || objective.evidence_turn_ids.some(id => turnIds.has(id))
     || objective.evidence.some(item => turnIds.has(item.turn_id)));
   const bySkill = new Map<string, ObjectiveReport[]>();
-  const byTurn = new Map<string, Observation[]>();
-  for (const turn of turns) {
-    if (turn.skill_id) bySkill.set(turn.skill_id, []);
-  }
+  const byTurn = new Map<string, PublicEvidence[]>();
   for (const objective of interviewedObjectives) {
     const objectives = bySkill.get(objective.skill_id) ?? [];
     objectives.push(objective);
@@ -79,12 +76,10 @@ export function buildResult({ report, turns }: EvidenceSession) {
     const statuses = objectives.map(objective => assessmentStatus(objective.assessment));
     const status = statuses.includes('weak') ? 'weak'
       : statuses.length > 0 && statuses.every(value => value === 'strong') ? 'strong' : 'partial';
-    const evidenceIds = new Set(objectives.flatMap(objective => [
-      ...objective.evidence_turn_ids, ...objective.evidence.map(item => item.turn_id),
-    ]));
+    const evidenceIds = new Set(objectives.flatMap(objective =>
+      objective.evidence.map(item => item.turn_id)));
     const objectiveIds = new Set(objectives.map(objective => objective.objective_id));
-    const questionCount = turns.filter(turn => turn.skill_id === id
-      || objectiveIds.has(turn.objective_id) || evidenceIds.has(turn.turn_id)).length;
+    const questionCount = turns.filter(turn => objectiveIds.has(turn.objective_id) || evidenceIds.has(turn.turn_id)).length;
     return { id, objectives, status, questionCount } as const;
   });
 
@@ -92,7 +87,7 @@ export function buildResult({ report, turns }: EvidenceSession) {
     const evidence = byTurn.get(turn.turn_id) ?? [];
     const status = evidence.some(item => item.performance === 'BELOW') ? 'weak'
       : evidence.some(item => item.performance === 'AT_TARGET' || item.performance === 'ABOVE') ? 'strong' : 'partial';
-    return { turn, index, evidence, status } as const;
+    return { turn, skillId: skillByObjective.get(turn.objective_id) ?? '', index, evidence, status } as const;
   });
 
   return {

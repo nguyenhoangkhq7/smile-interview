@@ -2,8 +2,7 @@
 test_upgraded_architecture.py — Verification suite for upgraded Module 2 (`skill_gap`):
 1. Parallel LangGraph StateGraph (Fan-out / Fan-in speedup & determinism).
 2. DSPy Signatures, Modules, Metrics, and LabeledFewShot artifact compilation.
-3. Fact-based Static XAI Audit Report (`StaticGapAuditReport` JSON + GFM table).
-4. FastAPI REST endpoints (`/health`, `/api/v1/skill-gap/analyze`, `/api/v1/skill-gap/report/{id}`)
+5. Compact application response and FastAPI REST endpoints (`/health`, `/api/v1/skill-gap/analyze`)
    and 100% contract compatibility with Module 3 (`adaptive_questioning`).
 """
 
@@ -17,7 +16,6 @@ from main import create_app
 from skill_gap.adapters.config import AppConfig
 from skill_gap.adapters.llm_client import DSPyLLMClient, LLMClient
 from skill_gap.domain.enums import (
-    QuestionStrategy,
     RichnessLabel,
     SemanticAlignment,
     SeniorityLevel,
@@ -213,13 +211,10 @@ def _build_sample_inputs():
     return cv_skills, jd_skills, matches
 
 
-def test_langgraph_parallel_speedup_and_static_report():
+def test_langgraph_parallel_speedup():
     """
-    Verifies that:
-    1. LangGraph StateGraph executes Fan-out (segment_cv // parse_jd) and parallel skill estimation
-       significantly faster than sequential execution.
-    2. Fact-based Static XAI Audit Report (`StaticGapAuditReport`) accurately diagnoses
-       MATCH, PARTIAL, and MISSING skills using observable CV facts.
+    Verifies that LangGraph StateGraph executes Fan-out (segment_cv // parse_jd) and parallel
+    skill estimation significantly faster than sequential execution, and produces expected alignments.
     """
     config = AppConfig(reference_date="2024-06-01")
     llm = SimulatedLatencyMockLLM(delay_sec=0.08)
@@ -242,15 +237,11 @@ def test_langgraph_parallel_speedup_and_static_report():
     # Parallel Fan-out (max(2,1) calls) + Parallel 3 skills (1 wave) = 3 waves * 0.08s = ~0.24s.
     assert elapsed < 0.42
     assert len(gap_results) == 4
-    assert report.analysis_id == "test_audit_001"
-    assert report.total_jd_skills == 4
-    assert report.matched_count == 2
-    assert report.partial_count == 1
-    assert report.missing_count == 1
-    assert "Static Skill-Gap Audit Report" in report.markdown_summary
-    assert "`kubernetes`" in report.markdown_summary
-    assert "`COMPARE_SUBSTITUTE`" in report.markdown_summary
-    assert "`LEARNING_AGILITY`" in report.markdown_summary
+    assert report.degraded is False
+    alignments = [item.semantic_alignment for item in gap_results]
+    assert alignments.count(SemanticAlignment.MATCH) == 2
+    assert alignments.count(SemanticAlignment.PARTIAL) == 1
+    assert alignments.count(SemanticAlignment.MISSING) == 1
 
 
 def test_dspy_compilation_and_metrics(tmp_path):
@@ -364,9 +355,8 @@ def test_dspy_calibrated_metrics_adversarial_discrimination():
 
 def test_fastapi_endpoints_and_module3_contract_interoperability():
     """
-    Verifies FastAPI endpoints (`/health`, `/api/v1/skill-gap/analyze`, `/api/v1/skill-gap/report/{id}`)
-    and validates that the returned `skills` payload can be passed directly into Module 3's
-    `SkillGapInput` and `initialize_session_state` without any schema mismatch.
+    Verifies FastAPI endpoints (`/health`, `/api/v1/skill-gap/analyze`)
+    and validates that the returned skills can ground Module 3's interview objectives.
     """
     config = AppConfig(reference_date="2024-06-01")
     mock_llm = SimulatedLatencyMockLLM(delay_sec=0.0)
@@ -392,17 +382,21 @@ def test_fastapi_endpoints_and_module3_contract_interoperability():
     assert analyze_res.status_code == 200
     data = analyze_res.json()
     assert data["analysis_id"] == "api_session_01"
-    assert data["total_skills"] == 4
+    assert set(data) == {"analysis_id", "skills", "report"}
+    assert set(data["report"]) == {"matching_score", "degraded"}
     assert len(data["skills"]) == 4
+    for skill in data["skills"]:
+        assert set(skill) - {"jd_evidence_spans"} == {
+            "jd_skill_id", "jd_skill_name", "matched_cv_skill_id", "matched_cv_skill_name",
+            "semantic_alignment", "required_proficiency",
+            "importance_weight", "priority", "job_tasks", "cv_evidence_spans", "context_job",
+        }
+        if skill["job_tasks"]:
+            assert "jd_evidence_spans" not in skill
+    assert client.post("/api/v1/skill-gap/analyze-with-report", json=payload).json() == data
+    assert client.get("/api/v1/skill-gap/report/api_session_01").status_code == 404
 
-    # 3. GET /api/v1/skill-gap/report/{analysis_id}
-    report_res = client.get("/api/v1/skill-gap/report/api_session_01")
-    assert report_res.status_code == 200
-    report_data = report_res.json()
-    assert report_data["analysis_id"] == "api_session_01"
-    assert "Bảng Đối chiếu Định lượng Bằng chứng CV vs. Chuẩn JD" in report_data["markdown_summary"]
-
-    # 4. Verify 100% direct interoperability with Module 3 (adaptive_questioning)
+    # 3. Verify 100% direct interoperability with Module 3 (adaptive_questioning)
     import sys
     project_root = str(Path(__file__).resolve().parent.parent.parent)
     if project_root not in sys.path:

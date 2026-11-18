@@ -30,17 +30,15 @@ public final class StudyPlanDtos {
 
     public record KnowledgeGaps(int completedAttempts, List<CompetencyProjection.Skill> weak,
                                 List<CompetencyProjection.Skill> needsVerification,
-                                List<String> notAssessedSkillIds, List<ReportWeakness> reportWeaknesses,
+                                List<String> notAssessedSkillIds,
                                 List<ObjectiveSuggestion> objectiveSuggestions) {}
 
-    public record ObjectiveSuggestion(String skillId, String objectiveId, String claim, String assessment,
+    public record ObjectiveSuggestion(String skillId, String objectiveId, String claim,
                                       CompetencyProjection.Source source, List<CriterionSuggestion> criteria) {}
 
-    public record CriterionSuggestion(String criterionId, String description, boolean essential, String assessment,
-                                      String kind, boolean selectedByDefault, String reason, String goal,
+    public record CriterionSuggestion(String criterionId, String description, String assessment,
+                                      String kind, String goal,
                                       CompetencyProjection.Source source, CompetencyProjection.Source lastAssessment) {}
-
-    public record ReportWeakness(String skillId, String sessionId, int attemptNumber, List<String> weaknesses) {}
 
     public record TaskView(StudyTask task, List<StudyTaskChecklistItem> checklist, List<StudyTaskResource> resources) {}
 

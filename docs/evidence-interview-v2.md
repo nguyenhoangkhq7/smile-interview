@@ -19,10 +19,10 @@ flowchart LR
     J --> K[Báo cáo theo kỹ năng và mục tiêu]
 ```
 
-- `matching_cv` chạy Module 1 và tạo trực tiếp `Module1Output` với `w_j` và `soft_match`. Router ghi `matcher_source:MATCHING_CV` vào flags của C2. Kết quả cũ có thể chứa `MOCK_LLM` hoặc `MOCK_HEURISTIC`.
+- `matching_cv` chạy Module 1 và tạo trực tiếp `Module1Output` với `w_j` và `soft_match`. Router ghi `matcher_source: MATCHING_CV` ở output `/api/v1/match`. Kết quả C2 không còn trả `flags` hoặc `matcher_source` trong public output.
 - `skill_gap`: bổ sung `job_tasks`, trích dẫn JD, lý do mức yêu cầu, trọng số quan trọng, độ bao phủ bằng chứng CV, cờ recency/degraded. Giữ công thức gap và priority hiện có. Thứ tự suy luận mức yêu cầu: nhiệm vụ/độ sâu rõ ràng → kinh nghiệm riêng của kỹ năng → seniority fallback. Optional không đồng nghĩa mức thấp.
 - `evidence/provider.py`: interface LLM cho blueprint, question, judge. Không tải compiled artifact C3 cũ. Câu hỏi, rubric và kết luận của LLM đều phải qua kiểm tra trước khi lưu.
-- `planning.py`: mỗi nhiệm vụ có mục tiêu riêng; ID ổn định theo skill/task. Blueprint phủ đúng yêu cầu đầu vào. Nhóm core được ưu tiên trước; trong nhóm core dùng gap priority rồi importance. MATCH core vẫn được xác minh. Ưu tiên một lượt trên các kỹ năng, giữ phần ngân sách cho follow-up và có thể đưa mục tiêu chưa hỏi trở lại khi còn ngân sách.
+- `planning.py` tạo một mục tiêu cho mỗi nhiệm vụ với ID ổn định theo skill/task. Blueprint phủ đúng yêu cầu đầu vào. Planner xếp theo nhóm core, loại yêu cầu, `importance_weight` rồi `priority`. Kỹ năng core đã khớp với CV vẫn được xác minh. Planner ưu tiên một lượt trên các kỹ năng, dành ngân sách cho follow-up và có thể đưa mục tiêu chưa hỏi trở lại khi còn ngân sách.
 - `assessment.py`: kiểm tra trích dẫn nguyên văn, criterion IDs và tính hợp lệ của judgment; tổng hợp bằng chứng; quyết định clarification/follow-up/easier/deeper/contradiction verification. Kết luận dựa trên bằng chứng và độ sâu theo Criteria.
 - `workflow.py`: chuyển trạng thái trên bản sao sâu. Lỗi judge/generator không làm thay đổi snapshot đã lưu. Giới hạn thời gian, tổng số câu và số câu/mục tiêu; dành cơ hội ban đầu cho các mục tiêu còn lại.
 - `reporting.py`: projection thuần từ snapshot. Kết luận theo mục tiêu, nhóm theo kỹ năng trên UI; mỗi bằng chứng có `turn_id` và trích dẫn câu trả lời.
@@ -33,7 +33,9 @@ flowchart LR
 
 Một mục tiêu có nhiều `suitable_modes` cùng lý do và coverage theo criterion. MIXED chọn theo task fit → coverage essential criteria → dạng ít được dùng hơn → thứ tự blueprint khi hòa. FOCUSED giữ đúng lựa chọn người dùng. Mode được khóa trong từng objective. Không có mục tiêu phù hợp thì trả lỗi rõ ràng để người dùng đổi dạng.
 
-Độ sâu câu hỏi có thang riêng: L1 Foundation, L2 Application, L3 Analysis/Problem Solving, L4 Design/Trade-offs. `required_proficiency` vẫn là thang C2 1–5. `target_depth` được khóa theo nhiệm vụ; `current_question_depth` chỉ thay đổi độ sâu của câu đang hỏi. Câu đầu ở target, câu chẩn đoán thấp hơn một mức, câu mở rộng chỉ dùng khi có `extension_depth`, anchor cao hơn và cấu hình cho phép. Không yêu cầu đi qua từng mức. Chi tiết audit, thuật toán, cấu hình và ví dụ phiên đầy đủ ở [evidence-interview-v2-audit.md](evidence-interview-v2-audit.md).
+Độ sâu câu hỏi có thang riêng: L1 Foundation, L2 Application, L3 Analysis/Problem Solving, L4 Design/Trade-offs. `required_proficiency` vẫn là thang C2 1–5. `target_depth` được khóa theo nhiệm vụ. `Turn.question_depth` lưu độ sâu của câu thực sự đã hỏi. Câu đầu ở target, câu chẩn đoán thấp hơn một mức, câu mở rộng chỉ dùng khi có `extension_depth`, anchor cao hơn và cấu hình cho phép. Không yêu cầu đi qua từng mức. Chi tiết audit, thuật toán, cấu hình và ví dụ phiên đầy đủ ở [evidence-interview-v2-audit.md](evidence-interview-v2-audit.md).
+
+LLM trả `BlueprintDraft` với cấu trúc rubric, độ sâu đề xuất và dạng hỏi phù hợp. Mỗi `requirement_id` trong bản nháp khớp với một key trong `requirements`. Builder kiểm tra ID và kỹ năng, lấy metadata JD từ đầu vào và gán ID mục tiêu, ID tiêu chí trước khi lưu `Blueprint`. Lượt sau có thể tái sử dụng blueprint đã lưu.
 
 ## Ý nghĩa kết luận
 
@@ -50,13 +52,21 @@ Câu trả lời ngắn không tự động bị hạ điểm. Evidence ledger g
 
 ## Hỏi từng tiêu chí và đào sâu thích nghi
 
-Một kỹ năng có thể có nhiều mục tiêu theo nhiệm vụ JD; mỗi mục tiêu có nhiều tiêu chí. Mỗi lượt mới chỉ nhắm đúng **một** tiêu chí, do bộ điều phối chọn trước khi gọi LLM. Generator chỉ nhận rubric của tiêu chí đó, `probe_reason` và phần bằng chứng còn thiếu, rồi thực hiện suy luận Abductive CoT (`surprising_fact_C` → `hypothesis_A`) trước khi sinh `question.text`. Prompt cấm gộp các nhiệm vụ độc lập; validator kiểm tra đầy đủ `surprising_fact_C`/`hypothesis_A`, chặn nhiều criterion IDs, nhiều dấu hỏi ngoài code và các danh sách yêu cầu đánh số/gạch đầu dòng rõ ràng, rồi sinh lại trong giới hạn retry. Đây là kiểm tra cấu trúc và heuristic, chưa phải bộ xác minh ngữ nghĩa đầy đủ cho mọi cách diễn đạt.
+Một kỹ năng có thể có nhiều mục tiêu theo nhiệm vụ JD; mỗi mục tiêu có nhiều tiêu chí. Mỗi lượt mới chỉ nhắm đúng **một** tiêu chí, do bộ điều phối chọn trước khi gọi LLM. Generator dùng tiêu chí, hành động và lịch sử liên quan để hỏi một hành vi quan sát được. Khi làm rõ, câu hỏi giữ nguyên tình huống. Khi hạ độ khó, câu hỏi tập trung vào một quyết định nền tảng nhỏ hơn. Validator kiểm tra mode, độ sâu, criterion ID, phạm vi tình huống và một số dạng câu hỏi gộp. Lời nhận xét có thể để trống để chuyển thẳng đến câu hỏi tiếp theo.
 
 Validator bỏ qua dấu hỏi trong URL và literal được trích dẫn không có khoảng trắng; danh sách điều kiện đầu vào dạng “Nếu chuỗi rỗng, trả về False” không tự bị coi là nhiều yêu cầu trả lời. Khi sinh câu hỏi không hợp lệ, mỗi retry nhận `required_question_contract` với metadata chính xác và `validation_error` chỉ rõ điều kiện sai (mode, depth, tiêu chí, scope, câu gộp hoặc lặp). Log ghi lý do từng lần, không ghi câu trả lời hoặc toàn bộ câu hỏi. Không tự đổi nhãn mode/depth/criterion của đầu ra sai để vượt kiểm tra.
+
+`required_question_contract` cung cấp mode, độ sâu, ID tiêu chí và scope bắt buộc khi làm rõ. Judge nhận rubric của tiêu chí hiện tại trong `objective.criteria`, ID cần chấm trong `turn.question.criterion_ids` và lời đáp gốc kèm số dòng để trích bằng chứng.
+
+Generator trả mode và độ sâu để validator đối chiếu bản nháp với hợp đồng. Trong snapshot, `Turn.mode` và `Turn.question_depth` là nguồn metadata của lượt. `Turn.question` lưu nội dung, ID tiêu chí, mức hỗ trợ và phạm vi tình huống. Snapshot cũ thiếu độ sâu cấp lượt có thể lấy giá trị từ `question.depth` khi đọc.
 
 Hết retry là `QuestionUnavailableError` → HTTP 503 với thông báo tiếng Việt, không còn trả lỗi yêu cầu 422 hoặc chuỗi kỹ thuật `Question generation failed validation after bounded retry` cho ứng viên. Snapshot đầu vào và dữ liệu đã lưu giữ nguyên; UI giữ bản nháp/request ID để gửi lại. Ngày 08/11/2026 đã kiểm chứng 260 kiểm thử Python, bao gồm lỗi tạo câu tiếp theo, gửi lại không đếm trùng, scope clarification và dữ liệu chứa dấu hỏi/danh sách điều kiện. Log của lần lỗi cũ chỉ có HTTP 422 nên chưa xác định được ràng buộc cụ thể đã bị vi phạm trong lần đó.
 
 `criterion_progress` lưu riêng số lượt, clarification/easier/extension, các phần chưa xác minh, số lượt không tiến triển, những case đã quan sát và lý do dừng. Cờ tổng ở objective được giữ cho tương thích/telemetry, không còn tiêu hao cơ hội hỏi làm rõ hoặc chẩn đoán của tiêu chí khác. Snapshot cũ thiếu counters được khôi phục từ các lượt đã lưu khi tiếp tục trả lời.
+
+Context sinh câu hỏi chỉ gửi lịch sử hỏi–đáp đầy đủ của cùng mục tiêu và tiêu chí đang hỏi, bao gồm câu chính, các lượt làm rõ/đào sâu và các lượt trước khi tạm chuyển sang mục tiêu khác. Bằng chứng trước đó cũng được lọc theo tiêu chí hiện tại để giữ thông tin kiểm chứng mâu thuẫn. Các lượt thuộc mục tiêu khác bị loại hoàn toàn khỏi context sinh câu hỏi. Các lượt cùng mục tiêu nhưng khác tiêu chí chỉ xuất hiện trong `other_questions`, mỗi mục gồm tối đa 300 ký tự đầu của câu hỏi và cờ `truncated`, không có câu trả lời hay kết quả chấm; LLM chỉ dùng chúng để tránh hỏi lặp. Kiểm tra trùng nguyên câu phía server vẫn đối chiếu toàn bộ lịch sử gốc. Database/snapshot giữ nguyên toàn bộ lịch sử, và context chấm câu trả lời vẫn giữ phạm vi cùng mục tiêu như trước. Thay đổi này giảm dữ liệu đưa vào bộ sinh câu hỏi; chưa có đo đạc độ trễ hoặc benchmark chất lượng bằng LLM thật.
+
+Kiểm chứng ngày 17/11/2026: 95 kiểm thử offline đạt, gồm `test_question_context_scope.py`, `test_evidence_workflow.py` và `test_evidence_depth_policy.py` với `-k 'not api'`, cùng `test_dspy_optimization.py`. Sáu ca mới phủ TEXT/VOICE, đổi mục tiêu/tiêu chí, hỏi phụ, tiếp tục nhánh sau khi chuyển mục tiêu, bằng chứng mâu thuẫn, chống lặp toàn phiên và giữ nguyên transcript. Đã tái sinh artifacts DSPy bằng labeled few-shot, không gọi model. Bộ HTTP/voice đầy đủ chưa xác nhận: quá trình chạy bị treo tại FastAPI TestClient trên môi trường Windows và đã được dừng.
 
 Sau mỗi câu trả lời: ưu tiên giải quyết mâu thuẫn, quay về target sau chẩn đoán thành công, chuyển tiêu chí khi đã đủ bằng chứng, hoặc hỏi tiếp đúng phần chưa rõ. Judge trả `unresolved_aspects` cho bằng chứng chưa đầy đủ; không được vừa đánh dấu đạt anchor vừa khai báo phần bắt buộc còn thiếu. Một follow-up không mặc định tăng độ khó. Extension chỉ bật bằng policy, với anchor cao hơn đã khóa; từng tiêu chí được hỏi riêng.
 
@@ -68,15 +78,15 @@ Các mặc định là heuristic vận hành, chưa được hiệu chuẩn trê
 
 | Giới hạn | Mặc định | Ý nghĩa |
 |---|---|---|
-| `criterion_soft_limit` (policy) | 3 | Mốc xem xét tiến triển và nhường lượt cho tiêu chí/kỹ năng chưa được phủ; không tự đóng tiêu chí |
-| `max_stagnant_turns` (policy) | 2 | Từ mốc mềm, dừng tiêu chí nếu không có bằng chứng thực chất ở case mới hoặc thay đổi phần chưa rõ trong số lượt liên tiếp này |
-| `max_turns_per_criterion` (policy) | 6 | Giới hạn cứng cho một tiêu chí, gồm cả làm rõ/chẩn đoán/mở rộng |
+| `CRITERION_SOFT_LIMIT` (nội bộ) | 3 | Mốc xem xét tiến triển và nhường lượt cho tiêu chí/kỹ năng chưa được phủ; không tự đóng tiêu chí |
+| `MAX_STAGNANT_TURNS` (nội bộ) | 2 | Từ mốc mềm, dừng tiêu chí nếu không có bằng chứng thực chất ở case mới hoặc thay đổi phần chưa rõ trong số lượt liên tiếp này |
+| `MAX_TURNS_PER_CRITERION` (nội bộ) | 6 | Giới hạn cứng cho một tiêu chí, gồm cả làm rõ/chẩn đoán/mở rộng |
 | `max_questions_per_objective` (config) | 8 | Giới hạn cứng cả mục tiêu; cho phép cấu hình 1–40, vẫn chịu ngân sách toàn phiên |
 | `max_questions` / `duration_seconds` | 10 / 900 | Giới hạn cứng toàn phiên |
 
-Phần chưa rõ thay đổi được nhận biết bằng danh sách đã chuẩn hóa, không dùng điểm confidence chưa hiệu chuẩn. Thay đổi cách mô tả gap vẫn có thể bị coi là tiến triển; giới hạn cứng ngăn chuỗi hỏi kéo dài. Case giống nhau ở cùng độ sâu không được tính lại là case mới. Các giá trị policy được cấu hình bằng `EVIDENCE_POLICY_JSON` và giữ trong snapshot; giới hạn cứng tiêu chí không được nhỏ hơn mốc mềm.
+Phần chưa rõ thay đổi được nhận biết bằng danh sách đã chuẩn hóa, không dùng điểm confidence chưa hiệu chuẩn. Thay đổi cách mô tả gap vẫn có thể bị coi là tiến triển; giới hạn cứng ngăn chuỗi hỏi kéo dài. Case giống nhau ở cùng độ sâu không được tính lại là case mới. Các ngưỡng đánh giá và phân bổ cốt lõi (`fallback_depth`, `core_importance`, `reserve_followup_fraction`, `min_failure_contexts`, `allow_extension_probes`) có thể cấu hình qua `EVIDENCE_POLICY_JSON` trên AI service và được giữ trong snapshot.
 
-Nếu còn mục tiêu khác, hệ thống nhường cơ hội ban đầu trước khi dùng hết ngân sách và luân chuyển sau mốc mềm, giữ nguyên bằng chứng/counters để quay lại. Trong mục tiêu, ưu tiên tiêu chí thiết yếu chưa hỏi sau mốc mềm trước khi tiếp tục đào sâu tiêu chí cũ. Dừng vì `NO_PROGRESS`, `CRITERION_BUDGET`, thời gian hoặc số câu không tự sinh kết luận yếu: phần chưa xác minh vẫn là chưa đủ bằng chứng. Báo cáo bổ sung `objectives[].criteria` với kết luận, số lượt và lý do dừng từng tiêu chí; rubric/anchor không được đưa vào pending turn.
+Nếu còn mục tiêu khác, hệ thống nhường cơ hội ban đầu trước khi dùng hết ngân sách và luân chuyển sau mốc mềm, giữ nguyên bằng chứng/counters để quay lại. Trong mục tiêu, ưu tiên tiêu chí thiết yếu chưa hỏi sau mốc mềm trước khi tiếp tục đào sâu tiêu chí cũ. Dừng vì `NO_PROGRESS`, `CRITERION_BUDGET`, thời gian hoặc số câu không tự sinh kết luận yếu: phần chưa xác minh vẫn là chưa đủ bằng chứng. Báo cáo gồm `objectives[].criteria` với `criterion_id`, `description`, `essential` và `assessment`; rubric/anchor và telemetry nội bộ không được đưa vào public report hoặc `pending_turn`.
 
 Config đã lưu, kể cả giới hạn 3 lượt của phiên cũ, được giữ nguyên. Để dùng mặc định 8 lượt/mục tiêu, bắt đầu phiên mới. Không sửa DB hoặc tự tăng ngân sách phiên đang chạy.
 
@@ -90,7 +100,7 @@ TEXT hiển thị phần này trực tiếp trước câu hỏi, không yêu c�
 
 Kiểm chứng phần hội thoại ngày 08/11/2026: 251 kiểm thử Python, 12 kiểm thử backend (voice/contract/AI client), TypeScript, ESLint và production build đạt. Browser fixtures xác minh phản hồi hiển thị trước câu hỏi qua 15 lượt, giữ sau reload, bố cục desktop/mobile và hồi quy luồng voice với cùng số yêu cầu TTS. Chưa chạy nhận xét hoặc phát âm bằng LLM/TTS thật trong đợt này.
 
-`progress` đo số mục tiêu đã đóng. `evidence_coverage` đo tiêu chí có bằng chứng được chấp nhận và không còn mâu thuẫn, trên các mục tiêu được chọn. `target_attainment` chỉ tính trên mục tiêu đã quan sát đủ mức thể hiện; trả `null` nếu chưa có mục tiêu như vậy. Các mục tiêu ngoài dạng/ngân sách vẫn xuất hiện với lý do loại trừ và không bị tính là yếu.
+Báo cáo mới mô tả kết quả theo mục tiêu và tiêu chí. Mỗi bằng chứng mang `turn_id` để nối với câu hỏi. Các mục tiêu ngoài dạng hoặc ngân sách xuất hiện với lý do loại trừ. Giao diện cũng đọc được các báo cáo cũ có `evidence_turn_ids`.
 
 ## API, lưu trữ và đồng thời
 
@@ -99,12 +109,14 @@ Public backend: `/api/v2/sessions/{sessionId}/interview`.
 | API | Đầu vào |
 |---|---|
 | `GET /` | Khôi phục public state từ DB |
-| `POST /start` | mode, focused_question_mode, duration_seconds, max_questions, max_questions_per_objective |
+| `POST /start` | `interaction_mode`, `focused_question_mode`, `duration_seconds`, `max_questions` và `max_questions_per_objective` tùy chọn |
 | `POST /respond` | request_id UUID, turn_id, expected_state_version, candidate_response |
 | `POST /stop` | request_id UUID, expected_state_version |
 | `GET /report` | Báo cáo từ cùng snapshot |
 
 Backend kiểm tra chủ sở hữu trước khi trả state hoặc receipt. Frontend gửi qua service `evidenceInterview` và axiosClient theo cấu hình kết nối backend hiện tại; component không gọi HTTP trực tiếp.
+
+Server suy ra `MIXED` khi `focused_question_mode` là `null` hoặc bị bỏ qua, và `FOCUSED` khi có dạng câu hỏi cụ thể. Client cũ vẫn có thể gửi `mode` nếu khớp với quy tắc này. Khi bỏ qua `max_questions_per_objective`, Backend áp dụng mặc định 8. Snapshot và response có cả `mode` đã suy ra và giới hạn thực tế của phiên.
 
 Khi trang phỏng vấn đang mở, bộ đếm kiểm tra `deadline_at` mỗi giây và khi tab nhận focus/đổi trạng thái hiển thị. Hết hạn tự gọi `/stop`, kể cả sau lỗi chấm AI; không tự nộp bản nháp. Nếu đang gửi câu trả lời, chờ yêu cầu đó hoàn tất rồi kiểm tra lại hạn. Lỗi kết thúc tạm thời được thử lại cách nhau ít nhất 5 giây với cùng request ID; HTTP 409 tải lại state trước khi thử với version mới. Trang kết quả chỉ đọc không gửi lệnh kết thúc. Đây là bộ đếm phía trình duyệt; khi đóng trang hoàn toàn, backend kiểm tra hạn ở yêu cầu tiếp theo. `web-app/scripts/interview-expiry-smoke.mjs` kiểm thử 7 tình huống bằng API fixtures: idle, lỗi chấm, lỗi stop, xung đột version, yêu cầu đang chạy, voice và chỉ đọc.
 
@@ -114,7 +126,11 @@ Migration `V2__evidence_interviews.sql` thêm:
 - `interview_commands`: receipt theo `(session_id, request_id)` kèm hash payload, bảo đảm retry không ghi trùng.
 - `session_turns.external_turn_id`: khóa duy nhất để projection transcript không tạo lượt trùng.
 
-AI service chỉ tính toán: `/api/v2/interview/start`, `/respond`, `/stop`. Backend gửi snapshot đã lưu; client không được cung cấp snapshot thay thế. Những endpoint AI này là giao tiếp nội bộ, cần giữ trong mạng backend khi triển khai.
+Khi gọi `/api/v2/interview/start`, Backend gửi `session_id`, `skills` đã lọc, `config` và `opening` gồm `company`, `role_title`, `candidate_name`, tóm tắt JD/CV giới hạn độ dài và `attempt_number` (nếu có). AI service mặc định `interviewer_name` là `Minh`, nạp `InterviewPolicy` thu gọn (5 ngưỡng cốt lõi) từ `EVIDENCE_POLICY_JSON` hoặc mặc định rồi lưu vào `snapshot.policy`. Khi hồ sơ đã có rubric, Backend gửi thêm `blueprint` đã lưu của hồ sơ (không cần gửi `policy`).
+
+Backend gửi snapshot đã lưu vào các yêu cầu chuyển tiếp. Các endpoint nội bộ `/api/v2/interview/start`, `/respond`, `/conversation` và `/stop` trả `snapshot` và `public`. Các endpoint AI này cần nằm trong mạng backend khi triển khai.
+
+`interview_runs` lưu snapshot và projection phục vụ ứng dụng. Hai cột bổ sung của migration V6 (`blueprint_json` và `dynamic_state_json`) vẫn có trong DB để giữ tương thích dữ liệu đã lưu. Rubric dùng chung giữa các lượt được lưu tại `application_profiles.blueprint_json`. Quyền hỏi lại, hỏi dễ hơn hoặc hỏi sâu hơn được theo dõi theo từng tiêu chí trong `criterion_progress`.
 
 Gọi LLM diễn ra ngoài transaction DB. Khi commit, khóa hàng session, kiểm tra version, ghi snapshot + transcript + trạng thái session + receipt trong một transaction. Nếu hai yêu cầu khác nhau cùng version đến đồng thời, chỉ một yêu cầu commit; yêu cầu còn lại nhận 409. Nếu receipt đã tồn tại với cùng hash, trả lại response đã lưu. Tái sử dụng request ID với payload khác trả 409.
 
@@ -124,9 +140,9 @@ Trong lúc hệ thống còn dùng Jackson 2 để lưu JSON và Spring Boot 4/J
 
 - Flyway tự áp dụng V2 khi backend khởi động; không sửa V1, không chạy migration vào DB đang dùng trong các script kiểm thử.
 - Engine C3 cũ đã được gỡ. Endpoint thực thi cũ trả HTTP 410, UI chỉ cho xem lại lịch sử/kết quả đã lưu. Phiên đã có transcript hoặc AI session ID cũ không được đổi engine tại chỗ; clone hoặc tạo lượt mới để dùng V2.
-- Phiên V2 đã bắt đầu khóa config/blueprint. Các API ghi transcript/trạng thái cũ bị chặn đối với V2. Feedback người dùng/HR vẫn dùng cơ chế hiện có.
+- Phiên V2 đã bắt đầu khóa config/blueprint. Các API ghi transcript/trạng thái cũ bị chặn đối với V2. Feedback người dùng vẫn dùng cơ chế hiện có (giao diện và evaluation HR đã được gỡ bỏ ở V11).
 - Cache C2 cũ thiếu contract nhiệm vụ được phân tích lại trước khi bắt đầu V2 từ CV/JD gốc. Không phân tích lại trong mỗi lượt trả lời. Snapshot giữ dữ liệu C2 và rubric cho phiên đang chạy.
-- Snapshot giữ `schema_version=2`, `engine_version` và `rubric_version=evidence-2.0`. Các field cũ `belief`, `raw_belief`, `tag` được bỏ qua khi đọc và không được ghi lại trong snapshot mới. Không cần migration phá hủy dữ liệu hoặc tính lại báo cáo cũ.
+- Snapshot giữ `schema_version=2`. Các field cũ (`belief`, `raw_belief`, `tag`, `engine_version`, `rubric_version`, `question.assistance`, `objective.inferred`, `objective.extension_criterion_ids`, `objective_state.clarification_spent`, `conversation.introduction_skipped`) đã bị loại bỏ khỏi schema và bị từ chối khi xác thực (`extra="forbid"`). Không cần migration phá hủy dữ liệu hoặc tính lại báo cáo cũ.
 - Để chạy LLM thật cần `OPENROUTER_API_KEY` và `OPENROUTER_MODEL` trên AI service. Câu coding hiện được đánh giá theo code/lập luận người dùng nhập; chưa có sandbox thực thi code.
 
 ## Kiểm chứng và giới hạn nghiên cứu

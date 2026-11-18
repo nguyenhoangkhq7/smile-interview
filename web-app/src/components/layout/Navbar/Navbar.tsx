@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { BookOpen, ChevronDown, UserRound } from 'lucide-react';
+import { BookOpen, ChevronDown, History, UserRound } from 'lucide-react';
 import styles from './navbar.module.css';
 import { useAuthStore } from '@/store/authStore';
 
@@ -28,6 +28,11 @@ const navLinks = [
         <circle cx="12" cy="12" r="2" />
       </svg>
     )
+  },
+  {
+    href: '/history',
+    label: 'Lịch sử phỏng vấn',
+    icon: <History size={16} strokeWidth={2.5} aria-hidden="true" />,
   },
   {
     href: '/practice',
@@ -126,18 +131,8 @@ export default function Navbar() {
                         <circle cx="12" cy="12" r="10" />
                         <polyline points="12 6 12 12 16 14" />
                       </svg>
-                      Lịch sử phân tích
+                      Lịch sử phỏng vấn
                     </Link>
-
-                    {user.role === 'ADMIN' && (
-                      <Link href="/admin/evaluations" className={styles.dropdownItem}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-orange-500" style={{ stroke: '#ea580c' }}>
-                          <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
-                          <circle cx="12" cy="12" r="3" />
-                        </svg>
-                        Trang quản trị
-                      </Link>
-                    )}
                   </div>
 
                   {/* Log Out option */}

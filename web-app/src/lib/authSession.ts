@@ -15,11 +15,22 @@ export function getTokenExpiresAt(token: string): number | null {
   }
 }
 
+export function analysisResultSearch(): string {
+  const params = new URLSearchParams(window.location.search);
+  const sessionId = params.get('sessionId');
+  const jobId = params.get('jobId');
+  return sessionId && jobId ? '?' + new URLSearchParams({ sessionId, jobId }) : '';
+}
+
+export function loginPath(): string {
+  return '/login' + (window.location.pathname === '/interview/new' ? analysisResultSearch() : '');
+}
+
 export function expireSession(token: string): void {
   // Ignore failures/timers belonging to a previous login.
   if (useAuthStore.getState().token !== token) return;
   useAuthStore.getState().logout();
   if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-    window.location.replace('/login');
+    window.location.replace(loginPath());
   }
 }

@@ -11,7 +11,7 @@ from matching_cv.app.container import match_documents
 from matching_cv.app.schemas.module1 import Module1Output
 from matching_cv.app.services.document_parser import document_parser_service
 from matching_cv.app.services.standardized_output_builder import Module1OutputError
-from skill_gap.api.routes import _get_orchestrator, _get_report_store
+from skill_gap.api.routes import _get_orchestrator
 from skill_gap.api.schemas import AnalyzeWithReportResponse
 
 logger = logging.getLogger(__name__)
@@ -62,6 +62,7 @@ async def analyze(request: Request) -> AnalyzeWithReportResponse:
         raise HTTPException(status_code=400, detail="Both CV content and JD content (file or text) are required.")
     documents = await run_matching(cv_text, jd_text, include_compatibility_score=True)
     match_result = documents.output
+    resolved_analysis_id = analysis_id or str(uuid.uuid4())
     skills, report = await run_in_threadpool(
         _get_orchestrator(request).run_pipeline_with_report,
         cv_text=documents.cv_text,
@@ -69,10 +70,7 @@ async def analyze(request: Request) -> AnalyzeWithReportResponse:
         cv_skills=match_result.cv_skills,
         jd_skills=match_result.jd_skills,
         match_results=match_result.match_results,
-        analysis_id=analysis_id or str(uuid.uuid4()),
+        analysis_id=resolved_analysis_id,
     )
-    for skill in skills:
-        skill.flags.append(f"matcher_source:{match_result.matcher_source}")
     report.matching_score = documents.matching_score
-    _get_report_store(request)[report.analysis_id] = report
-    return AnalyzeWithReportResponse(analysis_id=report.analysis_id, skills=skills, report=report)
+    return AnalyzeWithReportResponse(analysis_id=resolved_analysis_id, skills=skills, report=report)

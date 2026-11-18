@@ -14,15 +14,15 @@ ai-service/
 │   ├── app/schemas/module1.py          # Hợp đồng output dùng chung với Module 2
 │   └── app/api/v1/endpoints/unified.py # POST /api/v1/match & POST /api/v1/pipeline/analyze
 │
-├── skill_gap/                                # [Module 2]: Skill-Gap Detection (Xác định khoảng trống năng lực)
-│   ├── domain/                         # SkillNode, StaticGapAuditReport, SkillGapResult
-│   ├── pipeline/                       # SkillGapPipeline
-│   └── services/                       # GraphEngine, DependencyResolver
+├── skill_gap/                          # [Module 2]: Skill-Gap Detection (Xác định khoảng trống năng lực)
+│   ├── domain/                         # JobTask, SkillGapSummary, SkillGapResult, SkillGapReportSummary
+│   ├── pipeline/                       # SkillGapOrchestrator
+│   └── services/                       # ResumeSegmenter, JDRequirementParser, ProficiencyEstimator, GapDetector
 │
 ├── adaptive_questioning/               # [Module 3]: Phỏng vấn thích ứng theo bằng chứng
-│   ├── evidence/routes.py             # POST /api/v2/interview/start, /respond, /stop
-│   ├── evidence/assessment.py         # Kiểm tra trích dẫn, tổng hợp bằng chứng theo Criteria
-│   └── evidence/models.py             # Objective, Turn, Judgment, ObjectiveState, Snapshot
+│   ├── evidence/routes.py              # POST /api/v2/interview/start, /respond, /conversation, /stop
+│   ├── evidence/assessment.py          # Kiểm tra trích dẫn, tổng hợp bằng chứng theo Criteria
+│   └── evidence/models.py              # Objective, Turn, Judgment, ObjectiveState, Snapshot
 │
 ├── app/
 │   ├── config.py                       # Cấu hình môi trường & Settings
@@ -47,9 +47,9 @@ ai-service/
 
 `/api/v1/match` trả `cv_skills`, `jd_skills`, `match_results` và `matcher_source: MATCHING_CV`. Cả hai endpoint phân tích hỗ trợ JSON văn bản và multipart. Module 2 dùng cùng văn bản đã làm sạch mà Module 1 dùng để trích dẫn. Kỹ năng JD thiếu cặp CV có `matched_cv_skill_id: "none"` và `soft_match: 0`. Confidence thiếu được ghi là `0`. Trọng số JD thiếu làm phân tích trả HTTP 503.
 
-`/api/v1/pipeline/analyze` trả thêm `report.matching_score` trên thang 0–1 khi checkpoint GNN cho kết quả. Khi điểm không khả dụng, trường này là `null` và báo cáo skill gap vẫn được trả về.
+`/api/v1/pipeline/analyze`, `/api/v1/skill-gap/analyze` và `/api/v1/skill-gap/analyze-with-report` trả `analysis_id`, `skills[]` và `report` gồm `matching_score` và `degraded`. Điểm phù hợp CV–JD nằm trên thang 0–1 khi matcher cung cấp điểm, hoặc `null` khi chưa có điểm. Mỗi kỹ năng chỉ giữ phần tóm tắt cần cho người dùng và phỏng vấn (`priority`, `semantic_alignment`, `required_proficiency`, `importance_weight`, `cv_evidence_spans`, `job_tasks`), kèm `jd_evidence_spans` khi có trích dẫn JD cấp kỹ năng chưa gắn với nhiệm vụ; các trường chẩn đoán nội bộ (`is_substituted`, `candidate_proficiency`, `gap_magnitude`, `flags`, `degraded` cấp kỹ năng) được lược bỏ khỏi output REST.
 
-Module 2 dùng điểm năng lực CV/JD và độ thiếu hụt tất định; không khởi tạo phân phối xác suất năng lực. Module 3 không yêu cầu hoặc cập nhật `raw_belief`, `belief`, `tag` hay TV. Engine phỏng vấn cũ đã được gỡ; API AI `/api/v1/interview/*` trả HTTP 410. Dataset và bộ tối ưu DSPy được khôi phục, chuyển sang schema bằng chứng V2; xem [hướng dẫn compile/load](adaptive_questioning/optimization/README.md). Backend vẫn phục vụ báo cáo cũ đã lưu, không gọi AI để tính lại. Snapshot V2 cũ được đọc bằng cách bỏ qua các field đã loại bỏ; lần chuyển trạng thái thành công tiếp theo lưu cấu trúc mới. Xem [tài liệu V2](../docs/evidence-interview-v2.md).
+Module 2 dùng điểm năng lực CV/JD và độ thiếu hụt tất định; không khởi tạo phân phối xác suất năng lực. Module 3 không yêu cầu hoặc cập nhật `raw_belief`, `belief`, `tag` hay TV. Engine phỏng vấn cũ đã được gỡ; API AI `/api/v1/interview/*` trả HTTP 410. Dataset và bộ tối ưu DSPy được khôi phục, chuyển sang schema bằng chứng V2; xem [hướng dẫn compile/load](adaptive_questioning/optimization/README.md). Backend vẫn phục vụ báo cáo cũ đã lưu, không gọi AI để tính lại. Schema V2 áp dụng `extra="forbid"`, nên snapshot/turn chứa các field đã loại bỏ (`engine_version`, `rubric_version`, `question.assistance`, `objective.inferred`, `objective.extension_criterion_ids`, `objective_state.clarification_spent`, `conversation.introduction_skipped`) sẽ bị từ chối khi xác thực. Xem [tài liệu V2](../docs/evidence-interview-v2.md).
 
 Module extract explicit skill trong `matching_cv` dùng DSPy Signature và metric F0.5 ưu tiên precision. Dataset có ví dụ phân biệt skill thực tế với bằng cấp/ngành học, chức danh, lĩnh vực của nhà tuyển dụng và coursework. Compile bộ few-shot ban đầu từ thư mục `ai-service` bằng `python -m matching_cv.dspy_modules.compiler`; module được lưu ở `matching_cv/dspy_modules/compiled_modules/explicit_skill_extractor.json`. So sánh prompt cũ với DSPy trên holdout bằng `python -m matching_cv.dspy_modules.benchmark` (cần OpenRouter key và gửi văn bản holdout cho model). Khi bật `MATCHING_CV_DSPY_EXPLICIT_ENABLED=true`, cache extract không có `extractor_version=explicit_dspy_v1` hoặc metadata schema `dspy_explicit_v1` sẽ bị bỏ qua để tránh dùng kết quả trước DSPy. Nếu chưa có artifact đã compile, runtime nạp bộ ví dụ gold cục bộ làm few-shot seed.
 

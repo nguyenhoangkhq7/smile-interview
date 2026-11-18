@@ -19,6 +19,14 @@ from .telemetry import event
 BLUEPRINT_BATCH_SIZE = 3
 BLUEPRINT_WORKERS = 3
 
+MODE_PATTERNS: dict[str, str] = {
+    "DEBUGGING": r"\b(debug|diagnos\w*|troubleshoot\w*|optimi[sz]\w*)\b|chẩn đoán|tối ưu|sửa lỗi",
+    "DESIGN": r"\b(design|architect|trade.?offs?)\b|thiết kế|đánh đổi",
+    "CODING": r"\b(write|implement|code|program)\b|viết|lập trình",
+    "TECHNICAL_EXPLANATION": r"\b(explain|define|describe)\b|giải thích|định nghĩa|mô tả",
+    "BEHAVIORAL": r"\b(collaborat\w*|mentor\w*|conflict|stakeholders?)\b|phối hợp|hướng dẫn|xung đột",
+}
+
 
 def requirements_for(skills: list[InterviewSkill]) -> dict[str, GroundedRequirement]:
     requirements: dict[str, GroundedRequirement] = {}
@@ -35,7 +43,7 @@ def requirements_for(skills: list[InterviewSkill]) -> dict[str, GroundedRequirem
             if key in requirements:
                 raise ValueError("Duplicate task identifiers")
             requirements[key] = {
-                "requirement_id": key, "skill_id": skill.jd_skill_id,
+                "skill_id": skill.jd_skill_id,
                 "description": task.description if task else f"Đánh giá kiến thức thực hành {skill.jd_skill_id}",
                 "required_proficiency": task.required_level if task else skill.required_proficiency,
                 "inferred": task is None or task.level_basis != "EXPLICIT",
@@ -104,22 +112,30 @@ class BlueprintBuilder:
     def _build_batch(self, requirements: dict[str, GroundedRequirement]) -> Blueprint:
         context = self._batch_context(requirements)
         if self.cache:
-            return self.cache.get_or_compute(context, lambda: self._generate_batch(context))
-        return self._generate_batch(context)
+            return self.cache.get_or_compute(context, lambda: self._generate_batch(context, requirements))
+        return self._generate_batch(context, requirements)
 
     def _batch_context(self, requirements: dict[str, GroundedRequirement]) -> str:
+        prompt_requirements = {
+            key: {k: v for k, v in req.items() if k != "has_task"}
+            for key, req in requirements.items()
+        }
         return encode_context({
-            "requirements": requirements, "depth_definitions": DEPTH_DEFINITIONS,
+            "requirements": prompt_requirements, "depth_definitions": DEPTH_DEFINITIONS,
             "allow_extension_probes": self.policy.allow_extension_probes,
         })
 
-    def _generate_batch(self, context: str) -> Blueprint:
-        blueprint = self.provider.blueprint(context)
-        requirements = json.loads(context)["requirements"]
-        ids = [objective.requirement_id for objective in blueprint.objectives]
+    def _generate_batch(self, context: str, requirements: dict[str, GroundedRequirement]) -> Blueprint:
+        draft = self.provider.blueprint(context)
+        ids = [objective.requirement_id for objective in draft.objectives]
         if len(ids) != len(set(ids)) or set(ids) != set(requirements):
             raise ValueError("Blueprint must cover every requirement exactly once")
-        return blueprint
+        return Blueprint(objectives=[
+            Objective.model_validate(objective.model_dump() | {
+                "claim": requirements[objective.requirement_id]["description"],
+            })
+            for objective in draft.objectives
+        ])
 
     def validate(self, blueprint: Blueprint, skills: list[InterviewSkill]) -> Blueprint:
         requirements = requirements_for(skills)
@@ -134,9 +150,7 @@ class BlueprintBuilder:
         if objective.skill_id != requirement["skill_id"]:
             raise ValueError("Blueprint changed the requirement skill")
         objective.objective_id = str(uuid5(NAMESPACE_URL, objective.requirement_id))
-        objective.required_proficiency = requirement["required_proficiency"]
         objective.claim = requirement["description"]
-        objective.inferred = requirement["inferred"]
         objective.jd_evidence_spans = requirement["jd_evidence_spans"]
         objective.requirement_kind = requirement["requirement_kind"]
         if not self.policy.allow_extension_probes:
@@ -146,7 +160,7 @@ class BlueprintBuilder:
         self._ground_criteria(objective)
 
     def _validate_modes(self, objective: Objective, requirement: GroundedRequirement) -> None:
-        task_modes = {Mode(mode) for mode, pattern in self.policy.mode_patterns.items()
+        task_modes = {Mode(mode) for mode, pattern in MODE_PATTERNS.items()
                       if requirement["has_task"] and re.search(pattern, objective.claim, re.IGNORECASE)}
         if task_modes and not task_modes.intersection(item.mode for item in objective.suitable_modes):
             raise ValueError("Suitable modes do not cover the JD task intent")
@@ -167,9 +181,6 @@ class BlueprintBuilder:
             # Extension anchors are frozen before interviewing, never invented by Judge.
             if any(c.above_target.strip().casefold() == c.at_target.strip().casefold() for c in objective.criteria if c.essential):
                 raise ValueError("Extension must have a distinct higher standard")
-            objective.extension_criterion_ids = [c.criterion_id for c in objective.criteria if c.essential]
-        else:
-            objective.extension_criterion_ids = []
 
 
 def plan(blueprint: Blueprint, skills: list[InterviewSkill], config: InterviewConfig,
@@ -205,12 +216,8 @@ def _allocate(
     compatible = 0
     for obj in objectives:
         modes = [item.mode for item in obj.suitable_modes]
-        mode, mode_reason = select_mode(obj, config, policy, mode_usage)
-        state = ObjectiveState(
-            objective=obj,
-            current_question_depth=obj.target_depth,
-            mode_selection_reason=mode_reason,
-        )
+        mode = select_mode(obj, config, mode_usage)
+        state = ObjectiveState(objective=obj)
         compatible += int(mode in modes)
         optional_reserve = (
             bool(core_skills)
@@ -250,20 +257,18 @@ def _check_plan_exclusion(
     return None
 
 
-def select_mode(objective: Objective, config: InterviewConfig, policy: InterviewPolicy,
-                usage: Counter[Mode]) -> tuple[Mode, str]:
+def select_mode(objective: Objective, config: InterviewConfig, usage: Counter[Mode]) -> Mode:
     if config.mode == "FOCUSED":
         assert config.focused_question_mode is not None
-        return config.focused_question_mode, "User-selected focused mode"
+        return config.focused_question_mode
     essential = {i for i, criterion in enumerate(objective.criteria) if criterion.essential}
-    task_modes = {Mode(mode) for mode, pattern in policy.mode_patterns.items()
+    task_modes = {Mode(mode) for mode, pattern in MODE_PATTERNS.items()
                   if re.search(pattern, objective.claim, re.IGNORECASE)}
     ranked = sorted(enumerate(objective.suitable_modes), key=lambda entry: (
         -int(entry[1].mode in task_modes),
         -len(essential & set(entry[1].criterion_indices or essential)), usage[entry[1].mode], entry[0],
     ))
-    chosen = ranked[0][1]
-    return chosen.mode, f"JD task fit, essential criterion coverage, then mode coverage: {chosen.rationale}"
+    return ranked[0][1].mode
 
 
 def _rank(objective: Objective, skill: InterviewSkill, policy: InterviewPolicy) -> tuple[int, int, float, float, int, str]:
@@ -277,7 +282,7 @@ def _rank(objective: Objective, skill: InterviewSkill, policy: InterviewPolicy) 
 def rubric_fingerprint(objective: Objective) -> str:
     """Equal IDs alone do not imply equivalent standards across independently built rubrics."""
     standard = objective.model_dump(include={
-        "requirement_id", "required_proficiency", "target_depth", "criteria", "suitable_modes",
-        "extension_depth", "extension_criterion_ids", "rubric_version",
+        "requirement_id", "target_depth", "criteria", "suitable_modes",
+        "extension_depth",
     }, mode="json")
     return hashlib.sha256(json.dumps(standard, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()

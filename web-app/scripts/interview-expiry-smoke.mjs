@@ -13,10 +13,11 @@ try {
       deadline_at: new Date(Date.now() + 8000).toISOString(),
       config: { interaction_mode: scenario === 'voice' ? 'VOICE' : 'TEXT', mode: 'MIXED',
         max_questions: 10, duration_seconds: 60, max_questions_per_objective: 8 },
-      turns: [], pending_turn: { turn_id: 'turn', objective_id: 'objective', skill_id: 'javascript',
-        mode: 'CODING', question: 'Viết một hàm JavaScript.', answer: null, feedback: null },
-      report: { schema_version: 2, state_version: 1, is_finished: false, termination_reason: null,
-        progress: 0, evidence_coverage: 0, target_attainment: null, objectives: [] } };
+      turns: [], pending_turn: { turn_id: 'turn', objective_id: 'objective',
+        mode: 'CODING', question: 'Viết một hàm JavaScript.' },
+      report: { termination_reason: null,
+        objectives: [{ objective_id: 'objective', skill_id: 'javascript', claim: 'JS', jd_evidence_spans: [],
+          assessment: 'NOT_ASSESSED', stop_reason: null, strengths: [], weaknesses: [], evidence: [] }] } };
     page.on('pageerror', error => errors.push(error.message));
     await page.evaluateOnNewDocument(() => localStorage.setItem('auth-storage', JSON.stringify({
       state: { user: { id: 'test', username: 'Test', role: 'USER' },
@@ -46,7 +47,7 @@ try {
           return send(409, {});
         }
         session = { ...session, state_version: session.state_version + 1, is_finished: true, pending_turn: null,
-          report: { ...session.report, is_finished: true, termination_reason: 'TIME_BUDGET' } };
+          report: { ...session.report, termination_reason: 'TIME_BUDGET' } };
       }
       if (url.pathname.endsWith('/interview') && request.method() === 'GET') {
         // Start the short deadline when the fixture is actually loaded, after compilation.

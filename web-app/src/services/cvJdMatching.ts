@@ -2,7 +2,15 @@ import axiosClient from '@/lib/axiosClient';
 import { useAuthStore } from '@/store/authStore';
 
 export type SemanticAlignment = 'MATCH' | 'PARTIAL' | 'MISSING';
-export type QuestionStrategy = 'NONE' | 'COMPARE_SUBSTITUTE' | 'PROBE_DEPTH' | 'LEARNING_AGILITY';
+
+interface JobTask {
+  task_id: string;
+  description: string;
+  evidence_spans: string[];
+  required_level: number;
+  requirement_kind: 'REQUIRED' | 'OPTIONAL' | 'UNSPECIFIED';
+  level_basis: 'EXPLICIT' | 'INFERRED' | 'FALLBACK';
+}
 
 export interface SkillGapResult {
   jd_skill_id: string;
@@ -11,49 +19,23 @@ export interface SkillGapResult {
   jd_evidence_spans?: string[];
   semantic_alignment: SemanticAlignment;
   matched_cv_skill_id?: string | null;
-  is_substituted: boolean;
-  gap_magnitude: number;
-  severity: number;
   priority: number;
+  importance_weight: number;
   required_proficiency: number;
-  candidate_proficiency: number;
   cv_evidence_spans: string[];
   context_job?: string | null;
-  suggested_strategy: QuestionStrategy;
-  degraded?: boolean;
-  flags?: string[];
+  job_tasks?: JobTask[];
 }
 
-export interface StaticSkillAuditItem extends SkillGapResult {
-  soft_match: number;
-  substitution_factor: number;
-  importance_weight: number;
-  jd_reasoning: string;
-  effective_candidate_proficiency: number;
-  effective_months: number;
-  c_evidence: number;
-  recency_flag: boolean;
-  static_diagnosis: string;
-}
-
-export interface StaticGapAuditReport {
-  analysis_id: string;
-  total_jd_skills: number;
-  matched_count: number;
-  partial_count: number;
-  missing_count: number;
-  skills_requiring_probing: number;
+export interface SkillGapReport {
   matching_score?: number | null;
   degraded: boolean;
-  system_flags: string[];
-  items: StaticSkillAuditItem[];
-  markdown_summary: string;
 }
 
 export interface AnalyzeWithReportResponse {
   analysis_id: string;
   skills: SkillGapResult[];
-  report: StaticGapAuditReport;
+  report: SkillGapReport;
 }
 
 export interface AbductiveReasoning {
@@ -130,6 +112,12 @@ function getAuthHeaders(includeJsonContentType = false): Record<string, string> 
   return headers;
 }
 
+interface AnalysisJob {
+  job_id: string;
+  status: 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED';
+  result: AnalyzeWithReportResponse | null;
+}
+
 export const cvJdMatchingService = {
   async ingestCvJd(
     sessionId: string,
@@ -161,13 +149,26 @@ export const cvJdMatchingService = {
     return data;
   },
 
-  async analyzeSkillGap(sessionId: string, forceRefresh = false): Promise<AnalyzeWithReportResponse> {
-    const { data } = await axiosClient.post<AnalyzeWithReportResponse>(
-      `/api/v1/sessions/${encodeURIComponent(sessionId)}/analyze-gap?forceRefresh=${forceRefresh}`,
-      null,
-      { headers: getAuthHeaders(false) }
-    );
-    return data;
+  async analyzeSkillGap(sessionId: string, forceRefresh: boolean, signal: AbortSignal,
+                        onAccepted: (id: string) => void, previousJob?: string): Promise<AnalyzeWithReportResponse> {
+    const path = `/api/v1/sessions/${encodeURIComponent(sessionId)}/analyze-gap`;
+    const options = { headers: getAuthHeaders(), signal };
+    let jobId = previousJob;
+    if (!jobId) {
+      const { data } = await axiosClient.post<AnalysisJob | AnalyzeWithReportResponse>(
+        path, null, { ...options, params: { forceRefresh } });
+      if ('skills' in data) return data;
+      jobId = data.job_id;
+      onAccepted(jobId);
+    }
+    while (!signal.aborted) {
+      const { data } = await axiosClient.get<AnalysisJob>(`${path}/${encodeURIComponent(jobId)}`, options);
+      if (data.status === 'SUCCEEDED' && data.result) return data.result;
+      if (data.status !== 'PENDING' && data.status !== 'RUNNING')
+        throw new Error('Phân tích chưa hoàn tất. Vui lòng thử lại.');
+      await new Promise(resolve => setTimeout(resolve, 1500));
+    }
+    throw new DOMException('Cancelled', 'AbortError');
   },
 
 };

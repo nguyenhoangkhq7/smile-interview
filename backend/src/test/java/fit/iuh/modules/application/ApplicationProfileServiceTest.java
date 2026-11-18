@@ -85,7 +85,14 @@ class ApplicationProfileServiceTest {
         SkillGapClient gaps = mock(SkillGapClient.class);
         var profile = profile();
         var session = Session.builder().applicationProfile(profile).build();
-        assertThat(new EvidenceInputs(gaps, json).skills(session)).isEqualTo(json.read(profile.getSkillGapJson()));
+        profile.setSkillGapJson("""
+                [{"jd_skill_id":"sql","job_tasks":[],"jd_evidence_spans":["Tối ưu SQL"],
+                  "importance_weight":1,"candidate_proficiency":3,"suggested_strategy":"PROBE_DEPTH"}]
+                """);
+        var skills = new EvidenceInputs(gaps, json).skills(session);
+        assertThat(skills).isEqualTo(json.read("""
+                [{"jd_skill_id":"sql","job_tasks":[],"jd_evidence_spans":["Tối ưu SQL"],"importance_weight":1}]
+                """));
         verifyNoInteractions(gaps);
     }
 

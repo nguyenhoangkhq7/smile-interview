@@ -39,7 +39,8 @@ class EvidencePersistenceTest {
     private EvidenceStore.Commit input(long version, UUID requestId) {
         var visible = json.tree(Map.of("schema_version", 2, "session_id", sessionId,
                 "state_version", version + 1, "is_finished", false, "turns", java.util.List.of(),
-                "pending_turn", Map.of("turn_id", "turn-1", "question", "Explain the query", "skill_id", "sql")));
+                "pending_turn", Map.of("turn_id", "turn-1", "objective_id", "obj-1", "question", "Explain the query"),
+                "report", Map.of("objectives", java.util.List.of(Map.of("objective_id", "obj-1", "skill_id", "sql")))));
         return new EvidenceStore.Commit(sessionId, version, requestId, "hash", json.read("{}"),
                 json.tree(Map.of("snapshot", visible, "public", visible)));
     }
@@ -84,7 +85,8 @@ class EvidencePersistenceTest {
 
     @Test void failedProjectionRollsBackSnapshotAndReceipt() {
         var command = input(1, UUID.randomUUID());
-        ((com.fasterxml.jackson.databind.node.ObjectNode) command.result().path("public").path("pending_turn"))
+        ((com.fasterxml.jackson.databind.node.ObjectNode) command.result().path("public").path("report")
+                .path("objectives").get(0))
                 .put("skill_id", "x".repeat(101));
         assertThatThrownBy(() -> store.commit(command)).isInstanceOf(RuntimeException.class);
         assertThat(runs.findById(sessionId).orElseThrow().getStateVersion()).isEqualTo(1);

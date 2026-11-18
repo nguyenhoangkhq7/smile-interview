@@ -9,8 +9,56 @@ from adaptive_questioning.evidence.question_validation import (
     VOICE_MAX_WORDS, question_errors, single_question,
 )
 from adaptive_questioning.evidence.models import Question
+from adaptive_questioning.evidence.errors import QuestionUnavailableError
+from adaptive_questioning.evidence.provider import DSPyAssessmentProvider
+import dspy
 from adaptive_questioning.evidence.routes import router
 from test_evidence_workflow import setup, start, answer
+
+
+@pytest.mark.parametrize("repair", [True, False])
+def test_correct_metadata_cannot_bypass_criterion_review(setup, monkeypatch, repair):
+    provider, engine, _ = setup
+    blueprint = provider.blueprint
+    generate = provider.question
+    criterion = "Chọn dữ liệu thử để phát hiện hàm kiểm tra email chấp nhận đầu vào sai."
+    wrong = "Bạn viết hàm kiểm tra email bằng Python thế nào?"
+    focused = "Hàm chấp nhận mọi chuỗi có @. Theo yêu cầu email phải có tên miền. Bạn chọn đầu vào nào để phát hiện lỗi?"
+
+    def plan(context):
+        result = blueprint(context)
+        target = result.objectives[0].criteria[0]
+        target.description = criterion
+        target.expected_evidence = target.at_target = "Một đầu vào có @ nhưng thiếu tên miền."
+        return result
+
+    def draft(context):
+        result = generate(context)
+        previous = json.loads(context).get("rejected_draft")
+        result.text = focused if repair and previous == wrong else wrong
+        return result
+
+    # Exercise the DSPy reviewer interface offline, including rejection and regeneration.
+    review = DSPyAssessmentProvider(lm=dspy.utils.DummyLM([
+        {"verdict": "WRONG_SKILL"}, {"verdict": "ALIGNED" if repair else "WRONG_SKILL"},
+    ]))
+    reviewed = []
+
+    def inspect(context):
+        data = json.loads(context)
+        assert data["criterion"]["description"] == criterion
+        reviewed.append(data["question"])
+        return review.review_question(context)
+
+    monkeypatch.setattr(provider, "blueprint", plan)
+    monkeypatch.setattr(provider, "question", draft)
+    monkeypatch.setattr(provider, "review_question", inspect)
+    if repair:
+        assert start(engine).public.pending_turn.question == focused
+    else:
+        with pytest.raises(QuestionUnavailableError):
+            start(engine)
+    assert reviewed == [wrong, focused if repair else wrong]
 
 
 @pytest.mark.parametrize("text", [
@@ -33,12 +81,11 @@ def test_independent_response_tasks_are_still_rejected(text):
 
 @pytest.mark.parametrize("word_count, rejected", [(VOICE_MAX_WORDS, False), (VOICE_MAX_WORDS + 1, True)])
 def test_voice_length_boundary(word_count, rejected):
-    question = Question(surprising_fact_C="CV only mentions basic API setup",
-                        hypothesis_A="Candidate may not know how to isolate slow database queries",
-                        text=" ".join(["API"] * (word_count - 1) + ["chậm?"]),
+    question = Question(text=" ".join(["API"] * (word_count - 1) + ["chậm?"]),
                         criterion_ids=["c1"], mode="DEBUGGING", depth=3, evidence_scope="slow-api")
-    context = {"mode": "DEBUGGING", "question_depth": 3, "interaction_mode": "VOICE"}
-    errors = question_errors(question, context, ["c1"])
+    context = {"required_question_contract": {"mode": "DEBUGGING", "depth": 3, "criterion_ids": ["c1"]},
+               "interaction_mode": "VOICE"}
+    errors = question_errors(question, context)
     assert bool(errors) == rejected
     if rejected:
         assert "Do not truncate" in errors[0]
@@ -60,13 +107,16 @@ def test_long_voice_question_is_rewritten_with_same_target_and_depth(setup, monk
 
     monkeypatch.setattr(provider, "question", question)
     result = start(engine, interaction_mode="VOICE")
-    pending = result.snapshot.pending_turn.question
+    turn = result.snapshot.pending_turn
+    pending = turn.question
     assert len(calls) == 2
     assert "VOICE question must use at most" in calls[1]["validation_error"]
     assert calls[0]["required_question_contract"] == calls[1]["required_question_contract"]
     assert pending.text == concise
-    assert pending.depth == calls[0]["question_depth"]
-    assert pending.criterion_ids == calls[0]["target_criteria"]
+    assert turn.question_depth == calls[0]["required_question_contract"]["depth"]
+    assert turn.mode == calls[0]["required_question_contract"]["mode"]
+    assert pending.criterion_ids == calls[0]["required_question_contract"]["criterion_ids"]
+    assert {"mode", "question_depth", "target_criteria", "required_evidence_scope", "remaining_questions"}.isdisjoint(calls[0])
     assert pending.evidence_scope == "slow-api"
 
 

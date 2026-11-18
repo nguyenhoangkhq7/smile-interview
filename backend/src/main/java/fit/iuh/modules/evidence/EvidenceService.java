@@ -15,6 +15,13 @@ import java.util.Objects;
 
 @Service @RequiredArgsConstructor @Slf4j
 public class EvidenceService {
+    private static final int MAX_COMPANY_LENGTH = 200;
+    private static final int MAX_ROLE_TITLE_LENGTH = 200;
+    private static final int MAX_CANDIDATE_NAME_LENGTH = 150;
+    private static final int MAX_JD_SUMMARY_LENGTH = 1500;
+    private static final int MAX_CV_SUMMARY_LENGTH = 1200;
+    private static final String DEFAULT_ROLE_TITLE = "vị trí ứng tuyển";
+
     private final SessionRepository sessions;
     private final SessionTurnRepository turns;
     private final InterviewRunRepository runs;
@@ -56,11 +63,9 @@ public class EvidenceService {
         start.put("config", config);
         start.put("skills", inputs.skills(session));
         var profile = session.getApplicationProfile();
-        start.put("opening", Map.of("company", profile == null ? "" : Objects.requireNonNullElse(profile.getCompany(), ""),
-                "role_title", Objects.requireNonNullElse(session.getRoleTitle(), "vị trí ứng tuyển")));
+        start.put("opening", openingContext(session, user));
         if (profile != null && profile.getBlueprintJson() != null) {
             start.put("blueprint", json.read(profile.getBlueprintJson()));
-            start.put("policy", json.read(profile.getPolicyJson()));
         }
         JsonNode payload = json.tree(start);
         log.info("Interview preparation started session_id={} skills={} reuse_blueprint={}",
@@ -112,6 +117,40 @@ public class EvidenceService {
         JsonNode result = ai.compute("conversation", payload);
         return store.commit(new EvidenceStore.Commit(sessionId, run.getStateVersion(), command.requestId(),
                 hash, json.read(run.getConfigJson()), result));
+    }
+
+    private Map<String, Object> openingContext(Session session, User user) {
+        var profile = session.getApplicationProfile();
+        var jd = session.getJobDescription();
+        var resume = session.getResume();
+        var opening = new java.util.HashMap<String, Object>();
+        opening.put("company", clip(profile == null ? "" : profile.getCompany(), MAX_COMPANY_LENGTH));
+        opening.put("role_title", clip(firstNonBlank(session.getRoleTitle(),
+                profile == null ? null : profile.getRoleTitle(),
+                jd == null ? null : jd.getTitle(),
+                DEFAULT_ROLE_TITLE), MAX_ROLE_TITLE_LENGTH));
+        opening.put("candidate_name", clip(user == null ? "" : user.getDisplayUsername(), MAX_CANDIDATE_NAME_LENGTH));
+        opening.put("jd_summary", clip(firstNonBlank(profile == null ? null : profile.getJdText(),
+                jd == null ? null : jd.getRawText()), MAX_JD_SUMMARY_LENGTH));
+        opening.put("cv_summary", clip(firstNonBlank(profile == null ? null : profile.getCvText(),
+                resume == null ? null : resume.getRawText()), MAX_CV_SUMMARY_LENGTH));
+        if (session.getAttemptNumber() != null && session.getAttemptNumber() >= 1) {
+            opening.put("attempt_number", session.getAttemptNumber());
+        }
+        return opening;
+    }
+
+    private static String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) return value;
+        }
+        return "";
+    }
+
+    private static String clip(String value, int maxLength) {
+        if (value == null) return "";
+        String normalized = value.trim().replaceAll("\\s+", " ");
+        return normalized.length() <= maxLength ? normalized : normalized.substring(0, maxLength);
     }
 
     private Session owned(String id, User user) {

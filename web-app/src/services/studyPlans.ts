@@ -10,30 +10,23 @@ export type StudySkill = CurrentCompetency['skills'][number];
 export interface CriterionSuggestion {
   criterionId: string;
   description: string;
-  essential: boolean;
   assessment: CompetencyStatus;
   kind: 'REVIEW' | 'VERIFY' | 'REINFORCE' | 'UNASSESSED' | 'MET';
-  selectedByDefault: boolean;
-  reason: string;
   goal: string;
   source: CompetencySource | null;
   lastAssessment: CompetencySource | null;
+}
+
+export function isCriterionRecommended(criterion: Pick<CriterionSuggestion, 'kind'>): boolean {
+  return criterion.kind === 'REVIEW' || criterion.kind === 'VERIFY';
 }
 
 export interface ObjectiveSuggestion {
   skillId: string;
   objectiveId: string;
   claim: string;
-  assessment: CompetencyStatus;
   source: CompetencySource | null;
   criteria: CriterionSuggestion[];
-}
-
-export interface ReportWeakness {
-  skillId: string;
-  sessionId: string;
-  attemptNumber: number;
-  weaknesses: string[];
 }
 
 export interface KnowledgeGaps {
@@ -41,8 +34,7 @@ export interface KnowledgeGaps {
   weak: StudySkill[];
   needsVerification: StudySkill[];
   notAssessedSkillIds: string[];
-  reportWeaknesses: ReportWeakness[];
-  objectiveSuggestions?: ObjectiveSuggestion[];
+  objectiveSuggestions: ObjectiveSuggestion[];
 }
 
 export interface StudyPlanDetails {

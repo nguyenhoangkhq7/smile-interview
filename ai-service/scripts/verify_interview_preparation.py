@@ -21,8 +21,8 @@ def post(base_url, operation, payload):
 
 def prepare(base_url, count):
     payload = {"session_id": f"synthetic-verification-{uuid4().hex[:8]}", "skills": [
-        {"jd_skill_id": name, "required_proficiency": 3, "candidate_proficiency": 3, "importance_weight": 0.7,
-         "priority": 0, "suggested_strategy": "PROBE_DEPTH", "job_tasks": [], "jd_evidence_spans": []}
+        {"jd_skill_id": name, "required_proficiency": 3, "importance_weight": 0.7,
+         "priority": 0, "job_tasks": [], "cv_evidence_spans": []}
         for name in SKILLS[:count]], "opening": {"company": "Synthetic Test", "role_title": "Backend Developer"}}
     print(f"Preparing synthetic session={payload['session_id']} skills={count}", flush=True)
     result = None

@@ -1,5 +1,5 @@
-from typing import List, Optional, Tuple
-from skill_gap.domain.enums import SemanticAlignment, QuestionStrategy
+from typing import List, Optional
+from skill_gap.domain.enums import SemanticAlignment
 from skill_gap.domain.models import (
     JDRequirement, ProficiencyResult, MatchResult, SkillGapResult,
     ExtractedCVSkill, JobBlock, SpanMapping, UNASSIGNED_JOB_ID
@@ -11,10 +11,9 @@ class GapDetector:
     """
     Service responsible for quantifying skill gaps between JD requirements and candidate proficiencies.
     Implements a clean, robust, deterministic, and explainable linear framework:
-    1. Continuous Substitution Factor: s = clip((soft_match - tau_lo) / (tau_hi - tau_lo), 0, 1).
+    1. Substitution Factor: partial matches use the semantic similarity score.
     2. Linear Scale Normalization: gap = max(0, P_JD - s * P_CV) / 4.0, invariant to scale level.
-    3. Deterministic Priority: Priority = Severity = w_j * gap_magnitude.
-    4. Adaptive Question Strategy: Deterministic classification based on gap and substitution.
+    3. Deterministic Priority: w_j * (P_JD / 5.0) * gap_magnitude.
     """
     def __init__(self, llm_client: Optional[LLMClient] = None, config: Optional[AppConfig] = None):
         self.llm_client = llm_client
@@ -71,47 +70,15 @@ class GapDetector:
         shortfall = max(0.0, required_level - effective_candidate_level)
         return min(1.0, max(0.0, shortfall / 4.0))
 
-    def compute_priorities(
+    def compute_priority(
         self,
         w_j: float,
         gap_magnitude: float,
         required_level: float = 5.0
-    ) -> Tuple[float, float]:
-        """
-        Computes Severity and Priority using deterministic algebraic formulation
-        incorporating requirement depth P_JD normalized by Max Scale (5.0):
-        Severity = Priority = w_j * (required_level / 5.0) * gap_magnitude.
-        """
+    ) -> float:
+        """Scale the weighted gap by depth on the 1–5 requirement scale."""
         depth_factor = min(1.0, max(0.0, required_level / 5.0))
-        severity = w_j * depth_factor * gap_magnitude
-        priority = severity
-        return severity, priority
-
-    def classify_question_strategy(
-        self,
-        alignment: SemanticAlignment,
-        substitution_factor: float,
-        gap_magnitude: float
-    ) -> QuestionStrategy:
-        """
-        Deterministically selects the recommended adaptive interview question strategy.
-
-        Decision tree:
-        - MISSING  → LEARNING_AGILITY  (kỹ năng hoàn toàn không có)
-        - PARTIAL  → COMPARE_SUBSTITUTE (kỹ năng thay thế được phát hiện, kể cả khi
-                     substitution_factor = 0.0 tại ranh giới floor_threshold — gap lớn
-                     chính xác vì s ≈ 0, cần hỏi về khả năng chuyển giao)
-        - MATCH + gap > 0 → PROBE_DEPTH  (kỹ năng đúng nhưng chưa đủ chiều sâu)
-        - MATCH + gap = 0 → NONE         (đã đáp ứng đầy đủ)
-        """
-        if alignment == SemanticAlignment.MISSING:
-            return QuestionStrategy.LEARNING_AGILITY
-        elif alignment == SemanticAlignment.PARTIAL:
-            return QuestionStrategy.COMPARE_SUBSTITUTE
-        elif gap_magnitude > 0.0:
-            return QuestionStrategy.PROBE_DEPTH
-        else:
-            return QuestionStrategy.NONE
+        return w_j * depth_factor * gap_magnitude
 
     def detect(
         self,
@@ -177,20 +144,13 @@ class GapDetector:
             )
 
             # 3. Deterministic priorities with depth scaling (P_JD / 5.0)
-            severity, priority = self.compute_priorities(
+            priority = self.compute_priority(
                 w_j=match.w_j,
                 gap_magnitude=gap_magnitude,
                 required_level=req.required_level
             )
 
-            # 4. Question Strategy Classification
-            strategy = self.classify_question_strategy(
-                alignment=alignment,
-                substitution_factor=substitution_factor,
-                gap_magnitude=gap_magnitude
-            )
-
-            # 5. Harvest Rich Context for Module 3 (Adaptive Question Generation)
+            # 4. Collect the supporting CV evidence and job context.
             if alignment == SemanticAlignment.MISSING:
                 cv_evidence_spans: List[str] = []
                 context_job_str: Optional[str] = None
@@ -219,21 +179,15 @@ class GapDetector:
                 matched_cv_skill_id=effective_matched_cv_skill_id,
                 is_substituted=is_substituted,
                 gap_magnitude=gap_magnitude,
-                severity=severity,
                 priority=priority,
                 required_proficiency=req.required_level,
                 candidate_proficiency=candidate_proficiency,
                 cv_evidence_spans=cv_evidence_spans,
                 context_job=context_job_str,
-                suggested_strategy=strategy,
                 degraded=degraded,
                 flags=flags,
                 importance_weight=match.w_j,
-                jd_reasoning=req.reasoning,
                 job_tasks=req.tasks,
-                jd_evidence_spans=list(dict.fromkeys(span for task in req.tasks for span in task.evidence_spans)),
-                c_evidence=prof.c_evidence if prof else 0.0,
-                recency_flag=prof.recency_flag if prof else False,
             ))
 
         return results

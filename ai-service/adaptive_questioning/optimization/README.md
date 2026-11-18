@@ -6,11 +6,14 @@ original questions, responses, source contexts, reasoning and source Git revisio
 Tests pin SHA-256 digests of the original question/answer lists to guard against
 silently replacing the recovered corpus.
 
+`dialogue_examples.json` adds four Vietnamese response-and-follow-up pairs. Both
+responses to the password case belong to training, and both stock-level responses
+belong to development. The development evaluation also feeds generated feedback to
+the question generator and reports the lower of the two module scores per pair.
+
 `dataset.py` exposes `dspy.Example(context=..., question=Question(...))` and
 `dspy.Example(context=..., judgment=Judgment(...))` matching the production V2
-signatures. Question outputs include Abductive Chain-of-Thought fields
-(`surprising_fact_C` and `hypothesis_A`) restored from `source_reasoning` before
-the focused question `text`. Question demonstrations are shortened to one task.
+signatures. Question demonstrations model one observable task. Historical reasoning stays in the source corpus.
 Historical CV context is kept separately; only CV quotes enter `cv_evidence`.
 Depth is assigned from the task, independently of the original JD proficiency score.
 

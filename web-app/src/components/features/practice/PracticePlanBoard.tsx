@@ -13,7 +13,7 @@ import { usePracticeKnowledgeGaps } from '@/hooks/usePracticeProfiles';
 import { useStudyPlan } from '@/hooks/useStudyPlan';
 import { cn } from '@/lib/utils';
 import type { ApplicationProfile } from '@/services/applicationProfiles';
-import { studyPlans, type ObjectiveSuggestion, type ReportWeakness, type StudyPlanDetails, type StudyPlanView, type StudySkill } from '@/services/studyPlans';
+import { isCriterionRecommended, studyPlans, type ObjectiveSuggestion, type StudyPlanDetails, type StudyPlanView } from '@/services/studyPlans';
 import {
   formatStudyPercent as formatPercent,
   type NewStudyTask, type StudyChecklistItem, type StudyProgress as PlanProgress, type StudyTask, type StudyTaskStatus, type StudyTaskUpdate,
@@ -142,42 +142,13 @@ function ProgressSummary({ progress }: { progress: StudyProgress }) {
   );
 }
 
-function GapList({ title, skills, actions }: { title: string; skills: StudySkill[]; actions?: StudyGapActions }) {
-  if (!skills.length) return null;
-  return (
-    <div className="space-y-2">
-      <h3 className="text-sm font-semibold">{title}</h3>
-      {skills.map((skill) => {
-        const evidence = skill.objectives.flatMap((objective) => objective.criteria.flatMap((criterion) => criterion.evidence))
-          .filter((item) => item.performance === 'BELOW')
-          .sort((a, b) => b.source.attemptNumber - a.source.attemptNumber)[0];
-        const source = evidence?.source ?? skill.lastChecked;
-        const note = evidence?.rationale || skill.objectives[0]?.explanation;
-        return <StudyGapCard key={skill.skillId} gap={{ skillId: skill.skillId, notes: note ? [note] : [], source }} actions={actions} />;
-      })}
-    </div>
-  );
-}
-
-function InterviewWeaknesses({ findings, actions }: { findings: ReportWeakness[]; actions?: StudyGapActions }) {
-  if (!findings.length) return <p className={mutedText}>Báo cáo phỏng vấn chưa ghi nhận điểm yếu.</p>;
-  return (
-    <div className="space-y-2">
-      <h3 className="text-sm font-semibold">Điểm yếu sau phỏng vấn</h3>
-      {findings.map(({ skillId, sessionId, attemptNumber, weaknesses }) => (
-        <StudyGapCard key={skillId} gap={{ skillId, notes: weaknesses, source: { sessionId, attemptNumber } }} actions={actions} list />
-      ))}
-    </div>
-  );
-}
-
 function ObjectiveGaps({ suggestions, actions }: { suggestions: ObjectiveSuggestion[]; actions?: StudyGapActions }) {
-  const visible = suggestions.filter(objective => objective.criteria.some(criterion => criterion.selectedByDefault));
+  const visible = suggestions.filter(objective => objective.criteria.some(isCriterionRecommended));
   if (!visible.length) return <p className={mutedText}>Không có lỗ hổng kiến thức nào cần luyện tập.</p>;
   return <div className="space-y-3">
     <p className="text-xs leading-5 text-(--practice-muted)">Chọn mục tiêu để xem và chỉnh checklist. Tiêu chí chưa đánh giá không được xem là điểm yếu.</p>
     {visible.map(objective => <StudyGapCard key={objective.objectiveId}
-      gap={{ skillId: objective.skillId, notes: [], source: objective.source, objective }} actions={actions} />)}
+      gap={{ skillId: objective.skillId, source: objective.source, objective }} actions={actions} />)}
   </div>;
 }
 
@@ -207,14 +178,10 @@ function KnowledgeGaps({ profile, request, compact = false, actions }: {
               <p className={mutedText}>Không tải được kết quả kiểm chứng.</p>
               <Button type="button" variant="outline" size="sm" onClick={retry}>Thử lại</Button>
             </div>
-          ) : data && (data.completedAttempts > 0 || (data.reportWeaknesses?.length ?? 0) > 0) ? (
+          ) : data && data.completedAttempts > 0 ? (
             <div className="space-y-3">
               {actions && <p className="text-xs text-(--practice-muted)">Bấm thêm hoặc kéo thẻ vào cột để chuẩn bị đầu việc.</p>}
-              {data.objectiveSuggestions ? <ObjectiveGaps suggestions={data.objectiveSuggestions} actions={actions} /> : <>
-              <InterviewWeaknesses findings={data.reportWeaknesses ?? []} actions={actions} />
-              <GapList title="Cần ôn tập" skills={data.weak} actions={actions} />
-              <GapList title="Cần kiểm chứng thêm" skills={data.needsVerification} actions={actions} />
-              </>}
+              <ObjectiveGaps suggestions={data.objectiveSuggestions} actions={actions} />
               {data.notAssessedSkillIds.length > 0 && <p className={mutedText}>{data.notAssessedSkillIds.length} kỹ năng chưa đánh giá.</p>}
             </div>
           ) : (
@@ -313,22 +280,17 @@ export function PracticePlanBoard({ profile, initialPlan }: {
   const skillIds = [...new Set(profile.skills.map((skill) => skill.jd_skill_id))];
   const isMindMap = view === 'mind-map';
   const knowledgeGapData = gaps.state.status === 'ready' ? gaps.state.data : null;
+  const recommendedObjectives = knowledgeGapData?.objectiveSuggestions.filter(objective => objective.criteria.some(isCriterionRecommended)) ?? [];
   const improvementSkillIds = new Set([
     ...(knowledgeGapData?.weak.map(({ skillId }) => skillId) ?? []),
     ...(knowledgeGapData?.needsVerification.map(({ skillId }) => skillId) ?? []),
-    ...(knowledgeGapData?.objectiveSuggestions
-      ? knowledgeGapData.objectiveSuggestions.filter(objective => objective.criteria.some(c => c.selectedByDefault)).map(objective => objective.skillId)
-      : knowledgeGapData?.reportWeaknesses.map(({ skillId }) => skillId) ?? []),
+    ...recommendedObjectives.map(objective => objective.skillId),
   ]);
   const latestAssessmentAttemptNumber = plan.sourceSessionId
     ? profile.attempts.find((attempt) => attempt.id === plan.sourceSessionId && attempt.status === 'Completed')?.number ?? 0
     : profile.attempts.filter((attempt) => attempt.status === 'Completed').reduce((latest, attempt) => Math.max(latest, attempt.number), 0);
   const notAssessedSkillIds = new Set(knowledgeGapData?.notAssessedSkillIds ?? []);
-  const gapCount = knowledgeGapData
-    ? (knowledgeGapData.objectiveSuggestions
-        ? knowledgeGapData.objectiveSuggestions.filter((objective) => objective.criteria.some((criterion) => criterion.selectedByDefault)).length
-        : ((knowledgeGapData.weak?.length ?? 0) + (knowledgeGapData.needsVerification?.length ?? 0) + (knowledgeGapData.reportWeaknesses?.length ?? 0)))
-    : 0;
+  const gapCount = recommendedObjectives.length;
   const tasks = storedTasks.map((task) => ({
     ...task,
     gapNeedsConfirmation: task.gapSourceObjectiveId ? Boolean(
@@ -463,22 +425,8 @@ export function PracticePlanBoard({ profile, initialPlan }: {
 
   function createTaskFromGap(gap: StudyGap, status: StudyTaskStatus) {
     if (gapsDetailsRef.current) gapsDetailsRef.current.open = false;
-    if (gap.objective) {
-      setGapDraft({ objective: gap.objective, status });
-      return Promise.resolve(true);
-    }
-    const referenceUrl = gap.source
-      ? new URL(`/interview/session/${encodeURIComponent(gap.source.sessionId)}/result`, window.location.origin).href
-      : undefined;
-    return createTask({
-      title: `Ôn tập ${skillLabel(gap.skillId)}`.slice(0, 255),
-      skillId: skillIds.includes(gap.skillId) ? gap.skillId : undefined,
-      status,
-      notes: gap.notes.join('\n\n').slice(0, 10000) || undefined,
-      checklist: [],
-      referenceUrl: referenceUrl && referenceUrl.length <= 2048 ? referenceUrl : undefined,
-      gapOrigin: { skillId: gap.skillId, sessionId: gap.source?.sessionId ?? null, attemptNumber: gap.source?.attemptNumber ?? null },
-    });
+    setGapDraft({ objective: gap.objective, status });
+    return Promise.resolve(true);
   }
 
   function guardParentDone(task: StudyTask, nextStatus?: StudyTaskStatus): boolean {

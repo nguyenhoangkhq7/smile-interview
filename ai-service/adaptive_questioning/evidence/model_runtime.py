@@ -42,8 +42,9 @@ class ModelRuntime:
                 return
             self._wait(delay)
 
-    def call(self, operation: str, compute: Callable[[], T]) -> T:
-        for attempt in range(len(RETRY_DELAYS) + 1):
+    def call(self, operation: str, compute: Callable[[], T], *, retries: int | None = None) -> T:
+        max_retries = len(RETRY_DELAYS) if retries is None else max(0, retries)
+        for attempt in range(max_retries + 1):
             try:
                 with self._slots:
                     self._cool_down()
@@ -53,12 +54,13 @@ class ModelRuntime:
                 status = provider_status(error)
                 if status is None:
                     raise
-                self._retry_or_raise(operation, attempt, error, status)
+                self._retry_or_raise(operation, attempt, error, status, max_retries)
         raise AssertionError("Unreachable retry state")
 
-    def _retry_or_raise(self, operation: str, attempt: int, error: Exception, status: int) -> None:
+    def _retry_or_raise(self, operation: str, attempt: int, error: Exception, status: int,
+                        max_retries: int = len(RETRY_DELAYS)) -> None:
         retry_after = getattr(error, "retry_after", None) or 0.0
-        if status not in TRANSIENT_STATUSES or attempt >= len(RETRY_DELAYS) or retry_after > MAX_RETRY_DELAY:
+        if status not in TRANSIENT_STATUSES or attempt >= max_retries or retry_after > MAX_RETRY_DELAY:
             event("model.failed", operation=operation, status=status, attempts=attempt + 1,
                   error_type=type(error).__name__)
             message = RATE_LIMIT_MESSAGE if status == 429 else UNAVAILABLE_MESSAGE

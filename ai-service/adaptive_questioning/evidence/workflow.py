@@ -5,14 +5,17 @@ from collections import Counter
 import logging
 from pydantic import ValidationError
 
-from .assessment import TERMINAL, apply_judgment, eligible_criteria, next_action, validate_judgment
+from .assessment import TERMINAL, apply_judgment, eligible_criteria, next_action, standalone_inability, validate_judgment
 from .errors import JudgmentUnavailableError, QuestionUnavailableError
-from .models import Action, ConversationRequest, Judgment, ObjectiveState, Question, Snapshot, StartRequest, TransitionRequest, TransitionResult, Turn
+from .models import (
+    Action, ConversationRequest, InterviewSkillContext, Judgment, ObjectiveState,
+    Question, Snapshot, StartRequest, StoredQuestion, TransitionRequest, TransitionResult, Turn,
+)
 from . import lifecycle
 from .planning import BlueprintBuilder, plan, select_mode
 from .depth import DEPTH_DEFINITIONS, question_depth
 from .policy_config import InterviewPolicy
-from .criterion_progress import progress_for, restore_progress
+from .criterion_progress import CRITERION_SOFT_LIMIT, progress_for
 from .conversation import turn_introduction
 from .question_validation import question_errors
 from .provider import AssessmentProvider, encode_context
@@ -21,6 +24,22 @@ from .preparation_cache import PreparationCache
 from .telemetry import event
 
 logger = logging.getLogger(__name__)
+
+GENERATION_ATTEMPTS = 2
+JUDGMENT_ATTEMPTS = 2
+
+ALIGNMENT_REPAIRS = {
+    "WRONG_SKILL": "Ask the candidate to perform the behavior in the selected criterion. Remove the substitute task.",
+    "INSUFFICIENT_EVIDENCE": "Ask for the observable evidence specified by the criterion or the current probe. Leave it for the candidate to supply.",
+    "WRONG_DEPTH": "Match the requested depth: select a direct prerequisite for a diagnostic or the relevant anchor for a target or extension.",
+    "UNANSWERABLE": "Supply the missing inputs and request one deliverable possible in this interaction mode.",
+}
+
+_PROMPT_EXCLUDED_OBJECTIVE_FIELDS = {
+    "requirement_id", "objective_id", "depth_basis", "depth_rationale",
+    "depth_evidence_spans", "requirement_kind", "jd_evidence_spans",
+    "suitable_modes", "estimated_seconds",
+}
 
 
 class EvidenceWorkflow:
@@ -32,7 +51,7 @@ class EvidenceWorkflow:
         self.preparation_cache = preparation_cache
 
     def start(self, request: StartRequest) -> TransitionResult:
-        policy = request.policy or self.policy
+        policy = self.policy
         event("preparation.started", skills=len(request.skills), reuse_blueprint=request.blueprint is not None)
         builder = BlueprintBuilder(self.provider, policy, self.preparation_cache)
         blueprint = (builder.validate(request.blueprint.model_copy(deep=True), request.skills)
@@ -40,11 +59,15 @@ class EvidenceWorkflow:
         objectives, queue = plan(blueprint, request.skills, request.config, policy)
         event("preparation.planned", objectives=len(objectives), queued=len(queue))
         now = self.clock()
+        skills = [InterviewSkillContext(jd_skill_id=skill.jd_skill_id, cv_evidence_spans=skill.cv_evidence_spans)
+                  for skill in request.skills]
         snapshot = Snapshot(session_id=request.session_id, config=request.config,
-                            skills=request.skills, objectives=objectives, queue=queue, policy=policy.model_copy(deep=True),
-                            started_at=now, deadline_at=now + timedelta(seconds=request.config.duration_seconds))
+                            skills=skills, objectives=objectives, queue=queue, policy=policy.model_copy(deep=True),
+                            deadline_at=now + timedelta(seconds=request.config.duration_seconds))
         if request.opening is not None:
-            snapshot.conversation = lifecycle.begin(request.opening, now)
+            snapshot.opening_context = request.opening.model_copy(deep=True)
+            opening_text = self._generate_opening(request)
+            snapshot.conversation = lifecycle.begin(request.opening, now, text=opening_text)
             event("preparation.ready", phase="OPENING")
         else:
             self._ask(snapshot, Action.INITIAL)
@@ -62,7 +85,7 @@ class EvidenceWorkflow:
             conversation.phase = "SELF_INTRODUCTION"
             conversation.expires_at = self.clock() + timedelta(seconds=lifecycle.INTRODUCTION_SECONDS)
         elif conversation.phase in {"OPENING", "SELF_INTRODUCTION"} and request.action == "SKIP_INTRODUCTION":
-            conversation.introduction_skipped = True
+            conversation.introduction = ""
             self._begin_technical(snapshot)
         elif conversation.phase == "SELF_INTRODUCTION" and request.action == "SUBMIT_INTRODUCTION":
             if not request.introduction.strip():
@@ -80,8 +103,8 @@ class EvidenceWorkflow:
         snapshot.deadline_at = self.clock() + timedelta(seconds=snapshot.config.duration_seconds)
         self._ask(snapshot, Action.INITIAL)
         if snapshot.pending_turn:
-            snapshot.pending_turn.introduction = (lifecycle.SKIP_BRIDGE if conversation.introduction_skipped
-                                                   else lifecycle.INTRODUCTION_BRIDGE)
+            snapshot.pending_turn.introduction = (lifecycle.INTRODUCTION_BRIDGE if conversation.introduction
+                                                   else lifecycle.SKIP_BRIDGE)
 
     def respond(self, request: TransitionRequest) -> TransitionResult:
         snapshot = request.snapshot.model_copy(deep=True)
@@ -91,8 +114,6 @@ class EvidenceWorkflow:
         turn = snapshot.pending_turn
         assert turn is not None
         state = snapshot.objectives[turn.objective_id]
-        self._retain_legacy_evidence(state)
-        restore_progress(state, snapshot.turns, snapshot.policy)
         turn.answer = request.candidate_response
         turn.judgment = self._judge(snapshot, turn)
         apply_judgment(state, turn, snapshot.policy)
@@ -102,26 +123,33 @@ class EvidenceWorkflow:
         return self._result(snapshot)
 
     def _judge(self, snapshot: Snapshot, turn: Turn) -> Judgment:
+        admission = standalone_inability(turn)
+        if admission is not None:
+            return admission
         state = snapshot.objectives[turn.objective_id]
         ids = turn.question.criterion_ids
-        targets = [criterion for criterion in state.objective.criteria if criterion.criterion_id in ids]
-        objective = state.objective.model_dump(
-            mode="json",
-            exclude={"suitable_modes", "estimated_seconds", "rubric_version", "depth_evidence_spans", "jd_evidence_spans"}
-        )
-        objective["criteria"] = [criterion.model_dump(mode="json") for criterion in targets]
+        objective = self._prompt_objective(state, ids)
         context = {
             "interaction_mode": snapshot.config.interaction_mode,
             "objective": objective, "turn": turn,
             "answer_lines": [{"line": index, "text": text} for index, text in
                              enumerate((turn.answer or "").splitlines(), start=1)],
-            "required_criterion_ids": ids, "target_criteria": targets,
             "depth_definitions": DEPTH_DEFINITIONS,
             "prior_observations": [item for item in state.evidence_history if item.criterion_id in ids],
-            "prior_turns": [t for t in snapshot.turns if t.objective_id == turn.objective_id],
+            "prior_turns": [
+                {
+                    "action": t.action,
+                    "question_depth": t.question_depth,
+                    "question": t.question.text,
+                    "evidence_scope": t.question.evidence_scope,
+                    "answer": t.answer,
+                }
+                for t in snapshot.turns
+                if t.objective_id == turn.objective_id and set(ids).intersection(t.question.criterion_ids)
+            ],
         }
         last_error = None
-        for attempt in range(snapshot.policy.judgment_attempts):
+        for attempt in range(JUDGMENT_ATTEMPTS):
             if attempt and self.clock() >= snapshot.deadline_at:
                 break
             judgment = None
@@ -136,7 +164,7 @@ class EvidenceWorkflow:
                 if judgment is not None:
                     context["previous_invalid_judgment"] = judgment.model_dump(mode="json")
                 logger.warning("Invalid judge output for turn %s (attempt %s/%s): %s",
-                               turn.turn_id, attempt + 1, snapshot.policy.judgment_attempts, feedback)
+                               turn.turn_id, attempt + 1, JUDGMENT_ATTEMPTS, feedback)
         raise JudgmentUnavailableError(
             "AI chưa thể chấm câu trả lời một cách hợp lệ. Câu trả lời chưa bị chấm điểm; vui lòng thử gửi lại."
         ) from last_error
@@ -205,7 +233,7 @@ class EvidenceWorkflow:
         time_remaining = (snapshot.deadline_at - self.clock()).total_seconds()
         other_turns = [snapshot.objectives[key].turns_spent for key in snapshot.queue[1:]]
         return (min(other_turns) == 0 and (available <= reserve or time_remaining <= reserved_seconds)
-                or state.turns_spent >= snapshot.policy.criterion_soft_limit and min(other_turns) < state.turns_spent)
+                or state.turns_spent >= CRITERION_SOFT_LIMIT and min(other_turns) < state.turns_spent)
 
     @staticmethod
     def _criterion_stop_reason(state: ObjectiveState) -> str:
@@ -228,78 +256,119 @@ class EvidenceWorkflow:
         if state.turns_spent >= snapshot.config.max_questions_per_objective:
             raise ValueError("Cannot generate beyond the objective budget")
         state.lifecycle = "ACTIVE"
-        state.current_question_depth = question_depth(state, action)
-        criteria = self._targets(state, action, snapshot)
-        if not criteria:
-            raise ValueError("No independent criteria available for question generation")
         context = self._question_context(snapshot, action)
-        question = self._generate_valid_question(context, snapshot, criteria)
+        question = self._generate_valid_question(context, snapshot)
         if question is None or self.clock() >= snapshot.deadline_at:
             self._finish(snapshot, "TIME_BUDGET")
             return
-        snapshot.pending_turn = Turn(turn_id=str(uuid4()), objective_id=state.objective.objective_id,
-                                     skill_id=state.objective.skill_id, mode=state.selected_mode,
-                                     action=action,
-                                     question_depth=state.current_question_depth, question=question)
+        assert question.depth is not None
+        snapshot.pending_turn = Turn(
+            turn_id=str(uuid4()), objective_id=state.objective.objective_id,
+            skill_id=state.objective.skill_id, mode=state.selected_mode,
+            action=action, question_depth=question.depth,
+            question=StoredQuestion(
+                text=question.text, criterion_ids=question.criterion_ids, evidence_scope=question.evidence_scope,
+            ),
+        )
         snapshot.pending_turn.introduction = turn_introduction(snapshot, snapshot.pending_turn)
         event("question.ready", turn_id=snapshot.pending_turn.turn_id, mode=state.selected_mode.value)
 
     def _question_context(self, snapshot: Snapshot, action: Action) -> dict[str, object]:
         state = snapshot.objectives[snapshot.queue[0]]
         skill = next(s for s in snapshot.skills if s.jd_skill_id == state.objective.skill_id)
-        targets = self._targets(state, action, snapshot)
-        objective = state.objective.model_dump(
-            mode="json",
-            exclude={"suitable_modes", "estimated_seconds", "rubric_version", "depth_evidence_spans", "jd_evidence_spans"}
-        )
-        objective["criteria"] = [c.model_dump(mode="json") for c in state.objective.criteria if c.criterion_id in targets]
-        objective["extension_criterion_ids"] = [key for key in objective["extension_criterion_ids"] if key in targets]
-        context = {"objective": objective, "mode": state.selected_mode,
+        targets = self._targets(state)
+        if not targets:
+            raise ValueError("No independent criteria available for question generation")
+        objective = self._prompt_objective(state, targets)
+        # Keep the full probing chain, including older turns after yielding to
+        # another objective. Criterion IDs alone are not a cross-objective key.
+        history = [turn for turn in snapshot.turns
+                   if turn.objective_id == state.objective.objective_id
+                   and set(turn.question.criterion_ids).intersection(targets)]
+        relevant_ids = {turn.turn_id for turn in history}
+        # Other criteria within this objective are only a compact repetition
+        # guard. Turns from other objectives never enter the question context.
+        other_questions = [
+            {"question": turn.question.text[:300], "truncated": len(turn.question.text) > 300}
+            for turn in snapshot.turns
+            if turn.objective_id == state.objective.objective_id and turn.turn_id not in relevant_ids
+        ]
+        contract = {"mode": state.selected_mode, "depth": question_depth(state, action), "criterion_ids": targets}
+        if action == Action.CLARIFY and history:
+            previous = history[-1]
+            contract["evidence_scope"] = previous.question.evidence_scope
+            contract["depth"] = previous.question_depth
+        context = {"objective": objective, "required_question_contract": contract,
+                   "question_guidance": "Give all necessary inputs or sample output inline. Ask for one decision "
+                                        "or task the candidate can complete here without opening another tool.",
                    "interaction_mode": snapshot.config.interaction_mode,
                    "action": action,
-                   "question_depth": state.current_question_depth, "depth_definitions": DEPTH_DEFINITIONS,
-                   "target_criteria": targets, "probe_reason": state.probe_reason,
+                   "depth_definitions": DEPTH_DEFINITIONS, "probe_reason": state.probe_reason,
                    "criterion_progress": progress_for(state, targets[0]),
-                   "cv_evidence": skill.cv_evidence_spans, "strategy": skill.suggested_strategy,
-                   "history": snapshot.turns, "remaining_questions": snapshot.config.max_questions - len(snapshot.turns)}
-        if action == Action.CLARIFY and snapshot.turns:
-            previous = next(t for t in reversed(snapshot.turns) if t.objective_id == state.objective.objective_id
-                            and targets[0] in t.question.criterion_ids)
-            context["required_evidence_scope"] = previous.question.evidence_scope
+                   "cv_evidence": skill.cv_evidence_spans,
+                   "history": history, "other_questions": other_questions,
+                   "prior_observations": [item for item in state.evidence_history if item.criterion_id in targets]}
+        if action == Action.EASIER:
+            context["question_guidance"] += (" Ask about one prerequisite using a small concrete example. "
+                                             "Do not ask why the candidate could not answer.")
         return context
 
-    def _generate_valid_question(self, context: dict[str, object], snapshot: Snapshot,
-                                 criteria: list[str]) -> Question | None:
+    def _generate_valid_question(self, context: dict[str, object], snapshot: Snapshot) -> Question | None:
         seen = {" ".join(turn.question.text.casefold().split()) for turn in snapshot.turns}
-        contract = {"mode": context["mode"], "depth": context["question_depth"], "criterion_ids": criteria}
-        if "required_evidence_scope" in context:
-            contract["evidence_scope"] = context["required_evidence_scope"]
-        context["required_question_contract"] = contract
-        for attempt in range(snapshot.policy.generation_attempts):
+        for attempt in range(GENERATION_ATTEMPTS):
             if self.clock() >= snapshot.deadline_at:
                 return None
-            question, errors = self._question_attempt(context, criteria, seen)
+            question, errors = self._question_attempt(context, seen)
             if not errors:
-                return question
+                if self.clock() >= snapshot.deadline_at:
+                    return None
+                verdict = self.provider.review_question(self._review_context(context, question))
+                if verdict == "ALIGNED":
+                    return question
+                context["rejected_draft"] = question.text
+                errors = [ALIGNMENT_REPAIRS.get(
+                    verdict,
+                    "Revise the question to match the criterion, depth, mode, and single-task scope.",
+                )]
             context["validation_error"] = "; ".join(errors)
             logger.warning("Invalid question for session %s (attempt %s/%s): %s", snapshot.session_id,
-                           attempt + 1, snapshot.policy.generation_attempts, context["validation_error"])
+                           attempt + 1, GENERATION_ATTEMPTS, context["validation_error"])
         raise QuestionUnavailableError("AI chưa tạo được câu hỏi phù hợp. Dữ liệu đã lưu được giữ nguyên; vui lòng thử lại.")
 
-    def _question_attempt(self, context: dict[str, object], criteria: list[str], seen: set[str]) -> tuple[Question | None, list[str]]:
+    @staticmethod
+    def _review_context(context, question: Question) -> str:
+        objective = context["objective"]
+        contract = context["required_question_contract"]
+        history = context["history"]
+        return encode_context({
+            "question": question.text, "criterion": objective["criteria"][0],
+            "action": context["action"], "question_depth": contract["depth"],
+            "target_depth": objective["target_depth"], "depth_definitions": DEPTH_DEFINITIONS,
+            "mode": contract["mode"], "interaction_mode": context["interaction_mode"],
+            "probe_reason": context["probe_reason"], "unresolved": context["criterion_progress"].unresolved_aspects,
+            "history": [{"question": t.question.text, "answer": t.answer} for t in history],
+        })
+
+    def _question_attempt(self, context: dict[str, object], seen: set[str]) -> tuple[Question | None, list[str]]:
         try:
             question = self.provider.question(encode_context(context))
         except ValidationError as exc:
             errors = [f"Invalid Question schema at {item['loc']}: {item['type']}"
                       for item in exc.errors(include_input=False, include_url=False)]
             return None, errors
-        errors = question_errors(question, context, criteria)
+        errors = question_errors(question, context)
         if " ".join(question.text.casefold().split()) in seen:
             errors.append("The question repeats a prior turn; use a new focused question instead")
         return question, errors
 
     @staticmethod
-    def _targets(state: ObjectiveState, action: Action, snapshot: Snapshot) -> list[str]:
+    def _prompt_objective(state: ObjectiveState, target_ids: list[str]) -> dict[str, object]:
+        objective = state.objective.model_dump(mode="json", exclude=_PROMPT_EXCLUDED_OBJECTIVE_FIELDS)
+        objective["criteria"] = [c.model_dump(mode="json") for c in state.objective.criteria if c.criterion_id in target_ids]
+        return objective
+
+    @staticmethod
+    def _targets(state: ObjectiveState) -> list[str]:
         eligible = eligible_criteria(state)
         if state.active_criterion_id in eligible:
             return [state.active_criterion_id]
@@ -316,22 +385,13 @@ class EvidenceWorkflow:
             if state.excluded_reason == "PLAN_BUDGET" and state.objective.estimated_seconds <= remaining:
                 modes = [item.mode for item in state.objective.suitable_modes]
                 usage = Counter(t.mode for t in snapshot.turns)
-                mode, reason = select_mode(state.objective, snapshot.config, snapshot.policy, usage)
+                mode = select_mode(state.objective, snapshot.config, usage)
                 if mode not in modes:
                     continue
-                state.selected_mode, state.mode_selection_reason = mode, reason
+                state.selected_mode = mode
                 state.excluded_reason, state.lifecycle = None, "PLANNED"
                 snapshot.queue.append(state.objective.objective_id)
                 break
-
-    @staticmethod
-    def _retain_legacy_evidence(state: ObjectiveState) -> None:
-        legacy = [e for e in state.criterion_results.values() if e.question_depth is None]
-        for evidence in legacy:
-            if evidence not in state.evidence_history:
-                state.evidence_history.append(evidence)
-        for evidence in legacy:
-            state.criterion_results.pop(evidence.criterion_id, None)
 
     def _finish(self, snapshot: Snapshot, reason: str) -> Snapshot:
         snapshot.is_finished, snapshot.termination_reason = True, reason
@@ -339,9 +399,39 @@ class EvidenceWorkflow:
             state = snapshot.objectives[key]
             state.lifecycle, state.stop_reason = "CLOSED", reason
         snapshot.queue.clear()
+        had_pending = snapshot.pending_turn is not None
         snapshot.pending_turn = None
-        lifecycle.close(snapshot, reason, self.clock())
+        closing_text = self._generate_closing(snapshot, reason, had_pending)
+        lifecycle.close(snapshot, reason, self.clock(), text=closing_text)
         return snapshot
+
+    def _generate_opening(self, request: StartRequest) -> str | None:
+        return self._generate_dialogue(
+            "opening_greeting", "opening", lambda: lifecycle.opening_context(request), request.config.interaction_mode
+        )
+
+    def _generate_closing(self, snapshot: Snapshot, reason: str, had_pending: bool) -> str | None:
+        if snapshot.conversation is None:
+            return None
+        return self._generate_dialogue(
+            "closing_farewell",
+            "closing",
+            lambda: lifecycle.closing_context(snapshot, reason, had_pending),
+            snapshot.config.interaction_mode,
+        )
+
+    def _generate_dialogue(self, method_name: str, stage: str, build_context, interaction_mode: str) -> str | None:
+        generator = getattr(self.provider, method_name, None)
+        if not callable(generator):
+            return None
+        try:
+            generated = generator(encode_context(build_context()))
+            raw_text = generated.text if hasattr(generated, "text") else str(generated)
+            return lifecycle.clean_dialogue_text(raw_text, interaction_mode)
+        except Exception as exc:
+            logger.warning("Falling back to template for %s (%s): %s", stage, type(exc).__name__, exc)
+            event("dialogue.fallback", stage=stage, error_type=type(exc).__name__)
+            return None
 
     @staticmethod
     def _result(snapshot: Snapshot) -> TransitionResult:

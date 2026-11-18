@@ -7,8 +7,8 @@ from pathlib import Path
 import dspy
 
 from adaptive_questioning.evidence.models import Judgment, Question
-from adaptive_questioning.evidence.provider import JudgeSignature, QuestionSignature
-from .dataset import get_gold_judge_examples, get_gold_question_examples
+from adaptive_questioning.evidence.provider import JudgeSignature, QuestionSignature, encode_context
+from .dataset import dialogue_examples, get_gold_judge_examples, get_gold_question_examples
 from .metrics import get_judge_lm, judge_evaluation_metric, question_generation_metric
 
 DEFAULT_COMPILED_DIR = Path(__file__).resolve().parent.parent / "compiled_modules"
@@ -114,7 +114,7 @@ def evaluate_modules_on_dev(q_module, j_module, lm: dspy.LM | None = None, split
     if split not in {"dev", "val"}:
         raise ValueError("Held-out evaluation requires dev or val")
     questions, judgments = get_gold_question_examples(split), get_gold_judge_examples(split)
-    q_scores, j_scores, errors = [], [], 0
+    q_scores, j_scores, dialogue_scores, errors = [], [], [], 0
     teacher = judge_lm if judge_lm is not None else get_judge_lm()
     with dspy.context(lm=lm) if lm is not None else dspy.context():
         for module, examples, metric, scores in (
@@ -127,7 +127,20 @@ def evaluate_modules_on_dev(q_module, j_module, lm: dspy.LM | None = None, split
                 except Exception:
                     errors += 1
                     scores.append(0.0)
+        for judge_case, question_case in dialogue_examples(split):
+            try:
+                assessment = j_module(context=judge_case.context)
+                context = json.loads(question_case.context)
+                context["history"][-1]["judgment"] = Judgment.model_validate(assessment.judgment).model_dump(mode="json")
+                next_case = dspy.Example(context=encode_context(context), question=question_case.question)
+                next_question = q_module(context=next_case.context)
+                dialogue_scores.append(min(judge_evaluation_metric(judge_case, assessment, lm=teacher),
+                                           question_generation_metric(next_case, next_question, lm=teacher)))
+            except Exception:
+                errors += 1
+                dialogue_scores.append(0.0)
     return {"dev_split": split, "question_examples_count": len(questions), "judge_examples_count": len(judgments),
+            "paired_dialogue_count": len(dialogue_scores), "paired_dialogue_avg_score": sum(dialogue_scores) / len(dialogue_scores),
             "question_generator_avg_score": sum(q_scores) / len(q_scores),
             "reflective_judge_avg_score": sum(j_scores) / len(j_scores), "evaluation_errors": errors,
             "question_semantic_evaluator": "independent_lm" if teacher is not None else "lexical_heuristic"}

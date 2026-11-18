@@ -35,8 +35,6 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    application.state.report_store = {}
-
     application.include_router(matching_cv_router)
     application.include_router(skill_gap_router)
     application.include_router(evidence_router)

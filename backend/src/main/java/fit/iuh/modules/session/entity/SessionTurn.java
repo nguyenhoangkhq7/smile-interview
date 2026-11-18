@@ -46,10 +46,4 @@ public class SessionTurn {
 
     @Column(name = "is_deep_dive")
     private Boolean isDeepDive;
-
-    @Column(name = "hr_rating")
-    private Integer hrRating;
-
-    @Column(name = "hr_feedback", columnDefinition = "TEXT")
-    private String hrFeedback;
 }
