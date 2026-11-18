@@ -358,6 +358,18 @@ class SkillPostprocessor:
             else None
         )
 
+        skill_clusters = []
+        topic_group_hint = []
+        certification_hint_pairs = []
+
+        if getattr(settings, "SKILL_CLUSTERING_ENABLED", False):
+            from matching_cv.app.services.skill_clustering_service import skill_clustering_service
+
+            clustering_res = skill_clustering_service.cluster_skills(skills)
+            skill_clusters = clustering_res.clusters
+            topic_group_hint = clustering_res.topic_group_hint
+            certification_hint_pairs = clustering_res.certification_hint_pairs
+
         return ExtractionResult(
             filename=filename,
             document_type=document_type,
@@ -367,6 +379,9 @@ class SkillPostprocessor:
             non_skill_entities=non_skill_entities,
             quarantined=quarantined,
             extraction_meta=extraction_meta,
+            skill_clusters=skill_clusters,
+            topic_group_hint=topic_group_hint,
+            certification_hint_pairs=certification_hint_pairs,
         )
 
     def process_extraction(

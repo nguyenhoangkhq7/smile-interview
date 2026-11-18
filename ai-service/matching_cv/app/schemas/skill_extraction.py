@@ -299,6 +299,11 @@ class ExtractedSkill(BaseModel):
         description="List of evidence citations and character offsets",
     )
 
+    @property
+    def label(self) -> str:
+        """Convenience display label (primary surface form or skill_id)."""
+        return self.surface_forms[0] if self.surface_forms else self.skill_id
+
     @model_validator(mode="after")
     def derive_fields(self) -> "ExtractedSkill":
         # If surface_forms is empty but evidences exist, populate from evidences
@@ -423,6 +428,58 @@ class ExtractionMeta(BaseModel):
     )
 
 
+# -----------------------------------------------------------------------------
+# Stage C: Skill Clustering & Topic Hint Schemas
+# -----------------------------------------------------------------------------
+
+class SkillCluster(BaseModel):
+    """Deterministic cluster of near-duplicate explicit skills."""
+
+    cluster_id: str = Field(..., description="Unique ID for the skill cluster")
+    canonical_skill_id: str = Field(..., description="Canonical skill identifier")
+    canonical_label: str = Field(..., description="Canonical display label for the cluster")
+    member_skill_ids: List[str] = Field(
+        default_factory=list,
+        description="List of member skill_ids grouped in this cluster",
+    )
+    member_surface_forms: List[str] = Field(
+        default_factory=list,
+        description="All unique verbatim surface forms across member skills",
+    )
+    merge_rule: str = Field(
+        ...,
+        description="Deterministic rule that produced this cluster (e.g. R1_normalization, R2_tool_generic_suffix, R3_known_alias, singleton)",
+    )
+    evidences: List[Evidence] = Field(
+        default_factory=list,
+        description="Complete union of all member evidences; none dropped",
+    )
+
+
+class TopicGroupHint(BaseModel):
+    """Candidate topic group for related concepts kept separate in extraction."""
+
+    topic: str = Field(..., description="Topic group name")
+    member_skill_ids: List[str] = Field(
+        default_factory=list,
+        description="Member skill IDs assigned to this topic group",
+    )
+    member_labels: List[str] = Field(
+        default_factory=list,
+        description="Member skill labels assigned to this topic group",
+    )
+
+
+class CertificationHintPair(BaseModel):
+    """Hint pair linking vendor-generic and specific certifications without merging them."""
+
+    generic_skill_id: str = Field(..., description="Vendor-generic certification skill ID")
+    generic_label: str = Field(..., description="Vendor-generic certification display label")
+    specific_skill_id: str = Field(..., description="Specific role/credential certification skill ID")
+    specific_label: str = Field(..., description="Specific certification display label")
+    hint: str = Field(..., description="Explanation of the certification relationship")
+
+
 class ExtractionResult(BaseModel):
     """Final contract for skill extraction per document."""
 
@@ -454,6 +511,18 @@ class ExtractionResult(BaseModel):
     extraction_meta: Optional[ExtractionMeta] = Field(
         default=None,
         description="Provenance metadata for the extraction run",
+    )
+    skill_clusters: List[SkillCluster] = Field(
+        default_factory=list,
+        description="Deterministic skill clusters grouping near-duplicate explicit skills",
+    )
+    topic_group_hint: List[TopicGroupHint] = Field(
+        default_factory=list,
+        description="Candidate topic groups for related skills that are kept separate",
+    )
+    certification_hint_pairs: List[CertificationHintPair] = Field(
+        default_factory=list,
+        description="Hint pairs for generic vs specific certifications that are kept separate",
     )
 
     @model_validator(mode="after")
