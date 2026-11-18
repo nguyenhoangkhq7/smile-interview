@@ -14,7 +14,16 @@ CategoryType = Literal[
 ]
 
 # Additive kind classification
-KindType = Literal["skill", "domain", "context", "certification"]
+KindType = Literal[
+    "skill",
+    "domain",
+    "context",
+    "certification",
+    "education",
+    "industry",
+    "experience_years",
+    "job_title",
+]
 KindSourceType = Literal["llm", "inferred", "invalid"]
 
 
@@ -370,6 +379,19 @@ class ExtractionStats(BaseModel):
         ge=0,
         description="Count of raw items quarantined due to structural errors",
     )
+    non_skill_count: int = Field(
+        default=0,
+        ge=0,
+        description="Count of unique non-skill entities routed to non_skill_entities",
+    )
+    kind_counts: Dict[str, int] = Field(
+        default_factory=dict,
+        description="Count of unique extracted entities per kind across skills and non_skill_entities",
+    )
+    mention_kind_counts: Dict[str, int] = Field(
+        default_factory=dict,
+        description="Count of extracted mentions per kind across skills and non_skill_entities",
+    )
 
 
 class ExtractionMeta(BaseModel):
@@ -421,6 +443,10 @@ class ExtractionResult(BaseModel):
         default_factory=list,
         description="Deduplicated canonical skills",
     )
+    non_skill_entities: List[ExtractedSkill] = Field(
+        default_factory=list,
+        description="Deduplicated non-skill entities routed away from the skill list with their kind",
+    )
     quarantined: List[Dict[str, Any]] = Field(
         default_factory=list,
         description="Raw items quarantined due to structural errors with details",
@@ -432,32 +458,48 @@ class ExtractionResult(BaseModel):
 
     @model_validator(mode="after")
     def validate_invariants(self) -> "ExtractionResult":
-        # Invariant 1: skill_id unique within a document
+        # Invariant 1: skill_id unique within skills and within non_skill_entities
         skill_ids = [s.skill_id for s in self.skills]
         if len(skill_ids) != len(set(skill_ids)):
             duplicates = {sid for sid in skill_ids if skill_ids.count(sid) > 1}
             raise ValueError(
                 f"Invariant violated: duplicate skill_id found within document: {duplicates}"
             )
-
-        # Invariant 2: stats.total_mentions == sum(len(evidences))
-        expected_total_mentions = sum(len(s.evidences) for s in self.skills)
-        if self.stats.total_mentions != expected_total_mentions:
+        non_skill_ids = [s.skill_id for s in self.non_skill_entities]
+        if len(non_skill_ids) != len(set(non_skill_ids)):
+            duplicates = {sid for sid in non_skill_ids if non_skill_ids.count(sid) > 1}
             raise ValueError(
-                f"Invariant violated: stats.total_mentions ({self.stats.total_mentions}) "
-                f"!= sum(len(evidences)) ({expected_total_mentions})"
+                f"Invariant violated: duplicate non_skill_entities skill_id found within document: {duplicates}"
             )
 
-        # Invariant 3: stats.unique_skills == len(skills)
+        all_entities = list(self.skills) + list(self.non_skill_entities)
+
+        # Invariant 2: stats.total_mentions == sum(len(evidences))
+        expected_total_mentions_all = sum(len(s.evidences) for s in all_entities)
+        expected_total_mentions_skills = sum(len(s.evidences) for s in self.skills)
+        if self.stats.total_mentions not in (expected_total_mentions_all, expected_total_mentions_skills):
+            raise ValueError(
+                f"Invariant violated: stats.total_mentions ({self.stats.total_mentions}) "
+                f"!= sum(len(evidences)) ({expected_total_mentions_all})"
+            )
+
+        # Use the entity pool matching stats.total_mentions for evidence-level invariants
+        evidence_entities = (
+            all_entities
+            if self.stats.total_mentions == expected_total_mentions_all
+            else self.skills
+        )
+
+        # Invariant 3: stats.unique_skills == len(skills) (ONLY the skill list)
         if self.stats.unique_skills != len(self.skills):
             raise ValueError(
                 f"Invariant violated: stats.unique_skills ({self.stats.unique_skills}) "
                 f"!= len(skills) ({len(self.skills)})"
             )
 
-        # Invariant 4: stats.unresolved_evidences == sum(1 for s in skills for ev in evidences if not ev.offset_resolved)
+        # Invariant 4: stats.unresolved_evidences == sum(1 for s in evidence_entities for ev in evidences if not ev.offset_resolved)
         expected_unresolved = sum(
-            1 for s in self.skills for ev in s.evidences if not ev.offset_resolved
+            1 for s in evidence_entities for ev in s.evidences if not ev.offset_resolved
         )
         if self.stats.unresolved_evidences != expected_unresolved:
             raise ValueError(
@@ -465,9 +507,9 @@ class ExtractionResult(BaseModel):
                 f"!= actual unresolved count ({expected_unresolved})"
             )
 
-        # Invariant 5: stats.non_verbatim_mentions == sum(1 for s in skills for ev in evidences if not ev.verbatim_ok)
+        # Invariant 5: stats.non_verbatim_mentions == sum(1 for s in evidence_entities for ev in evidences if not ev.verbatim_ok)
         expected_non_verbatim = sum(
-            1 for s in self.skills for ev in s.evidences if not ev.verbatim_ok
+            1 for s in evidence_entities for ev in s.evidences if not ev.verbatim_ok
         )
         if self.stats.non_verbatim_mentions != expected_non_verbatim:
             raise ValueError(
@@ -477,7 +519,7 @@ class ExtractionResult(BaseModel):
 
         # Invariant 6: stats.kind_conflicts == number of skill_ids whose evidences carry different non-None kinds
         expected_kind_conflicts = sum(
-            1 for s in self.skills if len({ev.kind for ev in s.evidences if ev.kind is not None}) > 1
+            1 for s in evidence_entities if len({ev.kind for ev in s.evidences if ev.kind is not None}) > 1
         )
         if self.stats.kind_conflicts != expected_kind_conflicts:
             raise ValueError(
@@ -487,7 +529,7 @@ class ExtractionResult(BaseModel):
 
         # Invariant 7: stats.header_evidences == number of resolved evidences whose section == 'header'
         expected_header_evidences = sum(
-            1 for s in self.skills for ev in s.evidences if ev.offset_resolved and ev.section == "header"
+            1 for s in evidence_entities for ev in s.evidences if ev.offset_resolved and ev.section == "header"
         )
         if self.stats.header_evidences != expected_header_evidences:
             raise ValueError(
@@ -495,9 +537,9 @@ class ExtractionResult(BaseModel):
                 f"!= actual header evidences count ({expected_header_evidences})"
             )
 
-        # Invariant 8: stats.unresolved_mentions == sum(1 for s in skills for ev in evidences if ev.mention_start is None)
+        # Invariant 8: stats.unresolved_mentions == sum(1 for s in evidence_entities for ev in evidences if ev.mention_start is None)
         expected_unresolved_mentions = sum(
-            1 for s in self.skills for ev in s.evidences if ev.mention_start is None
+            1 for s in evidence_entities for ev in s.evidences if ev.mention_start is None
         )
         if self.stats.unresolved_mentions != expected_unresolved_mentions:
             raise ValueError(
@@ -505,9 +547,9 @@ class ExtractionResult(BaseModel):
                 f"!= actual unresolved mentions count ({expected_unresolved_mentions})"
             )
 
-        # Invariant 9: stats.ambiguous_mentions == sum(1 for s in skills for ev in evidences if ev.mention_ambiguous)
+        # Invariant 9: stats.ambiguous_mentions == sum(1 for s in evidence_entities for ev in evidences if ev.mention_ambiguous)
         expected_ambiguous_mentions = sum(
-            1 for s in self.skills for ev in s.evidences if ev.mention_ambiguous
+            1 for s in evidence_entities for ev in s.evidences if ev.mention_ambiguous
         )
         if self.stats.ambiguous_mentions != expected_ambiguous_mentions:
             raise ValueError(
@@ -515,9 +557,9 @@ class ExtractionResult(BaseModel):
                 f"!= actual ambiguous mentions count ({expected_ambiguous_mentions})"
             )
 
-        # Invariant 10: stats.unknown_category_mentions == sum(1 for s in skills for ev in evidences if ev.category_raw is not None and ev.category is None)
+        # Invariant 10: stats.unknown_category_mentions == sum(1 for s in evidence_entities for ev in evidences if ev.category_raw is not None and ev.category is None)
         expected_unknown_category = sum(
-            1 for s in self.skills for ev in s.evidences if ev.category_raw is not None and ev.category is None
+            1 for s in evidence_entities for ev in s.evidences if ev.category_raw is not None and ev.category is None
         )
         if self.stats.unknown_category_mentions != expected_unknown_category:
             raise ValueError(
@@ -525,9 +567,9 @@ class ExtractionResult(BaseModel):
                 f"!= actual unknown category mentions count ({expected_unknown_category})"
             )
 
-        # Invariant 11: stats.invalid_kind_mentions == sum(1 for s in skills for ev in evidences if ev.kind is None)
+        # Invariant 11: stats.invalid_kind_mentions == sum(1 for s in evidence_entities for ev in evidences if ev.kind is None)
         expected_invalid_kind = sum(
-            1 for s in self.skills for ev in s.evidences if ev.kind is None
+            1 for s in evidence_entities for ev in s.evidences if ev.kind is None
         )
         if self.stats.invalid_kind_mentions != expected_invalid_kind:
             raise ValueError(

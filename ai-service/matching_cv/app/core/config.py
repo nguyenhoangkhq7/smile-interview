@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     # Production skill importance inference
     JSI_IMPORTANCE_ENABLED: bool = True
 
+    # Explicit skill extraction routing: route domain entities to skills
+    ROUTE_DOMAIN_TO_SKILLS: bool = True
+
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parents[3] / ".env",
         env_file_encoding="utf-8",

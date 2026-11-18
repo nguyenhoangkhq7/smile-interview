@@ -9,11 +9,13 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import dspy
+from pydantic import ValidationError
 
 from matching_cv.app.core.config import settings
 from matching_cv.app.schemas.skill_extraction import check_verbatim_mention
 from matching_cv.dspy_modules.modules import DSPyExplicitSkillExtractorModule
 from matching_cv.dspy_modules.schemas import ExplicitSkillMention
+from matching_cv.dspy_modules.signatures import ExplicitSkillExtractionSignature
 from matching_cv.app.services.text_locator import locate_sentence
 from matching_cv.dspy_modules.dataset import get_train_val_split
 
@@ -60,7 +62,11 @@ class DSPyExplicitSkillService:
         """Reject malformed or ungrounded predictions before legacy post-processing."""
         if hasattr(raw_item, "model_dump"):
             raw_item = raw_item.model_dump()
-        candidate = ExplicitSkillMention.model_validate(raw_item)
+        try:
+            candidate = ExplicitSkillMention.model_validate(raw_item)
+        except ValidationError as exc:
+            logger.warning("DSPy returned an invalid explicit skill candidate; dropping it: %s", exc)
+            return None
         if not candidate.mention.strip() or not check_verbatim_mention(
             candidate.mention, candidate.source_sentence
         ):
@@ -107,6 +113,10 @@ class DSPyExplicitSkillService:
         module = DSPyExplicitSkillExtractorModule()
         if self._compiled_path.is_file():
             module.load(str(self._compiled_path))
+            if ExplicitSkillExtractionSignature.__doc__:
+                module.extract.signature = module.extract.signature.with_instructions(
+                    ExplicitSkillExtractionSignature.__doc__.strip()
+                )
             logger.info("Loaded compiled explicit skill DSPy module from %s", self._compiled_path)
             return module
         trainset, _ = get_train_val_split()
