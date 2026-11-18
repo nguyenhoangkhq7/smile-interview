@@ -449,56 +449,38 @@ class ImplicitEvidenceVerifier:
 
     @classmethod
     def check_subcomponent_support(cls, sub_label: str, evidence_text: str) -> bool:
-        """Evaluate if an atomic sub-component is evidenced in the source text."""
-        sub_lower = sub_label.casefold()
+        """
+        Stage B.3 Fix:
+        Evaluate if an atomic sub-component is evidenced in the source text
+        using the exact same semantic anchor grounding and thresholds as atomic labels:
+        1. Direct verbatim mention in evidence text (case-insensitive word boundary), OR
+        2. evaluate_semantic_anchor(sub_label, evidence_text) with anchor_ratio >= 0.40
+           (where generic stems remain in the denominator, never count as overlap,
+           and the bare stem 'test' is not accepted).
+        """
+        sub_clean = sub_label.strip()
+        sub_lower = sub_clean.casefold()
         ev_lower = evidence_text.casefold()
 
-        # 1. Check direct mention
+        # 1. Direct mention
         if re.search(rf"\b{re.escape(sub_lower)}\b", ev_lower):
             return True
 
-        # 2. Check semantic anchor / stem overlap
-        sub_stems = {s for s in cls.extract_semantic_stems(sub_label) if s not in SEMANTIC_FLUFF_STEMS}
-        ev_stems = cls.extract_semantic_stems(evidence_text)
-        for tool, anchors in CANONICAL_TOOL_ANCHORS.items():
-            if tool in ev_lower:
-                for a in anchors:
-                    ev_stems.add(cls.stem_word(a))
+        # 2. Check role / specialized overclaim patterns
+        for role_pat, _, evidence_req_pat in ROLE_EXAGGERATION_PATTERNS:
+            if role_pat.search(sub_clean) and not evidence_req_pat.search(evidence_text):
+                return False
+        for pat, _, req_pat in SPECIALIZED_TECH_OVERCLAIM_PATTERNS:
+            if pat.search(sub_clean) and not req_pat.search(evidence_text):
+                return False
 
-        if sub_stems:
-            matched_stems = sub_stems.intersection(ev_stems)
-            if len(matched_stems) / len(sub_stems) >= 0.5:
-                return True
-
-        # 3. Check domain-specific action / synonym patterns for common sub-components
-        if "incident" in sub_lower:
-            return bool(re.search(r"\b(incident|on-call|outage|troubleshoot|paging|pagerduty|triag)\b", ev_lower))
-        if "post-mortem" in sub_lower or "postmortem" in sub_lower or "root cause" in sub_lower:
-            return bool(re.search(r"\b(post[- ]?mortem|root\s+cause|rca|retrospective|cause\s+analysis)\b", ev_lower))
-        if "trade-off" in sub_lower or "tradeoff" in sub_lower:
-            return bool(re.search(r"\b(trade-off|tradeoff|compromis|evaluat|weigh)\b", ev_lower))
-        if "management" in sub_lower or "coordination" in sub_lower:
-            return bool(re.search(r"\b(manag|coordinat|facilitat|lead|direct)\b", ev_lower))
-        if "automation" in sub_lower:
-            return bool(re.search(r"\b(automat|script|pipeline|provision|deploy|ansible|terraform|ci|cd|github\s+actions)\b", ev_lower))
-        if "optimization" in sub_lower or "optimizing" in sub_lower or "tuning" in sub_lower:
-            return bool(re.search(r"\b(optim|reduc|improv|accelerat|tun|speed|fast|effici|scal)\b", ev_lower))
-        if "monitoring" in sub_lower or "observability" in sub_lower:
-            return bool(re.search(r"\b(monitor|observ|metric|alert|telemetr|ping|health|log)\b", ev_lower))
-        if "reliability" in sub_lower:
-            return bool(re.search(r"\b(reliab|availab|uptime|fault|resilien|failover|sla|slo)\b", ev_lower))
-        if "pipeline" in sub_lower:
-            return bool(re.search(r"\b(pipelin|ci/cd|cicd|workflow|etl|stream)\b", ev_lower))
-        if "analysis" in sub_lower or "analytics" in sub_lower:
-            return bool(re.search(r"\b(analy|metric|measur|profil|evaluat|benchmark)\b", ev_lower))
-        if "communication" in sub_lower:
-            return bool(re.search(r"\b(communicat|present|collaborat|articulat|written|verbal)\b", ev_lower))
-
-        # 4. Fallback: check significant single stemmed word match
-        if sub_stems and len(sub_stems.intersection(ev_stems)) > 0 and len(sub_stems) == 1:
-            return True
-
-        return False
+        # 3. Semantic anchor grounding through evaluate_semantic_anchor
+        anchor_ratio, overlap, missing = cls.evaluate_semantic_anchor(sub_clean, evidence_text)
+        if anchor_ratio == 0.0 or (anchor_ratio < 0.30 and len(missing) >= 2):
+            return False
+        if anchor_ratio < 0.40:
+            return False
+        return True
 
     @classmethod
     def stem_word(cls, w: str) -> str:
