@@ -1,6 +1,7 @@
 package fit.iuh.modules.evidence;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import fit.iuh.modules.session.entity.Session;
 import fit.iuh.modules.session.entity.SessionTurn;
 import fit.iuh.modules.session.repository.SessionRepository;
@@ -11,6 +12,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 @Service @RequiredArgsConstructor
@@ -55,7 +58,6 @@ public class EvidenceStore {
                     ((com.fasterxml.jackson.databind.node.ArrayNode) objectives).add(state.path("objective")));
             if (objectives.isEmpty()) throw conflict("Interview blueprint is missing");
             profile.setBlueprintJson(json.tree(java.util.Map.of("objectives", objectives)).toString());
-            profile.setPolicyJson(input.result().path("snapshot").path("policy").toString());
         }
         projectSession(session, input.result().path("public"));
         if (input.requestId() != null) saveReceipt(input, run.getPublicJson());
@@ -69,9 +71,16 @@ public class EvidenceStore {
     }
 
     private JsonNode normalizedConfig(JsonNode config) {
-        var normalized = config.deepCopy();
-        if (normalized.isObject() && !normalized.hasNonNull("interaction_mode"))
-            ((com.fasterxml.jackson.databind.node.ObjectNode) normalized).put("interaction_mode", "TEXT");
+        if (!(config instanceof ObjectNode object)) return config;
+        var normalized = object.deepCopy();
+        if (!normalized.hasNonNull("interaction_mode")) normalized.put("interaction_mode", "TEXT");
+        if (!normalized.has("focused_question_mode")) normalized.putNull("focused_question_mode");
+        if (!normalized.has("mode")) {
+            normalized.put("mode", EvidenceDtos.Config.modeFor(normalized.path("focused_question_mode").asText(null)));
+        }
+        if (!normalized.hasNonNull("max_questions_per_objective")) {
+            normalized.put("max_questions_per_objective", EvidenceDtos.Config.DEFAULT_MAX_PER_OBJECTIVE);
+        }
         return normalized;
     }
 
@@ -101,12 +110,6 @@ public class EvidenceStore {
         run.setConfigJson(input.config().toString());
         run.setSnapshotJson(input.result().path("snapshot").toString());
         run.setPublicJson(input.result().path("public").toString());
-        if (input.result().hasNonNull("blueprint")) {
-            run.setBlueprintJson(input.result().path("blueprint").toString());
-        }
-        if (input.result().hasNonNull("dynamic_state")) {
-            run.setDynamicStateJson(input.result().path("dynamic_state").toString());
-        }
         return run;
     }
 
@@ -126,19 +129,25 @@ public class EvidenceStore {
         session.setStatus(!finished ? "In progress" : "USER_STOP".equals(reason)
                 ? (visible.path("turns").isEmpty() ? "Cancelled" : "Stopped early") : "Completed");
         session.setEndedAt(finished ? LocalDateTime.now() : null);
-        for (JsonNode turn : visible.path("turns")) projectTurn(session.getId(), turn);
-        if (visible.path("pending_turn").isObject()) projectTurn(session.getId(), visible.path("pending_turn"));
+        Map<String, String> skillByObjective = new HashMap<>();
+        for (JsonNode objective : visible.path("report").path("objectives")) {
+            String objectiveId = objective.path("objective_id").asText("");
+            String skillId = objective.path("skill_id").asText("");
+            if (!objectiveId.isEmpty() && !skillId.isEmpty()) skillByObjective.put(objectiveId, skillId);
+        }
+        for (JsonNode turn : visible.path("turns")) projectTurn(session.getId(), turn, skillByObjective);
+        if (visible.path("pending_turn").isObject()) projectTurn(session.getId(), visible.path("pending_turn"), skillByObjective);
         sessions.save(session);
     }
 
-    private void projectTurn(String sessionId, JsonNode value) {
+    private void projectTurn(String sessionId, JsonNode value, Map<String, String> skillByObjective) {
         String turnId = value.path("turn_id").asText();
         SessionTurn turn = turns.findBySessionIdAndExternalTurnId(sessionId, turnId).orElseGet(SessionTurn::new);
         turn.setSessionId(sessionId);
         turn.setExternalTurnId(turnId);
         turn.setQuestion(value.path("question").asText());
         turn.setAnswer(value.path("answer").asText(""));
-        turn.setTopicTag(value.path("skill_id").asText());
+        turn.setTopicTag(skillByObjective.getOrDefault(value.path("objective_id").asText(""), ""));
         turn.setIsDeepDive(false);
         turns.save(turn);
     }

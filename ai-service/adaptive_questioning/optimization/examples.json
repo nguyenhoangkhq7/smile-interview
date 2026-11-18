@@ -24,13 +24,8 @@
             }
           ]
         },
-        "mode": "DEBUGGING",
         "interaction_mode": "VOICE",
         "action": "INITIAL",
-        "question_depth": 3,
-        "target_criteria": [
-          "q01:c1"
-        ],
         "required_question_contract": {
           "mode": "DEBUGGING",
           "depth": 3,
@@ -39,9 +34,7 @@
           ]
         },
         "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `java_spring` (Matched CV Skill: `java_spring`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.30 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Phát triển các RESTful API CRUD cơ bản sử dụng Java Spring Boot và Spring Data JPA.\"\n- Ngữ cảnh công việc: Junior Java Developer (01/2022 - 05/2023)\n- Context Anchors bắc cầu (A_ctx):\n  1. [INITIAL_NONE] Skill: postgresql | s_cv=4.00 | Job: Backend Developer (06/2023 - Hiện tại)\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng java_spring tại local turn k=1)",
-        "strategy": "PROBE_DEPTH",
         "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
-        "remaining_questions": 8,
         "history": []
       },
       "question": {
@@ -49,7 +42,6 @@
         "criterion_ids": [
           "q01:c1"
         ],
-        "assistance": "NONE",
         "mode": "DEBUGGING",
         "depth": 3,
         "evidence_scope": "q01-case"
@@ -84,13 +76,8 @@
             }
           ]
         },
-        "mode": "DESIGN",
         "interaction_mode": "VOICE",
         "action": "INITIAL",
-        "question_depth": 4,
-        "target_criteria": [
-          "q02:c1"
-        ],
         "required_question_contract": {
           "mode": "DESIGN",
           "depth": 4,
@@ -99,9 +86,7 @@
           ]
         },
         "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `terraform` (Matched CV Skill: `cloudformation`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.40 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Tự động hóa cấp phát hạ tầng AWS bằng CloudFormation templates.\"\n- Ngữ cảnh công việc: Cloud Engineer (06/2021 - 02/2024)\n- Context Anchors bắc cầu (A_ctx):\n  1. [INITIAL_NONE] Skill: kubernetes | s_cv=4.50 | Job: DevOps Lead (03/2024 - Hiện tại)\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng terraform tại local turn k=1)",
-        "strategy": "COMPARE_SUBSTITUTE",
         "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
-        "remaining_questions": 8,
         "history": []
       },
       "question": {
@@ -109,7 +94,6 @@
         "criterion_ids": [
           "q02:c1"
         ],
-        "assistance": "NONE",
         "mode": "DESIGN",
         "depth": 4,
         "evidence_scope": "q02-case"
@@ -144,13 +128,8 @@
             }
           ]
         },
-        "mode": "DEBUGGING",
         "interaction_mode": "VOICE",
         "action": "INITIAL",
-        "question_depth": 3,
-        "target_criteria": [
-          "q03:c1"
-        ],
         "required_question_contract": {
           "mode": "DEBUGGING",
           "depth": 3,
@@ -159,9 +138,7 @@
           ]
         },
         "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `english` (Matched CV Skill: `english`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 3.50 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.00 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Đọc hiểu tài liệu kỹ thuật tiếng Anh cơ bản.\"\n- Ngữ cảnh công việc: Backend Developer (06/2023 - Hiện tại)\n- Context Anchors bắc cầu (A_ctx): Các dự án Backend thực tế\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng english tại local turn k=1)",
-        "strategy": "PROBE_DEPTH",
         "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
-        "remaining_questions": 8,
         "history": []
       },
       "question": {
@@ -169,7 +146,6 @@
         "criterion_ids": [
           "q03:c1"
         ],
-        "assistance": "NONE",
         "mode": "DEBUGGING",
         "depth": 3,
         "evidence_scope": "q03-case"
@@ -204,13 +180,8 @@
             }
           ]
         },
-        "mode": "DEBUGGING",
         "interaction_mode": "VOICE",
         "action": "INITIAL",
-        "question_depth": 3,
-        "target_criteria": [
-          "q04:c1"
-        ],
         "required_question_contract": {
           "mode": "DEBUGGING",
           "depth": 3,
@@ -219,9 +190,7 @@
           ]
         },
         "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `kubernetes` (Matched CV Skill: `kubernetes`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.50 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 3.00 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Triển khai ứng dụng lên Kubernetes cluster bằng Helm chart.\"\n- Ngữ cảnh công việc: Backend Developer (03/2023 - Hiện tại)\n- Context Anchors bắc cầu (A_ctx): 1. [INITIAL_NONE] Skill: docker | s_cv=4.00\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng kubernetes tại local turn k=1)",
-        "strategy": "PROBE_DEPTH",
         "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
-        "remaining_questions": 8,
         "history": []
       },
       "question": {
@@ -229,7 +198,6 @@
         "criterion_ids": [
           "q04:c1"
         ],
-        "assistance": "NONE",
         "mode": "DEBUGGING",
         "depth": 3,
         "evidence_scope": "q04-case"
@@ -264,13 +232,8 @@
             }
           ]
         },
-        "mode": "DEBUGGING",
         "interaction_mode": "VOICE",
         "action": "INITIAL",
-        "question_depth": 3,
-        "target_criteria": [
-          "q05:c1"
-        ],
         "required_question_contract": {
           "mode": "DEBUGGING",
           "depth": 3,
@@ -279,9 +242,7 @@
           ]
         },
         "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `kafka` (Matched CV Skill: `rabbitmq`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.50 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Sử dụng RabbitMQ để xử lý hàng đợi tin nhắn giữa các microservices.\"\n- Ngữ cảnh công việc: Backend Engineer (05/2022 - 01/2024)\n- Context Anchors bắc cầu (A_ctx): 1. [INITIAL_NONE] Skill: java_spring | s_cv=4.00\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng kafka tại local turn k=1)",
-        "strategy": "COMPARE_SUBSTITUTE",
         "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
-        "remaining_questions": 8,
         "history": []
       },
       "question": {
@@ -289,7 +250,6 @@
         "criterion_ids": [
           "q05:c1"
         ],
-        "assistance": "NONE",
         "mode": "DEBUGGING",
         "depth": 3,
         "evidence_scope": "q05-case"
@@ -324,13 +284,8 @@
             }
           ]
         },
-        "mode": "DEBUGGING",
         "interaction_mode": "VOICE",
         "action": "INITIAL",
-        "question_depth": 3,
-        "target_criteria": [
-          "q06:c1"
-        ],
         "required_question_contract": {
           "mode": "DEBUGGING",
           "depth": 3,
@@ -339,9 +294,7 @@
           ]
         },
         "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `postgresql` (Matched CV Skill: `postgresql`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.80 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Thiết kế cơ sở dữ liệu quan hệ PostgreSQL và viết câu truy vấn SQL.\"\n- Ngữ cảnh công việc: Backend Developer (08/2022 - Hiện tại)\n- Context Anchors bắc cầu (A_ctx): Các dịch vụ API hiện hành\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng postgresql tại local turn k=1)",
-        "strategy": "PROBE_DEPTH",
         "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
-        "remaining_questions": 8,
         "history": []
       },
       "question": {
@@ -349,7 +302,6 @@
         "criterion_ids": [
           "q06:c1"
         ],
-        "assistance": "NONE",
         "mode": "DEBUGGING",
         "depth": 3,
         "evidence_scope": "q06-case"
@@ -384,13 +336,8 @@
             }
           ]
         },
-        "mode": "DESIGN",
         "interaction_mode": "VOICE",
         "action": "INITIAL",
-        "question_depth": 4,
-        "target_criteria": [
-          "q07:c1"
-        ],
         "required_question_contract": {
           "mode": "DESIGN",
           "depth": 4,
@@ -399,9 +346,7 @@
           ]
         },
         "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `redis` (Matched CV Skill: `memcached`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 3.50 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.20 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Sử dụng Memcached để lưu tạm session và dữ liệu bộ nhớ đệm.\"\n- Ngữ cảnh công việc: Web Developer (01/2021 - 12/2022)\n- Context Anchors bắc cầu (A_ctx): Dự án Web Thương mại điện tử\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng redis tại local turn k=1)",
-        "strategy": "COMPARE_SUBSTITUTE",
         "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
-        "remaining_questions": 8,
         "history": []
       },
       "question": {
@@ -409,7 +354,6 @@
         "criterion_ids": [
           "q07:c1"
         ],
-        "assistance": "NONE",
         "mode": "DESIGN",
         "depth": 4,
         "evidence_scope": "q07-case"
@@ -444,13 +388,8 @@
             }
           ]
         },
-        "mode": "TECHNICAL_EXPLANATION",
         "interaction_mode": "VOICE",
         "action": "INITIAL",
-        "question_depth": 2,
-        "target_criteria": [
-          "q08:c1"
-        ],
         "required_question_contract": {
           "mode": "TECHNICAL_EXPLANATION",
           "depth": 2,
@@ -459,9 +398,7 @@
           ]
         },
         "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `docker` (Matched CV Skill: `docker`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 3.50 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.50 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Sử dụng Docker đóng gói ứng dụng Node.js.\"\n- Ngữ cảnh công việc: Junior Developer (06/2022 - 04/2023)\n- Context Anchors bắc cầu (A_ctx): Dự án Node.js API\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng docker tại local turn k=1)",
-        "strategy": "PROBE_DEPTH",
         "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
-        "remaining_questions": 8,
         "history": []
       },
       "question": {
@@ -469,7 +406,6 @@
         "criterion_ids": [
           "q08:c1"
         ],
-        "assistance": "NONE",
         "mode": "TECHNICAL_EXPLANATION",
         "depth": 2,
         "evidence_scope": "q08-case"
@@ -504,13 +440,8 @@
             }
           ]
         },
-        "mode": "DEBUGGING",
         "interaction_mode": "VOICE",
         "action": "INITIAL",
-        "question_depth": 3,
-        "target_criteria": [
-          "q09:c1"
-        ],
         "required_question_contract": {
           "mode": "DEBUGGING",
           "depth": 3,
@@ -519,9 +450,7 @@
           ]
         },
         "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `golang` (Matched CV Skill: `golang`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.60 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Phát triển microservice xử lý dữ liệu bằng Go.\"\n- Ngữ cảnh công việc: Backend Developer (10/2022 - Hiện tại)\n- Context Anchors bắc cầu (A_ctx): Hệ thống backend xử lý dữ liệu\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng golang tại local turn k=1)",
-        "strategy": "PROBE_DEPTH",
         "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
-        "remaining_questions": 8,
         "history": []
       },
       "question": {
@@ -529,7 +458,6 @@
         "criterion_ids": [
           "q09:c1"
         ],
-        "assistance": "NONE",
         "mode": "DEBUGGING",
         "depth": 3,
         "evidence_scope": "q09-case"
@@ -564,13 +492,8 @@
             }
           ]
         },
-        "mode": "DESIGN",
         "interaction_mode": "VOICE",
         "action": "INITIAL",
-        "question_depth": 4,
-        "target_criteria": [
-          "q10:c1"
-        ],
         "required_question_contract": {
           "mode": "DESIGN",
           "depth": 4,
@@ -579,9 +502,7 @@
           ]
         },
         "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `aws` (Matched CV Skill: `aws`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.70 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Sử dụng EC2, S3 và RDS để vận hành ứng dụng trên AWS.\"\n- Ngữ cảnh công việc: Infrastructure Support (02/2022 - 11/2023)\n- Context Anchors bắc cầu (A_ctx): Dự án triển khai AWS\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng aws tại local turn k=1)",
-        "strategy": "PROBE_DEPTH",
         "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
-        "remaining_questions": 8,
         "history": []
       },
       "question": {
@@ -589,7 +510,6 @@
         "criterion_ids": [
           "q10:c1"
         ],
-        "assistance": "NONE",
         "mode": "DESIGN",
         "depth": 4,
         "evidence_scope": "q10-case"
@@ -624,13 +544,8 @@
             }
           ]
         },
-        "mode": "DEBUGGING",
         "interaction_mode": "VOICE",
         "action": "INITIAL",
-        "question_depth": 3,
-        "target_criteria": [
-          "q11:c1"
-        ],
         "required_question_contract": {
           "mode": "DEBUGGING",
           "depth": 3,
@@ -639,9 +554,7 @@
           ]
         },
         "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `reactjs` (Matched CV Skill: `reactjs`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.50 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Xây dựng giao diện người dùng web sử dụng ReactJS và Redux.\"\n- Ngữ cảnh công việc: Frontend Developer (05/2022 - Hiện tại)\n- Context Anchors bắc cầu (A_ctx): Dự án Dashboard quản trị\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng reactjs tại local turn k=1)",
-        "strategy": "PROBE_DEPTH",
         "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
-        "remaining_questions": 8,
         "history": []
       },
       "question": {
@@ -649,7 +562,6 @@
         "criterion_ids": [
           "q11:c1"
         ],
-        "assistance": "NONE",
         "mode": "DEBUGGING",
         "depth": 3,
         "evidence_scope": "q11-case"
@@ -684,13 +596,8 @@
             }
           ]
         },
-        "mode": "TECHNICAL_EXPLANATION",
         "interaction_mode": "VOICE",
         "action": "INITIAL",
-        "question_depth": 2,
-        "target_criteria": [
-          "q12:c1"
-        ],
         "required_question_contract": {
           "mode": "TECHNICAL_EXPLANATION",
           "depth": 2,
@@ -699,9 +606,7 @@
           ]
         },
         "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `ci_cd` (Matched CV Skill: `jenkins`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 3.50 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.40 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Cấu hình Jenkins job để tự động build và deploy mã nguồn.\"\n- Ngữ cảnh công việc: Software Engineer (09/2021 - 03/2023)\n- Context Anchors bắc cầu (A_ctx): Hệ thống tự động hóa build\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng ci_cd tại local turn k=1)",
-        "strategy": "COMPARE_SUBSTITUTE",
         "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
-        "remaining_questions": 8,
         "history": []
       },
       "question": {
@@ -709,7 +614,6 @@
         "criterion_ids": [
           "q12:c1"
         ],
-        "assistance": "NONE",
         "mode": "TECHNICAL_EXPLANATION",
         "depth": 2,
         "evidence_scope": "q12-case"
@@ -744,13 +648,8 @@
             }
           ]
         },
-        "mode": "DESIGN",
         "interaction_mode": "VOICE",
         "action": "INITIAL",
-        "question_depth": 4,
-        "target_criteria": [
-          "q13:c1"
-        ],
         "required_question_contract": {
           "mode": "DESIGN",
           "depth": 4,
@@ -759,9 +658,7 @@
           ]
         },
         "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `system_design` (Matched CV Skill: `system_design`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.50 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.80 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Tham gia thiết kế kiến trúc các dịch vụ backend phục vụ người dùng.\"\n- Ngữ cảnh công việc: Senior Backend (01/2023 - Hiện tại)\n- Context Anchors bắc cầu (A_ctx): 1. [INITIAL_NONE] Skill: redis | s_cv=4.00\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng system_design tại local turn k=1)",
-        "strategy": "PROBE_DEPTH",
         "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
-        "remaining_questions": 8,
         "history": []
       },
       "question": {
@@ -769,7 +666,6 @@
         "criterion_ids": [
           "q13:c1"
         ],
-        "assistance": "NONE",
         "mode": "DESIGN",
         "depth": 4,
         "evidence_scope": "q13-case"
@@ -804,13 +700,8 @@
             }
           ]
         },
-        "mode": "TECHNICAL_EXPLANATION",
         "interaction_mode": "VOICE",
         "action": "INITIAL",
-        "question_depth": 2,
-        "target_criteria": [
-          "q14:c1"
-        ],
         "required_question_contract": {
           "mode": "TECHNICAL_EXPLANATION",
           "depth": 2,
@@ -819,9 +710,7 @@
           ]
         },
         "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `graphql` (Matched CV Skill: `rest_api`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.40 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Xây dựng hệ thống REST API theo chuẩn OpenAPI.\"\n- Ngữ cảnh công việc: Backend Developer (03/2022 - 08/2023)\n- Context Anchors bắc cầu (A_ctx): Hệ thống API dịch vụ\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng graphql tại local turn k=1)",
-        "strategy": "COMPARE_SUBSTITUTE",
         "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
-        "remaining_questions": 8,
         "history": []
       },
       "question": {
@@ -829,7 +718,6 @@
         "criterion_ids": [
           "q14:c1"
         ],
-        "assistance": "NONE",
         "mode": "TECHNICAL_EXPLANATION",
         "depth": 2,
         "evidence_scope": "q14-case"
@@ -864,13 +752,8 @@
             }
           ]
         },
-        "mode": "TECHNICAL_EXPLANATION",
         "interaction_mode": "VOICE",
         "action": "INITIAL",
-        "question_depth": 2,
-        "target_criteria": [
-          "q15:c1"
-        ],
         "required_question_contract": {
           "mode": "TECHNICAL_EXPLANATION",
           "depth": 2,
@@ -879,9 +762,7 @@
           ]
         },
         "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `elasticsearch` (Matched CV Skill: `postgresql`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 3.50 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.00 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Tìm kiếm dữ liệu toàn văn bằng tính năng Full-text search của PostgreSQL.\"\n- Ngữ cảnh công việc: Backend Developer (06/2022 - Hiện tại)\n- Context Anchors bắc cầu (A_ctx): Dự án tìm kiếm dữ liệu sản phẩm\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng elasticsearch tại local turn k=1)",
-        "strategy": "LEARNING_AGILITY",
         "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
-        "remaining_questions": 8,
         "history": []
       },
       "question": {
@@ -889,7 +770,6 @@
         "criterion_ids": [
           "q15:c1"
         ],
-        "assistance": "NONE",
         "mode": "TECHNICAL_EXPLANATION",
         "depth": 2,
         "evidence_scope": "q15-case"
@@ -924,13 +804,8 @@
             }
           ]
         },
-        "mode": "DESIGN",
         "interaction_mode": "VOICE",
         "action": "INITIAL",
-        "question_depth": 4,
-        "target_criteria": [
-          "q16:c1"
-        ],
         "required_question_contract": {
           "mode": "DESIGN",
           "depth": 4,
@@ -939,9 +814,7 @@
           ]
         },
         "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `microservices_security` (Matched CV Skill: `jwt`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.50 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Xác thực người dùng bằng JSON Web Token (JWT).\"\n- Ngữ cảnh công việc: Backend Developer (01/2022 - 12/2023)\n- Context Anchors bắc cầu (A_ctx): Cổng xác thực người dùng\n- Lịch sử hội thoại: (Bắt đầu phỏng vấn kỹ năng microservices_security tại local turn k=1)",
-        "strategy": "PROBE_DEPTH",
         "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
-        "remaining_questions": 8,
         "history": []
       },
       "question": {
@@ -949,7 +822,6 @@
         "criterion_ids": [
           "q16:c1"
         ],
-        "assistance": "NONE",
         "mode": "DESIGN",
         "depth": 4,
         "evidence_scope": "q16-case"
@@ -984,13 +856,8 @@
             }
           ]
         },
-        "mode": "DESIGN",
         "interaction_mode": "VOICE",
         "action": "FOLLOW_UP",
-        "question_depth": 4,
-        "target_criteria": [
-          "q17:c1"
-        ],
         "required_question_contract": {
           "mode": "DESIGN",
           "depth": 4,
@@ -999,9 +866,7 @@
           ]
         },
         "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `java_spring` (Matched CV Skill: `java_spring`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.30 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Phát triển các RESTful API CRUD cơ bản sử dụng Java Spring Boot...\"\n- Ngữ cảnh công việc: Junior Java Developer\n- Lịch sử hội thoại:\n- [Turn t=1, k=1, Skill='java_spring', Slot='java_spring:primary']\n  + Câu hỏi: Cấu hình rollback cho @Transactional khi gặp runtime exception?\n  + Trả lời: Em dùng @Transactional(rollbackFor = Exception.class) trên Service.\n  + Judge Insight: Ứng viên nắm được cú pháp cơ bản cho local transaction đơn lẻ.",
-        "strategy": "PROBE_DEPTH",
         "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
-        "remaining_questions": 8,
         "history": []
       },
       "question": {
@@ -1009,7 +874,6 @@
         "criterion_ids": [
           "q17:c1"
         ],
-        "assistance": "NONE",
         "mode": "DESIGN",
         "depth": 4,
         "evidence_scope": "q17-case"
@@ -1044,13 +908,8 @@
             }
           ]
         },
-        "mode": "DESIGN",
         "interaction_mode": "VOICE",
         "action": "FOLLOW_UP",
-        "question_depth": 4,
-        "target_criteria": [
-          "q18:c1"
-        ],
         "required_question_contract": {
           "mode": "DESIGN",
           "depth": 4,
@@ -1059,9 +918,7 @@
           ]
         },
         "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `kafka` (Matched CV Skill: `rabbitmq`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.50 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Sử dụng RabbitMQ xử lý message queue.\"\n- Lịch sử hội thoại:\n- [Turn t=2, k=1, Skill='kafka', Slot='kafka:primary']\n  + Câu hỏi: Xử lý consumer lag khi topic lưu lượng lớn?\n  + Trả lời: Em tăng số partition và scale thêm instance trong consumer group.\n  + Judge Insight: Ứng viên hiểu cơ chế scale partition của Kafka.",
-        "strategy": "PROBE_DEPTH",
         "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
-        "remaining_questions": 8,
         "history": []
       },
       "question": {
@@ -1069,7 +926,6 @@
         "criterion_ids": [
           "q18:c1"
         ],
-        "assistance": "NONE",
         "mode": "DESIGN",
         "depth": 4,
         "evidence_scope": "q18-case"
@@ -1104,13 +960,8 @@
             }
           ]
         },
-        "mode": "DESIGN",
         "interaction_mode": "VOICE",
         "action": "FOLLOW_UP",
-        "question_depth": 4,
-        "target_criteria": [
-          "q19:c1"
-        ],
         "required_question_contract": {
           "mode": "DESIGN",
           "depth": 4,
@@ -1119,9 +970,7 @@
           ]
         },
         "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `kubernetes` (Matched CV Skill: `kubernetes`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.50 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 3.00 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Triển khai ứng dụng lên Kubernetes cluster...\"\n- Lịch sử hội thoại:\n- [Turn t=3, k=1, Skill='kubernetes', Slot='kubernetes:primary']\n  + Câu hỏi: Xử lý Pod bị OOMKilled exit code 137?\n  + Trả lời: Em kiểm tra heap dump và tăng limit memory trong Deployment spec.\n  + Judge Insight: Ứng viên biết cách khắc phục cơ bản.",
-        "strategy": "PROBE_DEPTH",
         "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
-        "remaining_questions": 8,
         "history": []
       },
       "question": {
@@ -1129,7 +978,6 @@
         "criterion_ids": [
           "q19:c1"
         ],
-        "assistance": "NONE",
         "mode": "DESIGN",
         "depth": 4,
         "evidence_scope": "q19-case"
@@ -1164,13 +1012,8 @@
             }
           ]
         },
-        "mode": "DEBUGGING",
         "interaction_mode": "VOICE",
         "action": "FOLLOW_UP",
-        "question_depth": 3,
-        "target_criteria": [
-          "q20:c1"
-        ],
         "required_question_contract": {
           "mode": "DEBUGGING",
           "depth": 3,
@@ -1179,9 +1022,7 @@
           ]
         },
         "cv_evidence": "- Kỹ năng mục tiêu (Primary Skill d*): `postgresql` (Matched CV Skill: `postgresql`)\n- Độ sâu năng lực yêu cầu từ JD (r_target = s_jd): 4.00 / 5.0\n- Điểm năng lực ước lượng ban đầu từ CV (s_cv): 2.80 / 5.0\n- Bằng chứng nguyên văn từ CV: \"Thiết kế cơ sở dữ liệu quan hệ PostgreSQL...\"\n- Ngữ cảnh công việc: Backend Developer\n- Lịch sử hội thoại:\n- [Turn t=4, k=1, Skill='postgresql', Slot='postgresql:primary']\n  + Câu hỏi: Dùng EXPLAIN ANALYZE tối ưu truy vấn chậm?\n  + Trả lời: Em phân tích cost, xem node nào bị seq scan thì thêm composite index.\n  + Judge Insight: Nắm vững nguyên lý đánh index cơ bản.",
-        "strategy": "PROBE_DEPTH",
         "probe_reason": "Thu bằng chứng cụ thể cho tiêu chí đang hỏi.",
-        "remaining_questions": 8,
         "history": []
       },
       "question": {
@@ -1189,7 +1030,6 @@
         "criterion_ids": [
           "q20:c1"
         ],
-        "assistance": "NONE",
         "mode": "DEBUGGING",
         "depth": 3,
         "evidence_scope": "q20-case"
@@ -1240,7 +1080,6 @@
             "criterion_ids": [
               "j01:c1"
             ],
-            "assistance": "NONE",
             "mode": "DEBUGGING",
             "depth": 3,
             "evidence_scope": "j01-case"
@@ -1249,20 +1088,6 @@
           "judgment": null,
           "introduction": ""
         },
-        "required_criterion_ids": [
-          "j01:c1"
-        ],
-        "target_criteria": [
-          {
-            "criterion_id": "j01:c1",
-            "description": "Spring transaction rollback",
-            "expected_evidence": "Giải thích rollback khi phương thức Spring có transaction gặp RuntimeException.",
-            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Giải thích rollback khi phương thức Spring có transaction gặp RuntimeException.",
-            "at_target": "Giải thích rollback khi phương thức Spring có transaction gặp RuntimeException.",
-            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Giải thích rollback khi phương thức Spring có transaction gặp RuntimeException.",
-            "essential": true
-          }
-        ],
         "prior_observations": [],
         "prior_turns": []
       },
@@ -1324,7 +1149,6 @@
             "criterion_ids": [
               "j02:c1"
             ],
-            "assistance": "NONE",
             "mode": "DESIGN",
             "depth": 4,
             "evidence_scope": "j02-case"
@@ -1333,20 +1157,6 @@
           "judgment": null,
           "introduction": ""
         },
-        "required_criterion_ids": [
-          "j02:c1"
-        ],
-        "target_criteria": [
-          {
-            "criterion_id": "j02:c1",
-            "description": "Terraform state locking",
-            "expected_evidence": "Thiết kế cơ chế phối hợp truy cập remote state khi nhiều người cùng apply.",
-            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Thiết kế cơ chế phối hợp truy cập remote state khi nhiều người cùng apply.",
-            "at_target": "Thiết kế cơ chế phối hợp truy cập remote state khi nhiều người cùng apply.",
-            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Thiết kế cơ chế phối hợp truy cập remote state khi nhiều người cùng apply.",
-            "essential": true
-          }
-        ],
         "prior_observations": [],
         "prior_turns": []
       },
@@ -1406,7 +1216,6 @@
             "criterion_ids": [
               "j03:c1"
             ],
-            "assistance": "NONE",
             "mode": "TECHNICAL_EXPLANATION",
             "depth": 2,
             "evidence_scope": "j03-case"
@@ -1415,20 +1224,6 @@
           "judgment": null,
           "introduction": ""
         },
-        "required_criterion_ids": [
-          "j03:c1"
-        ],
-        "target_criteria": [
-          {
-            "criterion_id": "j03:c1",
-            "description": "Docker multi-stage build",
-            "expected_evidence": "Giải thích cách tách môi trường build khỏi runtime image.",
-            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Giải thích cách tách môi trường build khỏi runtime image.",
-            "at_target": "Giải thích cách tách môi trường build khỏi runtime image.",
-            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Giải thích cách tách môi trường build khỏi runtime image.",
-            "essential": true
-          }
-        ],
         "prior_observations": [],
         "prior_turns": []
       },
@@ -1490,7 +1285,6 @@
             "criterion_ids": [
               "j04:c1"
             ],
-            "assistance": "NONE",
             "mode": "DESIGN",
             "depth": 4,
             "evidence_scope": "j04-case"
@@ -1499,20 +1293,6 @@
           "judgment": null,
           "introduction": ""
         },
-        "required_criterion_ids": [
-          "j04:c1"
-        ],
-        "target_criteria": [
-          {
-            "criterion_id": "j04:c1",
-            "description": "AWS availability zone failure",
-            "expected_evidence": "Thiết kế đường phục hồi ứng dụng khi một Availability Zone lỗi.",
-            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Thiết kế đường phục hồi ứng dụng khi một Availability Zone lỗi.",
-            "at_target": "Thiết kế đường phục hồi ứng dụng khi một Availability Zone lỗi.",
-            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Thiết kế đường phục hồi ứng dụng khi một Availability Zone lỗi.",
-            "essential": true
-          }
-        ],
         "prior_observations": [],
         "prior_turns": []
       },
@@ -1574,7 +1354,6 @@
             "criterion_ids": [
               "j05:c1"
             ],
-            "assistance": "NONE",
             "mode": "DEBUGGING",
             "depth": 3,
             "evidence_scope": "j05-case"
@@ -1583,20 +1362,6 @@
           "judgment": null,
           "introduction": ""
         },
-        "required_criterion_ids": [
-          "j05:c1"
-        ],
-        "target_criteria": [
-          {
-            "criterion_id": "j05:c1",
-            "description": "Kubernetes Guaranteed QoS configuration",
-            "expected_evidence": "Guaranteed QoS yêu cầu CPU/memory request và limit bằng nhau cho từng container.",
-            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Guaranteed QoS yêu cầu CPU/memory request và limit bằng nhau cho từng container.",
-            "at_target": "Guaranteed QoS yêu cầu CPU/memory request và limit bằng nhau cho từng container.",
-            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Guaranteed QoS yêu cầu CPU/memory request và limit bằng nhau cho từng container.",
-            "essential": true
-          }
-        ],
         "prior_observations": [],
         "prior_turns": []
       },
@@ -1658,7 +1423,6 @@
             "criterion_ids": [
               "j06:c1"
             ],
-            "assistance": "NONE",
             "mode": "DEBUGGING",
             "depth": 3,
             "evidence_scope": "j06-case"
@@ -1667,20 +1431,6 @@
           "judgment": null,
           "introduction": ""
         },
-        "required_criterion_ids": [
-          "j06:c1"
-        ],
-        "target_criteria": [
-          {
-            "criterion_id": "j06:c1",
-            "description": "PostgreSQL EXPLAIN ANALYZE",
-            "expected_evidence": "Dùng execution plan thực tế để đánh giá lựa chọn index cho truy vấn.",
-            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Dùng execution plan thực tế để đánh giá lựa chọn index cho truy vấn.",
-            "at_target": "Dùng execution plan thực tế để đánh giá lựa chọn index cho truy vấn.",
-            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Dùng execution plan thực tế để đánh giá lựa chọn index cho truy vấn.",
-            "essential": true
-          }
-        ],
         "prior_observations": [],
         "prior_turns": []
       },
@@ -1742,7 +1492,6 @@
             "criterion_ids": [
               "j07:c1"
             ],
-            "assistance": "NONE",
             "mode": "DESIGN",
             "depth": 4,
             "evidence_scope": "j07-case"
@@ -1751,20 +1500,6 @@
           "judgment": null,
           "introduction": ""
         },
-        "required_criterion_ids": [
-          "j07:c1"
-        ],
-        "target_criteria": [
-          {
-            "criterion_id": "j07:c1",
-            "description": "JWT token revocation",
-            "expected_evidence": "Thiết kế kiểm tra thu hồi token trước thời điểm hết hạn.",
-            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Thiết kế kiểm tra thu hồi token trước thời điểm hết hạn.",
-            "at_target": "Thiết kế kiểm tra thu hồi token trước thời điểm hết hạn.",
-            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Thiết kế kiểm tra thu hồi token trước thời điểm hết hạn.",
-            "essential": true
-          }
-        ],
         "prior_observations": [],
         "prior_turns": []
       },
@@ -1826,7 +1561,6 @@
             "criterion_ids": [
               "j08:c1"
             ],
-            "assistance": "NONE",
             "mode": "DEBUGGING",
             "depth": 3,
             "evidence_scope": "j08-case"
@@ -1835,20 +1569,6 @@
           "judgment": null,
           "introduction": ""
         },
-        "required_criterion_ids": [
-          "j08:c1"
-        ],
-        "target_criteria": [
-          {
-            "criterion_id": "j08:c1",
-            "description": "Kafka consumer lag",
-            "expected_evidence": "Liên hệ thời gian xử lý vượt max.poll.interval.ms với hiện tượng rebalance liên tục.",
-            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Liên hệ thời gian xử lý vượt max.poll.interval.ms với hiện tượng rebalance liên tục.",
-            "at_target": "Liên hệ thời gian xử lý vượt max.poll.interval.ms với hiện tượng rebalance liên tục.",
-            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Liên hệ thời gian xử lý vượt max.poll.interval.ms với hiện tượng rebalance liên tục.",
-            "essential": true
-          }
-        ],
         "prior_observations": [],
         "prior_turns": []
       },
@@ -1908,7 +1628,6 @@
             "criterion_ids": [
               "j09:c1"
             ],
-            "assistance": "NONE",
             "mode": "DEBUGGING",
             "depth": 3,
             "evidence_scope": "j09-case"
@@ -1917,20 +1636,6 @@
           "judgment": null,
           "introduction": ""
         },
-        "required_criterion_ids": [
-          "j09:c1"
-        ],
-        "target_criteria": [
-          {
-            "criterion_id": "j09:c1",
-            "description": "Go goroutine leak",
-            "expected_evidence": "Dùng dấu hiệu runtime và cơ chế hủy tác vụ để chẩn đoán goroutine bị kẹt.",
-            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Dùng dấu hiệu runtime và cơ chế hủy tác vụ để chẩn đoán goroutine bị kẹt.",
-            "at_target": "Dùng dấu hiệu runtime và cơ chế hủy tác vụ để chẩn đoán goroutine bị kẹt.",
-            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Dùng dấu hiệu runtime và cơ chế hủy tác vụ để chẩn đoán goroutine bị kẹt.",
-            "essential": true
-          }
-        ],
         "prior_observations": [],
         "prior_turns": []
       },
@@ -1992,7 +1697,6 @@
             "criterion_ids": [
               "j10:c1"
             ],
-            "assistance": "NONE",
             "mode": "DESIGN",
             "depth": 4,
             "evidence_scope": "j10-case"
@@ -2001,20 +1705,6 @@
           "judgment": null,
           "introduction": ""
         },
-        "required_criterion_ids": [
-          "j10:c1"
-        ],
-        "target_criteria": [
-          {
-            "criterion_id": "j10:c1",
-            "description": "Redis cache stampede",
-            "expected_evidence": "Điều phối việc làm mới một hot key khi cache hết hạn.",
-            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Điều phối việc làm mới một hot key khi cache hết hạn.",
-            "at_target": "Điều phối việc làm mới một hot key khi cache hết hạn.",
-            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Điều phối việc làm mới một hot key khi cache hết hạn.",
-            "essential": true
-          }
-        ],
         "prior_observations": [],
         "prior_turns": []
       },
@@ -2074,7 +1764,6 @@
             "criterion_ids": [
               "j11:c1"
             ],
-            "assistance": "NONE",
             "mode": "TECHNICAL_EXPLANATION",
             "depth": 2,
             "evidence_scope": "j11-case"
@@ -2083,20 +1772,6 @@
           "judgment": null,
           "introduction": ""
         },
-        "required_criterion_ids": [
-          "j11:c1"
-        ],
-        "target_criteria": [
-          {
-            "criterion_id": "j11:c1",
-            "description": "Elasticsearch analyzer",
-            "expected_evidence": "Giải thích normalization cho nhu cầu tìm kiếm không phân biệt dấu và hoa thường.",
-            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Giải thích normalization cho nhu cầu tìm kiếm không phân biệt dấu và hoa thường.",
-            "at_target": "Giải thích normalization cho nhu cầu tìm kiếm không phân biệt dấu và hoa thường.",
-            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Giải thích normalization cho nhu cầu tìm kiếm không phân biệt dấu và hoa thường.",
-            "essential": true
-          }
-        ],
         "prior_observations": [],
         "prior_turns": []
       },
@@ -2158,7 +1833,6 @@
             "criterion_ids": [
               "j12:c1"
             ],
-            "assistance": "NONE",
             "mode": "TECHNICAL_EXPLANATION",
             "depth": 2,
             "evidence_scope": "j12-case"
@@ -2167,20 +1841,6 @@
           "judgment": null,
           "introduction": ""
         },
-        "required_criterion_ids": [
-          "j12:c1"
-        ],
-        "target_criteria": [
-          {
-            "criterion_id": "j12:c1",
-            "description": "GitLab dependency cache",
-            "expected_evidence": "Giải thích việc gắn cache key với dependency lockfile.",
-            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Giải thích việc gắn cache key với dependency lockfile.",
-            "at_target": "Giải thích việc gắn cache key với dependency lockfile.",
-            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Giải thích việc gắn cache key với dependency lockfile.",
-            "essential": true
-          }
-        ],
         "prior_observations": [],
         "prior_turns": []
       },
@@ -2240,7 +1900,6 @@
             "criterion_ids": [
               "j13:c1"
             ],
-            "assistance": "NONE",
             "mode": "DEBUGGING",
             "depth": 3,
             "evidence_scope": "j13-case"
@@ -2249,20 +1908,6 @@
           "judgment": null,
           "introduction": ""
         },
-        "required_criterion_ids": [
-          "j13:c1"
-        ],
-        "target_criteria": [
-          {
-            "criterion_id": "j13:c1",
-            "description": "React render profiling",
-            "expected_evidence": "Liên hệ kết quả Profiler với prop reference gây render thừa.",
-            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Liên hệ kết quả Profiler với prop reference gây render thừa.",
-            "at_target": "Liên hệ kết quả Profiler với prop reference gây render thừa.",
-            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Liên hệ kết quả Profiler với prop reference gây render thừa.",
-            "essential": true
-          }
-        ],
         "prior_observations": [],
         "prior_turns": []
       },
@@ -2322,7 +1967,6 @@
             "criterion_ids": [
               "j14:c1"
             ],
-            "assistance": "NONE",
             "mode": "DEBUGGING",
             "depth": 3,
             "evidence_scope": "j14-case"
@@ -2331,20 +1975,6 @@
           "judgment": null,
           "introduction": ""
         },
-        "required_criterion_ids": [
-          "j14:c1"
-        ],
-        "target_criteria": [
-          {
-            "criterion_id": "j14:c1",
-            "description": "Kafka consumer lag",
-            "expected_evidence": "Chẩn đoán nguyên nhân consumer lag từ hành vi poll và rebalance.",
-            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Chẩn đoán nguyên nhân consumer lag từ hành vi poll và rebalance.",
-            "at_target": "Chẩn đoán nguyên nhân consumer lag từ hành vi poll và rebalance.",
-            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Chẩn đoán nguyên nhân consumer lag từ hành vi poll và rebalance.",
-            "essential": true
-          }
-        ],
         "prior_observations": [],
         "prior_turns": []
       },
@@ -2406,7 +2036,6 @@
             "criterion_ids": [
               "j15:c1"
             ],
-            "assistance": "NONE",
             "mode": "DEBUGGING",
             "depth": 3,
             "evidence_scope": "j15-case"
@@ -2415,20 +2044,6 @@
           "judgment": null,
           "introduction": ""
         },
-        "required_criterion_ids": [
-          "j15:c1"
-        ],
-        "target_criteria": [
-          {
-            "criterion_id": "j15:c1",
-            "description": "PostgreSQL lock dependency",
-            "expected_evidence": "Xác định blocked pid và quan hệ phụ thuộc khóa từ pg_locks/pg_stat_activity.",
-            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Xác định blocked pid và quan hệ phụ thuộc khóa từ pg_locks/pg_stat_activity.",
-            "at_target": "Xác định blocked pid và quan hệ phụ thuộc khóa từ pg_locks/pg_stat_activity.",
-            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Xác định blocked pid và quan hệ phụ thuộc khóa từ pg_locks/pg_stat_activity.",
-            "essential": true
-          }
-        ],
         "prior_observations": [],
         "prior_turns": []
       },
@@ -2488,7 +2103,6 @@
             "criterion_ids": [
               "j16:c1"
             ],
-            "assistance": "NONE",
             "mode": "DESIGN",
             "depth": 4,
             "evidence_scope": "j16-case"
@@ -2497,20 +2111,6 @@
           "judgment": null,
           "introduction": ""
         },
-        "required_criterion_ids": [
-          "j16:c1"
-        ],
-        "target_criteria": [
-          {
-            "criterion_id": "j16:c1",
-            "description": "Distributed rate limiting",
-            "expected_evidence": "Thiết kế cập nhật bộ đếm phân tán nhất quán khi nhiều service cùng giới hạn request.",
-            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Thiết kế cập nhật bộ đếm phân tán nhất quán khi nhiều service cùng giới hạn request.",
-            "at_target": "Thiết kế cập nhật bộ đếm phân tán nhất quán khi nhiều service cùng giới hạn request.",
-            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Thiết kế cập nhật bộ đếm phân tán nhất quán khi nhiều service cùng giới hạn request.",
-            "essential": true
-          }
-        ],
         "prior_observations": [],
         "prior_turns": []
       },
@@ -2572,7 +2172,6 @@
             "criterion_ids": [
               "j17:c1"
             ],
-            "assistance": "NONE",
             "mode": "DEBUGGING",
             "depth": 3,
             "evidence_scope": "j17-case"
@@ -2581,20 +2180,6 @@
           "judgment": null,
           "introduction": ""
         },
-        "required_criterion_ids": [
-          "j17:c1"
-        ],
-        "target_criteria": [
-          {
-            "criterion_id": "j17:c1",
-            "description": "PostgreSQL EXPLAIN ANALYZE",
-            "expected_evidence": "Dùng execution plan thực tế để đánh giá lựa chọn index cho truy vấn.",
-            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Dùng execution plan thực tế để đánh giá lựa chọn index cho truy vấn.",
-            "at_target": "Dùng execution plan thực tế để đánh giá lựa chọn index cho truy vấn.",
-            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Dùng execution plan thực tế để đánh giá lựa chọn index cho truy vấn.",
-            "essential": true
-          }
-        ],
         "prior_observations": [],
         "prior_turns": []
       },
@@ -2656,7 +2241,6 @@
             "criterion_ids": [
               "j18:c1"
             ],
-            "assistance": "NONE",
             "mode": "DEBUGGING",
             "depth": 3,
             "evidence_scope": "j18-case"
@@ -2665,20 +2249,6 @@
           "judgment": null,
           "introduction": ""
         },
-        "required_criterion_ids": [
-          "j18:c1"
-        ],
-        "target_criteria": [
-          {
-            "criterion_id": "j18:c1",
-            "description": "Kubernetes OOMKilled",
-            "expected_evidence": "Dùng trạng thái container và số liệu bộ nhớ để chẩn đoán OOMKilled.",
-            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Dùng trạng thái container và số liệu bộ nhớ để chẩn đoán OOMKilled.",
-            "at_target": "Dùng trạng thái container và số liệu bộ nhớ để chẩn đoán OOMKilled.",
-            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Dùng trạng thái container và số liệu bộ nhớ để chẩn đoán OOMKilled.",
-            "essential": true
-          }
-        ],
         "prior_observations": [],
         "prior_turns": []
       },
@@ -2740,7 +2310,6 @@
             "criterion_ids": [
               "j19:c1"
             ],
-            "assistance": "NONE",
             "mode": "DEBUGGING",
             "depth": 3,
             "evidence_scope": "j19-case"
@@ -2749,20 +2318,6 @@
           "judgment": null,
           "introduction": ""
         },
-        "required_criterion_ids": [
-          "j19:c1"
-        ],
-        "target_criteria": [
-          {
-            "criterion_id": "j19:c1",
-            "description": "Spring transaction rollback",
-            "expected_evidence": "Giải thích rollback khi phương thức Spring có transaction gặp RuntimeException.",
-            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Giải thích rollback khi phương thức Spring có transaction gặp RuntimeException.",
-            "at_target": "Giải thích rollback khi phương thức Spring có transaction gặp RuntimeException.",
-            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Giải thích rollback khi phương thức Spring có transaction gặp RuntimeException.",
-            "essential": true
-          }
-        ],
         "prior_observations": [],
         "prior_turns": []
       },
@@ -2822,7 +2377,6 @@
             "criterion_ids": [
               "j20:c1"
             ],
-            "assistance": "NONE",
             "mode": "TECHNICAL_EXPLANATION",
             "depth": 2,
             "evidence_scope": "j20-case"
@@ -2831,20 +2385,6 @@
           "judgment": null,
           "introduction": ""
         },
-        "required_criterion_ids": [
-          "j20:c1"
-        ],
-        "target_criteria": [
-          {
-            "criterion_id": "j20:c1",
-            "description": "GraphQL DataLoader batching",
-            "expected_evidence": "Giải thích cách batch các yêu cầu resolver để giảm truy vấn N+1.",
-            "below_target": "Đưa ra cách xử lý trái với yêu cầu: Giải thích cách batch các yêu cầu resolver để giảm truy vấn N+1.",
-            "at_target": "Giải thích cách batch các yêu cầu resolver để giảm truy vấn N+1.",
-            "above_target": "Kiểm chứng giới hạn và đánh đổi của cách xử lý: Giải thích cách batch các yêu cầu resolver để giảm truy vấn N+1.",
-            "essential": true
-          }
-        ],
         "prior_observations": [],
         "prior_turns": []
       },

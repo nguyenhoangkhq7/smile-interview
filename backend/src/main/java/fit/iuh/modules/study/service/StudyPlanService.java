@@ -5,7 +5,6 @@ import fit.iuh.modules.application.ApplicationProfileRepository;
 import fit.iuh.modules.application.CompetencyProjection;
 import fit.iuh.modules.auth.entity.User;
 import fit.iuh.modules.evidence.EvidenceJson;
-import fit.iuh.modules.evidence.InterviewRun;
 import fit.iuh.modules.evidence.InterviewRunRepository;
 import fit.iuh.modules.session.entity.Session;
 import fit.iuh.modules.session.repository.SessionRepository;
@@ -28,7 +27,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.URI;
 import java.util.List;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.UUID;
@@ -87,36 +85,7 @@ public class StudyPlanService {
                 }).toList(),
                 result.skills().stream().filter(skill -> "NOT_ASSESSED".equals(skill.assessment()))
                         .map(CompetencyProjection.Skill::skillId).toList(),
-                reportWeaknesses(attempts, savedRuns), suggestions.project(profile, result, attempts, savedRuns));
-    }
-
-    private List<ReportWeakness> reportWeaknesses(List<Session> attempts, List<InterviewRun> savedRuns) {
-        var bySession = savedRuns.stream().collect(Collectors.toMap(InterviewRun::getSessionId, run -> run));
-        var latestBySkill = new LinkedHashMap<String, ReportWeakness>();
-        for (var attempt : attempts) {
-            var run = bySession.get(attempt.getId());
-            if (run == null) continue;
-            var visible = json.read(run.getPublicJson());
-            var report = visible.path("report");
-            if (!visible.path("is_finished").asBoolean() || visible.path("turns").isEmpty()) continue;
-
-            var bySkill = new LinkedHashMap<String, LinkedHashSet<String>>();
-            for (var objective : report.path("objectives")) {
-                String skillId = objective.path("skill_id").asText();
-                String assessment = objective.path("assessment").asText();
-                if (skillId.isBlank() || "NOT_ASSESSED".equals(assessment)) continue;
-                var notes = new LinkedHashSet<String>();
-                for (var note : objective.path("weaknesses")) {
-                    if (note.isTextual() && !note.asText().isBlank()) notes.add(note.asText().strip());
-                }
-                if (!notes.isEmpty() || (!assessment.isBlank() && !"INSUFFICIENT_EVIDENCE".equals(assessment))) {
-                    bySkill.computeIfAbsent(skillId, ignored -> new LinkedHashSet<>()).addAll(notes);
-                }
-            }
-            bySkill.forEach((skillId, notes) -> latestBySkill.putIfAbsent(skillId,
-                    new ReportWeakness(skillId, attempt.getId(), attempt.getAttemptNumber(), List.copyOf(notes))));
-        }
-        return latestBySkill.values().stream().filter(item -> !item.weaknesses().isEmpty()).toList();
+                suggestions.project(profile, result, attempts, savedRuns));
     }
 
     public StudyTask createTask(UUID profileId, User user, CreateTaskInput input) {

@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, List, NamedTuple, Optional
+from typing import Any, Callable, Dict, List, NamedTuple
 from skill_gap.baselines.base import BaselineMethod
 
 

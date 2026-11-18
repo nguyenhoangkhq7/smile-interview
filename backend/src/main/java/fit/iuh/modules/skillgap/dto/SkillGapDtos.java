@@ -1,6 +1,7 @@
 package fit.iuh.modules.skillgap.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;
@@ -20,30 +21,27 @@ public final class SkillGapDtos {
             @JsonProperty("matched_cv_skill_name") String matchedCvSkillName,
             @JsonProperty("semantic_alignment") String semanticAlignment,
             @JsonProperty("matched_cv_skill_id") String matchedCvSkillId,
-            @JsonProperty("is_substituted") boolean isSubstituted,
-            @JsonProperty("gap_magnitude") double gapMagnitude,
-            @JsonProperty("severity") double severity,
             @JsonProperty("priority") double priority,
             @JsonProperty("required_proficiency") double requiredProficiency,
-            @JsonProperty("candidate_proficiency") double candidateProficiency,
             @JsonProperty("cv_evidence_spans") List<String> cvEvidenceSpans,
             @JsonProperty("context_job") String contextJob,
-            @JsonProperty("suggested_strategy") String suggestedStrategy,
-            @JsonProperty("degraded") boolean degraded,
-            @JsonProperty("flags") List<String> flags,
             @JsonProperty("importance_weight") double importanceWeight,
-            @JsonProperty("jd_reasoning") String jdReasoning,
+            @JsonInclude(JsonInclude.Include.NON_EMPTY)
             @JsonProperty("jd_evidence_spans") List<String> jdEvidenceSpans,
             // Keep HTTP DTOs independent of Jackson 2/3 tree implementations.
-            @JsonProperty("job_tasks") List<Map<String, Object>> jobTasks,
-            @JsonProperty("c_evidence") double cEvidence,
-            @JsonProperty("recency_flag") boolean recencyFlag
+            @JsonProperty("job_tasks") List<Map<String, Object>> jobTasks
+    ) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record SkillGapReportDto(
+            @JsonProperty("matching_score") Double matchingScore,
+            @JsonProperty("degraded") boolean degraded
     ) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record AnalyzeWithReportResponseDto(
             @JsonProperty("analysis_id") String analysisId,
             @JsonProperty("skills") List<SkillGapResultDto> skills,
-            @JsonProperty("report") Map<String, Object> report
+            @JsonProperty("report") SkillGapReportDto report
     ) {}
 }

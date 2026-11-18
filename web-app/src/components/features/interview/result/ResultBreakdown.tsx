@@ -89,7 +89,7 @@ function SkillCard({ skill }: { skill: ResultData['skills'][number] }) {
         </summary>
         <div className="mt-3 space-y-4">
           {skill.objectives.map(objective => {
-            const criteria = objective.criteria?.filter(criterion => criterion.turns_spent > 0 || criterion.assessment !== 'NOT_ASSESSED') ?? [];
+            const criteria = objective.criteria?.filter(criterion => criterion.assessment !== 'NOT_ASSESSED') ?? [];
             return (
               <div key={objective.objective_id} className="space-y-2 text-sm wrap-anywhere">
                 <h4 className="font-semibold">{objective.claim}</h4>
@@ -152,13 +152,13 @@ export function ResultQuestions({ questions }: { questions: ResultData['question
         <h2 className="text-xl font-bold">Chi tiết câu hỏi phỏng vấn <span className="text-sm font-medium text-muted-foreground">({questions.length} câu)</span></h2>
         {filters.length > 2 && <ResultFilters filters={filters} value={filter} label="Lọc câu hỏi" onChange={value => { setFilter(value); setLimit(5); }} />}
       </div>
-      {filtered.slice(0, limit).map(({ turn, index, evidence, status }) => (
+      {filtered.slice(0, limit).map(({ turn, skillId, index, evidence, status }) => (
         <details key={turn.turn_id} className="group rounded-xl border border-slate-200 bg-card shadow-xs">
           <summary className="flex cursor-pointer list-none items-center gap-3 p-4">
             <span className={cn('grid size-8 shrink-0 place-items-center rounded-lg text-xs font-bold', skillStatuses[status].tone)}>{String(index + 1).padStart(2, '0')}</span>
             <span className="min-w-0 flex-1">
               <span className="mb-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                {turn.skill_id && <span>{skillLabel(turn.skill_id)}</span>}
+                {skillId && <span>{skillLabel(skillId)}</span>}
                 <span>{questionLabels[status]}</span>
               </span>
               <span className="line-clamp-2 text-sm font-semibold wrap-anywhere">{turn.question}</span>

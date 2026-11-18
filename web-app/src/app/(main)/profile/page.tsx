@@ -1,9 +1,8 @@
 'use client';
 
-import type { LucideIcon } from 'lucide-react';
 import {
-  BarChart3, CalendarDays, Coins, Eye, LockKeyhole,
-  MapPin, PencilLine, Sparkles, Star, Upload, UserRound,
+  CalendarDays, Eye, LockKeyhole,
+  MapPin, PencilLine, Sparkles, Upload, UserRound,
   BriefcaseBusiness, ChevronDown, CheckCircle, AlertCircle, X, FileText
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
@@ -17,12 +16,6 @@ const PdfViewerModal = dynamic(() => import('@/components/common/PdfViewerModal'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type StatItem = {
-  label: string;
-  value: number;
-  icon: LucideIcon;
-  iconClass: string;
-};
 
 // ── Toast helper (lightweight, no external dep) ───────────────────────────────
 
@@ -50,36 +43,6 @@ function Toast({ toast }: { toast: ToastState }) {
         ? <CheckCircle size={15} />
         : <AlertCircle size={15} />}
       {toast.message}
-    </div>
-  );
-}
-
-// ── Admin-only Stats block ────────────────────────────────────────────────────
-
-function AdminStatsBlock({ stats }: { stats: StatItem[] }) {
-  return (
-    <div className={styles.card}>
-      <div className={styles.cardHead}>
-        <div>
-          <h2 className={styles.cardTitle}>Thống kê tài khoản</h2>
-          <p className={styles.cardSubText}>Hoạt động phân tích và điểm số trong hệ thống</p>
-        </div>
-        <span className={styles.statsBrandText}>ATS - CAREER</span>
-      </div>
-
-      <div className={styles.statsGrid}>
-        {stats.map((stat, idx) => (
-          <div key={idx} className={styles.statCard}>
-            <div className={styles.statCardHeader}>
-              <span className={styles.statCardLabel}>{stat.label}</span>
-              <span className={`${styles.statCardIcon} ${stat.iconClass}`}>
-                <stat.icon size={14} strokeWidth={2.5} />
-              </span>
-            </div>
-            <span className={styles.statCardVal}>{stat.value}</span>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
@@ -341,14 +304,6 @@ export default function ProfilePage() {
       setTimeout(() => setPwToast(null), 5000);
     }
   };
-
-  // ── Admin stats (only rendered for ADMIN role) ───────────────────
-  const stats: StatItem[] = [
-    { label: 'LƯỢT PHÂN TÍCH CV', value: 0, icon: BarChart3, iconClass: styles.statIconBlue },
-    { label: 'PHÂN TÍCH HÔM NAY', value: 0, icon: CalendarDays, iconClass: styles.statIconOrange },
-    { label: 'ĐIỂM TRUNG BÌNH', value: 0, icon: Star, iconClass: styles.statIconGreen },
-    { label: 'COINS', value: 0, icon: Coins, iconClass: styles.statIconAmber },
-  ];
 
   return (
     <ProtectedRoute>
@@ -696,9 +651,6 @@ export default function ProfilePage() {
               </div>
             </div>
           </div>
-
-          {/* ── Card 4: Thống kê tài khoản (Admin only) ───────────── */}
-          {user?.role === 'ADMIN' && <AdminStatsBlock stats={stats} />}
 
           {/* ── Coach Banner ───────────────────────────────────────── */}
           <div className={styles.coachingBanner}>

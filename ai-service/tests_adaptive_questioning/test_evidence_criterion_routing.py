@@ -46,7 +46,8 @@ def test_one_criterion_per_turn_until_all_three_are_verified(setup, monkeypatch)
         result = answer(engine, result.snapshot)
     assert len(asked) == len(set(asked)) == 3
     assert result.public.report.objectives[0].assessment == Assessment.AT
-    assert all(len(c["target_criteria"]) == len(c["objective"]["criteria"]) == 1 for c in contexts)
+    assert all(len(c["required_question_contract"]["criterion_ids"]) == len(c["objective"]["criteria"]) == 1
+               for c in contexts)
     assert all(c["probe_reason"] for c in contexts)
 
 
@@ -66,7 +67,7 @@ def test_a_single_criterion_can_take_four_turns_with_narrowing_gaps(setup, monke
     result = answer(engine, result.snapshot)
     assert result.public.is_finished
     assert result.public.report.objectives[0].assessment == Assessment.AT
-    assert result.public.report.objectives[0].criteria[0].turns_spent == 4
+    assert state_of(result).criterion_progress[criterion[0]].turns_spent == 4
 
 
 def test_clarifications_and_diagnostics_are_available_for_each_criterion(setup):
@@ -171,24 +172,6 @@ def test_bundled_question_is_rejected_and_regenerated(setup, monkeypatch, kind):
     assert len(calls[1]["required_question_contract"]["criterion_ids"]) == 1
 
 
-def test_recovery_rebuilds_per_criterion_actions_from_legacy_turns(setup):
-    provider, engine, _ = setup
-    provider.observation, provider.performance = "UNCLEAR", "UNDETERMINED"
-    result = answer(engine, start(engine).snapshot)
-    result = answer(engine, result.snapshot)
-    payload = result.snapshot.model_dump(mode="json")
-    for value in payload["objectives"].values():
-        value.pop("criterion_progress")
-        value.pop("active_criterion_id")
-    restored = Snapshot.model_validate(payload)
-    provider.observation, provider.performance = "SUPPORTS", "AT_TARGET"
-    result = answer(engine, restored)
-    progress = next(iter(state_of(result).criterion_progress.values()))
-    assert progress.turns_spent == 3
-    assert progress.clarification_spent
-    assert state_of(result).assessment == Assessment.AT
-
-
 def test_public_projection_does_not_modify_snapshot(setup):
     _, engine, _ = setup
     snapshot = start(engine).snapshot
@@ -197,9 +180,9 @@ def test_public_projection_does_not_modify_snapshot(setup):
     assert snapshot.model_dump_json() == saved
 
 
-def test_invalid_soft_and_hard_policy_is_rejected():
-    with pytest.raises(ValueError, match="hard limit"):
-        InterviewPolicy(criterion_soft_limit=4, max_turns_per_criterion=3)
+def test_criterion_hard_limit_is_not_below_soft_limit():
+    from adaptive_questioning.evidence.criterion_progress import CRITERION_SOFT_LIMIT, MAX_TURNS_PER_CRITERION
+    assert MAX_TURNS_PER_CRITERION >= CRITERION_SOFT_LIMIT
 
 
 def test_soft_limit_covers_unasked_criterion_before_returning_to_deep_probe(setup, monkeypatch):
@@ -217,7 +200,7 @@ def test_soft_limit_covers_unasked_criterion_before_returning_to_deep_probe(setu
     assert result.snapshot.pending_turn.question.criterion_ids == first
     result = answer(engine, result.snapshot)
     assert state_of(result).assessment == Assessment.AT
-    assert result.public.report.objectives[0].criteria[0].turns_spent == 4
+    assert state_of(result).criterion_progress[first[0]].turns_spent == 4
 
 
 def test_extension_is_requested_separately_for_each_criterion(setup, monkeypatch):

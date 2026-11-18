@@ -3,7 +3,7 @@ import threading
 from typing import List, Dict, Optional, Tuple, Protocol
 from pydantic import BaseModel
 
-from skill_gap.domain.enums import RichnessLabel, SkillType, SeniorityLevel
+from skill_gap.domain.enums import RichnessLabel, SeniorityLevel
 from skill_gap.domain.models import ExtractedCVSkill, SpanMapping, JobBlock, ProficiencyResult, SpanRichness, UNASSIGNED_JOB_ID
 from skill_gap.adapters.config import AppConfig
 from skill_gap.adapters.llm_client import LLMClient

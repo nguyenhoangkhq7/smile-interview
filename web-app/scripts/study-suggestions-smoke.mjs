@@ -11,15 +11,15 @@ const tasks = [];
 const errors = [];
 function objective() {
   return { skillId: 'sql', objectiveId: 'objective-a', claim: 'Phân tích truy vấn SQL chậm',
-    assessment: phase === 3 ? 'DEMONSTRATED_AT_TARGET' : 'DEMONSTRATED_BELOW_TARGET', source: source(phase),
+    source: source(phase),
     criteria: Array.from({ length: 5 }, (_, i) => {
       const number = i + 1;
       const kind = number === 1 || (phase > 1 && number === 2) || (phase === 3 && number === 3) ? 'MET'
         : number <= 3 ? 'REVIEW' : 'UNASSESSED';
       const assessed = kind !== 'UNASSESSED';
-      return { criterionId: `c${number}`, description: `Tiêu chí ${number}`, essential: true,
+      return { criterionId: `c${number}`, description: `Tiêu chí ${number}`,
         assessment: kind === 'MET' ? 'DEMONSTRATED_AT_TARGET' : kind === 'REVIEW' ? 'DEMONSTRATED_BELOW_TARGET' : 'NOT_ASSESSED',
-        kind, selectedByDefault: kind === 'REVIEW', reason: assessed ? 'Dựa trên bằng chứng phỏng vấn.' : 'Chưa đánh giá; có thể chọn ôn thêm.',
+        kind,
         goal: `Kết quả cần đạt ${number}`, source: assessed ? source(phase) : null, lastAssessment: assessed ? source(phase) : null };
     }) };
 }
@@ -40,7 +40,7 @@ try {
       'access-control-allow-origin': base, 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' }, body: JSON.stringify(body) });
     if (request.method() === 'OPTIONS') return send({});
     if (url.pathname.endsWith('/knowledge-gaps')) return send({ completedAttempts: phase, weak: [], needsVerification: [],
-      notAssessedSkillIds: [], reportWeaknesses: [], objectiveSuggestions: [objective()] });
+      notAssessedSkillIds: [], objectiveSuggestions: [objective()] });
     if (url.pathname.endsWith('/tasks') && request.method() === 'POST') {
       const input = JSON.parse(request.postData()); requests.push(input);
       if (failNext) { failNext = false; return send({ message: 'Không lưu được dữ liệu thử nghiệm.' }, 503); }

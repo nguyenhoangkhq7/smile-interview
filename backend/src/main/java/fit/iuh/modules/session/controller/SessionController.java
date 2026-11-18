@@ -46,11 +46,6 @@ public class SessionController {
         return ResponseEntity.ok(sessionService.getSessionsByUser(userId));
     }
 
-    @GetMapping
-    public ResponseEntity<List<SessionResponse>> getAllSessions() {
-        return ResponseEntity.ok(sessionService.getAllSessions());
-    }
-
     @PutMapping("/{sessionId}")
     public ResponseEntity<SessionResponse> updateSession(
             @PathVariable String sessionId,
@@ -87,17 +82,6 @@ public class SessionController {
                 "success", true,
                 "newSessionId", newSessionId
         ));
-    }
-
-    @PostMapping("/{sessionId}/turns/{turnId}/feedback")
-    public ResponseEntity<Map<String, Object>> updateTurnFeedback(
-            @PathVariable String sessionId,
-            @PathVariable Long turnId,
-            @RequestBody Map<String, Object> body) {
-        Integer hrRating = body.get("hrRating") != null ? ((Number) body.get("hrRating")).intValue() : null;
-        String hrFeedback = (String) body.get("hrFeedback");
-        sessionService.updateTurnFeedback(sessionId, turnId, hrRating, hrFeedback);
-        return ResponseEntity.ok(Map.of("success", true, "message", "Turn feedback saved successfully"));
     }
 
     @GetMapping("/raw-texts")

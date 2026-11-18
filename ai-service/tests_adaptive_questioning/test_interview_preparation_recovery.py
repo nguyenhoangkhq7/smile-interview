@@ -148,11 +148,12 @@ def test_cache_returns_independent_results_and_expires():
 
     def compute():
         calls.append(True)
-        return provider.blueprint(context)
+        return BlueprintBuilder(provider).build([skill()])
 
     first = cache.get_or_compute(context, compute)
+    claim = first.objectives[0].claim
     first.objectives[0].claim = "changed by validation"
-    assert cache.get_or_compute(context, compute).objectives[0].claim == "Diagnose queries"
+    assert cache.get_or_compute(context, compute).objectives[0].claim == claim
     assert len(calls) == 1
     clock.now += CACHE_TTL_SECONDS + 1
     cache.get_or_compute(context, compute)

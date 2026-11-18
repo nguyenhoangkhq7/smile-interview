@@ -2,7 +2,6 @@ package fit.iuh;
 
 import fit.iuh.modules.auth.entity.Role;
 import fit.iuh.modules.auth.entity.User;
-import fit.iuh.modules.hrevaluation.entity.HrEvaluation;
 import fit.iuh.modules.session.entity.JobDescription;
 import fit.iuh.modules.session.entity.Resume;
 import fit.iuh.modules.session.entity.Session;
@@ -53,12 +52,8 @@ class BackendApplicationTests {
                 .startedAt(LocalDateTime.now()).build();
         entityManager.persist(session);
         SessionTurn turn = SessionTurn.builder().sessionId(session.getId())
-                .question("Explain a transaction").answer("An atomic unit of work")
-                .hrRating(5).hrFeedback("Clear answer").build();
-        HrEvaluation evaluation = HrEvaluation.builder().sessionId(session.getId()).userId(user.getId())
-                .ratingMatchingAccuracy(5).ratingAiRationale(4).ratingQuestionQuality(5).build();
+                .question("Explain a transaction").answer("An atomic unit of work").build();
         entityManager.persist(turn);
-        entityManager.persist(evaluation);
         entityManager.flush();
         entityManager.clear();
 
@@ -67,8 +62,7 @@ class BackendApplicationTests {
         assertThat(entityManager.find(Resume.class, resume.getId()).getRawText()).isEqualTo("Java and PostgreSQL");
         assertThat(entityManager.find(JobDescription.class, jd.getId()).getRawText()).isEqualTo("Java required");
         assertThat(entityManager.find(Session.class, session.getId()).getSkillGapJson()).isEqualTo("[]");
-        assertThat(entityManager.find(SessionTurn.class, turn.getId()).getHrFeedback()).isEqualTo("Clear answer");
-        assertThat(entityManager.find(HrEvaluation.class, evaluation.getId()).getRatingMatchingAccuracy()).isEqualTo(5);
+        assertThat(entityManager.find(SessionTurn.class, turn.getId()).getAnswer()).isEqualTo("An atomic unit of work");
 
         entityManager.createNativeQuery("DELETE FROM resumes WHERE id = :id")
                 .setParameter("id", resume.getId()).executeUpdate();
@@ -80,7 +74,6 @@ class BackendApplicationTests {
                 .setParameter("id", session.getId()).executeUpdate();
         entityManager.clear();
         assertThat(entityManager.find(SessionTurn.class, turn.getId())).isNull();
-        assertThat(entityManager.find(HrEvaluation.class, evaluation.getId())).isNull();
     }
 
 }

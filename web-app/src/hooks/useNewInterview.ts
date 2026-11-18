@@ -67,6 +67,11 @@ export function useNewInterview() {
 
   const fileInputCvRef = useRef<HTMLInputElement>(null);
   const fileInputJdRef = useRef<HTMLInputElement>(null);
+  const analysisRequest = useRef<AbortController | null>(null);
+  const initialSession = useRef<string | null>(null);
+  const [acceptedJob, setAcceptedJob] = useState(false);
+  const pendingJobKey = user?.id ? 'pending-analysis:' + user.id : null;
+  useEffect(() => () => analysisRequest.current?.abort(), [token]);
 
   useEffect(() => {
     let mounted = true;
@@ -101,7 +106,6 @@ export function useNewInterview() {
                 date: s.date,
                 hasAssessment,
                 hasQuestions,
-                competencyFitScore: s.overallScore,
                 stage,
                 answeredCount,
                 totalQuestions,
@@ -144,44 +148,61 @@ export function useNewInterview() {
   }, [token]);
 
   const handleRunAssessment = useCallback(
-    async (forceRefresh = false, overrideSessionId?: string | null) => {
+    async (forceRefresh = false, overrideSessionId?: string | null, previousJob?: string) => {
       const targetSessionId = overrideSessionId || sessionId;
       if (!targetSessionId) return;
+      analysisRequest.current?.abort();
+      const request = new AbortController();
+      analysisRequest.current = request;
+      setAcceptedJob(Boolean(previousJob));
       setAnalyzing(true);
       setApiError(null);
       try {
-        const result = await cvJdMatchingService.analyzeSkillGap(targetSessionId, forceRefresh);
+        const result = await cvJdMatchingService.analyzeSkillGap(targetSessionId, forceRefresh, request.signal, id => {
+          if (request.signal.aborted) return;
+          const url = new URL(window.location.href);
+          url.searchParams.set('sessionId', targetSessionId);
+          url.searchParams.set('jobId', id);
+          if (pendingJobKey) {
+            try { sessionStorage.setItem(pendingJobKey, new URLSearchParams({ sessionId: targetSessionId, jobId: id }).toString()); }
+            catch { /* The URL still identifies the job when storage is unavailable. */ }
+          }
+          window.history.replaceState(null, '', url);
+          setAcceptedJob(true);
+        }, previousJob);
+        if (request.signal.aborted) return;
         setAnalysis(result);
         setSessionId(targetSessionId);
+        if (pendingJobKey) {
+          try { sessionStorage.removeItem(pendingJobKey); } catch { /* Storage is optional. */ }
+        }
       } catch (err) {
+        if (request.signal.aborted) return;
         const error = err as Error;
         console.error('[useNewInterview] analyzeSkillGap error:', error);
         setApiError('Không thể phân tích kỹ năng. Vui lòng thử lại.');
       } finally {
-        setAnalyzing(false);
+        if (!request.signal.aborted) setAnalyzing(false);
       }
     },
-    [sessionId]
+    [sessionId, pendingJobKey]
   );
 
   const handleViewAssessment = useCallback(
-    async (id: string) => {
+    async (id: string, previousJob?: string) => {
       try {
         const session = await historyService.getSessionById(id);
-        if (!session) return;
-        setSessionId(session.id);
-        setRoleTitle(session.roleTitle);
-        setProfileTitle(session.roleTitle);
-        setIngested(true);
-        if (session.skillGapResults && session.skillGapReport) {
-          setAnalysis({
-            analysis_id: session.id,
-            skills: session.skillGapResults,
-            report: session.skillGapReport,
-          });
-        } else {
-          await handleRunAssessment(false, session.id);
+        if (!session && !previousJob) {
+          setApiError('Không tải được thông tin phiên. Vui lòng mở lại phiên từ lịch sử.');
+          return;
         }
+        setSessionId(id);
+        if (session) {
+          setRoleTitle(session.roleTitle);
+          setProfileTitle(session.roleTitle);
+        }
+        setIngested(true);
+        await handleRunAssessment(false, id, previousJob);
       } catch (e) {
         console.error('[useNewInterview] viewAssessment', e);
       }
@@ -191,9 +212,27 @@ export function useNewInterview() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const id = new URLSearchParams(window.location.search).get('sessionId');
-    if (id) handleViewAssessment(id);
-  }, [handleViewAssessment]);
+    if (!token || !pendingJobKey || analysisRequest.current || initialSession.current) return;
+    const url = new URL(window.location.href);
+    const params = url.searchParams;
+    if (!params.has('sessionId')) {
+      try {
+        const pending = new URLSearchParams(sessionStorage.getItem(pendingJobKey) ?? '');
+        const session = pending.get('sessionId');
+        const job = pending.get('jobId');
+        if (session && job) {
+          params.set('sessionId', session);
+          params.set('jobId', job);
+          window.history.replaceState(null, '', url);
+        }
+      } catch { /* A new session can still start without browser storage. */ }
+    }
+    const id = params.get('sessionId');
+    if (token && id && !analysisRequest.current && initialSession.current !== id) {
+      initialSession.current = id;
+      void handleViewAssessment(id, params.get('jobId') ?? undefined);
+    }
+  }, [handleViewAssessment, token, pendingJobKey]);
 
   const validateFile = useCallback((file: File, zone: 'cv' | 'jd'): boolean => {
     const maxSize = 10 * 1024 * 1024;
@@ -306,6 +345,10 @@ export function useNewInterview() {
   );
 
   const handleReset = useCallback(() => {
+    analysisRequest.current?.abort();
+    analysisRequest.current = null;
+    initialSession.current = null;
+    setAcceptedJob(false);
     setAnalysis(null);
     setCvFile(null);
     setJdFile(null);
@@ -320,11 +363,15 @@ export function useNewInterview() {
     setProfileTitle('');
     setCompany('');
     if (typeof window !== 'undefined') {
+      if (pendingJobKey) {
+        try { sessionStorage.removeItem(pendingJobKey); } catch { /* Storage is optional. */ }
+      }
       const url = new URL(window.location.href);
       url.searchParams.delete('sessionId');
+      url.searchParams.delete('jobId');
       window.history.pushState({}, '', url.toString());
     }
-  }, []);
+  }, [pendingJobKey]);
 
   const handleStartInterview = useCallback(async () => {
     const targetSessionId = sessionId || analysis?.analysis_id;
@@ -367,7 +414,7 @@ export function useNewInterview() {
         ? jdFile.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ')
         : 'Software Engineer');
 
-    const newSessionId = `session-${Date.now()}`;
+    const newSessionId = `session-${crypto.randomUUID()}`;
     setRoleTitle(initialRole);
     setProfileTitle(initialRole);
 
@@ -458,6 +505,7 @@ export function useNewInterview() {
     jdError,
     uploading,
     analyzing,
+    acceptedJob,
     generating,
     uploadProgress,
     apiError,

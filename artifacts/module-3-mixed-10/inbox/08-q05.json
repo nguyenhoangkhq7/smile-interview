@@ -1,0 +1,6 @@
+{
+  "operation": "respond",
+  "from": "07-q04",
+  "scenario": "Trả lời đúng và ngắn đúng phạm vi câu hỏi mới về None và danh sách rỗng. Không nộp lại phần dedup của câu trước.",
+  "answer": "if not events:\n    return []\n\nEm đặt đoạn này ở đầu hàm. Theo kiểu đầu vào của câu hỏi, cả None và danh sách rỗng đều đi vào nhánh này. Danh sách có phần tử đi tiếp vào phần xử lý."
+}

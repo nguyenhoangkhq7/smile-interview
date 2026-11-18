@@ -12,6 +12,9 @@ def single_question(text: str) -> bool:
     prose = re.sub(r'''(["'])[^\s"']*\1''', "", prose)
     if prose.count("?") > 1:
         return False
+    if re.search(r"\b(?:hãy|bạn hãy)\b.+?[.!;]\s*(?:sau đó|tiếp theo),?\s*(?:bạn\s+)?hãy\b",
+                 prose, re.IGNORECASE | re.DOTALL):
+        return False
     items = re.findall(r"^\s*(?:\d+[.)]|[-*])\s+(.+)$", prose, re.MULTILINE)
     return sum(_response_request(item) for item in items) < 2
 
@@ -24,22 +27,24 @@ def _response_request(item: str) -> bool:
     return bool(conditional and re.search(command, item, re.IGNORECASE))
 
 
-def question_errors(question: Question, context: dict[str, object], criteria: list[str]) -> list[str]:
+def question_errors(question: Question, context: dict[str, object]) -> list[str]:
+    contract = context["required_question_contract"]
     errors = []
-    if not question.surprising_fact_C.strip() or not question.hypothesis_A.strip():
-        errors.append("Abductive CoT requires nonempty surprising_fact_C and hypothesis_A before writing the question")
-    if question.mode != context["mode"]:
+    if question.mode != contract["mode"]:
         errors.append("mode must equal required_question_contract.mode exactly")
-    if question.depth != context["question_depth"]:
+    if question.depth != contract["depth"]:
         errors.append("depth must equal required_question_contract.depth exactly (L1–L4, not proficiency)")
     if not question.evidence_scope.strip():
         errors.append("evidence_scope must be a nonempty stable case identifier")
-    if "required_evidence_scope" in context and question.evidence_scope != context["required_evidence_scope"]:
+    if "evidence_scope" in contract and question.evidence_scope != contract["evidence_scope"]:
         errors.append("CLARIFY must preserve required_question_contract.evidence_scope exactly")
-    if len(question.criterion_ids) != 1 or question.criterion_ids != criteria:
+    if len(question.criterion_ids) != 1 or question.criterion_ids != contract["criterion_ids"]:
         errors.append("criterion_ids must equal required_question_contract.criterion_ids exactly, with ONE criterion")
     if not single_question(question.text):
         errors.append("Ask exactly ONE response task; remove independent subquestions or numbered requests")
+    if re.search(r"\b(?:hãy|bạn cần)\s+(?:thử\s+)?(?:dùng|sử dụng|mở|truy cập)\s+ChatGPT\b",
+                 question.text, re.IGNORECASE):
+        errors.append("Provide any needed AI output in the question and ask one task answerable directly here")
     if context.get("interaction_mode") == "VOICE" and len(question.text.split()) > VOICE_MAX_WORDS:
         errors.append(
             f"VOICE question must use at most {VOICE_MAX_WORDS} whitespace-separated words including scenario; "

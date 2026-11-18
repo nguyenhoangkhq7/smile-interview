@@ -14,6 +14,4 @@ public interface SessionRepository extends JpaRepository<Session, String> {
     java.util.Optional<Session> lockById(@org.springframework.data.repository.query.Param("id") String id);
 
     java.util.List<Session> findByUserIdOrderByStartedAtDesc(java.util.UUID userId);
-
-    java.util.List<Session> findAllByOrderByStartedAtDesc();
 }

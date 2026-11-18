@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { historyService, type SessionHistoryItem } from '@/services/historyService';
+import { useAuthStore } from '@/store/authStore';
 
 export type TimeFilter = 'all' | 'week' | 'month';
 export type ScoreFilter = 'all' | 'high' | 'medium' | 'low';
@@ -14,23 +15,37 @@ function normalizeScore(item: SessionHistoryItem): number {
 }
 
 export function useHistoryFilter() {
+  const token = useAuthStore((state) => state.token);
   const [searchTerm, setSearchTerm]   = useState('');
   const [timeFilter, setTimeFilter]   = useState<TimeFilter>('all');
   const [scoreFilter, setScoreFilter] = useState<ScoreFilter>('all');
   const [historyData, setHistoryData] = useState<SessionHistoryItem[]>([]);
   const [loading, setLoading]         = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
+    if (!token) return;
+    let active = true;
     historyService.getHistory()
-      .then(setHistoryData)
-      .catch((err) => console.error('[useHistoryFilter]', err))
-      .finally(() => setLoading(false));
-  }, []);
+      .then((items) => { if (active) setHistoryData(items); })
+      .catch(() => {
+        if (active) setError('Không thể tải lịch sử phỏng vấn. Vui lòng thử lại.');
+      })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [token, reloadKey]);
+
+  const retry = () => {
+    setError(null);
+    setLoading(true);
+    setReloadKey((key) => key + 1);
+  };
 
   const filtered = useMemo(() => {
     return historyData.filter((item) => {
       // Search
-      const title = item.roleTitle || item.cvFilename || '';
+      const title = [item.roleTitle, item.cvFilename, item.applicationProfileTitle].filter(Boolean).join(' ');
       const matchSearch =
         !searchTerm ||
         title.toLowerCase().includes(searchTerm.toLowerCase());
@@ -60,6 +75,7 @@ export function useHistoryFilter() {
   return {
     filtered,
     loading,
+    error, retry,
     searchTerm, setSearchTerm,
     timeFilter, setTimeFilter,
     scoreFilter, setScoreFilter,

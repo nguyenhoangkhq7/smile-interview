@@ -22,8 +22,6 @@ export interface QuestionBankItem {
   improvements?: string;
   suggestedAnswer?: string;
   suggested_answer?: string;
-  hrRating?: number;
-  hrFeedback?: string;
 }
 
 export type ExportableQuestionItem = QuestionBankItem;

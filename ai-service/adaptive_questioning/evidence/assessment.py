@@ -1,13 +1,29 @@
 """Grounded evidence ledger and deterministic sufficiency; CV priors never decide results."""
+import re
+import unicodedata
 from .models import Action, Assessment, Judgment, ObjectiveState, Observation, RecordedEvidence, Turn
 from .policy_config import InterviewPolicy
-from .criterion_progress import progress_for, record_progress
-from .conversation import ACKNOWLEDGMENT, MAX_FEEDBACK_LENGTH
+from .criterion_progress import CRITERION_SOFT_LIMIT, progress_for, record_progress
+from .conversation import ACKNOWLEDGMENT, INABILITY_ACKNOWLEDGMENT, MAX_FEEDBACK_LENGTH
 from .excerpts import source_excerpt, source_lines
 
 VALID_PERFORMANCE = {"BELOW", "AT_TARGET", "ABOVE"}
 SUBSTANTIVE = {"SUPPORTS", "CONTRADICTS"}
 TERMINAL = {Assessment.AT, Assessment.ABOVE, Assessment.BELOW, Assessment.NOT_DEMONSTRATED}
+
+
+def standalone_inability(turn: Turn) -> Judgment | None:
+    answer = (turn.answer or "").strip()
+    normalized = " ".join(unicodedata.normalize("NFC", answer).casefold().split())
+    if not re.fullmatch(r"(?:dạ[, ]+)?(?:(?:tôi|em|mình) )?(?:không|chưa) biết"
+                        r"(?: câu trả lời| trả lời| cách làm)?(?: ạ)?[.!…]*", normalized):
+        return None
+    return Judgment(
+        explicit_inability=True, inability_excerpt=answer, feedback=INABILITY_ACKNOWLEDGMENT,
+        observations=[Observation(criterion_id=key, observation="NO_EVIDENCE", performance="UNDETERMINED",
+                                  rationale="Ứng viên cho biết chưa trả lời được câu hỏi này.")
+                      for key in turn.question.criterion_ids],
+    )
 
 
 def validate_judgment(judgment: Judgment, turn: Turn) -> None:
@@ -57,14 +73,9 @@ def apply_judgment(state: ObjectiveState, turn: Turn, policy: InterviewPolicy | 
     assert judgment is not None
     validate_judgment(judgment, turn)
     state.turns_spent += 1
-    state.clarification_spent |= turn.action == Action.CLARIFY
-    state.easier_spent |= turn.action == Action.EASIER
-    state.deeper_spent |= turn.action == Action.DEEPER
-    if turn.question.assistance == "HINT":
-        state.assisted_criteria = sorted(set(state.assisted_criteria) | set(turn.question.criterion_ids))
     for observation in judgment.observations:
         _record_observation(state, turn, observation)
-    record_progress(state, turn, policy or InterviewPolicy())
+    record_progress(state, turn)
     state.assessment = assess(state, policy)
     if judgment.feedback_contains_hint:
         state.assisted_criteria = sorted(set(state.assisted_criteria) | set(turn.question.criterion_ids))
@@ -72,7 +83,8 @@ def apply_judgment(state: ObjectiveState, turn: Turn, policy: InterviewPolicy | 
 
 def _record_observation(state: ObjectiveState, turn: Turn, observation: Observation) -> None:
     evidence = RecordedEvidence(
-        **observation.model_dump(), turn_id=turn.turn_id, question_depth=turn.question_depth,
+        **observation.model_dump(exclude={"response_line_range", "resolves_contradiction", "unresolved_aspects"}),
+        turn_id=turn.turn_id, question_depth=turn.question_depth,
         evidence_scope=turn.question.evidence_scope,
         independent=observation.criterion_id not in state.assisted_criteria,
         explicit_inability=bool(turn.judgment and turn.judgment.explicit_inability),
@@ -83,10 +95,16 @@ def _record_observation(state: ObjectiveState, turn: Turn, observation: Observat
         state.evidence_history.append(evidence)
     if not evidence.independent or evidence.question_depth != state.objective.target_depth:
         return  # diagnostics and extensions never overwrite target results
-    _update_target_result(state, turn, evidence)
+    _update_target_result(state, turn, evidence, resolves_contradiction=observation.resolves_contradiction)
 
 
-def _update_target_result(state: ObjectiveState, turn: Turn, evidence: RecordedEvidence) -> None:
+def _update_target_result(
+    state: ObjectiveState,
+    turn: Turn,
+    evidence: RecordedEvidence,
+    *,
+    resolves_contradiction: bool = False,
+) -> None:
     key = evidence.criterion_id
     previous = state.criterion_results.get(key)
     if evidence.explicit_inability and previous and previous.performance in {"AT_TARGET", "ABOVE"}:
@@ -105,7 +123,7 @@ def _update_target_result(state: ObjectiveState, turn: Turn, evidence: RecordedE
     )
     if incompatible and not recovered_after_easier and key not in state.contradictions:
         state.contradictions.append(key)
-    if turn.action == Action.VERIFY and evidence.resolves_contradiction and key in state.contradictions:
+    if turn.action == Action.VERIFY and resolves_contradiction and key in state.contradictions:
         state.contradictions.remove(key)
     state.criterion_results[key] = evidence
 
@@ -132,13 +150,12 @@ def _diagnosed_failure(state: ObjectiveState, key: str, policy: InterviewPolicy)
     target = state.objective.target_depth
     target_failed = any(item.question_depth == target and _failure(item) for item in evidence)
     diagnostic = any(
-        (item.question_depth is not None and item.question_depth < target
-         and (item.observation in SUBSTANTIVE or item.explicit_inability))
+        (item.question_depth < target and (item.observation in SUBSTANTIVE or item.explicit_inability))
         or item.explicit_inability
         for item in evidence
     )
     contexts = {item.evidence_scope.casefold().strip() for item in evidence
-                if item.question_depth is not None and item.question_depth <= target
+                if item.question_depth <= target
                 and (item.observation in SUBSTANTIVE or item.explicit_inability) and item.evidence_scope.strip()}
     return target_failed and (diagnostic or target == 1) and len(contexts) >= policy.min_failure_contexts
 
@@ -154,7 +171,7 @@ def assess(state: ObjectiveState, policy: InterviewPolicy | None = None) -> Asse
     if len(diagnosed) == len(required) and not any(
             item.performance in {"AT_TARGET", "ABOVE"} and item.observation == "SUPPORTS"
             for key in required for item in _criterion_evidence(state, key)
-            if item.question_depth is not None and item.question_depth <= state.objective.target_depth):
+            if item.question_depth <= state.objective.target_depth):
         return Assessment.NOT_DEMONSTRATED
     if any(key not in state.criterion_results and key not in diagnosed for key in required):
         return Assessment.INSUFFICIENT
@@ -168,7 +185,7 @@ def assess(state: ObjectiveState, policy: InterviewPolicy | None = None) -> Asse
 
 def _above_target(state: ObjectiveState, required: list[str]) -> bool:
     extension = state.objective.extension_depth
-    if extension is None or not state.objective.extension_criterion_ids:
+    if extension is None or not required:
         return False
     for key in required:
         evidence = [item for item in _criterion_evidence(state, key)
@@ -193,11 +210,13 @@ def next_action(state: ObjectiveState, turn: Turn, policy: InterviewPolicy | Non
     unresolved = [key for key in eligible if key in essential and not criterion_resolved(state, key, policy)]
     if not unresolved:
         return None
-    return _criterion_action(state, _choose_criterion(state, unresolved, policy))
+    return _criterion_action(state, _choose_criterion(state, unresolved))
 
 
 def _diagnostic_recovery(state: ObjectiveState, turn: Turn, eligible: list[str]) -> Action | None:
-    if turn.action != Action.EASIER or not turn.judgment or turn.judgment.explicit_inability:
+    diagnostic = (turn.action == Action.EASIER
+                  or (turn.action == Action.CLARIFY and turn.question_depth < state.objective.target_depth))
+    if not diagnostic or not turn.judgment or turn.judgment.explicit_inability:
         return None
     for item in turn.judgment.observations:
         if item.criterion_id in eligible and item.observation == "SUPPORTS" and item.performance in {"AT_TARGET", "ABOVE"}:
@@ -213,7 +232,7 @@ def _criterion_action(state: ObjectiveState, key: str) -> Action:
     evidence = [e for e in state.evidence_history if e.criterion_id == key]
     last = evidence[-1] if evidence else None
     if last and (last.performance == "BELOW" or last.explicit_inability) and not progress.easier_spent and state.objective.target_depth > 1:
-        return _probe(state, key, Action.EASIER, "Diagnose the foundation behind the observed error")
+        return _probe(state, key, Action.EASIER, "Ask for one simpler prerequisite decision using a small concrete case")
     if last and last.observation in {"UNCLEAR", "NO_EVIDENCE"} and not progress.clarification_spent:
         return _probe(state, key, Action.CLARIFY, "Clarify the missing or ambiguous evidence without hints")
     gaps = "; ".join(progress.unresolved_aspects)
@@ -227,10 +246,10 @@ def criterion_resolved(state: ObjectiveState, key: str, policy: InterviewPolicy)
     return bool(result and result.performance in {"AT_TARGET", "ABOVE"}) or _diagnosed_failure(state, key, policy)
 
 
-def _choose_criterion(state: ObjectiveState, candidates: list[str], policy: InterviewPolicy) -> str:
+def _choose_criterion(state: ObjectiveState, candidates: list[str]) -> str:
     active = state.active_criterion_id
     unasked = [key for key in candidates if not progress_for(state, key).turns_spent]
-    if active in candidates and (progress_for(state, active).turns_spent < policy.criterion_soft_limit or not unasked):
+    if active in candidates and (progress_for(state, active).turns_spent < CRITERION_SOFT_LIMIT or not unasked):
         return active
     return min(candidates, key=lambda key: progress_for(state, key).turns_spent)
 
@@ -243,8 +262,9 @@ def _probe(state: ObjectiveState, key: str, action: Action, reason: str) -> Acti
 def _extension_action(state: ObjectiveState, eligible: list[str], policy: InterviewPolicy) -> Action | None:
     if state.assessment != Assessment.AT or not policy.allow_extension_probes or state.objective.extension_depth is None:
         return None
-    for key in state.objective.extension_criterion_ids:
-        if key in eligible and not progress_for(state, key).deeper_spent:
+    for criterion in state.objective.criteria:
+        key = criterion.criterion_id
+        if criterion.essential and key in eligible and not progress_for(state, key).deeper_spent:
             return _probe(state, key, Action.DEEPER, "Measure the predefined higher standard after target attainment")
     return None
 

@@ -14,20 +14,15 @@ function view() {
     question: '## Chẩn đoán truy vấn\n\nBạn sẽ kiểm tra truy vấn SQL chậm như thế nào?',
     responseExcerpt: index ? 'EXPLAIN ANALYZE để kiểm chứng kế hoạch thực thi.' : 'Tôi chưa biết cách đọc kế hoạch thực thi.',
     rationale: index ? '**Có bằng chứng:** đối chiếu estimated rows và actual rows.' : 'Chưa thể hiện cách chẩn đoán.',
-    performance: index ? 'AT_TARGET' : 'BELOW', context: `query-${index}` }));
-  return { policyVersion: 'competency-1', completedAttempts: phase, incompatibleAssessments: 0,
-    lastAssessment: phase ? source(phase) : null,
-    summary: { totalSkills: 2, meetingTarget: phase === 3 ? 1 : 0, belowTarget: phase === 1 ? 1 : 0,
-      needsVerification: phase === 2 ? 1 : 0, incomplete: 0, notAssessed: phase ? 1 : 2 },
-    skills: [{ skillId: 'sql', baselineAlignment: 'MISSING', assessment: status[phase], evidencedCriteria: phase ? 1 : 0,
-      totalCriteria: 1, lastChecked: phase ? source(phase) : null,
+    performance: index ? 'AT_TARGET' : 'BELOW' }));
+  return { completedAttempts: phase, incompatibleAssessments: 0,
+    skills: [{ skillId: 'sql', baselineAlignment: 'MISSING', assessment: status[phase],
       objectives: [{ id: 'sql-task', claim: 'Chẩn đoán hiệu năng truy vấn SQL', assessment: status[phase],
         lastChecked: phase ? source(phase) : null, lastAssessment: phase ? source(phase) : null,
         explanation: phase === 2 ? 'Có bằng chứng mâu thuẫn. Cần hai lượt xác nhận nhất quán về sau ở các bối cảnh độc lập để cập nhật kết luận.' : 'Đánh giá theo bằng chứng đã lưu.',
         criteria: [{ id: 'sql-c1', description: 'Đọc và giải thích `EXPLAIN ANALYZE`', essential: true,
           assessment: status[phase], lastAssessment: phase ? source(phase) : null, evidence }] }] },
-    { skillId: 'java', baselineAlignment: 'MATCH', assessment: 'NOT_ASSESSED', evidencedCriteria: 0, totalCriteria: 1,
-      lastChecked: null, objectives: [] }] };
+    { skillId: 'java', baselineAlignment: 'MATCH', assessment: 'NOT_ASSESSED', objectives: [] }] };
 }
 
 const browser = await puppeteer.launch({ headless: true });

@@ -156,7 +156,7 @@ class StudyPlanHttpTest {
         assertThat(send("GET", path, stranger, null).statusCode()).isEqualTo(403);
         var baseline = body(send("GET", path, owner, null), 200);
         assertThat(baseline.path("weak")).isEmpty();
-        assertThat(baseline.path("reportWeaknesses")).isEmpty();
+        assertThat(baseline.has("reportWeaknesses")).isFalse();
         assertThat(baseline.path("notAssessedSkillIds").toString()).isEqualTo("[\"sql\",\"java\"]");
         var plan = Map.of("title", "Interview practice", "targetCompletionPercent", 80, "sourceSessionId", sessionId);
         body(send("PUT", "", owner, plan), 400);
@@ -164,7 +164,7 @@ class StudyPlanHttpTest {
         saveInterview(false);
         var running = body(send("GET", path, owner, null), 200);
         assertThat(running.path("weak")).isEmpty();
-        assertThat(running.path("reportWeaknesses")).isEmpty();
+        assertThat(running.path("objectiveSuggestions")).isEmpty();
         saveInterview(true);
         var result = body(send("GET", path, owner, null), 200);
         assertThat(result.path("completedAttempts").asInt()).isEqualTo(1);
@@ -173,12 +173,7 @@ class StudyPlanHttpTest {
         var evidence = result.at("/weak/0/objectives/0/criteria/0/evidence/0");
         assertThat(evidence.at("/source/sessionId").asText()).isEqualTo(sessionId);
         assertThat(evidence.path("rationale").asText()).isEqualTo("Cannot explain the execution plan");
-        var finding = result.at("/reportWeaknesses/0");
-        assertThat(finding.path("skillId").asText()).isEqualTo("sql");
-        assertThat(finding.path("sessionId").asText()).isEqualTo(sessionId);
-        assertThat(finding.path("attemptNumber").asInt()).isEqualTo(1);
-        assertThat(finding.path("weaknesses")).hasSize(1);
-        assertThat(finding.at("/weaknesses/0").asText()).isEqualTo("Needs practice interpreting an execution plan");
+        assertThat(result.at("/objectiveSuggestions/0/criteria/0/kind").asText()).isEqualTo("REVIEW");
         assertThat(result.path("notAssessedSkillIds").toString()).isEqualTo("[\"java\"]");
         assertThat(body(send("PUT", "", owner, plan), 200).at("/plan/sourceSessionId").asText()).isEqualTo(sessionId);
         body(send("PUT", "", owner, Map.of("title", "SQL plan", "targetCompletionPercent", 80,
@@ -189,7 +184,11 @@ class StudyPlanHttpTest {
         saveInterview(true);
         var gaps = body(send("GET", "/knowledge-gaps", owner, null), 200);
         assertThat(gaps.at("/objectiveSuggestions/0/objectiveId").asText()).isEqualTo("sql-task");
-        assertThat(gaps.at("/objectiveSuggestions/0/criteria/0/selectedByDefault").asBoolean()).isTrue();
+        assertThat(gaps.at("/objectiveSuggestions/0/criteria/0/kind").asText()).isEqualTo("REVIEW");
+        assertThat(gaps.at("/objectiveSuggestions/0/criteria/0").has("selectedByDefault")).isFalse();
+        assertThat(gaps.at("/objectiveSuggestions/0/criteria/0").has("reason")).isFalse();
+        assertThat(gaps.at("/objectiveSuggestions/0/criteria/0").has("essential")).isFalse();
+        assertThat(gaps.at("/objectiveSuggestions/0").has("assessment")).isFalse();
         var input = new java.util.HashMap<String, Object>();
         input.put("title", "Luyện đọc execution plan"); input.put("skillId", "sql"); input.put("status", "TODO");
         input.put("gapOrigin", Map.of("skillId", "sql", "objectiveId", "sql-task", "sessionId", sessionId, "attemptNumber", 1));
@@ -281,7 +280,7 @@ class StudyPlanHttpTest {
         String snapshot = """
                 {"is_finished":%s,
                  "turns":[{"turn_id":"sql-turn","objective_id":"sql-task","answer":"I do not know",
-                   "question":{"text":"How do you inspect a slow SQL query?","assistance":"NONE"}}],
+                   "question":{"text":"How do you inspect a slow SQL query?"}}],
                  "objectives":{"sql-task":{
                    "objective":%s,"assessment":"DEMONSTRATED_BELOW_TARGET","lifecycle":"CLOSED","turns_spent":1,
                    "contradictions":[],

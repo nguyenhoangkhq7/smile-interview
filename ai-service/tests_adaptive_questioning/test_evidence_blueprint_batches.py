@@ -2,12 +2,39 @@
 import json
 from threading import Barrier, Lock
 
+import dspy
 import pytest
 
-from adaptive_questioning.evidence.models import Blueprint
 from adaptive_questioning.evidence.planning import BlueprintBuilder, requirements_for
 from adaptive_questioning.evidence.policy_config import InterviewPolicy
+from adaptive_questioning.evidence.provider import BlueprintSignature, DSPyAssessmentProvider
 from test_evidence_workflow import ScriptedProvider, skill
+
+
+def test_dspy_blueprint_draft_omits_fields_owned_by_the_builder():
+    description = "Optimize SQL queries"
+    skills = [skill(job_tasks=[{
+        "task_id": "optimize", "description": description, "required_level": 3,
+        "requirement_kind": "OPTIONAL", "level_basis": "EXPLICIT", "evidence_spans": [description],
+    }])]
+    requirements = requirements_for(skills)
+    draft = ScriptedProvider().blueprint(json.dumps({"requirements": requirements})).model_dump(mode="json")
+    provider = DSPyAssessmentProvider(lm=dspy.utils.DummyLM([{"blueprint": draft}]))
+    objective = BlueprintBuilder(provider).build(skills).objectives[0]
+
+    schema = BlueprintSignature.output_fields["blueprint"].annotation.model_json_schema()
+    assert {"objective_id", "claim", "inferred", "requirement_kind",
+            "jd_evidence_spans", "extension_criterion_ids", "rubric_version"}.isdisjoint(
+        schema["$defs"]["ObjectiveDraft"]["properties"]
+    )
+    assert "required_proficiency" not in objective.model_dump()
+    assert "rationale" not in schema["$defs"]["SuitableMode"]["properties"]
+    assert "criterion_id" not in schema["$defs"]["CriterionDraft"]["properties"]
+    assert objective.claim == description
+    assert objective.requirement_kind == "OPTIONAL"
+    assert {"inferred", "extension_criterion_ids", "rubric_version"}.isdisjoint(objective.model_dump())
+    assert objective.jd_evidence_spans == [description]
+    assert objective.criteria[0].criterion_id == f"{objective.objective_id}:c1"
 
 
 def test_large_profile_prepares_all_requirements_in_bounded_parallel_calls():
@@ -34,6 +61,8 @@ def test_large_profile_prepares_all_requirements_in_bounded_parallel_calls():
     assert len({objective.objective_id for objective in result.objectives}) == 36
     assert max(len(call) for call in provider.calls) <= 4
     assert sum(len(call) for call in provider.calls) == len(expected)
+    assert all("requirement_id" not in requirement and "has_task" not in requirement
+               for call in provider.calls for requirement in call.values())
     assert {objective.skill_id for objective in result.objectives} == {item.jd_skill_id for item in skills}
 
 
@@ -42,7 +71,7 @@ def test_batch_cannot_swap_coverage_with_another_batch():
         def blueprint(self, context):
             result = super().blueprint(context)
             result.objectives[0].requirement_id = "another-batch:inferred"
-            return Blueprint(objectives=result.objectives)
+            return result
 
     with pytest.raises(ValueError, match="every requirement exactly once"):
         BlueprintBuilder(WrongCoverageProvider()).build([skill(f"skill-{index}") for index in range(8)])
@@ -71,6 +100,6 @@ def test_disabled_optional_extension_cannot_block_interview_preparation():
     result = BlueprintBuilder(ExtensionProvider()).build([skill()])
     assert result.objectives[0].target_depth == 2
     assert result.objectives[0].extension_depth is None
-    assert result.objectives[0].extension_criterion_ids == []
+    assert "extension_criterion_ids" not in result.objectives[0].model_dump()
     with pytest.raises(ValueError, match="Extension depth"):
         BlueprintBuilder(ExtensionProvider(), InterviewPolicy(allow_extension_probes=True)).build([skill()])

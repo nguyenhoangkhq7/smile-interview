@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { useNewInterview } from '@/hooks/useNewInterview';
 import { UploadStep } from '@/components/features/interview/NewInterview/UploadStep';
+import { AnalysisPushButton } from '@/components/features/interview/NewInterview/AnalysisPushButton';
 import { ActiveSessionsPanel } from '@/components/features/interview/NewInterview/ActiveSessionsPanel';
 import { SkillGapResultPanel } from '@/components/features/interview/NewInterview/SkillGapResultPanel';
 import {
@@ -51,6 +52,7 @@ export default function NewInterviewPage() {
     jdError,
     uploading,
     analyzing,
+    acceptedJob,
     generating,
     apiError,
     roleTitle,
@@ -95,6 +97,7 @@ export default function NewInterviewPage() {
             <p className="text-sm text-muted-foreground max-w-xl mx-auto">
               Phân tích CV và JD một lần, sau đó phỏng vấn nhiều lượt trong cùng hồ sơ.
             </p>
+            <AnalysisPushButton userId={user?.id} analyzing={analyzing && acceptedJob} key={user?.id} />
           </div>
 
           <InterviewProgressStepper
@@ -201,7 +204,7 @@ export default function NewInterviewPage() {
           {analyzing && (
             <BrandLoading
               label="Đang phân tích CV và yêu cầu công việc..."
-              description="Quá trình này có thể mất vài phút. Vui lòng chờ trong giây lát."
+              description={acceptedJob ? 'Đã nhận hồ sơ. Bạn có thể đóng trang và quay lại xem kết quả.' : 'Đang gửi hồ sơ để phân tích.'}
               className="animate-fade-up"
             />
           )}

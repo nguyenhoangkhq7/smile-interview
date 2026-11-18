@@ -5,7 +5,8 @@ import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { searchText, skillLabel } from './applicationUi';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import type { SkillGapResult, StaticGapAuditReport } from '@/services/cvJdMatching';
+import { jdSkillLabel } from '@/lib/skillLabels';
+import type { SkillGapResult, SkillGapReport } from '@/services/cvJdMatching';
 
 const alignmentInfo = {
   MATCH: { label: 'Phù hợp', tone: 'bg-emerald-50 text-emerald-800', order: 2 },
@@ -15,14 +16,13 @@ const alignmentInfo = {
 
 type Filter = 'all' | SkillGapResult['semantic_alignment'];
 const pageSize = 5;
-const jdLabel = (skill: SkillGapResult) => skillLabel(skill.jd_skill_id, skill.jd_skill_name, skill.jd_evidence_spans);
 const cvLabel = (skill: SkillGapResult) => skill.matched_cv_skill_id
   ? skillLabel(skill.matched_cv_skill_id, skill.matched_cv_skill_name, skill.cv_evidence_spans) : '';
 
 // Candidate pages use structured fields instead of the internal audit Markdown.
 export function CandidateCvJdSummary({ skills, report }: {
   skills: SkillGapResult[];
-  report: Pick<StaticGapAuditReport, 'matching_score' | 'degraded'>;
+  report: Pick<SkillGapReport, 'matching_score' | 'degraded'>;
 }) {
   const [filter, setFilter] = useState<Filter>('all');
   const [query, setQuery] = useState('');
@@ -30,7 +30,7 @@ export function CandidateCvJdSummary({ skills, report }: {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = skills.find(skill => skill.jd_skill_id === selectedId);
   const filtered = skills.filter(skill => (filter === 'all' || skill.semantic_alignment === filter)
-    && searchText(`${jdLabel(skill)} ${cvLabel(skill)}`).includes(searchText(query.trim())))
+    && searchText(`${jdSkillLabel(skill)} ${cvLabel(skill)}`).includes(searchText(query.trim())))
     .sort((a, b) => alignmentInfo[a.semantic_alignment].order - alignmentInfo[b.semantic_alignment].order);
   const totalPages = Math.ceil(filtered.length / pageSize);
   const currentPage = Math.min(page, Math.max(0, totalPages - 1));
@@ -47,7 +47,7 @@ export function CandidateCvJdSummary({ skills, report }: {
       <p className="shrink-0 text-3xl font-semibold tabular-nums text-emerald-800">{hasScore ? `${Math.round(score * 100)}%` : '—'}</p>
       <div className="min-w-0"><p className="text-sm font-medium">Mức phù hợp CV–JD</p><p className="mt-0.5 text-xs leading-5 text-muted-foreground">{hasScore ? 'Ước tính từ tài liệu, chưa phải kết quả đánh giá qua phỏng vấn.' : 'Chưa có điểm phù hợp từ tài liệu.'}</p></div>
     </div>
-    {(report.degraded || skills.some(skill => skill.degraded)) && <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">Một phần phân tích chưa đầy đủ. Bạn có thể kiểm tra tài liệu hoặc phân tích lại.</p>}
+    {report.degraded && <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">Một phần phân tích chưa đầy đủ. Bạn có thể kiểm tra tài liệu hoặc phân tích lại.</p>}
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div role="group" aria-label="Lọc đối chiếu kỹ năng" className="flex flex-wrap gap-1">
         {filters.map(item => <button key={item.value} type="button" aria-pressed={filter === item.value}
@@ -67,7 +67,7 @@ export function CandidateCvJdSummary({ skills, report }: {
         {filtered.slice(offset, offset + pageSize).map(skill => <button key={skill.jd_skill_id} type="button" data-cv-skill={skill.jd_skill_id}
           aria-haspopup="dialog" onClick={() => setSelectedId(skill.jd_skill_id)}
           className="flex min-h-14 w-full items-center gap-3 px-3 py-3 text-left transition hover:bg-muted/30 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-orange sm:px-4">
-          <span className="min-w-0 flex-1 break-words text-sm font-medium">{jdLabel(skill)}</span>
+          <span className="min-w-0 flex-1 break-words text-sm font-medium">{jdSkillLabel(skill)}</span>
           <span className={`shrink-0 rounded-md px-2 py-1 text-[11px] font-medium ${alignmentInfo[skill.semantic_alignment].tone}`}>{alignmentInfo[skill.semantic_alignment].label}</span>
           <ChevronRight size={15} className="shrink-0 text-muted-foreground" aria-hidden="true" />
         </button>)}
@@ -88,7 +88,7 @@ export function CandidateCvJdSummary({ skills, report }: {
     <p className="text-xs leading-5 text-muted-foreground">CV chưa thể hiện một kỹ năng không có nghĩa là bạn chưa có kỹ năng đó.</p>
     <Dialog open={Boolean(selected)} onOpenChange={open => !open && setSelectedId(null)}>
       <DialogContent className="sm:max-w-xl">
-        <DialogHeader><DialogTitle>{selected && jdLabel(selected)}</DialogTitle><DialogDescription>Chi tiết đối chiếu thông tin CV với yêu cầu công việc.</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>{selected && jdSkillLabel(selected)}</DialogTitle><DialogDescription>Chi tiết đối chiếu thông tin CV với yêu cầu công việc.</DialogDescription></DialogHeader>
         {selected && <div className="max-h-[60dvh] space-y-4 overflow-y-auto overscroll-contain pr-1 text-sm leading-6">
           <span className={`inline-block rounded-md px-2 py-1 text-xs font-medium ${alignmentInfo[selected.semantic_alignment].tone}`}>{alignmentInfo[selected.semantic_alignment].label}</span>
           {selected.matched_cv_skill_id && selected.matched_cv_skill_id !== selected.jd_skill_id && <p><span className="text-muted-foreground">Kỹ năng liên quan trong CV: </span><strong>{cvLabel(selected)}</strong></p>}

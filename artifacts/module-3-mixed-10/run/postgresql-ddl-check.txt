@@ -1,0 +1,19 @@
+\set VERBOSITY terse
+\echo -- scratch temp table and correct PostgreSQL DDL
+-- scratch temp table and correct PostgreSQL DDL
+BEGIN;
+BEGIN
+CREATE TEMP TABLE orders (status text, created_at timestamptz);
+CREATE TABLE
+CREATE INDEX idx_orders_status_created_at ON orders (status, created_at DESC);
+CREATE INDEX
+\echo -- DDL example from Blueprint
+-- DDL example from Blueprint
+SAVEPOINT before_invalid_ddl;
+SAVEPOINT
+ALTER TABLE orders ADD INDEX idx_bad (status, created_at);
+ROLLBACK TO SAVEPOINT before_invalid_ddl;
+ROLLBACK
+ROLLBACK;
+ERROR:  type "idx_bad" does not exist at character 30
+ROLLBACK

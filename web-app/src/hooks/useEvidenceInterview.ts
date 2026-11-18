@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { historyService, SessionHistoryItem } from '@/services/historyService';
-import { AnswerRequest, ConversationAction, ConversationRequest, EvidenceSession, InterviewConfig, conversationPhase, evidenceInterview, interviewError } from '@/services/evidenceInterview';
+import { AnswerRequest, ConversationAction, ConversationRequest, EvidenceSession, InterviewStartConfig, conversationPhase, evidenceInterview, interviewError } from '@/services/evidenceInterview';
 
 const EXPIRY_RETRY_DELAY_MS = 5000;
 
@@ -51,7 +51,7 @@ export function useEvidenceInterview(id: string, readOnly = false) {
     finally { inFlight.current = false; setBusy(false); }
   }, []);
 
-  const start = (config: InterviewConfig) => run(() => evidenceInterview.start(id, config));
+  const start = (config: InterviewStartConfig) => run(() => evidenceInterview.start(id, config));
   const converse = useCallback((action: ConversationAction, introduction = '') => run(async () => {
     if (!session?.conversation) throw new Error('Chưa có lượt hội thoại.');
     const previous = conversationRetry.current;

@@ -12,7 +12,6 @@ export const metadata: Metadata = {
 /**
  * Layout for all main app routes (home, login, register, interview, etc.)
  * Includes the shared Navbar and Footer.
- * Admin routes (/admin/**) use a completely separate layout without Navbar/Footer.
  */
 export default function MainLayout({
   children,

@@ -1,0 +1,258 @@
+[
+  {
+    "split": "train",
+    "interaction_mode": "VOICE",
+    "objective": {
+      "objective_id": "dialogue-train",
+      "skill_id": "kiểm thử",
+      "target_depth": 2,
+      "claim": "Chọn đầu vào kiểm tra giới hạn độ dài mật khẩu.",
+      "criteria": [
+        {
+          "criterion_id": "dialogue-train:c1",
+          "description": "Chọn đầu vào kiểm tra giới hạn độ dài mật khẩu.",
+          "expected_evidence": "Chọn mật khẩu 7 ký tự để kiểm tra việc từ chối.",
+          "at_target": "Chọn mật khẩu 7 ký tự để kiểm tra việc từ chối.",
+          "below_target": "Chọn đầu vào hợp lệ để kiểm tra việc từ chối.",
+          "above_target": "Xác định hai phía của biên độ dài."
+        }
+      ]
+    },
+    "turn": {
+      "turn_id": "dialogue-train-first",
+      "objective_id": "dialogue-train",
+      "skill_id": "kiểm thử",
+      "mode": "TECHNICAL_EXPLANATION",
+      "action": "INITIAL",
+      "question_depth": 2,
+      "question": {
+        "text": "Mật khẩu phải dài ít nhất 8 ký tự. Bạn sẽ thử đầu vào nào để phát hiện lỗi chấp nhận mật khẩu quá ngắn?",
+        "criterion_ids": [
+          "dialogue-train:c1"
+        ],
+        "mode": "TECHNICAL_EXPLANATION",
+        "depth": 2,
+        "evidence_scope": "dialogue-train-case"
+      },
+      "answer": "Em chưa biết."
+    },
+    "judgment": {
+      "observations": [
+        {
+          "criterion_id": "dialogue-train:c1",
+          "response_excerpt": "",
+          "observation": "NO_EVIDENCE",
+          "performance": "UNDETERMINED",
+          "rationale": "Ứng viên cho biết chưa trả lời được.",
+          "unresolved_aspects": []
+        }
+      ],
+      "feedback": "Cảm ơn bạn đã chia sẻ.",
+      "explicit_inability": true,
+      "inability_excerpt": "Em chưa biết."
+    },
+    "action": "ASK_EASIER",
+    "next_question": {
+      "text": "Mật khẩu dài 6 ký tự có đạt mức tối thiểu 8 ký tự không?",
+      "criterion_ids": [
+        "dialogue-train:c1"
+      ],
+      "mode": "TECHNICAL_EXPLANATION",
+      "depth": 1,
+      "evidence_scope": "dialogue-train-case-foundation"
+    }
+  },
+  {
+    "split": "train",
+    "interaction_mode": "TEXT",
+    "objective": {
+      "objective_id": "dialogue-train",
+      "skill_id": "kiểm thử",
+      "target_depth": 2,
+      "claim": "Chọn đầu vào kiểm tra giới hạn độ dài mật khẩu.",
+      "criteria": [
+        {
+          "criterion_id": "dialogue-train:c1",
+          "description": "Chọn đầu vào kiểm tra giới hạn độ dài mật khẩu.",
+          "expected_evidence": "Chọn mật khẩu 7 ký tự để kiểm tra việc từ chối.",
+          "at_target": "Chọn mật khẩu 7 ký tự để kiểm tra việc từ chối.",
+          "below_target": "Chọn đầu vào hợp lệ để kiểm tra việc từ chối.",
+          "above_target": "Xác định hai phía của biên độ dài."
+        }
+      ]
+    },
+    "turn": {
+      "turn_id": "dialogue-train-first",
+      "objective_id": "dialogue-train",
+      "skill_id": "kiểm thử",
+      "mode": "TECHNICAL_EXPLANATION",
+      "action": "INITIAL",
+      "question_depth": 2,
+      "question": {
+        "text": "Mật khẩu phải dài ít nhất 8 ký tự. Bạn sẽ thử đầu vào nào để phát hiện lỗi chấp nhận mật khẩu quá ngắn?",
+        "criterion_ids": [
+          "dialogue-train:c1"
+        ],
+        "mode": "TECHNICAL_EXPLANATION",
+        "depth": 2,
+        "evidence_scope": "dialogue-train-case"
+      },
+      "answer": "Em sẽ thử một mật khẩu ngắn."
+    },
+    "judgment": {
+      "observations": [
+        {
+          "criterion_id": "dialogue-train:c1",
+          "response_excerpt": "",
+          "observation": "UNCLEAR",
+          "performance": "UNDETERMINED",
+          "rationale": "Ứng viên nêu hướng thử nhưng chưa chọn giá trị cụ thể.",
+          "unresolved_aspects": [
+            "Giá trị đầu vào cụ thể"
+          ]
+        }
+      ],
+      "feedback": "",
+      "explicit_inability": false,
+      "inability_excerpt": ""
+    },
+    "action": "CLARIFY",
+    "next_question": {
+      "text": "Mật khẩu bạn định thử dài bao nhiêu ký tự?",
+      "criterion_ids": [
+        "dialogue-train:c1"
+      ],
+      "mode": "TECHNICAL_EXPLANATION",
+      "depth": 2,
+      "evidence_scope": "dialogue-train-case"
+    }
+  },
+  {
+    "split": "dev",
+    "interaction_mode": "VOICE",
+    "objective": {
+      "objective_id": "dialogue-dev",
+      "skill_id": "kiểm soát tồn kho",
+      "target_depth": 2,
+      "claim": "Chọn đầu vào kiểm tra quy tắc từ chối đơn vượt tồn kho.",
+      "criteria": [
+        {
+          "criterion_id": "dialogue-dev:c1",
+          "description": "Chọn đầu vào kiểm tra quy tắc từ chối đơn vượt tồn kho.",
+          "expected_evidence": "Chọn số lượng lớn hơn 5 để kiểm tra việc từ chối.",
+          "at_target": "Chọn số lượng lớn hơn 5 để kiểm tra việc từ chối.",
+          "below_target": "Chọn số lượng còn trong tồn kho để kiểm tra việc từ chối.",
+          "above_target": "Phân biệt vượt tồn kho với đặt hết hàng."
+        }
+      ]
+    },
+    "turn": {
+      "turn_id": "dialogue-dev-first",
+      "objective_id": "dialogue-dev",
+      "skill_id": "kiểm soát tồn kho",
+      "mode": "TECHNICAL_EXPLANATION",
+      "action": "INITIAL",
+      "question_depth": 2,
+      "question": {
+        "text": "Kho còn 5 sản phẩm. Bạn sẽ dùng đơn hàng nào để kiểm tra quy tắc từ chối đơn vượt tồn kho?",
+        "criterion_ids": [
+          "dialogue-dev:c1"
+        ],
+        "mode": "TECHNICAL_EXPLANATION",
+        "depth": 2,
+        "evidence_scope": "dialogue-dev-case"
+      },
+      "answer": "Dạ, phần này em chưa biết ạ."
+    },
+    "judgment": {
+      "observations": [
+        {
+          "criterion_id": "dialogue-dev:c1",
+          "response_excerpt": "",
+          "observation": "NO_EVIDENCE",
+          "performance": "UNDETERMINED",
+          "rationale": "Ứng viên cho biết chưa trả lời được.",
+          "unresolved_aspects": []
+        }
+      ],
+      "feedback": "Cảm ơn bạn đã chia sẻ.",
+      "explicit_inability": true,
+      "inability_excerpt": "Dạ, phần này em chưa biết ạ."
+    },
+    "action": "ASK_EASIER",
+    "next_question": {
+      "text": "Kho còn 5 sản phẩm. Một đơn đặt 6 sản phẩm có vượt tồn kho không?",
+      "criterion_ids": [
+        "dialogue-dev:c1"
+      ],
+      "mode": "TECHNICAL_EXPLANATION",
+      "depth": 1,
+      "evidence_scope": "dialogue-dev-case-foundation"
+    }
+  },
+  {
+    "split": "dev",
+    "interaction_mode": "TEXT",
+    "objective": {
+      "objective_id": "dialogue-dev",
+      "skill_id": "kiểm soát tồn kho",
+      "target_depth": 2,
+      "claim": "Chọn đầu vào kiểm tra quy tắc từ chối đơn vượt tồn kho.",
+      "criteria": [
+        {
+          "criterion_id": "dialogue-dev:c1",
+          "description": "Chọn đầu vào kiểm tra quy tắc từ chối đơn vượt tồn kho.",
+          "expected_evidence": "Chọn số lượng lớn hơn 5 để kiểm tra việc từ chối.",
+          "at_target": "Chọn số lượng lớn hơn 5 để kiểm tra việc từ chối.",
+          "below_target": "Chọn số lượng còn trong tồn kho để kiểm tra việc từ chối.",
+          "above_target": "Phân biệt vượt tồn kho với đặt hết hàng."
+        }
+      ]
+    },
+    "turn": {
+      "turn_id": "dialogue-dev-first",
+      "objective_id": "dialogue-dev",
+      "skill_id": "kiểm soát tồn kho",
+      "mode": "TECHNICAL_EXPLANATION",
+      "action": "INITIAL",
+      "question_depth": 2,
+      "question": {
+        "text": "Kho còn 5 sản phẩm. Bạn sẽ dùng đơn hàng nào để kiểm tra quy tắc từ chối đơn vượt tồn kho?",
+        "criterion_ids": [
+          "dialogue-dev:c1"
+        ],
+        "mode": "TECHNICAL_EXPLANATION",
+        "depth": 2,
+        "evidence_scope": "dialogue-dev-case"
+      },
+      "answer": "Em sẽ thử một đơn lớn."
+    },
+    "judgment": {
+      "observations": [
+        {
+          "criterion_id": "dialogue-dev:c1",
+          "response_excerpt": "",
+          "observation": "UNCLEAR",
+          "performance": "UNDETERMINED",
+          "rationale": "Ứng viên nêu hướng thử nhưng chưa chọn giá trị cụ thể.",
+          "unresolved_aspects": [
+            "Giá trị đầu vào cụ thể"
+          ]
+        }
+      ],
+      "feedback": "",
+      "explicit_inability": false,
+      "inability_excerpt": ""
+    },
+    "action": "CLARIFY",
+    "next_question": {
+      "text": "Với tồn kho 5 sản phẩm, bạn sẽ đặt bao nhiêu sản phẩm trong đơn thử đó?",
+      "criterion_ids": [
+        "dialogue-dev:c1"
+      ],
+      "mode": "TECHNICAL_EXPLANATION",
+      "depth": 2,
+      "evidence_scope": "dialogue-dev-case"
+    }
+  }
+]

@@ -4,6 +4,7 @@ import { useEffect, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import { LoaderCircle } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
+import { loginPath } from '@/lib/authSession';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -22,7 +23,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   useEffect(() => {
     if (isBrowser && !isAuthenticated) {
-      router.replace('/login');
+      router.replace(loginPath());
     }
   }, [isBrowser, isAuthenticated, router]);
 

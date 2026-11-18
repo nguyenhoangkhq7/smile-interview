@@ -77,6 +77,61 @@ class EvidenceServiceTest {
         verifyNoInteractions(ai, inputs);
     }
 
+    @Test void startReusingProfileBlueprintDoesNotSendPolicy() {
+        var profile = new fit.iuh.modules.application.ApplicationProfile();
+        profile.setCompany("Acme");
+        profile.setBlueprintJson("{\"objectives\":[]}");
+        profile.setPolicyJson("{\"fallback_depth\":1}");
+        var session = Session.builder().id("s").userId(owner.getId()).roleTitle("Backend")
+                .applicationProfile(profile).build();
+        when(sessions.findById("s")).thenReturn(Optional.of(session));
+        when(runs.findById("s")).thenReturn(Optional.empty());
+        when(turns.findBySessionIdOrderByIdAsc("s")).thenReturn(java.util.List.of());
+        when(inputs.skills(session)).thenReturn(json.read("[{\"jd_skill_id\":\"sql\"}]"));
+        var aiResult = json.read("{\"snapshot\":{\"state_version\":1},\"public\":{\"state_version\":1}}");
+        when(ai.compute(eq("start"), any())).thenReturn(aiResult);
+        when(store.commit(any())).thenReturn(aiResult.path("public"));
+
+        service.start("s", owner, EvidenceDtos.Config.defaults());
+
+        var payloadCaptor = org.mockito.ArgumentCaptor.forClass(com.fasterxml.jackson.databind.JsonNode.class);
+        verify(ai).compute(eq("start"), payloadCaptor.capture());
+        assertThat(payloadCaptor.getValue().has("blueprint")).isTrue();
+        assertThat(payloadCaptor.getValue().has("policy")).isFalse();
+    }
+
+    @Test void startIncludesUserAndJdContextInOpeningAndClipsLongText() {
+        var namedOwner = User.builder().id(owner.getId()).username("Nguyễn Minh Tuấn").email("tuan@example.com").build();
+        var profile = new fit.iuh.modules.application.ApplicationProfile();
+        profile.setCompany("Smile Tech");
+        profile.setRoleTitle("Senior Java Engineer");
+        profile.setJdText("Xây dựng hệ thống microservice Java   " + "A".repeat(2000));
+        profile.setCvText("5 năm kinh nghiệm Spring Boot   " + "B".repeat(2000));
+        var session = Session.builder().id("s").userId(namedOwner.getId()).attemptNumber(2)
+                .applicationProfile(profile).build();
+        when(sessions.findById("s")).thenReturn(Optional.of(session));
+        when(runs.findById("s")).thenReturn(Optional.empty());
+        when(turns.findBySessionIdOrderByIdAsc("s")).thenReturn(java.util.List.of());
+        when(inputs.skills(session)).thenReturn(json.read("[{\"jd_skill_id\":\"java\"}]"));
+        var aiResult = json.read("{\"snapshot\":{\"state_version\":1},\"public\":{\"state_version\":1}}");
+        when(ai.compute(eq("start"), any())).thenReturn(aiResult);
+        when(store.commit(any())).thenReturn(aiResult.path("public"));
+
+        service.start("s", namedOwner, EvidenceDtos.Config.defaults());
+
+        var payloadCaptor = org.mockito.ArgumentCaptor.forClass(com.fasterxml.jackson.databind.JsonNode.class);
+        verify(ai).compute(eq("start"), payloadCaptor.capture());
+        var opening = payloadCaptor.getValue().path("opening");
+        assertThat(opening.path("company").asText()).isEqualTo("Smile Tech");
+        assertThat(opening.path("role_title").asText()).isEqualTo("Senior Java Engineer");
+        assertThat(opening.path("candidate_name").asText()).isEqualTo("Nguyễn Minh Tuấn");
+        assertThat(opening.path("attempt_number").asInt()).isEqualTo(2);
+        assertThat(opening.path("jd_summary").asText()).startsWith("Xây dựng hệ thống microservice Java ");
+        assertThat(opening.path("jd_summary").asText().length()).isEqualTo(1500);
+        assertThat(opening.path("cv_summary").asText()).startsWith("5 năm kinh nghiệm Spring Boot ");
+        assertThat(opening.path("cv_summary").asText().length()).isEqualTo(1200);
+    }
+
     @Test void conversationChecksOwnerAndReplaysReceiptsBeforeAiCalls() {
         session();
         var command = new EvidenceDtos.Conversation(UUID.randomUUID(), "intro", 1, "NEXT", "");

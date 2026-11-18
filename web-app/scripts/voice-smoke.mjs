@@ -5,12 +5,12 @@ import puppeteer from 'puppeteer';
 const base = process.argv[2] || 'http://localhost:3217';
 const unconfigured = process.argv.includes('--unconfigured');
 const id = 'voice-smoke';
-const report = { schema_version: 2, state_version: 1, is_finished: false, objectives: [], progress: 0,
-  evidence_coverage: 0, target_attainment: null, termination_reason: null };
+const report = { objectives: [{ objective_id: 'o1', skill_id: 'postgresql', claim: 'SQL', jd_evidence_spans: [],
+  assessment: 'NOT_ASSESSED', stop_reason: null, strengths: [], weaknesses: [], evidence: [] }], termination_reason: null };
 const firstSession = { schema_version: 2, session_id: id, state_version: 1, is_finished: false,
   deadline_at: new Date(Date.now() + 900000).toISOString(), config: { interaction_mode: 'VOICE', mode: 'MIXED', max_questions: 10, duration_seconds: 900 },
-  pending_turn: { turn_id: 't1', objective_id: 'o1', skill_id: 'postgresql', mode: 'TECHNICAL_EXPLANATION',
-    question: 'Bạn xử lý transaction như thế nào?', answer: null, feedback: null }, turns: [], report };
+  pending_turn: { turn_id: 't1', objective_id: 'o1', mode: 'TECHNICAL_EXPLANATION',
+    question: 'Bạn xử lý transaction như thế nào?' }, turns: [], report };
 let session = null;
 const errors = [], answers = [], transcriptions = [], speeches = [], requests = [];
 let failRecognition = false;
@@ -88,7 +88,7 @@ try {
     }
     if (url.pathname.endsWith('/interview/stop')) {
       session = { ...session, state_version: session.state_version + 1, is_finished: true, pending_turn: null,
-        report: { ...report, is_finished: true, termination_reason: 'USER_STOP' } };
+        report: { ...report, termination_reason: 'USER_STOP' } };
       return send(session);
     }
     if (url.pathname.endsWith('/interview')) return send(session || {}, session ? 200 : 404);

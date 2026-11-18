@@ -1,0 +1,6 @@
+{
+  "operation": "respond",
+  "from": "08-q05",
+  "scenario": "Trả lời đầy đủ cho bài thiết kế RabbitMQ, phân biệt cửa sổ lỗi trước commit và sau commit nhưng trước ACK.",
+  "answer": "Em dùng payment_id ổn định làm khóa UNIQUE trong bảng ghi nhận. Consumer dùng manual ack. Trong một transaction PostgreSQL, em thử INSERT bản ghi khóa theo payment_id với ON CONFLICT DO NOTHING. Chỉ giao dịch INSERT thành công mới cập nhật số tiền và trạng thái thanh toán, trong cùng transaction. Nếu xung đột với bản ghi đã commit, em bỏ qua cập nhật. Với cả hai trường hợp, em chỉ ACK sau khi transaction đã commit. Crash trước commit sẽ rollback và RabbitMQ giao lại để xử lý. Crash sau commit nhưng trước ACK sẽ gặp khóa đã tồn tại, bỏ qua ghi lần hai rồi ACK. Cách này giả định tác dụng cần bảo vệ là ghi nhận trong DB, cùng phạm vi transaction."
+}

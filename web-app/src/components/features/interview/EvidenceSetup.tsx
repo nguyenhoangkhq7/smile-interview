@@ -2,14 +2,14 @@
 import { useState } from 'react';
 import { LoaderCircle, MessageSquareText, Mic } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { InterviewConfig, QuestionMode, defaultConfig, questionModes } from '@/services/evidenceInterview';
+import { InterviewStartConfig, QuestionMode, defaultConfig, questionModes } from '@/services/evidenceInterview';
 
 export const modeLabels: Record<QuestionMode, string> = {
   CODING: 'Lập trình', DEBUGGING: 'Tìm và sửa lỗi', DESIGN: 'Thiết kế hệ thống',
   TECHNICAL_EXPLANATION: 'Giải thích kỹ thuật', BEHAVIORAL: 'Kinh nghiệm và cách ứng xử',
 };
 
-interface Props { busy: boolean; onStart: (config: InterviewConfig) => void }
+interface Props { busy: boolean; onStart: (config: InterviewStartConfig) => void }
 export function EvidenceSetup({ busy, onStart }: Props) {
   const [config, setConfig] = useState(defaultConfig);
   return <section aria-busy={busy} className="space-y-5 rounded-xl border p-6">
@@ -31,7 +31,7 @@ export function EvidenceSetup({ busy, onStart }: Props) {
     </fieldset>
     <label className="block">Dạng phỏng vấn
       <select className="ml-3 rounded border p-2" disabled={busy} value={config.focused_question_mode ?? 'MIXED'}
-        onChange={e => setConfig({ ...config, mode: e.target.value === 'MIXED' ? 'MIXED' : 'FOCUSED', focused_question_mode: e.target.value === 'MIXED' ? null : e.target.value as QuestionMode })}>
+        onChange={e => setConfig({ ...config, focused_question_mode: e.target.value === 'MIXED' ? null : e.target.value as QuestionMode })}>
         <option value="MIXED">Tổng hợp</option>
         {questionModes.map(mode => <option key={mode} value={mode}>{modeLabels[mode]}</option>)}
       </select>

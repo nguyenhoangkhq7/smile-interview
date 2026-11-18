@@ -70,36 +70,22 @@ public class StudySuggestionProjection {
                             struggled |= "BELOW".equals(evidence.path("performance").asText())
                                     || evidence.path("explicit_inability").asBoolean();
                 }
-                String kind, reason;
-                switch (criterion.assessment()) {
-                    case "DEMONSTRATED_BELOW_TARGET", "NOT_DEMONSTRATED" -> {
-                        kind = "REVIEW"; reason = "Có bằng chứng chưa đạt yêu cầu; ưu tiên ôn tiêu chí này.";
-                    }
-                    case "NEEDS_VERIFICATION" -> {
-                        kind = "VERIFY"; reason = "Có bằng chứng mâu thuẫn; cần thực hành và kiểm chứng lại.";
-                    }
-                    case "DEMONSTRATED_AT_TARGET", "DEMONSTRATED_ABOVE_TARGET" -> {
-                        kind = struggled ? "REINFORCE" : "MET";
-                        reason = struggled ? "Đã đạt nhưng từng gặp khó khăn hoặc cần trợ giúp; có thể luyện để củng cố."
-                                : "Đã có bằng chứng đạt yêu cầu.";
-                    }
-                    default -> {
-                        kind = activity == null ? "UNASSESSED" : "VERIFY";
-                        reason = activity == null ? "Chưa đánh giá; bạn có thể chủ động chọn ôn thêm."
-                                : "Đã kiểm tra nhưng chưa đủ bằng chứng kết luận; cần luyện và kiểm chứng thêm.";
-                    }
-                }
+                String kind = switch (criterion.assessment()) {
+                    case "DEMONSTRATED_BELOW_TARGET", "NOT_DEMONSTRATED" -> "REVIEW";
+                    case "NEEDS_VERIFICATION" -> "VERIFY";
+                    case "DEMONSTRATED_AT_TARGET", "DEMONSTRATED_ABOVE_TARGET" -> struggled ? "REINFORCE" : "MET";
+                    default -> activity == null ? "UNASSESSED" : "VERIFY";
+                };
                 String goal = "";
                 for (var item : definition.path("criteria"))
                     if (criterion.id().equals(item.path("criterion_id").asText())) goal = item.path("at_target").asText();
                 var source = ("REVIEW".equals(kind) || "VERIFY".equals(kind)) && criterion.lastAssessment() != null
                         ? criterion.lastAssessment() : activity == null ? null : activity.source();
-                criteria.add(new CriterionSuggestion(criterion.id(), criterion.description(), criterion.essential(),
-                        criterion.assessment(), kind, Set.of("REVIEW", "VERIFY").contains(kind), reason, goal, source,
-                        criterion.lastAssessment()));
+                criteria.add(new CriterionSuggestion(criterion.id(), criterion.description(),
+                        criterion.assessment(), kind, goal, source, criterion.lastAssessment()));
             }
             suggestions.add(new ObjectiveSuggestion(skill.skillId(), objective.id(), objective.claim(),
-                    objective.assessment(), objective.lastChecked(), criteria));
+                    objective.lastChecked(), criteria));
         }
         return suggestions;
     }
