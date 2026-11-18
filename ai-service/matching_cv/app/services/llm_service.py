@@ -330,6 +330,7 @@ class LLMService:
         explicit_source: Optional[str] = None
         effective_explicit: Optional[List[str]] = explicit_mentions
 
+        non_skill_mentions: List[str] = []
         if explicit_result is not None:
             stored_sha = extract_stored_text_sha256(explicit_result)
             if stored_sha != doc_sha256:
@@ -337,12 +338,44 @@ class LLMService:
                     f"Provenance mismatch: explicit_result text_sha256 ({stored_sha}) "
                     f"does not match sha256(text) ({doc_sha256})"
                 )
+            from matching_cv.app.services.implicit_skill_postprocessor import (
+                build_explicit_list,
+                build_non_skill_list,
+            )
             if effective_explicit is None:
-                from matching_cv.app.services.implicit_skill_postprocessor import build_explicit_list
                 effective_explicit = build_explicit_list(explicit_result)
+            non_skill_mentions = build_non_skill_list(explicit_result)
             explicit_source = "extraction_result"
         elif explicit_mentions is not None:
             explicit_source = "caller_list"
+
+        model_to_use = settings.OPENROUTER_MODEL or self.model
+        if system_prompt is not None:
+            prompt_content = system_prompt
+        elif prompt_variant and prompt_variant.upper() in ("EN", "ENGLISH"):
+            prompt_content = IMPLICIT_SKILL_SYSTEM_PROMPT_EN
+        elif prompt_variant and prompt_variant.upper() == "V2":
+            prompt_content = IMPLICIT_SKILL_SYSTEM_PROMPT_V2
+        else:
+            prompt_content = IMPLICIT_SKILL_SYSTEM_PROMPT
+        prompt_sha256 = hashlib.sha256(prompt_content.encode("utf-8")).hexdigest()
+        temp_to_use = 0.0 if temperature is None else float(temperature)
+
+        # Stage B2: Skip the implicit LLM call for JD when IMPLICIT_ENABLED_FOR_JD is False
+        if document_type and document_type.strip().upper() == "JD" and not settings.IMPLICIT_ENABLED_FOR_JD:
+            logger.info("Skipping implicit skill LLM call for JD (IMPLICIT_ENABLED_FOR_JD=False).")
+            return {
+                "implicit_skills": [],
+                "extraction_meta": {
+                    "prompt_sha256": prompt_sha256,
+                    "prompt_variant": prompt_variant if prompt_variant is not None else ("default" if system_prompt is None else None),
+                    "model_configured": model_to_use,
+                    "temperature": temp_to_use,
+                    "schema_version": "1.0.0",
+                    "extracted_at": datetime.now(timezone.utc).isoformat(),
+                    "explicit_source": explicit_source,
+                },
+            }
 
         current_key = settings.OPENROUTER_API_KEY
         if not current_key or current_key.strip() in [
@@ -360,17 +393,6 @@ class LLMService:
             default_headers=self.default_headers,
         )
 
-        model_to_use = settings.OPENROUTER_MODEL or self.model
-        if system_prompt is not None:
-            prompt_content = system_prompt
-        elif prompt_variant and prompt_variant.upper() in ("EN", "ENGLISH"):
-            prompt_content = IMPLICIT_SKILL_SYSTEM_PROMPT_EN
-        elif prompt_variant and prompt_variant.upper() == "V2":
-            prompt_content = IMPLICIT_SKILL_SYSTEM_PROMPT_V2
-        else:
-            prompt_content = IMPLICIT_SKILL_SYSTEM_PROMPT
-        prompt_sha256 = hashlib.sha256(prompt_content.encode("utf-8")).hexdigest()
-
         # Build user message: if effective_explicit is provided, include ALREADY EXPLICIT section
         if effective_explicit is not None:
             seen = set()
@@ -380,9 +402,16 @@ class LLMService:
                     seen.add(m)
                     unique_explicit.append(m)
 
+            do_not_infer_block = ""
+            if explicit_result is not None or non_skill_mentions:
+                do_not_infer_block = (
+                    f"DO NOT INFER:\n{json.dumps(non_skill_mentions, ensure_ascii=False)}\n\n"
+                )
+
             user_content = (
                 f"Document Type: {document_type}\n\n"
                 f"ALREADY EXPLICIT:\n{json.dumps(unique_explicit, ensure_ascii=False)}\n\n"
+                f"{do_not_infer_block}"
                 f"Text:\n{text}"
             )
         else:
@@ -392,8 +421,6 @@ class LLMService:
             {"role": "system", "content": prompt_content},
             {"role": "user", "content": user_content},
         ]
-
-        temp_to_use = 0.0 if temperature is None else float(temperature)
 
         from matching_cv.app.services.extraction_recovery import request_stage_context_var
         request_stage_context_var.set("implicit")

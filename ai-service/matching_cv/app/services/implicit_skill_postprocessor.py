@@ -744,6 +744,63 @@ def build_explicit_list(
     return result
 
 
+def build_non_skill_list(explicit_result: Any) -> List[str]:
+    """Pure function returning distinct surface forms from explicit_result.non_skill_entities
+    (or mentions with non-skill kinds) for the Stage B1 'DO NOT INFER' list.
+    Case-insensitively deduplicated in order of first occurrence.
+    """
+    seen: Set[str] = set()
+    result: List[str] = []
+
+    def _add(sf: Optional[str]) -> None:
+        if not sf:
+            return
+        sf_clean = sf.strip()
+        if not sf_clean:
+            return
+        key = sf_clean.casefold()
+        if key not in seen:
+            seen.add(key)
+            result.append(sf_clean)
+
+    if explicit_result is None:
+        return []
+
+    if isinstance(explicit_result, dict):
+        if "processed_result" in explicit_result and isinstance(explicit_result["processed_result"], dict):
+            return build_non_skill_list(explicit_result["processed_result"])
+        if "postprocessed" in explicit_result and isinstance(explicit_result["postprocessed"], dict):
+            return build_non_skill_list(explicit_result["postprocessed"])
+        ns_list = explicit_result.get("non_skill_entities", [])
+        if isinstance(ns_list, list):
+            for s in ns_list:
+                if isinstance(s, dict):
+                    evs = s.get("evidences", [])
+                    if isinstance(evs, list) and evs:
+                        for ev in evs:
+                            if isinstance(ev, dict):
+                                _add(ev.get("surface_form"))
+                            else:
+                                _add(getattr(ev, "surface_form", None))
+                    for sf in s.get("surface_forms", []):
+                        _add(sf)
+                else:
+                    for ev in getattr(s, "evidences", []):
+                        _add(getattr(ev, "surface_form", None))
+                    for sf in getattr(s, "surface_forms", []):
+                        _add(sf)
+        return result
+
+    if hasattr(explicit_result, "non_skill_entities"):
+        for s in getattr(explicit_result, "non_skill_entities", []) or []:
+            for ev in getattr(s, "evidences", []) or []:
+                _add(getattr(ev, "surface_form", None))
+            for sf in getattr(s, "surface_forms", []) or []:
+                _add(sf)
+
+    return result
+
+
 def _extract_explicit_mentions(explicit_result: Any) -> List[str]:
     """Helper to extract unique explicit mention surface forms from various representations."""
     mentions: Set[str] = set()

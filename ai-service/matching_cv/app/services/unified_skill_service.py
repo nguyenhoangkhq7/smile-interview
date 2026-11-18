@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Literal, Optional, Set, Tuple
 
 from fastapi import HTTPException, UploadFile, status
 
+from matching_cv.app.core.config import settings
 from matching_cv.app.schemas.implicit_skill_extraction import (
     ImplicitExtractedSkill,
     ImplicitExtractionResult,
@@ -18,6 +19,7 @@ from matching_cv.app.schemas.unified_skill_extraction import (
     DocumentUnifiedResult,
     DocumentValidationResult,
     DuplicateImplicitSkill,
+    ImplicitEvidenceVerification,
     PipelineError,
     UnifiedExtractFileResponse,
     UnifiedExtractionSummary,
@@ -69,8 +71,43 @@ def deduplicate_explicit_implicit(
             evidence_verifications=[],
         )
 
-    if not explicit_result or not explicit_result.skills:
-        layer_a_accepted = list(implicit_result.skills)
+    # Stage B5: Drop items whose snippets have null start/end/section (non-verbatim)
+    # before validation instead of reaching "quarantined".
+    verbatim_implicit_skills: List[ImplicitExtractedSkill] = []
+    for imp_skill in implicit_result.skills:
+        has_null_snippet = False
+        for ev in imp_skill.evidences or []:
+            if not ev.snippets:
+                has_null_snippet = True
+                break
+            for snip in ev.snippets:
+                if (
+                    not snip.verbatim_ok
+                    and (snip.start is None or snip.end is None or snip.section is None)
+                ):
+                    has_null_snippet = True
+                    break
+            if has_null_snippet:
+                break
+        if not has_null_snippet:
+            verbatim_implicit_skills.append(imp_skill)
+
+    if not verbatim_implicit_skills:
+        return DocumentValidationResult(
+            status="completed",
+            validation_origin="original",
+            validation_policy=validation_policy,
+            duplicate_implicit_skills=[],
+            accepted_implicit_skills=[],
+            rejected_implicit_skills=[],
+            evidence_verifications=[],
+        )
+
+    has_explicit_skills = bool(explicit_result and explicit_result.skills)
+    has_non_skills = bool(explicit_result and getattr(explicit_result, "non_skill_entities", None))
+
+    if not explicit_result or (not has_explicit_skills and not has_non_skills):
+        layer_a_accepted = list(verbatim_implicit_skills)
         if validation_policy == "dedup_plus_evidence_verification":
             accepted_skills, rejected_skills, verifications = ImplicitEvidenceVerifier.verify_candidates(
                 layer_a_accepted, explicit_result=None, document_type=document_type
@@ -98,7 +135,7 @@ def deduplicate_explicit_implicit(
     # 3. Slugs of all surface forms: slug -> (canonical_id, surface_form)
     explicit_slugs: Dict[str, Tuple[str, str]] = {}
 
-    for exp_skill in explicit_result.skills:
+    for exp_skill in explicit_result.skills or []:
         first_sf = exp_skill.surface_forms[0] if exp_skill.surface_forms else exp_skill.skill_id
         explicit_ids[exp_skill.skill_id.lower()] = (exp_skill.skill_id, first_sf)
 
@@ -119,10 +156,30 @@ def deduplicate_explicit_implicit(
                 if slug:
                     explicit_slugs[slug] = (exp_skill.skill_id, ev.surface_form)
 
+    # Stage B1: Collect normalized non_skill_entities strings for leakage rejection
+    non_skill_norms: List[Tuple[str, str]] = []  # (normalized_form, display_form)
+    seen_ns_norms: Set[str] = set()
+    for ns_entity in getattr(explicit_result, "non_skill_entities", []) or []:
+        candidates_sf: List[str] = []
+        if getattr(ns_entity, "surface_forms", None):
+            candidates_sf.extend(ns_entity.surface_forms)
+        for ev in getattr(ns_entity, "evidences", []) or []:
+            if getattr(ev, "surface_form", None):
+                candidates_sf.append(ev.surface_form)
+        if getattr(ns_entity, "skill_id", None):
+            candidates_sf.append(ns_entity.skill_id)
+        for sf in candidates_sf:
+            n_sf = normalize_skill_name(sf)
+            if n_sf and n_sf not in seen_ns_norms:
+                seen_ns_norms.add(n_sf)
+                non_skill_norms.append((n_sf, sf))
+
     duplicate_list: List[DuplicateImplicitSkill] = []
     layer_a_accepted: List[ImplicitExtractedSkill] = []
+    layer_a_rejected_non_skill: List[ImplicitExtractedSkill] = []
+    layer_a_verifications_non_skill: List[ImplicitEvidenceVerification] = []
 
-    for imp_skill in implicit_result.skills:
+    for imp_skill in verbatim_implicit_skills:
         matched_info: Optional[Tuple[str, str, str]] = None  # (exp_id, exp_sf, reason)
 
         # Check 1: Canonical skill_id exact match
@@ -132,8 +189,8 @@ def deduplicate_explicit_implicit(
             matched_info = (exp_id, exp_sf, "exact_canonical_id")
 
         # Check 2: Normalized label match against explicit surface forms
+        norm_imp_label = normalize_skill_name(imp_skill.label)
         if not matched_info:
-            norm_imp_label = normalize_skill_name(imp_skill.label)
             if norm_imp_label in explicit_surface_forms:
                 exp_id, exp_sf = explicit_surface_forms[norm_imp_label]
                 matched_info = (exp_id, exp_sf, "surface_form_match")
@@ -158,6 +215,40 @@ def deduplicate_explicit_implicit(
                     original_inference=imp_skill,
                 )
             )
+            continue
+
+        # Check 4 (Stage B1): Reject if normalized label matches or contains any non_skill_entities item
+        matched_ns: Optional[str] = None
+        if norm_imp_label and non_skill_norms:
+            for n_ns, orig_ns in non_skill_norms:
+                if norm_imp_label == n_ns or n_ns in norm_imp_label:
+                    matched_ns = orig_ns
+                    break
+
+        if matched_ns is not None:
+            layer_a_rejected_non_skill.append(imp_skill)
+            layer_a_verifications_non_skill.append(
+                ImplicitEvidenceVerification(
+                    skill_id=imp_skill.skill_id,
+                    original_label=imp_skill.label,
+                    assessment="unsupported",
+                    assessment_reason=(
+                        f"Rejected by Stage B1 leakage guard: implicit label '{imp_skill.label}' "
+                        f"matches or contains non_skill_entities item '{matched_ns}'."
+                    ),
+                    is_accepted=False,
+                    confidence=0.0,
+                    skill_name=imp_skill.label,
+                    document_type="JD" if document_type.upper() == "JD" else "CV",
+                    support_status="unsupported",
+                    support_reason=(
+                        f"Rejected by Stage B1 leakage guard: implicit label '{imp_skill.label}' "
+                        f"matches or contains non_skill_entities item '{matched_ns}'."
+                    ),
+                    confidence_normalized=0.0,
+                    acceptance_decision="rejected",
+                )
+            )
         else:
             layer_a_accepted.append(imp_skill)
 
@@ -166,10 +257,12 @@ def deduplicate_explicit_implicit(
         accepted_skills, rejected_skills, verifications = ImplicitEvidenceVerifier.verify_candidates(
             layer_a_accepted, explicit_result=explicit_result, document_type=document_type
         )
+        rejected_skills = layer_a_rejected_non_skill + rejected_skills
+        verifications = layer_a_verifications_non_skill + verifications
     else:
         accepted_skills = layer_a_accepted
-        rejected_skills = []
-        verifications = []
+        rejected_skills = layer_a_rejected_non_skill
+        verifications = layer_a_verifications_non_skill
 
     return DocumentValidationResult(
         status="completed",
@@ -284,31 +377,39 @@ class UnifiedSkillService:
         # Phase 3: Implicit Skill Extraction (contextualized with explicit result)
         t_imp_start = time.perf_counter()
         implicit_result: Optional[ImplicitExtractionResult] = None
-        try:
-            raw_implicit = await llm_service.extract_implicit_skills(
-                text=raw_text,
-                document_type=document_type,
-                explicit_result=explicit_result,
-            )
+        if document_type.upper() == "JD" and not settings.IMPLICIT_ENABLED_FOR_JD:
             implicit_result = implicit_skill_postprocessor.process_extraction(
-                raw_result=raw_implicit,
+                raw_result={"implicit_skills": []},
                 text=raw_text,
                 filename=doc_data.filename,
                 document_type=document_type,
             )
-        except Exception as exc:
-            logger.error(
-                f"[{run_id}] Implicit extraction failed for {document_type}: {exc}",
-                exc_info=True,
-            )
-            errors.append(
-                PipelineError(
-                    document=document_type,
-                    stage="implicit_extraction",
-                    error_type=type(exc).__name__,
-                    message=str(exc),
+        else:
+            try:
+                raw_implicit = await llm_service.extract_implicit_skills(
+                    text=raw_text,
+                    document_type=document_type,
+                    explicit_result=explicit_result,
                 )
-            )
+                implicit_result = implicit_skill_postprocessor.process_extraction(
+                    raw_result=raw_implicit,
+                    text=raw_text,
+                    filename=doc_data.filename,
+                    document_type=document_type,
+                )
+            except Exception as exc:
+                logger.error(
+                    f"[{run_id}] Implicit extraction failed for {document_type}: {exc}",
+                    exc_info=True,
+                )
+                errors.append(
+                    PipelineError(
+                        document=document_type,
+                        stage="implicit_extraction",
+                        error_type=type(exc).__name__,
+                        message=str(exc),
+                    )
+                )
 
         imp_duration = (time.perf_counter() - t_imp_start) * 1000
         timings[f"{doc_prefix}_implicit_ms"] = round(imp_duration, 2)
