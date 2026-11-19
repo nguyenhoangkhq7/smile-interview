@@ -4,14 +4,16 @@ import logging
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile, status
 from starlette.concurrency import run_in_threadpool
 
 from matching_cv.app.container import match_documents
 from matching_cv.app.schemas.module1 import Module1Output
+from matching_cv.app.schemas.unified_skill_extraction import UnifiedExtractFileResponse
 from matching_cv.app.services.document_parser import document_parser_service
 from matching_cv.app.services.standardized_output_builder import Module1OutputError
-from skill_gap.api.routes import _get_orchestrator
+from matching_cv.app.services.unified_skill_service import unified_skill_service
+from skill_gap.api.routes import _get_orchestrator, _get_report_store
 from skill_gap.api.schemas import AnalyzeWithReportResponse
 
 logger = logging.getLogger(__name__)
@@ -73,4 +75,37 @@ async def analyze(request: Request) -> AnalyzeWithReportResponse:
         analysis_id=resolved_analysis_id,
     )
     report.matching_score = documents.matching_score
-    return AnalyzeWithReportResponse(analysis_id=resolved_analysis_id, skills=skills, report=report)
+    _get_report_store(request)[report.analysis_id] = report
+    return AnalyzeWithReportResponse(analysis_id=report.analysis_id, skills=skills, report=report)
+
+
+@router.post(
+    "/extract-all-from-file",
+    response_model=UnifiedExtractFileResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Extract explicit and implicit skills from CV and/or JD files",
+)
+async def extract_all_from_file(
+    cv_file: Optional[UploadFile] = File(
+        default=None,
+        description="Candidate CV document file (.pdf or .txt)",
+    ),
+    jd_file: Optional[UploadFile] = File(
+        default=None,
+        description="Job Description document file (.pdf or .txt)",
+    ),
+    file: Optional[UploadFile] = File(
+        default=None,
+        description="Single document file (.pdf or .txt) when testing one file with document_type",
+    ),
+    document_type: Optional[str] = Form(
+        default="CV",
+        description="Document type ('CV' or 'JD') when uploading via the single 'file' field",
+    ),
+) -> UnifiedExtractFileResponse:
+    return await unified_skill_service.extract_unified_from_files(
+        cv_file=cv_file,
+        jd_file=jd_file,
+        file=file,
+        document_type=document_type,
+    )

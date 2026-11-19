@@ -52,7 +52,6 @@ def get_gold_examples() -> List[dspy.Example]:
             [
                 ExplicitSkillMention(mention="Python", kind="skill", category="Technology/Tool", source_sentence="Built data pipelines with Python and Airflow."),
                 ExplicitSkillMention(mention="Airflow", kind="skill", category="Technology/Tool", source_sentence="Built data pipelines with Python and Airflow."),
-                ExplicitSkillMention(mention="data pipelines", kind="skill", category="Technical Concept", source_sentence="Built data pipelines with Python and Airflow."),
             ],
         ),
         _example(
@@ -67,17 +66,16 @@ def get_gold_examples() -> List[dspy.Example]:
             "JD",
             "The employer operates an e-commerce platform. Build payment APIs using Go and Kafka.",
             [
-                ExplicitSkillMention(mention="payment APIs", kind="skill", category="Technical Concept", source_sentence="Build payment APIs using Go and Kafka."),
                 ExplicitSkillMention(mention="Go", kind="skill", category="Technology/Tool", source_sentence="Build payment APIs using Go and Kafka."),
                 ExplicitSkillMention(mention="Kafka", kind="skill", category="Technology/Tool", source_sentence="Build payment APIs using Go and Kafka."),
             ],
         ),
         _example(
             "JD",
-            "Applicants need a PMP certification. Experience writing functional tests is required.",
+            "Applicants need a PMP certification. Experience writing automated tests with Playwright is required.",
             [
                 ExplicitSkillMention(mention="PMP certification", kind="certification", category="Certification", source_sentence="Applicants need a PMP certification."),
-                ExplicitSkillMention(mention="functional tests", kind="skill", category="Engineering Practice", source_sentence="Experience writing functional tests is required."),
+                ExplicitSkillMention(mention="Playwright", kind="skill", category="Technology/Tool", source_sentence="Experience writing automated tests with Playwright is required."),
             ],
         ),
         _example(

@@ -49,6 +49,15 @@ class Settings(BaseSettings):
     # Production skill importance inference
     JSI_IMPORTANCE_ENABLED: bool = True
 
+    # Explicit skill extraction routing: route domain entities to skills
+    ROUTE_DOMAIN_TO_SKILLS: bool = True
+
+    # Stage B2: Disable implicit LLM extraction for JD documents by default (CV unchanged)
+    IMPLICIT_ENABLED_FOR_JD: bool = False
+
+    # Stage C: Skill clustering (deterministic near-duplicate grouping, non-destructive)
+    SKILL_CLUSTERING_ENABLED: bool = False
+
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parents[3] / ".env",
         env_file_encoding="utf-8",

@@ -1551,4 +1551,325 @@ def test_aggregate_single_candidate_passes_logic():
     assert res5["covered_unstable"] is False
 
 
+# =============================================================================
+# Stage B Tests: B1 (Leakage Guard), B2 (JD Skip), B3 (Generic Stems),
+# B4 (Conjunction Rejection & Top-3 Cap), B5 (Drop Non-Verbatim Before Validation)
+# =============================================================================
+
+
+@pytest.mark.anyio
+async def test_stage_b1_do_not_infer_message_and_non_skill_dedup_rejection():
+    """Verify B1:
+    1. User message includes DO NOT INFER list with non_skill_entities strings.
+    2. deduplicate_explicit_implicit rejects any implicit label whose normalized form
+       matches or contains a non_skill_entities item.
+    """
+    import hashlib
+    from matching_cv.app.schemas.skill_extraction import Evidence, ExtractedSkill, ExtractionResult, ExtractionStats
+    from matching_cv.app.services.unified_skill_service import deduplicate_explicit_implicit
+
+    doc_text = "Own the order-management microservice handling 120k orders/day using Spring Boot."
+    doc_sha = hashlib.sha256(doc_text.encode("utf-8")).hexdigest()
+
+    explicit_res = ExtractionResult.model_construct(
+        text_sha256=doc_sha,
+        stats=ExtractionStats(total_mentions=2, unique_skills=1),
+        skills=[
+            ExtractedSkill(
+                skill_id="spring-boot",
+                surface_forms=["Spring Boot"],
+                kind="skill",
+                category="Technology/Tool",
+                evidences=[Evidence(surface_form="Spring Boot", kind="skill", sentence=doc_text)],
+            )
+        ],
+        non_skill_entities=[
+            ExtractedSkill(
+                skill_id="order-management-microservice",
+                surface_forms=["order-management microservice"],
+                kind="context",
+                category="Technical Concept",
+                evidences=[Evidence(surface_form="order-management microservice", kind="context", sentence=doc_text)],
+            )
+        ],
+    )
+
+    mock_choice = MagicMock()
+    mock_choice.message.content = json.dumps({"implicit_skills": []})
+    mock_completion = MagicMock()
+    mock_completion.choices = [mock_choice]
+    mock_create = AsyncMock(return_value=mock_completion)
+
+    with patch("matching_cv.app.core.config.settings.OPENROUTER_API_KEY", "sk-mock-key"), \
+         patch("matching_cv.app.services.llm_service.AsyncOpenAI") as mock_openai_cls:
+        mock_instance = MagicMock()
+        mock_instance.chat.completions.create = mock_create
+        mock_openai_cls.return_value = mock_instance
+
+        await llm_service.extract_implicit_skills(
+            text=doc_text,
+            document_type="CV",
+            explicit_result=explicit_res,
+        )
+        call_kwargs = mock_create.call_args.kwargs
+        user_msg = next(m for m in call_kwargs["messages"] if m["role"] == "user")
+        assert "DO NOT INFER:\n[\"order-management microservice\"]" in user_msg["content"]
+
+    # Check dedup layer rejects implicit skill matching or containing non_skill_entities item
+    imp_res = ImplicitExtractionResult(
+        stats=ImplicitExtractionStats(total_inferences=1, unique_skills=1),
+        skills=[
+            ImplicitExtractedSkill(
+                skill_id="order-management-microservice-scaling",
+                label="Order-Management Microservice Scaling",
+                category="Engineering Practice",
+                evidences=[
+                    ImplicitEvidence(
+                        inferred_from_raw=doc_text,
+                        snippets=[
+                            ImplicitEvidenceSnippet(
+                                text=doc_text, start=0, end=len(doc_text), section="experience", verbatim_ok=True
+                            )
+                        ],
+                    )
+                ],
+            )
+        ],
+    )
+    val_res = deduplicate_explicit_implicit(explicit_res, imp_res, document_type="CV")
+    assert len(val_res.accepted_implicit_skills) == 0
+    assert len(val_res.rejected_implicit_skills) == 1
+    assert val_res.evidence_verifications[0].acceptance_decision == "rejected"
+
+
+@pytest.mark.anyio
+async def test_stage_b2_implicit_enabled_for_jd_default_false():
+    """Verify B2: IMPLICIT_ENABLED_FOR_JD defaults to False and skips LLM call for JD."""
+    from matching_cv.app.core.config import settings
+
+    assert settings.IMPLICIT_ENABLED_FOR_JD is False
+
+    mock_create = AsyncMock()
+    with patch("matching_cv.app.core.config.settings.OPENROUTER_API_KEY", "sk-mock-key"), \
+         patch("matching_cv.app.services.llm_service.AsyncOpenAI") as mock_openai_cls:
+        mock_instance = MagicMock()
+        mock_instance.chat.completions.create = mock_create
+        mock_openai_cls.return_value = mock_instance
+
+        jd_res = await llm_service.extract_implicit_skills("JD text requiring Java.", "JD")
+        assert jd_res["implicit_skills"] == []
+        assert not mock_create.called
+
+
+def test_stage_b3_generic_stems_excluded_from_anchor_ratio():
+    """Verify B3 (Stage B.2 Fix):
+    1. Generic stems (design, system, manag, require, strateg, perform) are never counted as overlap.
+    2. Generic stems are kept in the denominator; an unmatched generic stem counts as missing.
+    3. Require at least one specific (non-generic) overlapping stem.
+    4. A candidate whose only specific overlap is the bare stem 'test' (test/tests) must not be accepted (ratio=0.0).
+    """
+    from matching_cv.app.services.implicit_evidence_verifier import GENERIC_ANCHOR_STEMS, ImplicitEvidenceVerifier
+
+    for st in ("design", "system", "manag", "require", "strateg", "perform"):
+        assert st in GENERIC_ANCHOR_STEMS
+
+    # Overlap ONLY on 'system' and 'design' must yield 0.0 ratio because 'databas' is missing
+    ratio, overlap, missing = ImplicitEvidenceVerifier.evaluate_semantic_anchor(
+        "Database System Design",
+        "Designed a distributed notification system for mobile alerts.",
+    )
+    assert ratio == 0.0
+    assert overlap == set()
+    assert "databa" in missing
+    assert "system" in missing
+    assert "design" in missing
+
+    # Generic stem in denominator: 'Database Design' (databa + design) with only 'databa' matched
+    # len(raw_cand_stems)=2, len(overlap)=1 -> ratio=0.50, 'design' is in missing
+    ratio2, overlap2, missing2 = ImplicitEvidenceVerifier.evaluate_semantic_anchor(
+        "Database Design",
+        "Queried the Postgres database directly.",
+    )
+    assert ratio2 == 0.50
+    assert overlap2 == {"databa"}
+    assert "design" in missing2
+
+    # Bare stem 'test' handling: candidate whose only specific overlap is 'test' yields 0.0 ratio
+    ratio_test1, overlap_test1, missing_test1 = ImplicitEvidenceVerifier.evaluate_semantic_anchor(
+        "Test Strategy",
+        "Wrote integration tests for all endpoints.",
+    )
+    assert ratio_test1 == 0.0
+    assert overlap_test1 == {"test"}
+    assert "strateg" in missing_test1
+
+    ratio_test2, overlap_test2, missing_test2 = ImplicitEvidenceVerifier.evaluate_semantic_anchor(
+        "Test Infrastructure Management",
+        "Wrote integration tests for all endpoints.",
+    )
+    assert ratio_test2 == 0.0
+    assert overlap_test2 == {"test"}
+    assert "infrastructur" in missing_test2
+
+
+def test_stage_b4_conjunction_rejection_and_top3_cv_cap():
+    """Verify B4 rework:
+    1. Route conjunction labels ('&', ',', ' and ', ' và ') through compound decomposition.
+       - Unsupported components are rejected.
+       - Evidenced components are accepted as atomic skills with decomposed_from tracking.
+    2. Cap accepted implicit skills at 3 per CV, ranked by verifier confidence_normalized
+       (tie-break: raw LLM confidence).
+    """
+    from matching_cv.app.services.implicit_evidence_verifier import ImplicitEvidenceVerifier
+
+    # 1a. Unsupported compound candidates: both components lack evidence, rejected
+    unsupp_conj_labels = [
+        "Cache Invalidation & Consistency",
+        "Phân tích và Thiết kế",
+    ]
+    for lbl in unsupp_conj_labels:
+        cand = ImplicitExtractedSkill(
+            skill_id="test-conj-unsupp",
+            label=lbl,
+            category="Engineering Practice",
+            evidences=[
+                ImplicitEvidence(
+                    inferred_from_raw="Implemented logging, monitoring and alerting.",
+                    snippets=[
+                        ImplicitEvidenceSnippet(
+                            text="Implemented logging, monitoring and alerting.",
+                            start=0,
+                            end=44,
+                            section="experience",
+                            verbatim_ok=True,
+                        )
+                    ],
+                )
+            ],
+        )
+        acc, rej, vers = ImplicitEvidenceVerifier.verify_candidates([cand], document_type="CV")
+        assert len(acc) == 0, f"Expected '{lbl}' to have no accepted components"
+        assert len(rej) == 1
+        assert vers[0].acceptance_decision == "rejected"
+
+    # 1b. Supported compound candidates: decomposed into atomic evidenced components
+    cand_supp = ImplicitExtractedSkill(
+        skill_id="test-conj-supp",
+        label="Logging, Monitoring",
+        category="Engineering Practice",
+        evidences=[
+            ImplicitEvidence(
+                inferred_from_raw="Implemented logging, monitoring and alerting.",
+                snippets=[
+                    ImplicitEvidenceSnippet(
+                        text="Implemented logging, monitoring and alerting.",
+                        start=0,
+                        end=44,
+                        section="experience",
+                        verbatim_ok=True,
+                    )
+                ],
+            )
+        ],
+    )
+    acc, rej, vers = ImplicitEvidenceVerifier.verify_candidates([cand_supp], document_type="CV")
+    assert len(acc) == 2, f"Expected 'Logging, Monitoring' to decompose into 2 accepted atomic skills, got: {[s.label for s in acc]}"
+    assert {s.skill_id for s in acc} == {"logging", "monitoring"}
+    assert all(s.decomposed_from == "test-conj-supp" for s in acc)
+
+    # Test top-3 cap ranked by confidence_normalized, tie-break by confidence_raw
+    ev_text = (
+        "Automated release deployment pipelines, mentored junior engineers, "
+        "migrated legacy monolith systems, and triaged production outage incidents."
+    )
+    cands = [
+        ImplicitExtractedSkill(
+            skill_id="release-automation",
+            label="Release Automation",
+            evidences=[
+                ImplicitEvidence(
+                    inferred_from_raw=ev_text,
+                    snippets=[ImplicitEvidenceSnippet(text=ev_text, start=0, end=len(ev_text), section="experience", verbatim_ok=True)],
+                    llm_confidence_raw=0.75,
+                )
+            ],
+        ),
+        ImplicitExtractedSkill(
+            skill_id="technical-mentoring",
+            label="Technical Mentoring",
+            evidences=[
+                ImplicitEvidence(
+                    inferred_from_raw=ev_text,
+                    snippets=[ImplicitEvidenceSnippet(text=ev_text, start=0, end=len(ev_text), section="experience", verbatim_ok=True)],
+                    llm_confidence_raw=0.95,
+                )
+            ],
+        ),
+        ImplicitExtractedSkill(
+            skill_id="legacy-migration",
+            label="Legacy Migration",
+            evidences=[
+                ImplicitEvidence(
+                    inferred_from_raw=ev_text,
+                    snippets=[ImplicitEvidenceSnippet(text=ev_text, start=0, end=len(ev_text), section="experience", verbatim_ok=True)],
+                    llm_confidence_raw=0.88,
+                )
+            ],
+        ),
+        ImplicitExtractedSkill(
+            skill_id="incident-triage",
+            label="Incident Triage",
+            evidences=[
+                ImplicitEvidence(
+                    inferred_from_raw=ev_text,
+                    snippets=[ImplicitEvidenceSnippet(text=ev_text, start=0, end=len(ev_text), section="experience", verbatim_ok=True)],
+                    llm_confidence_raw=0.91,
+                )
+            ],
+        ),
+    ]
+    acc, rej, vers = ImplicitEvidenceVerifier.verify_candidates(cands, document_type="CV")
+    assert len(acc) == 3
+    assert [s.skill_id for s in acc] == ["technical-mentoring", "incident-triage", "legacy-migration"]
+    assert [s.skill_id for s in rej] == ["release-automation"]
+
+
+def test_stage_b5_non_verbatim_snippets_dropped_before_validation():
+    """Verify B5: Items whose snippets have null start/end/section (non-verbatim)
+    are dropped before validation instead of reaching 'quarantined'.
+    """
+    from matching_cv.app.services.unified_skill_service import deduplicate_explicit_implicit
+
+    imp_res = ImplicitExtractionResult(
+        stats=ImplicitExtractionStats(total_inferences=1, unique_skills=1, non_verbatim_evidences=1),
+        skills=[
+            ImplicitExtractedSkill(
+                skill_id="production-incident-management",
+                label="Production Incident Management",
+                category="Engineering Practice",
+                category_raw="Engineering Practice",
+                evidences=[
+                    ImplicitEvidence(
+                        inferred_from_raw="non-verbatim paraphrase not in source",
+                        snippets=[
+                            ImplicitEvidenceSnippet(
+                                text="non-verbatim paraphrase not in source",
+                                start=None,
+                                end=None,
+                                section=None,
+                                verbatim_ok=False,
+                            )
+                        ],
+                    )
+                ],
+            )
+        ],
+    )
+    val_res = deduplicate_explicit_implicit(None, imp_res, document_type="CV")
+    assert len(val_res.accepted_implicit_skills) == 0
+    assert len(val_res.rejected_implicit_skills) == 0
+    assert len(val_res.evidence_verifications) == 0
+
+
+
 

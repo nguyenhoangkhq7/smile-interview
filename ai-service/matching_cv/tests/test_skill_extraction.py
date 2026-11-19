@@ -478,7 +478,9 @@ def test_golden_01_backend_cv_and_jd_extraction():
     )
     assert cv_result.stats.total_mentions == 51
     assert cv_result.stats.unresolved_evidences == 0
-    assert cv_result.stats.unique_skills == 44
+    assert cv_result.stats.unique_skills == 42
+    assert cv_result.stats.non_skill_count == 2
+    assert len(cv_result.non_skill_entities) == 2
     assert cv_result.stats.header_evidences == 0
     assert cv_result.stats.kind_conflicts == 0
     assert cv_result.stats.non_verbatim_mentions == 0
@@ -492,7 +494,9 @@ def test_golden_01_backend_cv_and_jd_extraction():
     )
     assert jd_result.stats.total_mentions == 46
     assert jd_result.stats.unresolved_evidences == 0
-    assert jd_result.stats.unique_skills == 42
+    assert jd_result.stats.unique_skills == 35
+    assert jd_result.stats.non_skill_count == 7
+    assert len(jd_result.non_skill_entities) == 7
     assert jd_result.stats.header_evidences == 0
     assert jd_result.stats.kind_conflicts == 0
     assert jd_result.stats.non_verbatim_mentions == 1
@@ -506,7 +510,7 @@ def test_golden_01_backend_cv_and_jd_extraction():
             assert ev.offset_resolved is True
             assert norm(cv_cleaned[ev.start:ev.end]) == norm(ev.sentence)
             cv_checked += 1
-    assert cv_checked == 51
+    assert cv_checked == 49
 
     jd_checked = 0
     for s in jd_result.skills:
@@ -514,7 +518,7 @@ def test_golden_01_backend_cv_and_jd_extraction():
             assert ev.offset_resolved is True
             assert norm(jd_cleaned[ev.start:ev.end]) == norm(ev.sentence)
             jd_checked += 1
-    assert jd_checked == 46
+    assert jd_checked == 39
 
     # Assert text_sha256 matches exact cleaned text sha256
     assert cv_result.text_sha256 == hashlib.sha256(cv_cleaned.encode("utf-8")).hexdigest()
@@ -645,8 +649,14 @@ def test_negative_control_altered_source_sentence():
     assert result.stats.unresolved_evidences == expected_unresolved
     resolved_count = sum(1 for s in result.skills for ev in s.evidences if ev.offset_resolved)
     unresolved_count = sum(1 for s in result.skills for ev in s.evidences if not ev.offset_resolved)
-    assert unresolved_count == 5
-    assert resolved_count == 46
+    non_skill_resolved = sum(1 for s in result.non_skill_entities for ev in s.evidences if ev.offset_resolved)
+    non_skill_unresolved = sum(1 for s in result.non_skill_entities for ev in s.evidences if not ev.offset_resolved)
+    assert unresolved_count == 4
+    assert resolved_count == 45
+    assert non_skill_unresolved == 1
+    assert non_skill_resolved == 1
+    assert unresolved_count + non_skill_unresolved == 5
+    assert resolved_count + non_skill_resolved == 46
     assert result.stats.total_mentions == 51
 
 
@@ -931,9 +941,10 @@ def test_kind_from_llm_wins_over_category_inferred():
     result = skill_postprocessor.process_extraction(raw_data, text=text, document_type="CV")
 
     skills_dict = {s.skill_id: s for s in result.skills}
+    non_skills_dict = {s.skill_id: s for s in result.non_skill_entities}
 
-    # 1. LLM kind="context" wins
-    order_skill = skills_dict["order-management-microservice"]
+    # 1. LLM kind="context" wins and routes to non_skill_entities
+    order_skill = non_skills_dict["order-management-microservice"]
     assert order_skill.kind == "context"
     assert order_skill.evidences[0].kind == "context"
     assert order_skill.evidences[0].kind_source == "llm"
