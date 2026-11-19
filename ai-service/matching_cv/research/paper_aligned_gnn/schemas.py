@@ -38,6 +38,7 @@ ProficiencySide = Literal["CV_DEMONSTRATED", "JD_REQUIRED"]
 ProficiencyMappingSource = Literal[
     "paper_table3_explicit",
     "paper_table6_7_assumption",
+    "years_heuristic_mapping",
     "missing",
 ]
 
@@ -279,6 +280,7 @@ class PaperAlignedGraphConfig:
     random_seed: int = 42
     embedding_dim: int = 768
     allow_paper_table6_7_descriptors: bool = True
+    allow_years_heuristic: bool = True
     edge_weight_normalization: EdgeWeightNormalization = "scaled_0_1"
     missing_proficiency_tensor_weight: float = 0.0
     include_reverse_edges: bool = True

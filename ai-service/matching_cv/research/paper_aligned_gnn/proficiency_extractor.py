@@ -57,11 +57,94 @@ PAPER_TABLE6_7_SUPPLEMENTAL_MAPPING: Dict[str, Tuple[float, str]] = {
 
 CLAUSE_SPLIT_REGEX = re.compile(r"[.;,\n]|\b(?:and|but|while|whereas)\b", re.IGNORECASE)
 
+# ---------------------------------------------------------------------------
+# PROJECT_ADAPTATION: Years of Experience Heuristic Mapping
+# Aligned with Dreyfus skill acquisition model & skill_gap standardized scale:
+# - < 0.5 year (0 - 5 mos): 1.0 (Basic)
+# - 0.5 - 0.9 year (6 - 11 mos): 3.0 (Beginner)
+# - 1.0 - 2.9 years (Junior): 4.0 (Intermediate)
+# - 3.0 - 4.9 years (Mid-level): 5.0 (Proficient)
+# - 5.0 - 7.9 years (Senior): 8.0 (Experienced)
+# - >= 8.0 years (Lead / Principal / Expert): 10.0 (Strong)
+# ---------------------------------------------------------------------------
+YEARS_PATTERN = re.compile(
+    r"(?:over|at least|more than|khoảng|hơn|tối thiểu|tầm)?\s*"
+    r"(\d+(?:\.\d+)?)(?:\s*(?:-|to|đến)\s*(\d+(?:\.\d+)?))?\s*(?:\+\s*)?"
+    r"(?:years?|yrs?|năm)\b",
+    re.IGNORECASE,
+)
+MONTHS_PATTERN = re.compile(
+    r"(?:over|at least|more than|khoảng|hơn|tối thiểu|tầm)?\s*"
+    r"(\d+(?:\.\d+)?)(?:\s*(?:-|to|đến)\s*(\d+(?:\.\d+)?))?\s*(?:\+\s*)?"
+    r"(?:months?|mos?|tháng)\b",
+    re.IGNORECASE,
+)
+
+
+def map_years_to_proficiency(
+    text: str,
+    side: ProficiencySide,
+    extraction_method: str = "years_heuristic_mapping",
+    provenance_sentence: Optional[str] = None,
+) -> Optional[ProficiencyRecord]:
+    """Map natural language years of experience expressions to Table 3 proficiency levels."""
+    if not text:
+        return None
+
+    num_years: Optional[float] = None
+    m_yr = YEARS_PATTERN.search(text)
+    if m_yr:
+        try:
+            val1 = float(m_yr.group(1))
+            val2 = float(m_yr.group(2)) if m_yr.group(2) else None
+            num_years = (val1 + val2) / 2.0 if val2 is not None else val1
+        except ValueError:
+            num_years = None
+    else:
+        m_mo = MONTHS_PATTERN.search(text)
+        if m_mo:
+            try:
+                val1 = float(m_mo.group(1))
+                val2 = float(m_mo.group(2)) if m_mo.group(2) else None
+                num_months = (val1 + val2) / 2.0 if val2 is not None else val1
+                num_years = num_months / 12.0
+            except ValueError:
+                num_years = None
+
+    if num_years is None:
+        return None
+
+    if num_years < 0.5:
+        val, canonical_desc = 1.0, "Basic"
+    elif num_years < 1.0:
+        val, canonical_desc = 3.0, "Beginner"
+    elif num_years < 3.0:
+        val, canonical_desc = 4.0, "Intermediate"
+    elif num_years < 5.0:
+        val, canonical_desc = 5.0, "Proficient"
+    elif num_years < 8.0:
+        val, canonical_desc = 8.0, "Experienced"
+    else:
+        val, canonical_desc = 10.0, "Strong"
+
+    return ProficiencyRecord(
+        side=side,
+        raw_descriptor=canonical_desc,
+        numeric_level=val,
+        normalized_weight=round(val / 10.0, 4),
+        is_missing=False,
+        mapping_source="years_heuristic_mapping",
+        extraction_method=extraction_method,
+        provenance_sentence=provenance_sentence,
+        decision_class="PROJECT_ADAPTATION",
+    )
+
 
 def map_descriptor_to_proficiency(
     descriptor_text: Optional[str],
     side: ProficiencySide,
     allow_paper_table6_7_descriptors: bool = True,
+    allow_years_heuristic: bool = True,
     extraction_method: str = "explicit_modifier_field",
     provenance_sentence: Optional[str] = None,
 ) -> ProficiencyRecord:
@@ -168,6 +251,17 @@ def map_descriptor_to_proficiency(
             decision_class=dec_cls,  # type: ignore[arg-type]
         )
 
+    # 4. Years of experience heuristic mapping (if enabled)
+    if allow_years_heuristic:
+        years_rec = map_years_to_proficiency(
+            text=cleaned,
+            side=side,
+            extraction_method=extraction_method,
+            provenance_sentence=provenance_sentence,
+        )
+        if years_rec is not None:
+            return years_rec
+
     # Unrecognized modifier string -> do not invent a numeric proficiency level
     return ProficiencyRecord(
         side=side,
@@ -224,6 +318,7 @@ def _extract_clause_around_skill(sentence: str, skill_surface: str, window_chars
 def extract_skill_proficiency(
     skill_item: SkillInputItem,
     allow_paper_table6_7_descriptors: bool = True,
+    allow_years_heuristic: bool = True,
 ) -> ProficiencyRecord:
     """
     Extract proficiency for a CV or JD skill item without fabricating values:
@@ -243,6 +338,7 @@ def extract_skill_proficiency(
             descriptor_text=skill_item.proficiency_override,
             side=side,
             allow_paper_table6_7_descriptors=allow_paper_table6_7_descriptors,
+            allow_years_heuristic=allow_years_heuristic,
             extraction_method="provided_override",
             provenance_sentence=first_sent,
         )
@@ -253,6 +349,7 @@ def extract_skill_proficiency(
             descriptor_text=skill_item.modifier_text,
             side=side,
             allow_paper_table6_7_descriptors=allow_paper_table6_7_descriptors,
+            allow_years_heuristic=allow_years_heuristic,
             extraction_method="explicit_modifier_field",
             provenance_sentence=first_sent,
         )
@@ -269,6 +366,7 @@ def extract_skill_proficiency(
             descriptor_text=local_clause,
             side=side,
             allow_paper_table6_7_descriptors=allow_paper_table6_7_descriptors,
+            allow_years_heuristic=allow_years_heuristic,
             extraction_method="context_window_regex",
             provenance_sentence=sent,
         )
