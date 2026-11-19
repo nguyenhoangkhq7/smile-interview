@@ -65,7 +65,7 @@ public class EvidenceService {
         var profile = session.getApplicationProfile();
         start.put("opening", openingContext(session, user));
         if (profile != null && profile.getBlueprintJson() != null) {
-            start.put("blueprint", json.read(profile.getBlueprintJson()));
+            start.put("blueprint", EvidenceInputs.leanBlueprint(json.read(profile.getBlueprintJson())));
         }
         JsonNode payload = json.tree(start);
         log.info("Interview preparation started session_id={} skills={} reuse_blueprint={}",
@@ -86,9 +86,25 @@ public class EvidenceService {
         InterviewRun run = current(sessionId, answer.expectedVersion());
         JsonNode payload = json.tree(Map.of("snapshot", json.read(run.getSnapshotJson()),
                 "turn_id", answer.turnId(), "expected_state_version", answer.expectedVersion(),
-                "candidate_response", answer.response()));
+                "candidate_response", answer.response(), "defer_question", true));
         JsonNode result = ai.compute("respond", payload);
         return store.commit(new EvidenceStore.Commit(sessionId, run.getStateVersion(), answer.requestId(),
+                hash, json.read(run.getConfigJson()), result));
+    }
+
+    public JsonNode nextQuestion(String sessionId, User user, EvidenceDtos.NextQuestion command) {
+        owned(sessionId, user);
+        String hash = json.hash(Map.of("next-question", command));
+        JsonNode cached = store.replay(sessionId, command.requestId(), hash);
+        if (cached != null) return cached;
+        InterviewRun run = current(sessionId, command.expectedVersion());
+        if (!json.read(run.getPublicJson()).path("awaiting_question").asBoolean()) {
+            throw EvidenceStore.conflict("Interview is not waiting for a question");
+        }
+        var payload = Map.of("snapshot", json.read(run.getSnapshotJson()),
+                "expected_state_version", command.expectedVersion());
+        JsonNode result = ai.compute("next-question", payload);
+        return store.commit(new EvidenceStore.Commit(sessionId, run.getStateVersion(), command.requestId(),
                 hash, json.read(run.getConfigJson()), result));
     }
 
@@ -113,7 +129,7 @@ public class EvidenceService {
         InterviewRun run = current(sessionId, command.expectedVersion());
         var payload = Map.of("snapshot", json.read(run.getSnapshotJson()), "message_id", command.messageId(),
                 "expected_state_version", command.expectedVersion(), "action", command.action(),
-                "introduction", Objects.requireNonNullElse(command.introduction(), ""));
+                "introduction", Objects.requireNonNullElse(command.introduction(), ""), "defer_question", true);
         JsonNode result = ai.compute("conversation", payload);
         return store.commit(new EvidenceStore.Commit(sessionId, run.getStateVersion(), command.requestId(),
                 hash, json.read(run.getConfigJson()), result));

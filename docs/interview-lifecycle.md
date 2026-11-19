@@ -24,7 +24,7 @@ Speech/avatar cho phần hội thoại kiểm tra chủ phiên, VOICE, message I
 
 - `conversation` lưu trong snapshot, public state và dynamic state; không cần migration database.
 - `POST /api/v2/sessions/{id}/interview/conversation` nhận `request_id`, `message_id`, `expected_state_version`, `action`, `introduction`. Các action là `NEXT`, `SUBMIT_INTRODUCTION`, `SKIP_INTRODUCTION`.
-- Receipt và compare-and-swap dùng chung cơ chế phiên hiện có; retry không ghi trùng phần giới thiệu hoặc chuyển giai đoạn hai lần. Lỗi sinh câu chuyên môn đầu tiên không commit mất phần tự giới thiệu: client giữ bản nháp và request ID để gửi lại.
+- Backend lưu phần giới thiệu hoặc câu trả lời đã chấm trước khi yêu cầu AI sinh câu chuyên môn tiếp theo. Khi `awaiting_question=true`, client gọi `POST /api/v2/sessions/{id}/interview/next-question` với `request_id` và `expected_state_version`. Nếu bước sinh câu thất bại, client có thể tải lại phiên và thử riêng bước này. Receipt và kiểm tra phiên bản ngăn ghi trùng khi retry.
 - Snapshot cũ không có `conversation` giữ nguyên luồng đang chạy. API tính toán nội bộ `/start` không có `opening` tiếp tục hỗ trợ contract cũ; backend public luôn gửi `opening` cho phiên mới.
 - Reload không tự mở micro. Reload tại SELF_INTRODUCTION tiếp tục phần tự giới thiệu, không đọc lại lời mở đầu.
 

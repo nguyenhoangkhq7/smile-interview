@@ -1,0 +1,1522 @@
+[
+  {
+    "sample_id": "xb01",
+    "split": "train",
+    "skills": [
+      {
+        "jd_skill_id": "python",
+        "required_proficiency": 3.0,
+        "priority": 0.9,
+        "importance_weight": 0.9,
+        "job_tasks": [
+          {
+            "task_id": "dedup",
+            "description": "Implement event deduplication preserving original input order",
+            "required_level": 3.0,
+            "requirement_kind": "REQUIRED",
+            "level_basis": "EXPLICIT",
+            "evidence_spans": [
+              "Implement event deduplication preserving original input order"
+            ]
+          }
+        ]
+      }
+    ],
+    "allow_extension_probes": false,
+    "context": {
+      "requirements": {
+        "python:dedup": {
+          "skill_id": "python",
+          "description": "Implement event deduplication preserving original input order",
+          "required_proficiency": 3.0,
+          "inferred": false,
+          "requirement_kind": "REQUIRED",
+          "jd_evidence_spans": [
+            "Implement event deduplication preserving original input order"
+          ]
+        }
+      },
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "allow_extension_probes": false
+    },
+    "blueprint": {
+      "objectives": [
+        {
+          "requirement_id": "python:dedup",
+          "skill_id": "python",
+          "target_depth": 2,
+          "depth_basis": "TASK_INTERPRETATION",
+          "depth_rationale": "Triển khai một hàm xử lý dữ liệu có ranh giới đầu vào rõ ràng thuộc mức vận dụng L2.",
+          "depth_evidence_spans": [
+            "Implement event deduplication preserving original input order"
+          ],
+          "extension_depth": null,
+          "criteria": [
+            {
+              "description": "Cài đặt hàm khử trùng lặp giữ bản ghi đầu tiên theo thứ tự gốc",
+              "expected_evidence": "Viết hàm deduplicate_events(events) giữ lần xuất hiện đầu của mỗi event_id và bảo toàn thứ tự.",
+              "below_target": "Làm mất thứ tự đầu vào hoặc ghi đè bằng bản ghi sau cùng.",
+              "at_target": "Giữ đúng bản ghi đầu tiên của mỗi event_id theo thứ tự gốc.",
+              "above_target": "Đạt độ phức tạp O(n) với giải thích rõ ràng.",
+              "essential": true
+            },
+            {
+              "description": "Kiểm thử ca biên với dữ liệu rỗng hoặc trùng liên tiếp",
+              "expected_evidence": "Chọn bộ dữ liệu thử gồm danh sách rỗng và nhiều phần tử trùng xen kẽ.",
+              "below_target": "Chỉ kiểm tra danh sách không trùng lặp.",
+              "at_target": "Nêu đủ ca biên rỗng và ca trùng xen kẽ.",
+              "above_target": "Bao phủ thêm trường hợp khóa thiếu hoặc kiểu dữ liệu đặc biệt.",
+              "essential": false
+            }
+          ],
+          "suitable_modes": [
+            {
+              "mode": "CODING",
+              "criterion_indices": [
+                0
+              ]
+            },
+            {
+              "mode": "TECHNICAL_EXPLANATION",
+              "criterion_indices": [
+                1
+              ]
+            }
+          ],
+          "estimated_seconds": 180
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "xb02",
+    "split": "train",
+    "skills": [
+      {
+        "jd_skill_id": "mysql",
+        "required_proficiency": 4.0,
+        "priority": 0.9,
+        "importance_weight": 0.9,
+        "job_tasks": [
+          {
+            "task_id": "slow-query",
+            "description": "Diagnose slow MySQL queries with EXPLAIN and design suitable indexes",
+            "required_level": 4.0,
+            "requirement_kind": "REQUIRED",
+            "level_basis": "EXPLICIT",
+            "evidence_spans": [
+              "Diagnose slow MySQL queries with EXPLAIN and design suitable indexes"
+            ]
+          }
+        ]
+      }
+    ],
+    "allow_extension_probes": true,
+    "context": {
+      "requirements": {
+        "mysql:slow-query": {
+          "skill_id": "mysql",
+          "description": "Diagnose slow MySQL queries with EXPLAIN and design suitable indexes",
+          "required_proficiency": 4.0,
+          "inferred": false,
+          "requirement_kind": "REQUIRED",
+          "jd_evidence_spans": [
+            "Diagnose slow MySQL queries with EXPLAIN and design suitable indexes"
+          ]
+        }
+      },
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "allow_extension_probes": true
+    },
+    "blueprint": {
+      "objectives": [
+        {
+          "requirement_id": "mysql:slow-query",
+          "skill_id": "mysql",
+          "target_depth": 3,
+          "depth_basis": "TASK_INTERPRETATION",
+          "depth_rationale": "Chẩn đoán kế hoạch thực thi và chọn chỉ mục cân nhắc điều kiện lọc thuộc mức phân tích L3.",
+          "depth_evidence_spans": [
+            "Diagnose slow MySQL queries with EXPLAIN and design suitable indexes"
+          ],
+          "extension_depth": 4,
+          "criteria": [
+            {
+              "description": "Đọc kết quả EXPLAIN để khoanh vùng nút thắt truy vấn",
+              "expected_evidence": "Chỉ ra dấu hiệu full table scan và filesort trong kế hoạch thực thi.",
+              "below_target": "Không đọc được nguyên nhân chậm từ các cột của EXPLAIN.",
+              "at_target": "Xác định đúng điểm nghẽn quét bảng và sắp xếp từ EXPLAIN.",
+              "above_target": "Ước lượng mức độ giảm I/O và đánh đổi bộ nhớ.",
+              "essential": true
+            },
+            {
+              "description": "Thiết kế chỉ mục khớp điều kiện lọc và sắp xếp",
+              "expected_evidence": "Đề xuất cấu trúc chỉ mục và thứ tự cột phù hợp với truy vấn.",
+              "below_target": "Chọn sai thứ tự cột khiến chỉ mục không hỗ trợ lọc và sắp xếp.",
+              "at_target": "Đặt cột lọc bằng trước cột sắp xếp hoặc phạm vi.",
+              "above_target": "Đánh giá chi phí cập nhật B-tree ở tần suất ghi cao và điều chỉnh chiến lược chỉ mục.",
+              "essential": true
+            }
+          ],
+          "suitable_modes": [
+            {
+              "mode": "DEBUGGING",
+              "criterion_indices": [
+                0
+              ]
+            },
+            {
+              "mode": "DESIGN",
+              "criterion_indices": [
+                1
+              ]
+            }
+          ],
+          "estimated_seconds": 240
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "xb03",
+    "split": "train",
+    "skills": [
+      {
+        "jd_skill_id": "rest_api",
+        "required_proficiency": 3.5,
+        "priority": 0.8,
+        "importance_weight": 0.85,
+        "job_tasks": [
+          {
+            "task_id": "idempotency",
+            "description": "Design idempotent payment endpoints resilient to network retries",
+            "required_level": 4.0,
+            "requirement_kind": "REQUIRED",
+            "level_basis": "EXPLICIT",
+            "evidence_spans": [
+              "Design idempotent payment endpoints resilient to network retries"
+            ]
+          }
+        ]
+      }
+    ],
+    "allow_extension_probes": true,
+    "context": {
+      "requirements": {
+        "rest_api:idempotency": {
+          "skill_id": "rest_api",
+          "description": "Design idempotent payment endpoints resilient to network retries",
+          "required_proficiency": 4.0,
+          "inferred": false,
+          "requirement_kind": "REQUIRED",
+          "jd_evidence_spans": [
+            "Design idempotent payment endpoints resilient to network retries"
+          ]
+        }
+      },
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "allow_extension_probes": true
+    },
+    "blueprint": {
+      "objectives": [
+        {
+          "requirement_id": "rest_api:idempotency",
+          "skill_id": "rest_api",
+          "target_depth": 4,
+          "depth_basis": "TASK_INTERPRETATION",
+          "depth_rationale": "Thiết kế cơ chế chống lặp khi retry và xử lý tranh chấp đồng thời là bài toán thiết kế L4.",
+          "depth_evidence_spans": [
+            "Design idempotent payment endpoints resilient to network retries"
+          ],
+          "extension_depth": null,
+          "criteria": [
+            {
+              "description": "Thiết kế khóa chống trùng và lưu trạng thái nhất quán khi client retry",
+              "expected_evidence": "Dùng khóa theo yêu cầu kèm kiểm soát đồng thời để trả lại kết quả cũ mà không trừ tiền lặp.",
+              "below_target": "Để mỗi lần retry tạo giao dịch mới hoặc chỉ lưu trạng thái trên RAM một instance.",
+              "at_target": "Dùng định danh theo request và khóa nguyên tử ở kho dùng chung để trả kết quả nhất quán.",
+              "above_target": "Xử lý hết thời gian lưu khóa và sai khác payload kèm mã HTTP phù hợp.",
+              "essential": true
+            }
+          ],
+          "suitable_modes": [
+            {
+              "mode": "DESIGN",
+              "criterion_indices": []
+            }
+          ],
+          "estimated_seconds": 180
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "xb04",
+    "split": "train",
+    "skills": [
+      {
+        "jd_skill_id": "security_auth",
+        "required_proficiency": 2.0,
+        "priority": 0.6,
+        "importance_weight": 0.7,
+        "jd_evidence_spans": [
+          "Basic web security awareness"
+        ],
+        "job_tasks": []
+      }
+    ],
+    "allow_extension_probes": false,
+    "context": {
+      "requirements": {
+        "security_auth:inferred": {
+          "skill_id": "security_auth",
+          "description": "Đánh giá kiến thức thực hành security_auth",
+          "required_proficiency": 2.0,
+          "inferred": true,
+          "requirement_kind": "UNSPECIFIED",
+          "jd_evidence_spans": [
+            "Basic web security awareness"
+          ]
+        }
+      },
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "allow_extension_probes": false
+    },
+    "blueprint": {
+      "objectives": [
+        {
+          "requirement_id": "security_auth:inferred",
+          "skill_id": "security_auth",
+          "target_depth": 2,
+          "depth_basis": "UNSPECIFIED",
+          "depth_rationale": "",
+          "depth_evidence_spans": [],
+          "extension_depth": null,
+          "criteria": [
+            {
+              "description": "Áp dụng nguyên tắc xác thực và bảo vệ dữ liệu nhạy cảm cơ bản",
+              "expected_evidence": "Phân biệt kiểm tra danh tính với kiểm tra quyền và chọn cách lưu thông tin nhạy cảm an toàn.",
+              "below_target": "Lưu thông tin nhạy cảm dạng rõ hoặc bỏ qua kiểm tra quyền phía server.",
+              "at_target": "Trình bày đúng bước xác thực, phân quyền phía server và bảo vệ thông tin xác thực.",
+              "above_target": "Phân tích kịch bản rò rỉ phiên và cách thu hồi.",
+              "essential": true
+            }
+          ],
+          "suitable_modes": [
+            {
+              "mode": "TECHNICAL_EXPLANATION",
+              "criterion_indices": []
+            }
+          ],
+          "estimated_seconds": 120
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "xb05",
+    "split": "train",
+    "skills": [
+      {
+        "jd_skill_id": "testing_unit",
+        "required_proficiency": 2.5,
+        "priority": 0.7,
+        "importance_weight": 0.75,
+        "job_tasks": [
+          {
+            "task_id": "boundary",
+            "description": "Explain boundary value testing and pick concrete edge-case inputs",
+            "required_level": 2.5,
+            "requirement_kind": "REQUIRED",
+            "level_basis": "EXPLICIT",
+            "evidence_spans": [
+              "Explain boundary value testing and pick concrete edge-case inputs"
+            ]
+          }
+        ]
+      }
+    ],
+    "allow_extension_probes": true,
+    "context": {
+      "requirements": {
+        "testing_unit:boundary": {
+          "skill_id": "testing_unit",
+          "description": "Explain boundary value testing and pick concrete edge-case inputs",
+          "required_proficiency": 2.5,
+          "inferred": false,
+          "requirement_kind": "REQUIRED",
+          "jd_evidence_spans": [
+            "Explain boundary value testing and pick concrete edge-case inputs"
+          ]
+        }
+      },
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "allow_extension_probes": true
+    },
+    "blueprint": {
+      "objectives": [
+        {
+          "requirement_id": "testing_unit:boundary",
+          "skill_id": "testing_unit",
+          "target_depth": 2,
+          "depth_basis": "TASK_INTERPRETATION",
+          "depth_rationale": "Vận dụng kỹ thuật kiểm thử biên vào đầu vào cụ thể thuộc L2.",
+          "depth_evidence_spans": [
+            "Explain boundary value testing and pick concrete edge-case inputs"
+          ],
+          "extension_depth": 3,
+          "criteria": [
+            {
+              "description": "Chọn giá trị đầu vào tại biên và sát biên để phát hiện lỗi lệch điều kiện",
+              "expected_evidence": "Đề xuất giá trị ngay trong và ngay ngoài cận biên của quy tắc cho trước.",
+              "below_target": "Chỉ chọn giá trị ở giữa vùng hợp lệ.",
+              "at_target": "Chọn đúng giá trị cận biên phát hiện lỗi so sánh < với <=.",
+              "above_target": "Phân tích trường hợp nhiều biến biên kết hợp để tránh bùng nổ tổ hợp ca thử.",
+              "essential": true
+            }
+          ],
+          "suitable_modes": [
+            {
+              "mode": "TECHNICAL_EXPLANATION",
+              "criterion_indices": []
+            }
+          ],
+          "estimated_seconds": 150
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "xb06",
+    "split": "train",
+    "skills": [
+      {
+        "jd_skill_id": "teamwork_incident",
+        "required_proficiency": 3.0,
+        "priority": 0.5,
+        "importance_weight": 0.6,
+        "job_tasks": [
+          {
+            "task_id": "conflict",
+            "description": "Collaborate across teams to resolve API contract conflicts",
+            "required_level": 3.0,
+            "requirement_kind": "OPTIONAL",
+            "level_basis": "EXPLICIT",
+            "evidence_spans": [
+              "Collaborate across teams to resolve API contract conflicts"
+            ]
+          }
+        ]
+      }
+    ],
+    "allow_extension_probes": false,
+    "context": {
+      "requirements": {
+        "teamwork_incident:conflict": {
+          "skill_id": "teamwork_incident",
+          "description": "Collaborate across teams to resolve API contract conflicts",
+          "required_proficiency": 3.0,
+          "inferred": false,
+          "requirement_kind": "OPTIONAL",
+          "jd_evidence_spans": [
+            "Collaborate across teams to resolve API contract conflicts"
+          ]
+        }
+      },
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "allow_extension_probes": false
+    },
+    "blueprint": {
+      "objectives": [
+        {
+          "requirement_id": "teamwork_incident:conflict",
+          "skill_id": "teamwork_incident",
+          "target_depth": 3,
+          "depth_basis": "TASK_INTERPRETATION",
+          "depth_rationale": "Phân tích tình huống xung đột và điều phối giải pháp đa bên thuộc L3 (không hạ mức chỉ vì OPTIONAL).",
+          "depth_evidence_spans": [
+            "Collaborate across teams to resolve API contract conflicts"
+          ],
+          "extension_depth": null,
+          "criteria": [
+            {
+              "description": "Giải quyết bất đồng hợp đồng API bằng dữ kiện thực tế",
+              "expected_evidence": "Trình bày cách đối chiếu yêu cầu thực tế, phân tích đánh đổi và chốt chuẩn chung.",
+              "below_target": "Áp đặt ý kiến cá nhân hoặc nhượng bộ mà không giải quyết điểm nghẽn.",
+              "at_target": "Nêu rõ quy trình đối chiếu dữ kiện và thống nhất chuẩn giao tiếp API.",
+              "above_target": "Thiết lập cơ chế kiểm tra hợp đồng tự động phòng tái diễn.",
+              "essential": true
+            }
+          ],
+          "suitable_modes": [
+            {
+              "mode": "BEHAVIORAL",
+              "criterion_indices": []
+            }
+          ],
+          "estimated_seconds": 150
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "xb07",
+    "split": "train",
+    "skills": [
+      {
+        "jd_skill_id": "linux_networking",
+        "required_proficiency": 2.0,
+        "priority": 0.5,
+        "importance_weight": 0.6,
+        "job_tasks": [
+          {
+            "task_id": "triage",
+            "description": "Troubleshoot service connectivity errors across DNS and ports",
+            "required_level": 3.0,
+            "requirement_kind": "REQUIRED",
+            "level_basis": "EXPLICIT",
+            "evidence_spans": [
+              "Troubleshoot service connectivity errors across DNS and ports"
+            ]
+          }
+        ]
+      },
+      {
+        "jd_skill_id": "frontend_state",
+        "required_proficiency": 2.5,
+        "priority": 0.6,
+        "importance_weight": 0.7,
+        "job_tasks": [
+          {
+            "task_id": "race",
+            "description": "Debug asynchronous UI search race conditions",
+            "required_level": 2.5,
+            "requirement_kind": "REQUIRED",
+            "level_basis": "EXPLICIT",
+            "evidence_spans": [
+              "Debug asynchronous UI search race conditions"
+            ]
+          }
+        ]
+      }
+    ],
+    "allow_extension_probes": false,
+    "context": {
+      "requirements": {
+        "linux_networking:triage": {
+          "skill_id": "linux_networking",
+          "description": "Troubleshoot service connectivity errors across DNS and ports",
+          "required_proficiency": 3.0,
+          "inferred": false,
+          "requirement_kind": "REQUIRED",
+          "jd_evidence_spans": [
+            "Troubleshoot service connectivity errors across DNS and ports"
+          ]
+        },
+        "frontend_state:race": {
+          "skill_id": "frontend_state",
+          "description": "Debug asynchronous UI search race conditions",
+          "required_proficiency": 2.5,
+          "inferred": false,
+          "requirement_kind": "REQUIRED",
+          "jd_evidence_spans": [
+            "Debug asynchronous UI search race conditions"
+          ]
+        }
+      },
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "allow_extension_probes": false
+    },
+    "blueprint": {
+      "objectives": [
+        {
+          "requirement_id": "linux_networking:triage",
+          "skill_id": "linux_networking",
+          "target_depth": 3,
+          "depth_basis": "TASK_INTERPRETATION",
+          "depth_rationale": "Chẩn đoán sự cố kết nối qua các tầng DNS và cổng thuộc L3.",
+          "depth_evidence_spans": [
+            "Troubleshoot service connectivity errors across DNS and ports"
+          ],
+          "extension_depth": null,
+          "criteria": [
+            {
+              "description": "Khoanh vùng lỗi kết nối giữa phân giải tên miền và mở cổng",
+              "expected_evidence": "Tách bạch kiểm tra phân giải DNS với kiểm tra khả năng kết nối tới cổng dịch vụ.",
+              "below_target": "Khởi động lại dịch vụ mà không tách tầng lỗi.",
+              "at_target": "Kiểm tra tuần tự từ tên miền tới kết nối cổng và phản hồi HTTP.",
+              "above_target": "Phân biệt mã lỗi từ chối kết nối với hết thời gian chờ.",
+              "essential": true
+            }
+          ],
+          "suitable_modes": [
+            {
+              "mode": "DEBUGGING",
+              "criterion_indices": []
+            }
+          ],
+          "estimated_seconds": 150
+        },
+        {
+          "requirement_id": "frontend_state:race",
+          "skill_id": "frontend_state",
+          "target_depth": 2,
+          "depth_basis": "TASK_INTERPRETATION",
+          "depth_rationale": "Chẩn đoán lỗi thứ tự phản hồi bất đồng bộ trong tác vụ giới hạn rõ thuộc L2.",
+          "depth_evidence_spans": [
+            "Debug asynchronous UI search race conditions"
+          ],
+          "extension_depth": null,
+          "criteria": [
+            {
+              "description": "Xác định nguyên nhân dữ liệu tìm kiếm cũ ghi đè kết quả mới",
+              "expected_evidence": "Giải thích phản hồi của yêu cầu trước đến sau cập nhật đè vào state.",
+              "below_target": "Cho rằng yêu cầu fetch luôn về đúng thứ tự gửi.",
+              "at_target": "Chỉ ra phản hồi cũ về muộn hơn ghi đè state.",
+              "above_target": "Đề xuất cơ chế hủy yêu cầu cũ khi có thay đổi mới.",
+              "essential": true
+            }
+          ],
+          "suitable_modes": [
+            {
+              "mode": "DEBUGGING",
+              "criterion_indices": []
+            }
+          ],
+          "estimated_seconds": 120
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "xb08",
+    "split": "train",
+    "skills": [
+      {
+        "jd_skill_id": "python",
+        "required_proficiency": 1.5,
+        "priority": 0.4,
+        "importance_weight": 0.5,
+        "job_tasks": [
+          {
+            "task_id": "basics",
+            "description": "Explain mutable default argument behavior in Python functions",
+            "required_level": 1.5,
+            "requirement_kind": "REQUIRED",
+            "level_basis": "EXPLICIT",
+            "evidence_spans": [
+              "Explain mutable default argument behavior in Python functions"
+            ]
+          }
+        ]
+      }
+    ],
+    "allow_extension_probes": false,
+    "context": {
+      "requirements": {
+        "python:basics": {
+          "skill_id": "python",
+          "description": "Explain mutable default argument behavior in Python functions",
+          "required_proficiency": 1.5,
+          "inferred": false,
+          "requirement_kind": "REQUIRED",
+          "jd_evidence_spans": [
+            "Explain mutable default argument behavior in Python functions"
+          ]
+        }
+      },
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "allow_extension_probes": false
+    },
+    "blueprint": {
+      "objectives": [
+        {
+          "requirement_id": "python:basics",
+          "skill_id": "python",
+          "target_depth": 1,
+          "depth_basis": "TASK_INTERPRETATION",
+          "depth_rationale": "Giải thích khái niệm hành vi tham số mặc định cho vị trí cơ bản thuộc mức nền tảng L1.",
+          "depth_evidence_spans": [
+            "Explain mutable default argument behavior in Python functions"
+          ],
+          "extension_depth": null,
+          "criteria": [
+            {
+              "description": "Giải thích lý do tham số mặc định kiểu list bị giữ lại giữa các lần gọi",
+              "expected_evidence": "Nêu giá trị mặc định được tạo một lần khi định nghĩa hàm và cách dùng None để tránh.",
+              "below_target": "Cho rằng danh sách mặc định luôn được cấp phát mới mỗi lần gọi hàm.",
+              "at_target": "Giải thích đúng việc dùng chung một đối tượng mặc định và cách thay bằng None.",
+              "above_target": "Chỉ ra thuộc tính __defaults__ lưu tham chiếu đối tượng.",
+              "essential": true
+            }
+          ],
+          "suitable_modes": [
+            {
+              "mode": "TECHNICAL_EXPLANATION",
+              "criterion_indices": []
+            }
+          ],
+          "estimated_seconds": 120
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "xb09",
+    "split": "train",
+    "skills": [
+      {
+        "jd_skill_id": "testing_unit",
+        "required_proficiency": 3.0,
+        "priority": 0.7,
+        "importance_weight": 0.8,
+        "job_tasks": [
+          {
+            "task_id": "mocking",
+            "description": "Write isolated unit tests using mocks for external gateway calls",
+            "required_level": 3.0,
+            "requirement_kind": "REQUIRED",
+            "level_basis": "EXPLICIT",
+            "evidence_spans": [
+              "Write isolated unit tests using mocks for external gateway calls"
+            ]
+          }
+        ]
+      }
+    ],
+    "allow_extension_probes": false,
+    "context": {
+      "requirements": {
+        "testing_unit:mocking": {
+          "skill_id": "testing_unit",
+          "description": "Write isolated unit tests using mocks for external gateway calls",
+          "required_proficiency": 3.0,
+          "inferred": false,
+          "requirement_kind": "REQUIRED",
+          "jd_evidence_spans": [
+            "Write isolated unit tests using mocks for external gateway calls"
+          ]
+        }
+      },
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "allow_extension_probes": false
+    },
+    "blueprint": {
+      "objectives": [
+        {
+          "requirement_id": "testing_unit:mocking",
+          "skill_id": "testing_unit",
+          "target_depth": 2,
+          "depth_basis": "TASK_INTERPRETATION",
+          "depth_rationale": "Viết một hàm unit test cô lập phụ thuộc ngoài theo mẫu có sẵn thuộc L2.",
+          "depth_evidence_spans": [
+            "Write isolated unit tests using mocks for external gateway calls"
+          ],
+          "extension_depth": null,
+          "criteria": [
+            {
+              "description": "Viết unit test giả lập ngoại lệ từ cổng thanh toán bên ngoài",
+              "expected_evidence": "Dùng mock giả lập lỗi và khẳng định kết quả hàm xử lý đúng.",
+              "below_target": "Gọi ra mạng thật trong unit test hoặc thiếu assertion.",
+              "at_target": "Cô lập phụ thuộc ngoài bằng mock và kiểm tra đúng hành vi mong đợi.",
+              "above_target": "Kiểm chứng thêm số lần gọi và tham số truyền cho mock.",
+              "essential": true
+            }
+          ],
+          "suitable_modes": [
+            {
+              "mode": "CODING",
+              "criterion_indices": []
+            }
+          ],
+          "estimated_seconds": 180
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "xb10",
+    "split": "dev",
+    "skills": [
+      {
+        "jd_skill_id": "typescript",
+        "required_proficiency": 2.5,
+        "priority": 0.7,
+        "importance_weight": 0.8,
+        "job_tasks": [
+          {
+            "task_id": "union",
+            "description": "Write type-safe discriminated union handlers in TypeScript",
+            "required_level": 2.5,
+            "requirement_kind": "REQUIRED",
+            "level_basis": "EXPLICIT",
+            "evidence_spans": [
+              "Write type-safe discriminated union handlers in TypeScript"
+            ]
+          }
+        ]
+      }
+    ],
+    "allow_extension_probes": true,
+    "context": {
+      "requirements": {
+        "typescript:union": {
+          "skill_id": "typescript",
+          "description": "Write type-safe discriminated union handlers in TypeScript",
+          "required_proficiency": 2.5,
+          "inferred": false,
+          "requirement_kind": "REQUIRED",
+          "jd_evidence_spans": [
+            "Write type-safe discriminated union handlers in TypeScript"
+          ]
+        }
+      },
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "allow_extension_probes": true
+    },
+    "blueprint": {
+      "objectives": [
+        {
+          "requirement_id": "typescript:union",
+          "skill_id": "typescript",
+          "target_depth": 2,
+          "depth_basis": "TASK_INTERPRETATION",
+          "depth_rationale": "Viết hàm xử lý kiểu union an toàn kiểu thuộc mức vận dụng L2.",
+          "depth_evidence_spans": [
+            "Write type-safe discriminated union handlers in TypeScript"
+          ],
+          "extension_depth": 3,
+          "criteria": [
+            {
+              "description": "Thu hẹp kiểu discriminated union không dùng any hay ép kiểu",
+              "expected_evidence": "Kiểm tra thuộc tính phân biệt để nhánh mã tự thu hẹp kiểu dữ liệu.",
+              "below_target": "Ép kiểu sang any hoặc bỏ qua kiểm tra nhánh lỗi.",
+              "at_target": "Thu hẹp kiểu hợp lệ theo trường phân biệt.",
+              "above_target": "Bổ sung kiểm tra vét cạn kiểu bằng never để phát hiện thiếu nhánh khi biên dịch.",
+              "essential": true
+            }
+          ],
+          "suitable_modes": [
+            {
+              "mode": "CODING",
+              "criterion_indices": []
+            }
+          ],
+          "estimated_seconds": 150
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "xb11",
+    "split": "dev",
+    "skills": [
+      {
+        "jd_skill_id": "mongodb",
+        "required_proficiency": 3.5,
+        "priority": 0.8,
+        "importance_weight": 0.85,
+        "job_tasks": [
+          {
+            "task_id": "schema",
+            "description": "Design MongoDB document models balancing embedding and referencing",
+            "required_level": 3.5,
+            "requirement_kind": "REQUIRED",
+            "level_basis": "EXPLICIT",
+            "evidence_spans": [
+              "Design MongoDB document models balancing embedding and referencing"
+            ]
+          }
+        ]
+      }
+    ],
+    "allow_extension_probes": false,
+    "context": {
+      "requirements": {
+        "mongodb:schema": {
+          "skill_id": "mongodb",
+          "description": "Design MongoDB document models balancing embedding and referencing",
+          "required_proficiency": 3.5,
+          "inferred": false,
+          "requirement_kind": "REQUIRED",
+          "jd_evidence_spans": [
+            "Design MongoDB document models balancing embedding and referencing"
+          ]
+        }
+      },
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "allow_extension_probes": false
+    },
+    "blueprint": {
+      "objectives": [
+        {
+          "requirement_id": "mongodb:schema",
+          "skill_id": "mongodb",
+          "target_depth": 3,
+          "depth_basis": "TASK_INTERPRETATION",
+          "depth_rationale": "Lựa chọn mô hình dữ liệu dựa trên mẫu truy cập và giới hạn tăng trưởng thuộc L3.",
+          "depth_evidence_spans": [
+            "Design MongoDB document models balancing embedding and referencing"
+          ],
+          "extension_depth": null,
+          "criteria": [
+            {
+              "description": "Quyết định nhúng hay tham chiếu cho danh sách con tăng trưởng lớn",
+              "expected_evidence": "Phân tích mẫu đọc-ghi và giới hạn kích thước document 16MB để chọn cách lưu hợp lý.",
+              "below_target": "Nhúng mảng tăng trưởng không giới hạn vào một document.",
+              "at_target": "Chọn tham chiếu cho danh sách tăng trưởng vô hạn kèm giải thích hợp lý.",
+              "above_target": "Đề xuất mẫu lai lưu kèm dữ liệu hay đọc nhất.",
+              "essential": true
+            }
+          ],
+          "suitable_modes": [
+            {
+              "mode": "DESIGN",
+              "criterion_indices": []
+            }
+          ],
+          "estimated_seconds": 180
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "xb12",
+    "split": "dev",
+    "skills": [
+      {
+        "jd_skill_id": "nginx_proxy",
+        "required_proficiency": 3.0,
+        "priority": 0.6,
+        "importance_weight": 0.7,
+        "job_tasks": [
+          {
+            "task_id": "timeouts",
+            "description": "Troubleshoot 504 Gateway Timeout errors in Nginx reverse proxy",
+            "required_level": 3.0,
+            "requirement_kind": "REQUIRED",
+            "level_basis": "EXPLICIT",
+            "evidence_spans": [
+              "Troubleshoot 504 Gateway Timeout errors in Nginx reverse proxy"
+            ]
+          }
+        ]
+      }
+    ],
+    "allow_extension_probes": false,
+    "context": {
+      "requirements": {
+        "nginx_proxy:timeouts": {
+          "skill_id": "nginx_proxy",
+          "description": "Troubleshoot 504 Gateway Timeout errors in Nginx reverse proxy",
+          "required_proficiency": 3.0,
+          "inferred": false,
+          "requirement_kind": "REQUIRED",
+          "jd_evidence_spans": [
+            "Troubleshoot 504 Gateway Timeout errors in Nginx reverse proxy"
+          ]
+        }
+      },
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "allow_extension_probes": false
+    },
+    "blueprint": {
+      "objectives": [
+        {
+          "requirement_id": "nginx_proxy:timeouts",
+          "skill_id": "nginx_proxy",
+          "target_depth": 3,
+          "depth_basis": "TASK_INTERPRETATION",
+          "depth_rationale": "Điều tra nguyên nhân mã lỗi 504 trên reverse proxy thuộc L3.",
+          "depth_evidence_spans": [
+            "Troubleshoot 504 Gateway Timeout errors in Nginx reverse proxy"
+          ],
+          "extension_depth": null,
+          "criteria": [
+            {
+              "description": "Khoanh vùng lỗi 504 do ngưỡng chờ phản hồi upstream",
+              "expected_evidence": "Liên hệ mã 504 với thời gian chờ đọc phản hồi từ backend vượt giới hạn proxy.",
+              "below_target": "Nhầm lẫn với lỗi kết nối chết hẳn 502.",
+              "at_target": "Xác định đúng ngưỡng chờ đọc phản hồi upstream.",
+              "above_target": "Đánh giá phương án xử lý bất đồng bộ cho tác vụ chạy dài.",
+              "essential": true
+            }
+          ],
+          "suitable_modes": [
+            {
+              "mode": "DEBUGGING",
+              "criterion_indices": []
+            }
+          ],
+          "estimated_seconds": 150
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "xb13",
+    "split": "dev",
+    "skills": [
+      {
+        "jd_skill_id": "oauth2_oidc",
+        "required_proficiency": 4.0,
+        "priority": 0.8,
+        "importance_weight": 0.85,
+        "job_tasks": [
+          {
+            "task_id": "spa-auth",
+            "description": "Architect secure OAuth2 authorization code exchange for public SPA clients",
+            "required_level": 4.0,
+            "requirement_kind": "REQUIRED",
+            "level_basis": "EXPLICIT",
+            "evidence_spans": [
+              "Architect secure OAuth2 authorization code exchange for public SPA clients"
+            ]
+          }
+        ]
+      }
+    ],
+    "allow_extension_probes": true,
+    "context": {
+      "requirements": {
+        "oauth2_oidc:spa-auth": {
+          "skill_id": "oauth2_oidc",
+          "description": "Architect secure OAuth2 authorization code exchange for public SPA clients",
+          "required_proficiency": 4.0,
+          "inferred": false,
+          "requirement_kind": "REQUIRED",
+          "jd_evidence_spans": [
+            "Architect secure OAuth2 authorization code exchange for public SPA clients"
+          ]
+        }
+      },
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "allow_extension_probes": true
+    },
+    "blueprint": {
+      "objectives": [
+        {
+          "requirement_id": "oauth2_oidc:spa-auth",
+          "skill_id": "oauth2_oidc",
+          "target_depth": 4,
+          "depth_basis": "TASK_INTERPRETATION",
+          "depth_rationale": "Thiết kế kiến trúc xác thực cho public client với đánh đổi bảo mật thuộc L4.",
+          "depth_evidence_spans": [
+            "Architect secure OAuth2 authorization code exchange for public SPA clients"
+          ],
+          "extension_depth": null,
+          "criteria": [
+            {
+              "description": "Bảo vệ quy trình đổi mã xác thực trên ứng dụng không giữ được bí mật",
+              "expected_evidence": "Áp dụng cơ chế gắn kết phiên khởi tạo với bước đổi token và đánh giá rủi ro lưu token.",
+              "below_target": "Đặt client_secret trong mã nguồn phía trình duyệt.",
+              "at_target": "Dùng cơ chế chứng minh verifier/challenge và đánh giá nơi lưu token.",
+              "above_target": "So sánh mô hình BFF với lưu token trên trình duyệt.",
+              "essential": true
+            }
+          ],
+          "suitable_modes": [
+            {
+              "mode": "DESIGN",
+              "criterion_indices": []
+            }
+          ],
+          "estimated_seconds": 210
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "xb14",
+    "split": "dev",
+    "skills": [
+      {
+        "jd_skill_id": "caching_http",
+        "required_proficiency": 2.0,
+        "priority": 0.5,
+        "importance_weight": 0.6,
+        "jd_evidence_spans": [
+          "HTTP caching headers"
+        ],
+        "job_tasks": []
+      }
+    ],
+    "allow_extension_probes": false,
+    "context": {
+      "requirements": {
+        "caching_http:inferred": {
+          "skill_id": "caching_http",
+          "description": "Đánh giá kiến thức thực hành caching_http",
+          "required_proficiency": 2.0,
+          "inferred": true,
+          "requirement_kind": "UNSPECIFIED",
+          "jd_evidence_spans": [
+            "HTTP caching headers"
+          ]
+        }
+      },
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "allow_extension_probes": false
+    },
+    "blueprint": {
+      "objectives": [
+        {
+          "requirement_id": "caching_http:inferred",
+          "skill_id": "caching_http",
+          "target_depth": 2,
+          "depth_basis": "UNSPECIFIED",
+          "depth_rationale": "",
+          "depth_evidence_spans": [],
+          "extension_depth": null,
+          "criteria": [
+            {
+              "description": "Áp dụng cơ chế kiểm chứng lại cache HTTP bằng header điều kiện",
+              "expected_evidence": "Giải thích luồng gửi khóa kiểm chứng và nhận phản hồi không kèm body khi chưa đổi.",
+              "below_target": "Nhầm lẫn không cần hỏi lại server sau khi hết hạn cache.",
+              "at_target": "Mô tả đúng kiểm chứng điều kiện trả mã không thay đổi.",
+              "above_target": "Phân biệt chỉ thị không lưu với chỉ thị kiểm tra lại.",
+              "essential": true
+            }
+          ],
+          "suitable_modes": [
+            {
+              "mode": "TECHNICAL_EXPLANATION",
+              "criterion_indices": []
+            }
+          ],
+          "estimated_seconds": 120
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "xb15",
+    "split": "test",
+    "skills": [
+      {
+        "jd_skill_id": "csharp_dotnet",
+        "required_proficiency": 3.0,
+        "priority": 0.85,
+        "importance_weight": 0.9,
+        "job_tasks": [
+          {
+            "task_id": "n-plus-one",
+            "description": "Diagnose N+1 query performance issues in EF Core",
+            "required_level": 3.0,
+            "requirement_kind": "REQUIRED",
+            "level_basis": "EXPLICIT",
+            "evidence_spans": [
+              "Diagnose N+1 query performance issues in EF Core"
+            ]
+          },
+          {
+            "task_id": "dict-safe",
+            "description": "Implement safe dictionary frequency counting in C#",
+            "required_level": 2.0,
+            "requirement_kind": "REQUIRED",
+            "level_basis": "EXPLICIT",
+            "evidence_spans": [
+              "Implement safe dictionary frequency counting in C#"
+            ]
+          }
+        ]
+      }
+    ],
+    "allow_extension_probes": false,
+    "context": {
+      "requirements": {
+        "csharp_dotnet:n-plus-one": {
+          "skill_id": "csharp_dotnet",
+          "description": "Diagnose N+1 query performance issues in EF Core",
+          "required_proficiency": 3.0,
+          "inferred": false,
+          "requirement_kind": "REQUIRED",
+          "jd_evidence_spans": [
+            "Diagnose N+1 query performance issues in EF Core"
+          ]
+        },
+        "csharp_dotnet:dict-safe": {
+          "skill_id": "csharp_dotnet",
+          "description": "Implement safe dictionary frequency counting in C#",
+          "required_proficiency": 2.0,
+          "inferred": false,
+          "requirement_kind": "REQUIRED",
+          "jd_evidence_spans": [
+            "Implement safe dictionary frequency counting in C#"
+          ]
+        }
+      },
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "allow_extension_probes": false
+    },
+    "blueprint": {
+      "objectives": [
+        {
+          "requirement_id": "csharp_dotnet:n-plus-one",
+          "skill_id": "csharp_dotnet",
+          "target_depth": 3,
+          "depth_basis": "TASK_INTERPRETATION",
+          "depth_rationale": "Phát hiện và giải thích nguyên nhân phát sinh N+1 truy vấn thuộc L3.",
+          "depth_evidence_spans": [
+            "Diagnose N+1 query performance issues in EF Core"
+          ],
+          "extension_depth": null,
+          "criteria": [
+            {
+              "description": "Nhận diện và lý giải cơ chế phát sinh N+1 truy vấn",
+              "expected_evidence": "Chỉ ra một truy vấn cha kéo theo N truy vấn con riêng lẻ khi duyệt vòng lặp.",
+              "below_target": "Cho rằng toàn bộ bản ghi con được tải trong truy vấn đầu.",
+              "at_target": "Xác định đúng số truy vấn 1 + N do tải chậm.",
+              "above_target": "Đánh đổi giữa eager loading một truy vấn với split query.",
+              "essential": true
+            }
+          ],
+          "suitable_modes": [
+            {
+              "mode": "DEBUGGING",
+              "criterion_indices": []
+            }
+          ],
+          "estimated_seconds": 150
+        },
+        {
+          "requirement_id": "csharp_dotnet:dict-safe",
+          "skill_id": "csharp_dotnet",
+          "target_depth": 2,
+          "depth_basis": "TASK_INTERPRETATION",
+          "depth_rationale": "Viết hàm thao tác tập hợp an toàn trong C# thuộc L2.",
+          "depth_evidence_spans": [
+            "Implement safe dictionary frequency counting in C#"
+          ],
+          "extension_depth": null,
+          "criteria": [
+            {
+              "description": "Đếm tần suất với Dictionary tránh ngoại lệ thiếu khóa",
+              "expected_evidence": "Viết hàm kiểm tra khóa an toàn trước khi cộng số đếm.",
+              "below_target": "Truy cập chỉ mục trực tiếp gây KeyNotFoundException.",
+              "at_target": "Kiểm tra tồn tại khóa hoặc dùng TryGetValue chính xác.",
+              "above_target": "Tránh băm lại hai lần khi cập nhật.",
+              "essential": true
+            }
+          ],
+          "suitable_modes": [
+            {
+              "mode": "CODING",
+              "criterion_indices": []
+            }
+          ],
+          "estimated_seconds": 150
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "xb16",
+    "split": "test",
+    "skills": [
+      {
+        "jd_skill_id": "rabbitmq",
+        "required_proficiency": 4.0,
+        "priority": 0.9,
+        "importance_weight": 0.9,
+        "job_tasks": [
+          {
+            "task_id": "reliability",
+            "description": "Design reliable message acknowledgement and dead-letter handling in RabbitMQ",
+            "required_level": 4.0,
+            "requirement_kind": "REQUIRED",
+            "level_basis": "EXPLICIT",
+            "evidence_spans": [
+              "Design reliable message acknowledgement and dead-letter handling in RabbitMQ"
+            ]
+          }
+        ]
+      }
+    ],
+    "allow_extension_probes": false,
+    "context": {
+      "requirements": {
+        "rabbitmq:reliability": {
+          "skill_id": "rabbitmq",
+          "description": "Design reliable message acknowledgement and dead-letter handling in RabbitMQ",
+          "required_proficiency": 4.0,
+          "inferred": false,
+          "requirement_kind": "REQUIRED",
+          "jd_evidence_spans": [
+            "Design reliable message acknowledgement and dead-letter handling in RabbitMQ"
+          ]
+        }
+      },
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "allow_extension_probes": false
+    },
+    "blueprint": {
+      "objectives": [
+        {
+          "requirement_id": "rabbitmq:reliability",
+          "skill_id": "rabbitmq",
+          "target_depth": 4,
+          "depth_basis": "TASK_INTERPRETATION",
+          "depth_rationale": "Thiết kế kiến trúc xử lý độ tin cậy hàng đợi thuộc L4.",
+          "depth_evidence_spans": [
+            "Design reliable message acknowledgement and dead-letter handling in RabbitMQ"
+          ],
+          "extension_depth": null,
+          "criteria": [
+            {
+              "description": "Thiết kế xác nhận thủ công và cô lập thông điệp lỗi lặp",
+              "expected_evidence": "Kết hợp manual ack sau xử lý, giới hạn retry và tách thông điệp hỏng ra hàng đợi riêng.",
+              "below_target": "Dùng auto-ack hoặc requeue vô hạn vào hàng đợi gốc.",
+              "at_target": "Đảm bảo không mất message hợp lệ và cô lập message hỏng.",
+              "above_target": "Xử lý idempotency ở consumer khi đứt kết nối trước lúc gửi ack.",
+              "essential": true
+            }
+          ],
+          "suitable_modes": [
+            {
+              "mode": "DESIGN",
+              "criterion_indices": []
+            }
+          ],
+          "estimated_seconds": 210
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "xb17",
+    "split": "test",
+    "skills": [
+      {
+        "jd_skill_id": "data_pipeline",
+        "required_proficiency": 3.5,
+        "priority": 0.8,
+        "importance_weight": 0.85,
+        "job_tasks": [
+          {
+            "task_id": "skew",
+            "description": "Analyze join skew bottlenecks in distributed data pipelines",
+            "required_level": 3.5,
+            "requirement_kind": "REQUIRED",
+            "level_basis": "EXPLICIT",
+            "evidence_spans": [
+              "Analyze join skew bottlenecks in distributed data pipelines"
+            ]
+          }
+        ]
+      }
+    ],
+    "allow_extension_probes": true,
+    "context": {
+      "requirements": {
+        "data_pipeline:skew": {
+          "skill_id": "data_pipeline",
+          "description": "Analyze join skew bottlenecks in distributed data pipelines",
+          "required_proficiency": 3.5,
+          "inferred": false,
+          "requirement_kind": "REQUIRED",
+          "jd_evidence_spans": [
+            "Analyze join skew bottlenecks in distributed data pipelines"
+          ]
+        }
+      },
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "allow_extension_probes": true
+    },
+    "blueprint": {
+      "objectives": [
+        {
+          "requirement_id": "data_pipeline:skew",
+          "skill_id": "data_pipeline",
+          "target_depth": 3,
+          "depth_basis": "TASK_INTERPRETATION",
+          "depth_rationale": "Phân tích nguyên nhân nghẽn 99% khi join dữ liệu phân tán thuộc L3.",
+          "depth_evidence_spans": [
+            "Analyze join skew bottlenecks in distributed data pipelines"
+          ],
+          "extension_depth": 4,
+          "criteria": [
+            {
+              "description": "Xác định hiện tượng dồn tải một partition do khóa lệch",
+              "expected_evidence": "Liên hệ tỷ lệ lặp khóa cao với việc băm cùng một partition làm chậm một task.",
+              "below_target": "Cho rằng tăng số partition tự động chia đều cùng một khóa.",
+              "at_target": "Giải thích đúng nguyên nhân một khóa phổ biến dồn vào một partition.",
+              "above_target": "Thiết kế phân tán khóa nóng bằng salting kèm nhân bản vế còn lại và đánh đổi chi phí shuffle.",
+              "essential": true
+            }
+          ],
+          "suitable_modes": [
+            {
+              "mode": "DEBUGGING",
+              "criterion_indices": []
+            }
+          ],
+          "estimated_seconds": 180
+        }
+      ]
+    }
+  },
+  {
+    "sample_id": "xb18",
+    "split": "test",
+    "skills": [
+      {
+        "jd_skill_id": "leadership_stakeholder",
+        "required_proficiency": 3.0,
+        "priority": 0.6,
+        "importance_weight": 0.7,
+        "job_tasks": [
+          {
+            "task_id": "stakeholder",
+            "description": "Negotiate technical release risks with Product Managers",
+            "required_level": 3.0,
+            "requirement_kind": "OPTIONAL",
+            "level_basis": "EXPLICIT",
+            "evidence_spans": [
+              "Negotiate technical release risks with Product Managers"
+            ]
+          }
+        ]
+      }
+    ],
+    "allow_extension_probes": false,
+    "context": {
+      "requirements": {
+        "leadership_stakeholder:stakeholder": {
+          "skill_id": "leadership_stakeholder",
+          "description": "Negotiate technical release risks with Product Managers",
+          "required_proficiency": 3.0,
+          "inferred": false,
+          "requirement_kind": "OPTIONAL",
+          "jd_evidence_spans": [
+            "Negotiate technical release risks with Product Managers"
+          ]
+        }
+      },
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "allow_extension_probes": false
+    },
+    "blueprint": {
+      "objectives": [
+        {
+          "requirement_id": "leadership_stakeholder:stakeholder",
+          "skill_id": "leadership_stakeholder",
+          "target_depth": 3,
+          "depth_basis": "TASK_INTERPRETATION",
+          "depth_rationale": "Đàm phán rủi ro kỹ thuật đa bên dựa trên phương án đánh đổi thuộc L3.",
+          "depth_evidence_spans": [
+            "Negotiate technical release risks with Product Managers"
+          ],
+          "extension_depth": null,
+          "criteria": [
+            {
+              "description": "Trao đổi rủi ro phát hành với PM và đề xuất phương án kiểm chứng gọn",
+              "expected_evidence": "Lượng hóa rủi ro sự cố người dùng và đưa ra lộ trình giảm thiểu thực tế.",
+              "below_target": "Bỏ qua rủi ro để làm vừa lòng hoặc từ chối cứng nhắc không có phương án thay thế.",
+              "at_target": "Đưa ra đánh giá rủi ro rõ ràng kèm phương án kiểm thử nhanh và khôi phục.",
+              "above_target": "Thống nhất ngưỡng Go/No-Go cho các lần phát hành sau.",
+              "essential": true
+            }
+          ],
+          "suitable_modes": [
+            {
+              "mode": "BEHAVIORAL",
+              "criterion_indices": []
+            }
+          ],
+          "estimated_seconds": 150
+        }
+      ]
+    }
+  }
+]

@@ -36,12 +36,13 @@ export function EvidenceTextInterview({ interview, onHistory, onStop }: {
       <div className="flex min-h-0 min-w-0 flex-col gap-3 rounded-2xl border bg-card p-5">
         <label htmlFor="interview-answer" className="font-semibold">Câu trả lời của bạn</label>
         <textarea id="interview-answer" aria-label="Câu trả lời" className={`h-40 min-h-32 w-full resize-none overflow-y-auto rounded-xl border bg-background p-4 text-sm leading-relaxed focus-visible:outline-2 focus-visible:outline-brand-orange lg:h-auto lg:flex-1 ${session.pending_turn?.mode === 'CODING' ? 'font-mono' : ''}`}
-          maxLength={conversation.introducing ? 10000 : 50000} value={conversation.closing ? session.turns.at(-1)?.answer || '' : interview.answer}
-          onChange={e => interview.setAnswer(e.target.value)} disabled={busy || conversation.closing || conversation.phase === 'OPENING'}
+          maxLength={conversation.introducing ? 10000 : 50000} value={conversation.closing || session.awaiting_question
+            ? session.turns.at(-1)?.answer || (session.awaiting_question ? session.conversation?.introduction : '') || '' : interview.answer}
+          onChange={e => interview.setAnswer(e.target.value)} disabled={busy || (!conversation.introducing && !session.pending_turn)}
           placeholder={conversation.introducing ? 'Bạn có thể giới thiệu về bản thân…' : 'Nhập câu trả lời hoặc code của bạn…'} />
         <div className="flex flex-wrap gap-3">{conversation.closing
           ? <Button disabled={busy} onClick={() => void interview.converse('NEXT')}>Xem kết quả</Button>
-          : <><Button disabled={busy || !interview.answer.trim()} onClick={() => void interview.submit()}><Send size={15} />{busy ? 'Đang xử lý…' : 'Gửi câu trả lời'}</Button>
+          : <>{!session.awaiting_question && <Button disabled={busy || !interview.answer.trim()} onClick={() => void interview.submit()}><Send size={15} />{busy ? 'Đang xử lý…' : 'Gửi câu trả lời'}</Button>}
             <Button variant="outline" disabled={busy} onClick={onStop}>Kết thúc phiên</Button>
             {conversation.introducing && <Button variant="ghost" disabled={busy} onClick={() => void interview.converse('SKIP_INTRODUCTION')}>Bỏ qua giới thiệu</Button>}</>}
         </div>

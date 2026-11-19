@@ -54,7 +54,12 @@ export function EvidenceInterview() {
   }
   return <main className="mx-auto w-full max-w-6xl space-y-4 px-4 py-5 sm:px-6">
     {interview.metadata?.applicationProfileId && session?.config.interaction_mode !== 'VOICE' && <header className="space-y-2 border-b pb-5"><Link className="text-sm text-brand-orange" href={`/applications/${interview.metadata.applicationProfileId}`}>← Về hồ sơ ứng tuyển</Link><h2 className="text-xl font-semibold">{interview.metadata.applicationProfileTitle} · Lượt {interview.metadata.attemptNumber}</h2></header>}
-    {error && <div role="alert" className="rounded border border-red-300 p-4"><p>{error}</p><Button variant="outline" onClick={() => void interview.reload()}>Tải lại phiên</Button></div>}
+    {session?.awaiting_question && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4">
+      <p role="status">{session.turns.length > 0 ? 'Đã lưu câu trả lời. ' : session.conversation?.introduction ? 'Đã lưu phần giới thiệu. ' : ''}
+        {busy ? 'Đang chuẩn bị câu hỏi…' : session.turns.length ? 'Câu tiếp theo đang chờ tải.' : 'Câu hỏi đầu tiên đang chờ tải.'}</p>
+      {!busy && <Button variant="outline" onClick={() => void interview.loadNextQuestion()}>Thử tải lại câu hỏi</Button>}
+    </div>}
+    {error && !session?.awaiting_question && <div role="alert" className="rounded border border-red-300 p-4"><p>{error}</p><Button variant="outline" onClick={() => void interview.reload()}>Tải lại phiên</Button></div>}
     {!session && <EvidenceSetup busy={busy} onStart={config => void interview.start(config)} />}
     {session && <>
       {session.is_finished && !conversationVisible ? <InterviewOutcome session={session} metadata={interview.metadata} />

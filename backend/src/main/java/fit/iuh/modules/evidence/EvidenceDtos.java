@@ -47,6 +47,10 @@ public final class EvidenceDtos {
             @JsonProperty("request_id") @NotNull UUID requestId,
             @JsonProperty("expected_state_version") @Min(1) long expectedVersion) {}
 
+    public record NextQuestion(
+            @JsonProperty("request_id") @NotNull UUID requestId,
+            @JsonProperty("expected_state_version") @Min(1) long expectedVersion) {}
+
     public record Conversation(
             @JsonProperty("request_id") @NotNull UUID requestId,
             @JsonProperty("message_id") @NotBlank String messageId,

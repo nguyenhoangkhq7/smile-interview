@@ -231,4 +231,12 @@ class CompetencyProjectionTest {
         assertThat(sql(result).objectives().getFirst().lastAssessment().attemptNumber()).isEqualTo(1);
         assertThat(sql(result).assessment()).isEqualTo(AT);
     }
+
+    @Test void legacyBlueprintFingerprintRemainsCompatibleWithLeanAttemptSnapshot() {
+        var currentRun = attempt(1, Map.of("sql", AT), "A");
+        ((ObjectNode) state(currentRun).path("objective")).remove("rubric_fingerprint");
+        View result = view(currentRun);
+        assertThat(result.incompatibleAssessments()).isZero();
+        assertThat(sql(result).assessment()).isEqualTo(AT);
+    }
 }

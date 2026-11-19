@@ -1,0 +1,161 @@
+{
+  "termination_reason": null,
+  "objectives": [
+    {
+      "objective_id": "29fb8ec0-16e2-56cd-9ad3-2d497f0f6d74",
+      "skill_id": "postgresql",
+      "claim": "Chẩn đoán và tối ưu truy vấn PostgreSQL lọc và sắp xếp danh sách đơn hàng trên bảng lớn.",
+      "jd_evidence_spans": [
+        "Bắt buộc: Chẩn đoán và tối ưu truy vấn PostgreSQL lọc và sắp xếp danh sách đơn hàng trên bảng lớn."
+      ],
+      "assessment": "NOT_ASSESSED",
+      "stop_reason": null,
+      "strengths": [],
+      "weaknesses": [],
+      "study_recommendations": [],
+      "evidence": [],
+      "criteria": [
+        {
+          "criterion_id": "29fb8ec0-16e2-56cd-9ad3-2d497f0f6d74:c1",
+          "description": "Xác định nguyên nhân gây chậm truy vấn lọc và sắp xếp đơn hàng trên bảng lớn.",
+          "assessment": "NOT_ASSESSED"
+        },
+        {
+          "criterion_id": "29fb8ec0-16e2-56cd-9ad3-2d497f0f6d74:c2",
+          "description": "Viết cú pháp SQL hợp lệ để tạo index hoặc sửa đổi truy vấn nhằm tối ưu hiệu năng.",
+          "assessment": "NOT_ASSESSED"
+        }
+      ]
+    },
+    {
+      "objective_id": "2b0a116f-4a69-54ca-8fa8-b36d764d4366",
+      "skill_id": "python",
+      "claim": "Viết hàm Python loại trùng sự kiện đơn hàng theo mã sự kiện, giữ nguyên thứ tự xuất hiện đầu tiên.",
+      "jd_evidence_spans": [
+        "Bắt buộc: Viết hàm Python loại trùng sự kiện đơn hàng theo mã sự kiện, giữ nguyên thứ tự xuất hiện đầu tiên."
+      ],
+      "assessment": "NOT_ASSESSED",
+      "stop_reason": null,
+      "strengths": [],
+      "weaknesses": [],
+      "study_recommendations": [],
+      "evidence": [],
+      "criteria": [
+        {
+          "criterion_id": "2b0a116f-4a69-54ca-8fa8-b36d764d4366:c1",
+          "description": "Triển khai thuật toán loại bỏ phần tử trùng lặp trong danh sách sự kiện mà vẫn giữ nguyên thứ tự xuất hiện đầu tiên.",
+          "assessment": "NOT_ASSESSED"
+        },
+        {
+          "criterion_id": "2b0a116f-4a69-54ca-8fa8-b36d764d4366:c2",
+          "description": "Xử lý các trường hợp biên như sự kiện có trường khóa là None hoặc kiểu dữ liệu không hashable.",
+          "assessment": "NOT_ASSESSED"
+        }
+      ]
+    },
+    {
+      "objective_id": "9bba5d04-deb3-5dba-b886-0a4d32a374d7",
+      "skill_id": "rabbitmq",
+      "claim": "Thiết kế consumer RabbitMQ cho sự kiện thanh toán để việc giao lại thông điệp không ghi nhận thanh toán hai lần.",
+      "jd_evidence_spans": [
+        "Bắt buộc: Thiết kế consumer RabbitMQ cho sự kiện thanh toán để việc giao lại thông điệp không ghi nhận thanh toán hai lần."
+      ],
+      "assessment": "NOT_ASSESSED",
+      "stop_reason": null,
+      "strengths": [],
+      "weaknesses": [],
+      "study_recommendations": [],
+      "evidence": [],
+      "criteria": [
+        {
+          "criterion_id": "9bba5d04-deb3-5dba-b886-0a4d32a374d7:c1",
+          "description": "Thiết kế cơ chế xử lý tin nhắn thanh toán để đảm bảo không ghi nhận thanh toán hai lần (idempotency) khi có message redelivery.",
+          "assessment": "NOT_ASSESSED"
+        },
+        {
+          "criterion_id": "9bba5d04-deb3-5dba-b886-0a4d32a374d7:c2",
+          "description": "Xác định cấu hình RabbitMQ phù hợp (acknowledgment, prefetch, queue type) để cân bằng giữa độ tin cậy và hiệu năng.",
+          "assessment": "NOT_ASSESSED"
+        }
+      ]
+    },
+    {
+      "objective_id": "c176cea4-105f-50c6-8075-6e0fe0742d0d",
+      "skill_id": "http-api",
+      "claim": "Giải thích tính idempotent của HTTP khi retry yêu cầu cập nhật đơn hàng sau timeout.",
+      "jd_evidence_spans": [
+        "Bắt buộc: Giải thích tính idempotent của HTTP khi retry yêu cầu cập nhật đơn hàng sau timeout."
+      ],
+      "assessment": "NOT_ASSESSED",
+      "stop_reason": null,
+      "strengths": [],
+      "weaknesses": [],
+      "study_recommendations": [],
+      "evidence": [],
+      "criteria": [
+        {
+          "criterion_id": "c176cea4-105f-50c6-8075-6e0fe0742d0d:c1",
+          "description": "Giải thích khái niệm tính idempotent trong HTTP và tại sao nó quan trọng khi retry.",
+          "assessment": "NOT_ASSESSED"
+        },
+        {
+          "criterion_id": "c176cea4-105f-50c6-8075-6e0fe0742d0d:c2",
+          "description": "Áp dụng kiến thức về idempotent để giải quyết tình huống retry sau timeout khi cập nhật đơn hàng.",
+          "assessment": "NOT_ASSESSED"
+        }
+      ]
+    },
+    {
+      "objective_id": "6f3398e3-51cd-5b7c-9db4-bd42a2c9d471",
+      "skill_id": "incident-collaboration",
+      "claim": "Phối hợp với QA và SRE để thống nhất giảm thiểu tác động và bàn giao theo dõi trong sự cố đơn hàng.",
+      "jd_evidence_spans": [
+        "Bắt buộc: Phối hợp với QA và SRE để thống nhất giảm thiểu tác động và bàn giao theo dõi trong sự cố đơn hàng."
+      ],
+      "assessment": "NOT_ASSESSED",
+      "stop_reason": null,
+      "strengths": [],
+      "weaknesses": [],
+      "study_recommendations": [],
+      "evidence": [],
+      "criteria": [
+        {
+          "criterion_id": "6f3398e3-51cd-5b7c-9db4-bd42a2c9d471:c1",
+          "description": "Xác định vai trò và trách nhiệm của QA, SRE và Dev trong việc giảm thiểu tác động sự cố đơn hàng.",
+          "assessment": "NOT_ASSESSED"
+        },
+        {
+          "criterion_id": "6f3398e3-51cd-5b7c-9db4-bd42a2c9d471:c2",
+          "description": "Thực hiện bàn giao theo dõi sự cố sau khi đã giảm thiểu tác động ban đầu.",
+          "assessment": "NOT_ASSESSED"
+        }
+      ]
+    },
+    {
+      "objective_id": "ceeec39e-4c0f-5292-b463-073378621ab6",
+      "skill_id": "docker",
+      "claim": "Viết Dockerfile tối giản cho API nội bộ dùng trong môi trường phát triển.",
+      "jd_evidence_spans": [
+        "Điểm cộng: Viết Dockerfile tối giản cho API nội bộ dùng trong môi trường phát triển."
+      ],
+      "assessment": "NOT_ASSESSED",
+      "stop_reason": null,
+      "strengths": [],
+      "weaknesses": [],
+      "study_recommendations": [],
+      "evidence": [],
+      "criteria": [
+        {
+          "criterion_id": "ceeec39e-4c0f-5292-b463-073378621ab6:c1",
+          "description": "Viết Dockerfile tối giản cho API nội bộ.",
+          "assessment": "NOT_ASSESSED"
+        },
+        {
+          "criterion_id": "ceeec39e-4c0f-5292-b463-073378621ab6:c2",
+          "description": "Đảm bảo Dockerfile phù hợp cho môi trường phát triển.",
+          "assessment": "NOT_ASSESSED"
+        }
+      ]
+    }
+  ]
+}

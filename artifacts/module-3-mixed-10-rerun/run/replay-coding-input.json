@@ -1,0 +1,41 @@
+{
+  "turn": {
+    "turn_id": "443af2ee-17a0-4486-b6e7-0ae6b5ad9d58",
+    "objective_id": "2b0a116f-4a69-54ca-8fa8-b36d764d4366",
+    "skill_id": "python",
+    "mode": "CODING",
+    "action": "INITIAL",
+    "question_depth": 2,
+    "question": {
+      "text": "Em đã từng triển khai API xử lý sự kiện đơn hàng. Hãy viết một hàm Python `deduplicate_events(events)` nhận vào danh sách các dict, mỗi dict có khóa `'event_id'`. Hàm cần trả về danh sách mới chỉ giữ lại lần xuất hiện đầu tiên của mỗi `event_id`, duy trì thứ tự ban đầu. Em sẽ dùng cấu trúc dữ liệu nào để đảm bảo hiệu năng tốt?",
+      "criterion_ids": [
+        "2b0a116f-4a69-54ca-8fa8-b36d764d4366:c1"
+      ],
+      "evidence_scope": "Viết hàm Python loại bỏ trùng lặp dựa trên event_id, giữ nguyên thứ tự."
+    },
+    "answer": "def deduplicate_events(events):\n    by_id = {event['event_id']: event for event in events}\n    return list(by_id.values())\n\nEm dùng dict vì tra theo khóa nhanh. Dict giữ thứ tự lần đầu thêm khóa nên theo em mỗi mã sẽ giữ nguyên sự kiện đầu tiên.",
+    "judgment": null,
+    "introduction": "Tiếp theo, mình chuyển sang trao đổi về python nhé."
+  },
+  "previous": {
+    "observations": [
+      {
+        "criterion_id": "2b0a116f-4a69-54ca-8fa8-b36d764d4366:c1",
+        "response_excerpt": "def deduplicate_events(events):\n    by_id = {event['event_id']: event for event in events}\n    return list(by_id.values())\n\nEm dùng dict vì tra theo khóa nhanh. Dict giữ thứ tự lần đầu thêm khóa nên theo em mỗi mã sẽ giữ nguyên sự kiện đầu tiên.",
+        "response_line_range": [
+          1,
+          5
+        ],
+        "observation": "SUPPORTS",
+        "performance": "AT_TARGET",
+        "rationale": "The candidate implemented the function using a dictionary comprehension to deduplicate events based on 'event_id'. This approach achieves O(n) time complexity, which is significantly better than the nested loop (O(n^2)) mentioned in the below_target criteria. The candidate correctly identified that Python dictionaries maintain insertion order (since version 3.7+), ensuring that the first occurrence of each event_id is preserved and subsequent duplicates are overwritten/ignored when converting back to a list. The explanation explicitly links the data structure choice to both performance ('tra theo khóa nhanh') and order preservation ('giữ thứ tự lần đầu thêm khóa').",
+        "resolves_contradiction": false,
+        "unresolved_aspects": []
+      }
+    ],
+    "feedback": "",
+    "explicit_inability": false,
+    "inability_excerpt": "",
+    "feedback_contains_hint": false
+  }
+}

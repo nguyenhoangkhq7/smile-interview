@@ -9,7 +9,7 @@ scipy>=1.14.0
 pyyaml>=6.0.0
 openai>=1.66.0
 langgraph>=1.0.0
-dspy[litellm]>=3.0.0
+dspy[litellm]==3.4.1
 pytest>=8.0.0
 pypdf>=5.0.0
 python-multipart>=0.0.12

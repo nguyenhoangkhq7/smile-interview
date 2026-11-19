@@ -6,7 +6,14 @@ _EXPORTS = {
         "DEFAULT_COMPILED_DIR", "compile_with_bootstrap_few_shot", "compile_with_labeled_few_shot",
         "evaluate_modules_on_dev", "load_compiled_modules", "save_compiled_modules", "seed_default_compiled_artifacts")},
     **{name: "dataset" for name in ("get_gold_judge_examples", "get_gold_question_examples")},
-    **{name: "metrics" for name in ("judge_evaluation_metric", "question_generation_metric")},
+    **{name: "extended_dataset" for name in (
+        "corpus_summary", "get_alignment_examples", "get_blueprint_examples",
+        "get_extended_dialogue_examples", "get_extended_judge_examples", "get_extended_question_examples",
+    )},
+    **{name: "metrics" for name in (
+        "alignment_evaluation_metric", "alignment_macro_f1", "blueprint_evaluation_metric",
+        "judge_evaluation_metric", "question_generation_metric",
+    )},
 }
 __all__ = list(_EXPORTS)
 

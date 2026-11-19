@@ -16,7 +16,7 @@ export function VoiceAvatarPanel({ room }: { room: VoiceInterviewRoom }) {
       {!voice.avatarReady && <div className={styles.simliPlaceholder}>
         {voice.starting ? <LoaderCircle size={30} className={styles.spinner} /> : <UserRound size={40} strokeWidth={1.25} />}
         <p>{voice.starting ? 'Đang kết nối…' : 'Người phỏng vấn AI'}</p>
-        {!voice.enabled && <Button className={styles.startButton} disabled={voice.starting || room.busy} onClick={() => void voice.enable()}>
+        {!voice.enabled && <Button className={styles.startButton} disabled={voice.starting || room.busy || room.session?.awaiting_question} onClick={() => void voice.enable()}>
           <Mic size={16} />{voice.starting ? 'Đang bật micro…' : 'Bắt đầu trò chuyện'}
         </Button>}
       </div>}

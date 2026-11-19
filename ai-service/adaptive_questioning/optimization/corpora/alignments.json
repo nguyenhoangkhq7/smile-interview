@@ -1,0 +1,1161 @@
+[
+  {
+    "sample_id": "xa01",
+    "split": "train",
+    "skill_id": "mysql",
+    "context": {
+      "question": "Truy vấn lọc theo `status` và sắp xếp theo `created_at` bị chậm trên bảng 5 triệu dòng. Hãy đề xuất cấu trúc chỉ mục phù hợp cho truy vấn này và giải thích lựa chọn.",
+      "criterion": {
+        "criterion_id": "xa01:c1",
+        "description": "Thiết kế chỉ mục cho truy vấn lọc và sắp xếp",
+        "expected_evidence": "Đề xuất composite index đúng thứ tự (status, created_at).",
+        "below_target": "Chỉ đánh index trên cột sắp xếp hoặc chọn sai thứ tự cột.",
+        "at_target": "Đề xuất composite index đặt cột lọc bằng trước cột sắp xếp.",
+        "above_target": "Đánh giá thêm độ chọn lọc và chi phí ghi.",
+        "essential": true
+      },
+      "action": "INITIAL",
+      "question_depth": 3,
+      "target_depth": 3,
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "mode": "DESIGN",
+      "interaction_mode": "TEXT",
+      "probe_reason": "Collect initial evidence",
+      "unresolved": [],
+      "history": []
+    },
+    "verdict": "ALIGNED"
+  },
+  {
+    "sample_id": "xa02",
+    "split": "train",
+    "skill_id": "mysql",
+    "context": {
+      "question": "Truy vấn lọc theo `status` và sắp xếp theo `created_at` bị chậm trên bảng 5 triệu dòng. Hãy đề xuất cấu trúc chỉ mục phù hợp: dùng composite index `(status, created_at)` và giải thích lựa chọn.",
+      "criterion": {
+        "criterion_id": "xa02:c1",
+        "description": "Thiết kế chỉ mục cho truy vấn lọc và sắp xếp",
+        "expected_evidence": "Chọn loại chỉ mục và thứ tự cột phù hợp.",
+        "below_target": "Chọn sai thứ tự cột.",
+        "at_target": "Chọn composite index theo thứ tự lọc trước sắp xếp sau.",
+        "above_target": "Phân tích chi phí ghi.",
+        "essential": true
+      },
+      "action": "INITIAL",
+      "question_depth": 3,
+      "target_depth": 3,
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "mode": "DESIGN",
+      "interaction_mode": "TEXT",
+      "probe_reason": "Collect initial evidence",
+      "unresolved": [],
+      "history": []
+    },
+    "verdict": "GIVES_SOLUTION"
+  },
+  {
+    "sample_id": "xa03",
+    "split": "train",
+    "skill_id": "testing_unit",
+    "context": {
+      "question": "Để kiểm tra quy tắc mật khẩu dài tối thiểu 8 ký tự, vì sao bạn chọn đầu vào dài 7 ký tự để thử?",
+      "criterion": {
+        "criterion_id": "xa03:c1",
+        "description": "Chọn giá trị biên kiểm tra độ dài tối thiểu",
+        "expected_evidence": "Chọn mật khẩu 7 ký tự để kiểm tra từ chối.",
+        "below_target": "Chọn mật khẩu từ 8 ký tự trở lên.",
+        "at_target": "Chọn mật khẩu 7 ký tự.",
+        "above_target": "Phân tích hai phía biên.",
+        "essential": true
+      },
+      "action": "INITIAL",
+      "question_depth": 2,
+      "target_depth": 2,
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "mode": "TECHNICAL_EXPLANATION",
+      "interaction_mode": "TEXT",
+      "probe_reason": "Collect initial evidence",
+      "unresolved": [],
+      "history": []
+    },
+    "verdict": "GIVES_SOLUTION"
+  },
+  {
+    "sample_id": "xa04",
+    "split": "train",
+    "skill_id": "mysql",
+    "context": {
+      "question": "Hãy phân tích vì sao truy vấn trong kế hoạch `EXPLAIN` bên dưới bị chậm, đồng thời viết lại câu lệnh SQL đã sửa hoàn chỉnh.",
+      "criterion": {
+        "criterion_id": "xa04:c1",
+        "description": "Xác định nút thắt từ kế hoạch thực thi EXPLAIN",
+        "expected_evidence": "Chỉ ra full table scan và filesort từ kế hoạch thực thi.",
+        "below_target": "Không nhận diện được bước quét toàn bảng.",
+        "at_target": "Chỉ ra đúng nút thắt quét bảng và sắp xếp.",
+        "above_target": "Ước lượng chi phí theo rows.",
+        "essential": true
+      },
+      "action": "INITIAL",
+      "question_depth": 3,
+      "target_depth": 3,
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "mode": "DEBUGGING",
+      "interaction_mode": "TEXT",
+      "probe_reason": "Collect initial evidence",
+      "unresolved": [],
+      "history": []
+    },
+    "verdict": "MULTIPLE_TASKS"
+  },
+  {
+    "sample_id": "xa05",
+    "split": "train",
+    "skill_id": "python",
+    "context": {
+      "question": "Hãy viết hàm Python `deduplicate_events(events)` giữ bản ghi đầu tiên mỗi `event_id` theo thứ tự đầu vào, sau đó viết bộ unit test kiểm chứng hàm đó.",
+      "criterion": {
+        "criterion_id": "xa05:c1",
+        "description": "Cài đặt hàm khử trùng lặp sự kiện",
+        "expected_evidence": "Cài đặt hàm deduplicate_events giữ bản ghi đầu tiên theo thứ tự gốc.",
+        "below_target": "Làm mất thứ tự hoặc giữ bản ghi cuối.",
+        "at_target": "Hàm chạy đúng thứ tự và bản ghi đầu.",
+        "above_target": "Độ phức tạp O(n).",
+        "essential": true
+      },
+      "action": "INITIAL",
+      "question_depth": 2,
+      "target_depth": 2,
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "mode": "CODING",
+      "interaction_mode": "TEXT",
+      "probe_reason": "Collect initial evidence",
+      "unresolved": [],
+      "history": []
+    },
+    "verdict": "MULTIPLE_TASKS"
+  },
+  {
+    "sample_id": "xa06",
+    "split": "train",
+    "skill_id": "testing_unit",
+    "context": {
+      "question": "Hãy viết hàm Python kiểm tra địa chỉ email hợp lệ có chứa ký tự `@` và dấu chấm phía sau.",
+      "criterion": {
+        "criterion_id": "xa06:c1",
+        "description": "Chọn đầu vào kiểm thử quy tắc kiểm tra email",
+        "expected_evidence": "Chọn một địa chỉ email không hợp lệ làm ca kiểm thử phát hiện lỗi bỏ sót.",
+        "below_target": "Chọn địa chỉ email hợp lệ để thử ca từ chối.",
+        "at_target": "Chọn đúng đầu vào vi phạm quy tắc định dạng.",
+        "above_target": "Phân tích nhiều ca biên của định dạng email.",
+        "essential": true
+      },
+      "action": "INITIAL",
+      "question_depth": 2,
+      "target_depth": 2,
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "mode": "TECHNICAL_EXPLANATION",
+      "interaction_mode": "TEXT",
+      "probe_reason": "Collect initial evidence",
+      "unresolved": [],
+      "history": []
+    },
+    "verdict": "WRONG_SKILL"
+  },
+  {
+    "sample_id": "xa07",
+    "split": "train",
+    "skill_id": "python",
+    "context": {
+      "question": "Bạn cấu hình Dockerfile multi-stage build như thế nào để giảm kích thước image Python?",
+      "criterion": {
+        "criterion_id": "xa07:c1",
+        "description": "Xử lý bất đồng bộ với asyncio",
+        "expected_evidence": "Chẩn đoán tác vụ đồng bộ làm nghẽn event loop asyncio.",
+        "below_target": "Không nhận ra tác vụ blocking chặn event loop.",
+        "at_target": "Chỉ ra nguyên nhân nghẽn event loop.",
+        "above_target": "So sánh thread pool với coroutine.",
+        "essential": true
+      },
+      "action": "INITIAL",
+      "question_depth": 3,
+      "target_depth": 3,
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "mode": "DEBUGGING",
+      "interaction_mode": "TEXT",
+      "probe_reason": "Collect initial evidence",
+      "unresolved": [],
+      "history": []
+    },
+    "verdict": "WRONG_SKILL"
+  },
+  {
+    "sample_id": "xa08",
+    "split": "train",
+    "skill_id": "python",
+    "context": {
+      "question": "Trong Python, từ khóa `async` và `await` được định nghĩa để làm gì?",
+      "criterion": {
+        "criterion_id": "xa08:c1",
+        "description": "Chẩn đoán nghẽn event loop khi gọi hàm blocking",
+        "expected_evidence": "Phân tích vì sao lời gọi đồng bộ trong coroutine làm treo toàn bộ các request khác.",
+        "below_target": "Cho rằng mọi hàm bên trong async def đều tự chạy song song.",
+        "at_target": "Chẩn đoán đúng việc chặn event loop đơn luồng.",
+        "above_target": "Đánh đổi offload sang executor.",
+        "essential": true
+      },
+      "action": "INITIAL",
+      "question_depth": 3,
+      "target_depth": 3,
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "mode": "DEBUGGING",
+      "interaction_mode": "TEXT",
+      "probe_reason": "Collect initial evidence",
+      "unresolved": [],
+      "history": []
+    },
+    "verdict": "WRONG_DEPTH"
+  },
+  {
+    "sample_id": "xa09",
+    "split": "train",
+    "skill_id": "testing_unit",
+    "context": {
+      "question": "Ở mức thiết kế kiến trúc chịu tải cao, bạn phối hợp lại toàn bộ hệ thống kiểm thử thế nào để không còn lỗi rò rỉ biên?",
+      "criterion": {
+        "criterion_id": "xa09:c1",
+        "description": "Kiểm tra đầu vào ở biên quy tắc",
+        "expected_evidence": "Kiểm tra một giá trị cụ thể với quy tắc cho sẵn ở mức nền tảng.",
+        "below_target": "Phân loại sai đầu vào.",
+        "at_target": "Phân loại đúng đầu vào theo quy tắc.",
+        "above_target": "Chọn đủ hai phía biên.",
+        "essential": true
+      },
+      "action": "ASK_EASIER",
+      "question_depth": 1,
+      "target_depth": 2,
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "mode": "TECHNICAL_EXPLANATION",
+      "interaction_mode": "VOICE",
+      "probe_reason": "Ask for one simpler prerequisite decision",
+      "unresolved": [],
+      "history": [
+        {
+          "question": "Bạn chọn giá trị nào kiểm thử độ dài mật khẩu tối thiểu 8?",
+          "answer": "Em chưa biết."
+        }
+      ]
+    },
+    "verdict": "WRONG_DEPTH"
+  },
+  {
+    "sample_id": "xa10",
+    "split": "train",
+    "skill_id": "mysql",
+    "context": {
+      "question": "Theo bạn việc đánh index cho bảng cơ sở dữ liệu lớn có thực sự quan trọng đối với hiệu năng không?",
+      "criterion": {
+        "criterion_id": "xa10:c1",
+        "description": "Thiết kế composite index theo truy vấn lọc và sắp xếp",
+        "expected_evidence": "Chọn cấu trúc và thứ tự cột chỉ mục cho truy vấn cho trước.",
+        "below_target": "Chọn sai thứ tự cột.",
+        "at_target": "Chọn đúng thứ tự lọc trước sắp xếp sau.",
+        "above_target": "Đánh đổi ghi.",
+        "essential": true
+      },
+      "action": "INITIAL",
+      "question_depth": 3,
+      "target_depth": 3,
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "mode": "DESIGN",
+      "interaction_mode": "TEXT",
+      "probe_reason": "Collect initial evidence",
+      "unresolved": [],
+      "history": []
+    },
+    "verdict": "INSUFFICIENT_EVIDENCE"
+  },
+  {
+    "sample_id": "xa11",
+    "split": "train",
+    "skill_id": "teamwork_incident",
+    "context": {
+      "question": "Bạn kể xem gần đây bạn có gặp xung đột gì trong công việc không và cảm thấy thế nào?",
+      "criterion": {
+        "criterion_id": "xa11:c1",
+        "description": "Thương lượng giải quyết bất đồng kỹ thuật bằng dữ kiện",
+        "expected_evidence": "Trình bày hành động đối chiếu bằng chứng kỹ thuật để đi tới quyết định chung.",
+        "below_target": "Tránh né hoặc nhượng bộ cảm tính.",
+        "at_target": "Nêu rõ hành động dùng dữ kiện kỹ thuật giải quyết bất đồng.",
+        "above_target": "Cải tiến quy trình sau sự cố.",
+        "essential": true
+      },
+      "action": "INITIAL",
+      "question_depth": 3,
+      "target_depth": 3,
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "mode": "BEHAVIORAL",
+      "interaction_mode": "VOICE",
+      "probe_reason": "Collect initial evidence",
+      "unresolved": [],
+      "history": []
+    },
+    "verdict": "INSUFFICIENT_EVIDENCE"
+  },
+  {
+    "sample_id": "xa12",
+    "split": "train",
+    "skill_id": "rest_api",
+    "context": {
+      "question": "Nhìn vào file log sản phẩm đang nằm trên máy của bạn và cho biết dòng nào gây lỗi timeout trong API thanh toán?",
+      "criterion": {
+        "criterion_id": "xa12:c1",
+        "description": "Chẩn đoán lỗi timeout giữa các dịch vụ",
+        "expected_evidence": "Khoanh vùng nguyên nhân timeout từ dữ kiện log hoặc mô tả sự cố cung cấp sẵn.",
+        "below_target": "Đoán nguyên nhân không khớp dữ kiện.",
+        "at_target": "Chỉ ra đúng nút thắt từ log cung cấp.",
+        "above_target": "Đề xuất cơ chế retry có backoff.",
+        "essential": true
+      },
+      "action": "INITIAL",
+      "question_depth": 3,
+      "target_depth": 3,
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "mode": "DEBUGGING",
+      "interaction_mode": "TEXT",
+      "probe_reason": "Collect initial evidence",
+      "unresolved": [],
+      "history": []
+    },
+    "verdict": "UNANSWERABLE"
+  },
+  {
+    "sample_id": "xa13",
+    "split": "train",
+    "skill_id": "python",
+    "context": {
+      "question": "Hãy đọc to từng dòng mã hoàn chỉnh của một lớp xử lý hàng đợi kèm 3 phương thức đầy đủ cú pháp Python qua micro.",
+      "criterion": {
+        "criterion_id": "xa13:c1",
+        "description": "Giải thích luồng xử lý khử trùng lặp",
+        "expected_evidence": "Giải thích bằng lời thuật toán giữ bản ghi đầu tiên.",
+        "below_target": "Sai thứ tự hoặc giữ bản ghi cuối.",
+        "at_target": "Giải thích chính xác luồng xử lý.",
+        "above_target": "Phân tích độ phức tạp.",
+        "essential": true
+      },
+      "action": "INITIAL",
+      "question_depth": 2,
+      "target_depth": 2,
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "mode": "CODING",
+      "interaction_mode": "VOICE",
+      "probe_reason": "Collect initial evidence",
+      "unresolved": [],
+      "history": []
+    },
+    "verdict": "UNANSWERABLE"
+  },
+  {
+    "sample_id": "xa14",
+    "split": "train",
+    "skill_id": "frontend_state",
+    "context": {
+      "question": "Với đoạn mã React `useEffect` dưới đây, khi gõ `'a'` rồi `'ab'` thì màn hình lại hiện kết quả của `'a'`. Nguyên nhân nào gây ra tình trạng này?\n```js\nuseEffect(() => { fetch('/search?q=' + q).then(r => r.json()).then(setResults); }, [q]);\n```",
+      "criterion": {
+        "criterion_id": "xa14:c1",
+        "description": "Chẩn đoán race condition bất đồng bộ",
+        "expected_evidence": "Chỉ ra yêu cầu cũ hoàn thành muộn hơn ghi đè state kết quả mới.",
+        "below_target": "Cho rằng trình duyệt luôn trả fetch theo đúng thứ tự gọi.",
+        "at_target": "Giải thích đúng race condition phản hồi cũ ghi đè phản hồi mới.",
+        "above_target": "Nêu cách hủy hoặc gắn cờ cleanup.",
+        "essential": true
+      },
+      "action": "INITIAL",
+      "question_depth": 2,
+      "target_depth": 2,
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "mode": "DEBUGGING",
+      "interaction_mode": "TEXT",
+      "probe_reason": "Collect initial evidence",
+      "unresolved": [],
+      "history": []
+    },
+    "verdict": "ALIGNED"
+  },
+  {
+    "sample_id": "xa15",
+    "split": "train",
+    "skill_id": "testing_unit",
+    "context": {
+      "question": "Với tồn kho 5 sản phẩm, một đơn đặt 6 sản phẩm có vượt tồn kho không?",
+      "criterion": {
+        "criterion_id": "xa15:c1",
+        "description": "Kiểm tra quy tắc biên ở mức nền tảng",
+        "expected_evidence": "Xác định 6 vượt giới hạn 5 ở mức nền tảng.",
+        "below_target": "Cho rằng 6 vẫn hợp lệ.",
+        "at_target": "Khẳng định 6 vượt quá tồn kho 5.",
+        "above_target": "Xét trường hợp biên đúng bằng 5.",
+        "essential": true
+      },
+      "action": "ASK_EASIER",
+      "question_depth": 1,
+      "target_depth": 2,
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "mode": "TECHNICAL_EXPLANATION",
+      "interaction_mode": "VOICE",
+      "probe_reason": "Collect initial evidence",
+      "unresolved": [],
+      "history": [
+        {
+          "question": "Kho còn 5, chọn đơn thử từ chối?",
+          "answer": "Em chưa biết."
+        }
+      ]
+    },
+    "verdict": "ALIGNED"
+  },
+  {
+    "sample_id": "xa16",
+    "split": "train",
+    "skill_id": "rest_api",
+    "context": {
+      "question": "Cụ thể bạn định trả mã lỗi HTTP 4xx nào khi cùng `Idempotency-Key` nhưng payload `amount` khác nhau?",
+      "criterion": {
+        "criterion_id": "xa16:c1",
+        "description": "Chọn mã trạng thái HTTP cho xung đột idempotency",
+        "expected_evidence": "Chọn mã 409 hoặc 422 và lý giải ngắn gọn.",
+        "below_target": "Dùng 200 hoặc 500.",
+        "at_target": "Chọn đúng mã 409 hoặc 422.",
+        "above_target": "Phân biệt 409 với 400.",
+        "essential": true
+      },
+      "action": "CLARIFY",
+      "question_depth": 2,
+      "target_depth": 2,
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "mode": "TECHNICAL_EXPLANATION",
+      "interaction_mode": "TEXT",
+      "probe_reason": "Collect initial evidence",
+      "unresolved": [
+        "Mã trạng thái HTTP cụ thể"
+      ],
+      "history": [
+        {
+          "question": "Trả mã nào?",
+          "answer": "Trả mã lỗi 4xx phù hợp."
+        }
+      ]
+    },
+    "verdict": "ALIGNED"
+  },
+  {
+    "sample_id": "xa17",
+    "split": "train",
+    "skill_id": "frontend_state",
+    "context": {
+      "question": "Vì sao trong React bạn nên bọc callback truyền xuống component con bằng `useCallback` và dùng `React.memo` để tránh render thừa?",
+      "criterion": {
+        "criterion_id": "xa17:c1",
+        "description": "Tối ưu render thừa trong React",
+        "expected_evidence": "Xác định thay đổi prop reference gây re-render và chọn cách ổn định hóa reference.",
+        "below_target": "Không nhận ra nguyên nhân từ thay đổi prop reference.",
+        "at_target": "Giải thích nguyên nhân thay đổi reference và giải pháp tương ứng.",
+        "above_target": "Phân tích chi phí memo hóa không cần thiết.",
+        "essential": true
+      },
+      "action": "INITIAL",
+      "question_depth": 3,
+      "target_depth": 3,
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "mode": "DEBUGGING",
+      "interaction_mode": "VOICE",
+      "probe_reason": "Collect initial evidence",
+      "unresolved": [],
+      "history": []
+    },
+    "verdict": "GIVES_SOLUTION"
+  },
+  {
+    "sample_id": "xa18",
+    "split": "train",
+    "skill_id": "rest_api",
+    "context": {
+      "question": "Bạn hãy nhắc lại một định nghĩa cơ bản về `Idempotency` trong HTTP đã nêu trước đó mà không cần thay đổi ràng buộc nào thêm.",
+      "criterion": {
+        "criterion_id": "xa18:c1",
+        "description": "Thiết kế cơ chế idempotency nâng cao",
+        "expected_evidence": "Thiết kế idempotency cơ bản.",
+        "below_target": "Không tránh được trùng giao dịch.",
+        "at_target": "Dùng idempotency key lưu nhất quán.",
+        "above_target": "Xử lý hai request trùng đến đồng thời khi request đầu chưa hoàn tất.",
+        "essential": true
+      },
+      "action": "PROBE_DEEPER",
+      "question_depth": 4,
+      "target_depth": 3,
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "mode": "DESIGN",
+      "interaction_mode": "VOICE",
+      "probe_reason": "Collect initial evidence",
+      "unresolved": [],
+      "history": [
+        {
+          "question": "Thiết kế idempotent API?",
+          "answer": "Dùng Idempotency-Key lưu DB."
+        }
+      ]
+    },
+    "verdict": "WRONG_DEPTH"
+  },
+  {
+    "sample_id": "xa19",
+    "split": "dev",
+    "skill_id": "typescript",
+    "context": {
+      "question": "Cho kiểu `type ApiResult<T> = { ok: true; data: T } | { ok: false; error: string };`. Hãy viết hàm TypeScript `unwrapOrDefault<T>(result: ApiResult<T>, fallback: T): T` không dùng `any` hay `as`.",
+      "criterion": {
+        "criterion_id": "xa19:c1",
+        "description": "Thu hẹp kiểu discriminated union",
+        "expected_evidence": "Kiểm tra trường discriminant result.ok để truy cập an toàn.",
+        "below_target": "Dùng as any.",
+        "at_target": "Thu hẹp kiểu hợp lệ qua result.ok.",
+        "above_target": "Kiểm tra exhaustiveness bằng never.",
+        "essential": true
+      },
+      "action": "INITIAL",
+      "question_depth": 2,
+      "target_depth": 2,
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "mode": "CODING",
+      "interaction_mode": "TEXT",
+      "probe_reason": "Collect initial evidence",
+      "unresolved": [],
+      "history": []
+    },
+    "verdict": "ALIGNED"
+  },
+  {
+    "sample_id": "xa20",
+    "split": "dev",
+    "skill_id": "oauth2_oidc",
+    "context": {
+      "question": "Cho ứng dụng SPA không giữ được `client_secret`. Hãy giải thích cách dùng PKCE với `code_verifier` và `code_challenge` để bảo vệ bước đổi token.",
+      "criterion": {
+        "criterion_id": "xa20:c1",
+        "description": "Bảo vệ đổi authorization code cho public client",
+        "expected_evidence": "Đề xuất cơ chế gắn kết client khởi tạo với lần đổi code mà không dùng client_secret.",
+        "below_target": "Dùng client_secret cứng trên SPA.",
+        "at_target": "Đề xuất cơ chế đối chiếu verifier/challenge độc lập.",
+        "above_target": "Đánh đổi lưu token phía client so với BFF.",
+        "essential": true
+      },
+      "action": "PROBE_DEEPER",
+      "question_depth": 4,
+      "target_depth": 3,
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "mode": "DESIGN",
+      "interaction_mode": "VOICE",
+      "probe_reason": "Collect initial evidence",
+      "unresolved": [],
+      "history": []
+    },
+    "verdict": "GIVES_SOLUTION"
+  },
+  {
+    "sample_id": "xa21",
+    "split": "dev",
+    "skill_id": "mongodb",
+    "context": {
+      "question": "Hãy chọn cấu trúc compound index tối ưu cho truy vấn `invoices` bên dưới, rồi trình bày thêm kiến trúc sharding toàn cụm MongoDB cho 5 năm tới.\nTruy vấn: `db.invoices.find({ tenant_id: 't1', status: 'OPEN' }).sort({ issued_at: -1 })`",
+      "criterion": {
+        "criterion_id": "xa21:c1",
+        "description": "Sắp xếp thứ tự trường trong compound index",
+        "expected_evidence": "Chọn thứ tự trường compound index khớp lọc và sắp xếp.",
+        "below_target": "Đặt sai thứ tự trường.",
+        "at_target": "Đặt đúng thứ tự lọc trước sort.",
+        "above_target": "Phân tích nguyên tắc ESR.",
+        "essential": true
+      },
+      "action": "INITIAL",
+      "question_depth": 3,
+      "target_depth": 3,
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "mode": "DESIGN",
+      "interaction_mode": "TEXT",
+      "probe_reason": "Collect initial evidence",
+      "unresolved": [],
+      "history": []
+    },
+    "verdict": "MULTIPLE_TASKS"
+  },
+  {
+    "sample_id": "xa22",
+    "split": "dev",
+    "skill_id": "nginx_proxy",
+    "context": {
+      "question": "Bạn viết một script bash tự động khởi động lại tiến trình Nginx mỗi 5 phút bằng cron khi có lỗi xảy ra thế nào?",
+      "criterion": {
+        "criterion_id": "xa22:c1",
+        "description": "Chẩn đoán lỗi 504 Gateway Timeout trên Nginx",
+        "expected_evidence": "Xác định lỗi 504 xảy ra do ngưỡng chờ phản hồi từ upstream vượt quá 60s.",
+        "below_target": "Nhầm sang 502 hoặc đoán lỗi DNS.",
+        "at_target": "Chỉ ra đúng timeout chờ đọc upstream.",
+        "above_target": "Phân biệt proxy_connect_timeout và proxy_read_timeout.",
+        "essential": true
+      },
+      "action": "INITIAL",
+      "question_depth": 3,
+      "target_depth": 3,
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "mode": "DEBUGGING",
+      "interaction_mode": "VOICE",
+      "probe_reason": "Collect initial evidence",
+      "unresolved": [],
+      "history": []
+    },
+    "verdict": "WRONG_SKILL"
+  },
+  {
+    "sample_id": "xa23",
+    "split": "dev",
+    "skill_id": "oauth2_oidc",
+    "context": {
+      "question": "Với `OAuth2`, thuật ngữ `Access Token` nghĩa là gì?",
+      "criterion": {
+        "criterion_id": "xa23:c1",
+        "description": "Thiết kế luồng đổi authorization code an toàn cho SPA",
+        "expected_evidence": "Thiết kế cơ chế ngăn chặn đánh cắp authorization code trên public client.",
+        "below_target": "Nhúng client_secret vào mã nguồn SPA.",
+        "at_target": "Đề xuất cơ chế bảo vệ bước đổi code không lộ secret.",
+        "above_target": "Đánh giá kiến trúc BFF.",
+        "essential": true
+      },
+      "action": "INITIAL",
+      "question_depth": 4,
+      "target_depth": 4,
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "mode": "DESIGN",
+      "interaction_mode": "VOICE",
+      "probe_reason": "Collect initial evidence",
+      "unresolved": [],
+      "history": []
+    },
+    "verdict": "WRONG_DEPTH"
+  },
+  {
+    "sample_id": "xa24",
+    "split": "dev",
+    "skill_id": "mongodb",
+    "context": {
+      "question": "Bạn có thấy làm việc với MongoDB dễ chịu hơn so với cơ sở dữ liệu quan hệ không?",
+      "criterion": {
+        "criterion_id": "xa24:c1",
+        "description": "Chọn embed hay reference cho dữ liệu bình luận",
+        "expected_evidence": "Quyết định nhúng hay tham chiếu dựa trên tăng trưởng dữ liệu và giới hạn 16MB.",
+        "below_target": "Nhúng mảng tăng trưởng không giới hạn.",
+        "at_target": "Chọn tham chiếu dựa trên giới hạn kích thước và truy vấn phân trang.",
+        "above_target": "Đề xuất hybrid pattern.",
+        "essential": true
+      },
+      "action": "INITIAL",
+      "question_depth": 3,
+      "target_depth": 3,
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "mode": "DESIGN",
+      "interaction_mode": "TEXT",
+      "probe_reason": "Collect initial evidence",
+      "unresolved": [],
+      "history": []
+    },
+    "verdict": "INSUFFICIENT_EVIDENCE"
+  },
+  {
+    "sample_id": "xa25",
+    "split": "dev",
+    "skill_id": "caching_http",
+    "context": {
+      "question": "Hãy mở trình duyệt kiểm tra trực tiếp response header của trang web thực tế bên bạn và đọc giá trị `ETag` đang trả về.",
+      "criterion": {
+        "criterion_id": "xa25:c1",
+        "description": "Giải thích cơ chế xác thực lại cache bằng ETag",
+        "expected_evidence": "Giải thích vai trò ETag, If-None-Match và mã 304.",
+        "below_target": "Cho rằng không cần gửi request kiểm tra.",
+        "at_target": "Mô tả đúng ETag / If-None-Match / 304.",
+        "above_target": "Phân biệt ETag mạnh và yếu.",
+        "essential": true
+      },
+      "action": "INITIAL",
+      "question_depth": 2,
+      "target_depth": 2,
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "mode": "TECHNICAL_EXPLANATION",
+      "interaction_mode": "TEXT",
+      "probe_reason": "Collect initial evidence",
+      "unresolved": [],
+      "history": []
+    },
+    "verdict": "UNANSWERABLE"
+  },
+  {
+    "sample_id": "xa26",
+    "split": "dev",
+    "skill_id": "nginx_proxy",
+    "context": {
+      "question": "Khi một API báo cáo mất 75 giây mới xong, gọi thẳng backend thì thành công nhưng qua Nginx mặc định đúng giây 60 trả 504. Nguyên nhân nằm ở đâu?",
+      "criterion": {
+        "criterion_id": "xa26:c1",
+        "description": "Chẩn đoán lỗi 504 Gateway Timeout trên Nginx",
+        "expected_evidence": "Xác định ngưỡng chờ phản hồi upstream của Nginx hết hạn tại 60s.",
+        "below_target": "Nhầm sang lỗi upstream không chạy (502).",
+        "at_target": "Chỉ ra đúng timeout chờ phản hồi upstream của Nginx.",
+        "above_target": "Phân biệt các loại proxy timeout.",
+        "essential": true
+      },
+      "action": "INITIAL",
+      "question_depth": 3,
+      "target_depth": 3,
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "mode": "DEBUGGING",
+      "interaction_mode": "VOICE",
+      "probe_reason": "Collect initial evidence",
+      "unresolved": [],
+      "history": []
+    },
+    "verdict": "ALIGNED"
+  },
+  {
+    "sample_id": "xa27",
+    "split": "dev",
+    "skill_id": "oauth2_oidc",
+    "context": {
+      "question": "Nếu mạng rớt làm ứng dụng gửi lại refresh token cũ trong cửa sổ 1 tiếng, hệ thống nên xử lý thế nào để vừa chống tái sử dụng vừa đảm bảo an toàn?",
+      "criterion": {
+        "criterion_id": "xa27:c1",
+        "description": "Xác minh xử lý replay refresh token",
+        "expected_evidence": "Làm rõ quy tắc thu hồi token family khi phát hiện dùng lại.",
+        "below_target": "Cho phép kẻ tấn công tái sử dụng dài hạn.",
+        "at_target": "Thu hồi cả chuỗi phiên khi phát hiện replay.",
+        "above_target": "Phân tích trade-off cửa sổ mạng ngắn.",
+        "essential": true
+      },
+      "action": "VERIFY_CONTRADICTION",
+      "question_depth": 2,
+      "target_depth": 2,
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "mode": "TECHNICAL_EXPLANATION",
+      "interaction_mode": "TEXT",
+      "probe_reason": "Collect initial evidence",
+      "unresolved": [],
+      "history": [
+        {
+          "question": "Rotation hoạt động thế nào?",
+          "answer": "Token cũ vô hiệu ngay, nhưng cho dùng lại 1 tiếng."
+        }
+      ]
+    },
+    "verdict": "ALIGNED"
+  },
+  {
+    "sample_id": "xa28",
+    "split": "test",
+    "skill_id": "rabbitmq",
+    "context": {
+      "question": "Một worker RabbitMQ xử lý thông điệp bị hỏng dữ liệu gây crash lặp đi lặp lại. Bạn thiết kế cơ chế xác nhận và cô lập thông điệp lỗi thế nào?",
+      "criterion": {
+        "criterion_id": "xa28:c1",
+        "description": "Thiết kế ack và cô lập message lỗi",
+        "expected_evidence": "Dùng manual ack, giới hạn retry và chuyển message lỗi sang hàng đợi riêng.",
+        "below_target": "Dùng auto-ack hoặc requeue vô hạn.",
+        "at_target": "Kết hợp manual ack với giới hạn thử lại và tách message lỗi.",
+        "above_target": "Xử lý idempotency khi mất kết nối trước ack.",
+        "essential": true
+      },
+      "action": "INITIAL",
+      "question_depth": 4,
+      "target_depth": 4,
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "mode": "DESIGN",
+      "interaction_mode": "VOICE",
+      "probe_reason": "Collect initial evidence",
+      "unresolved": [],
+      "history": []
+    },
+    "verdict": "ALIGNED"
+  },
+  {
+    "sample_id": "xa29",
+    "split": "test",
+    "skill_id": "csharp_dotnet",
+    "context": {
+      "question": "Trong EF Core, làm thế nào dùng phương thức `.Include(o => o.Items)` để sửa lỗi N+1 queries trong đoạn mã sau?\n```csharp\nvar orders = await db.Orders.Take(500).ToListAsync();\n```",
+      "criterion": {
+        "criterion_id": "xa29:c1",
+        "description": "Chẩn đoán và khắc phục N+1 queries",
+        "expected_evidence": "Chọn chiến lược eager loading phù hợp khắc phục N+1.",
+        "below_target": "Giữ lazy loading theo từng vòng lặp.",
+        "at_target": "Đề xuất tải gộp dữ liệu liên quan thay cho truy vấn từng phần tử.",
+        "above_target": "Phân tích tách truy vấn (split query) chống phình tích Descartes.",
+        "essential": true
+      },
+      "action": "INITIAL",
+      "question_depth": 3,
+      "target_depth": 3,
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "mode": "DEBUGGING",
+      "interaction_mode": "TEXT",
+      "probe_reason": "Collect initial evidence",
+      "unresolved": [],
+      "history": []
+    },
+    "verdict": "GIVES_SOLUTION"
+  },
+  {
+    "sample_id": "xa30",
+    "split": "test",
+    "skill_id": "nextjs_ssr",
+    "context": {
+      "question": "Hãy giải thích vì sao đoạn code Next.js dưới đây bị Hydration mismatch, và đồng thời viết lại toàn bộ file layout cùng test Playwright kiểm tra lỗi đó.\n```tsx\nexport function Clock() { return <span>{new Date().toLocaleTimeString()}</span>; }\n```",
+      "criterion": {
+        "criterion_id": "xa30:c1",
+        "description": "Chẩn đoán lỗi Hydration mismatch",
+        "expected_evidence": "Giải thích thời điểm render trên server khác trình duyệt khi hydrate.",
+        "below_target": "Đoán sai do CSS.",
+        "at_target": "Chỉ ra sự sai khác giá trị giữa SSR và client hydration.",
+        "above_target": "So sánh render sau mount với truyền timestamp.",
+        "essential": true
+      },
+      "action": "INITIAL",
+      "question_depth": 2,
+      "target_depth": 2,
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "mode": "DEBUGGING",
+      "interaction_mode": "TEXT",
+      "probe_reason": "Collect initial evidence",
+      "unresolved": [],
+      "history": []
+    },
+    "verdict": "MULTIPLE_TASKS"
+  },
+  {
+    "sample_id": "xa31",
+    "split": "test",
+    "skill_id": "csharp_dotnet",
+    "context": {
+      "question": "Bạn có thể tự đánh giá khả năng lập trình C# của mình ở mức mấy trên thang 10 và kể các dự án đã làm?",
+      "criterion": {
+        "criterion_id": "xa31:c1",
+        "description": "Viết hàm đếm tần suất từ an toàn với Dictionary",
+        "expected_evidence": "Viết phương thức C# CountWords xử lý an toàn khóa chưa tồn tại.",
+        "below_target": "Truy cập dict[key]++ gây KeyNotFoundException.",
+        "at_target": "Viết đúng phương thức dùng TryGetValue an toàn.",
+        "above_target": "Tối ưu tra cứu một lần.",
+        "essential": true
+      },
+      "action": "INITIAL",
+      "question_depth": 2,
+      "target_depth": 2,
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "mode": "CODING",
+      "interaction_mode": "TEXT",
+      "probe_reason": "Collect initial evidence",
+      "unresolved": [],
+      "history": []
+    },
+    "verdict": "WRONG_SKILL"
+  },
+  {
+    "sample_id": "xa32",
+    "split": "test",
+    "skill_id": "leadership_stakeholder",
+    "context": {
+      "question": "Bạn có nghĩ Product Manager đóng vai trò quan trọng trong việc quyết định ngày phát hành không?",
+      "criterion": {
+        "criterion_id": "xa32:c1",
+        "description": "Thương lượng rủi ro migration với PM",
+        "expected_evidence": "Trình bày cách lượng hóa rủi ro kỹ thuật và đề xuất phương án kiểm chứng gọn.",
+        "below_target": "Nhượng bộ không cảnh báo rủi ro.",
+        "at_target": "Thương lượng trên dữ kiện rủi ro và đề xuất kiểm thử nhanh.",
+        "above_target": "Đề xuất tiêu chí Go/No-Go.",
+        "essential": true
+      },
+      "action": "INITIAL",
+      "question_depth": 3,
+      "target_depth": 3,
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "mode": "BEHAVIORAL",
+      "interaction_mode": "VOICE",
+      "probe_reason": "Collect initial evidence",
+      "unresolved": [],
+      "history": []
+    },
+    "verdict": "INSUFFICIENT_EVIDENCE"
+  },
+  {
+    "sample_id": "xa33",
+    "split": "test",
+    "skill_id": "csharp_dotnet",
+    "context": {
+      "question": "Đoạn mã C# ở trên đang gửi tổng cộng bao nhiêu câu SQL khi vòng lặp chạy? (Lưu ý: không có đoạn mã nào được cung cấp kèm theo câu hỏi)",
+      "criterion": {
+        "criterion_id": "xa33:c1",
+        "description": "Chẩn đoán số lượng SQL phát sinh",
+        "expected_evidence": "Đọc đoạn mã được cung cấp để xác định số lần truy vấn.",
+        "below_target": "Đoán sai số truy vấn.",
+        "at_target": "Xác định đúng 1 + N truy vấn từ đoạn mã.",
+        "above_target": "Nêu cách đo bằng SQL profiler.",
+        "essential": true
+      },
+      "action": "INITIAL",
+      "question_depth": 3,
+      "target_depth": 3,
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "mode": "DEBUGGING",
+      "interaction_mode": "TEXT",
+      "probe_reason": "Collect initial evidence",
+      "unresolved": [],
+      "history": []
+    },
+    "verdict": "UNANSWERABLE"
+  },
+  {
+    "sample_id": "xa34",
+    "split": "test",
+    "skill_id": "rabbitmq",
+    "context": {
+      "question": "Trong câu hỏi vừa rồi về hàng đợi RabbitMQ bị dồn sang một worker chậm, bạn đặt `prefetch_count` bằng bao nhiêu và broker chờ tín hiệu gì trước khi gửi tiếp?",
+      "criterion": {
+        "criterion_id": "xa34:c1",
+        "description": "Điều chỉnh prefetch tránh dồn message",
+        "expected_evidence": "Nêu prefetch nhỏ như 1 và broker chờ ack.",
+        "below_target": "Để prefetch=0 không giới hạn.",
+        "at_target": "Nêu prefetch=1 và cơ chế chờ ack.",
+        "above_target": "Đánh đổi thông lượng khi RTT cao.",
+        "essential": true
+      },
+      "action": "CLARIFY",
+      "question_depth": 3,
+      "target_depth": 3,
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "mode": "DEBUGGING",
+      "interaction_mode": "TEXT",
+      "probe_reason": "Collect initial evidence",
+      "unresolved": [
+        "Giá trị prefetch cụ thể"
+      ],
+      "history": [
+        {
+          "question": "Chỉnh gì ở consumer?",
+          "answer": "Em chỉnh lại prefetch."
+        }
+      ]
+    },
+    "verdict": "ALIGNED"
+  },
+  {
+    "sample_id": "xa35",
+    "split": "test",
+    "skill_id": "data_pipeline",
+    "context": {
+      "question": "Một job Spark join gặp 5 mã `merchant_id` chiếm 70% dữ liệu nên không thể lọc bỏ. Bạn xử lý phần join lệch tải đó thế nào và đánh đổi chi phí gì?",
+      "criterion": {
+        "criterion_id": "xa35:c1",
+        "description": "Xử lý data skew bằng kỹ thuật phân tán khóa nóng",
+        "expected_evidence": "Áp dụng salting khóa nóng kèm nhân bản vế còn lại và nêu đánh đổi shuffle.",
+        "below_target": "Tăng partition tổng mà không tách khóa.",
+        "at_target": "Thiết kế salting đúng nguyên lý.",
+        "above_target": "Phân tích chi phí nhân bản và shuffle.",
+        "essential": true
+      },
+      "action": "PROBE_DEEPER",
+      "question_depth": 4,
+      "target_depth": 3,
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "mode": "DESIGN",
+      "interaction_mode": "TEXT",
+      "probe_reason": "Collect initial evidence",
+      "unresolved": [],
+      "history": [
+        {
+          "question": "Vì sao kẹt 99%?",
+          "answer": "Do user_id=null dồn về 1 partition."
+        }
+      ]
+    },
+    "verdict": "ALIGNED"
+  }
+]

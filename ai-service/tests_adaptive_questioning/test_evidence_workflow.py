@@ -416,3 +416,38 @@ def test_api_rejects_incompatible_schema_and_bad_config(setup):
         snapshot = start(engine).snapshot.model_dump(mode="json")
         snapshot["schema_version"] = 99
         assert client.post('/api/v2/interview/stop', json=snapshot).status_code == 422
+
+
+def test_api_start_accepts_legacy_persisted_blueprint_fields_and_rejects_unknown_fields(setup, monkeypatch):
+    provider, engine, _ = setup
+    initial = start(engine)
+    legacy_blueprint = Blueprint(
+        objectives=[state.objective for state in initial.snapshot.objectives.values()]
+    ).model_dump(mode="json")
+    for objective in legacy_blueprint["objectives"]:
+        objective.update(
+            required_proficiency=4.0,
+            extension_criterion_ids=[],
+            inferred=True,
+            rubric_version="evidence-2.0",
+            rubric_fingerprint="legacy-fingerprint",
+        )
+        for mode in objective["suitable_modes"]:
+            mode["rationale"] = "Legacy rationale"
+
+    monkeypatch.setattr(provider, "blueprint", lambda _: pytest.fail("Reused blueprint must not regenerate"))
+    app = FastAPI()
+    app.include_router(router)
+    app.state.evidence_workflow = engine
+    with TestClient(app) as client:
+        payload = StartRequest(session_id="attempt-legacy", skills=[skill()]).model_dump(mode="json")
+        payload["blueprint"] = legacy_blueprint
+        ok = client.post('/api/v2/interview/start', json=payload)
+        assert ok.status_code == 200
+        assert ok.json()["snapshot"]["session_id"] == "attempt-legacy"
+
+        bad_payload = StartRequest(session_id="attempt-bad", skills=[skill()]).model_dump(mode="json")
+        bad_payload["blueprint"] = {
+            "objectives": [{**legacy_blueprint["objectives"][0], "unexpected_field": "invalid"}]
+        }
+        assert client.post('/api/v2/interview/start', json=bad_payload).status_code == 422

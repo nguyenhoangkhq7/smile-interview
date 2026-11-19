@@ -1,10 +1,12 @@
 {
-  "version": "evidence-dspy-1",
-  "contract_fingerprint": "41f98167241239a89ccfec84fce79522634738e3a2dcc697166c9ccdabea85f5",
+  "version": "evidence-dspy-2",
+  "contract_fingerprint": "c254d3d384c0e1267e45ad91caf410a8ef0b01db70b2a53946e1f21c1999a894",
   "train_split": "train",
   "digest_format": "canonical-json-sha256",
   "files": {
-    "question_generator.json": "81026d3b4857187ba0940421a75ba866ce5c84b745ff43e0b1806981f34856ff",
-    "reflective_judge.json": "77251ffa00946ddb07ed5cde5a69ccef1b80893f8a975d11bbc49c58e6da7c17"
+    "question_generator.json": "63002fe5f9ce50a390c1520532a0b16d286314fc8f6c8dc3e7f47f868ca06b5d",
+    "reflective_judge.json": "66735dade3a4c59d8777095e62adcd8b19bd888db356e1ab28c5a77265a48535",
+    "alignment_reviewer.json": "770b6801717a183904b6b0741332b8b477e87b709203a9391cefeb6f083597c2",
+    "blueprint_drafter.json": "50031f4540ba50e776b3d3e0314ad99dc61277d53ce9353f54c397c50cfc97a0"
   }
 }

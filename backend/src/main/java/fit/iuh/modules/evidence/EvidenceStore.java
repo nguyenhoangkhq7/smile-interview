@@ -101,6 +101,12 @@ public class EvidenceStore {
                 || !channel.equals(visible.path("config").path("interaction_mode").asText("TEXT"))) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "AI changed the interview interaction mode");
         }
+        boolean awaiting = visible.path("awaiting_question").asBoolean();
+        if (snapshot.hasNonNull("next_question_action") != awaiting || (awaiting
+                && (visible.hasNonNull("pending_turn") || snapshot.hasNonNull("pending_turn")
+                || visible.path("is_finished").asBoolean() || snapshot.path("is_finished").asBoolean()))) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Invalid pending question transition");
+        }
     }
 
     private InterviewRun updateRun(InterviewRun run, Commit input) {

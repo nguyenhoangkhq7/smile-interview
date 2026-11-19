@@ -29,6 +29,12 @@ public class EvidenceController {
         return service.respond(sessionId, user, answer).toString();
     }
 
+    @PostMapping("/next-question")
+    public String nextQuestion(@PathVariable String sessionId, @AuthenticationPrincipal User user,
+                               @Valid @RequestBody EvidenceDtos.NextQuestion command) {
+        return service.nextQuestion(sessionId, user, command).toString();
+    }
+
     @PostMapping("/stop")
     public String stop(@PathVariable String sessionId, @AuthenticationPrincipal User user,
                          @Valid @RequestBody EvidenceDtos.Stop stop) {

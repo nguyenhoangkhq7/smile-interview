@@ -6,9 +6,10 @@ import logging
 from pydantic import ValidationError
 
 from .assessment import TERMINAL, apply_judgment, eligible_criteria, next_action, standalone_inability, validate_judgment
+from .coding_verification import check_coding_answer
 from .errors import JudgmentUnavailableError, QuestionUnavailableError
 from .models import (
-    Action, ConversationRequest, InterviewSkillContext, Judgment, ObjectiveState,
+    Action, ConversationRequest, InterviewSkillContext, Judgment, NextQuestionRequest, ObjectiveState,
     Question, Snapshot, StartRequest, StoredQuestion, TransitionRequest, TransitionResult, Turn,
 )
 from . import lifecycle
@@ -32,7 +33,12 @@ ALIGNMENT_REPAIRS = {
     "WRONG_SKILL": "Ask the candidate to perform the behavior in the selected criterion. Remove the substitute task.",
     "INSUFFICIENT_EVIDENCE": "Ask for the observable evidence specified by the criterion or the current probe. Leave it for the candidate to supply.",
     "WRONG_DEPTH": "Match the requested depth: select a direct prerequisite for a diagnostic or the relevant anchor for a target or extension.",
-    "UNANSWERABLE": "Supply the missing inputs and request one deliverable possible in this interaction mode.",
+    "UNANSWERABLE": (
+        "Supply any missing inputs, definitions, or expected behavior that change the answer. "
+        "Ask for one answerable deliverable without revealing the solution."
+    ),
+    "MULTIPLE_TASKS": "Keep one work product for the selected criterion; remove the other deliverables.",
+    "GIVES_SOLUTION": "Keep the problem inputs and constraints. Remove the method or answer the candidate must derive.",
 }
 
 _PROMPT_EXCLUDED_OBJECTIVE_FIELDS = {
@@ -94,6 +100,8 @@ class EvidenceWorkflow:
             self._begin_technical(snapshot)
         else:
             raise ValueError("Action is not allowed in this conversation phase")
+        if not request.defer_question and snapshot.next_question_action is not None:
+            self._deliver_question(snapshot)
         return self._result(snapshot)
 
     def _begin_technical(self, snapshot: Snapshot) -> None:
@@ -101,10 +109,7 @@ class EvidenceWorkflow:
         assert conversation is not None
         conversation.phase = "INTERVIEW"
         snapshot.deadline_at = self.clock() + timedelta(seconds=snapshot.config.duration_seconds)
-        self._ask(snapshot, Action.INITIAL)
-        if snapshot.pending_turn:
-            snapshot.pending_turn.introduction = (lifecycle.INTRODUCTION_BRIDGE if conversation.introduction
-                                                   else lifecycle.SKIP_BRIDGE)
+        snapshot.next_question_action = Action.INITIAL
 
     def respond(self, request: TransitionRequest) -> TransitionResult:
         snapshot = request.snapshot.model_copy(deep=True)
@@ -120,12 +125,38 @@ class EvidenceWorkflow:
         snapshot.turns.append(turn)
         snapshot.pending_turn = None
         self._advance(snapshot, turn)
+        if not request.defer_question and snapshot.next_question_action is not None:
+            self._deliver_question(snapshot)
         return self._result(snapshot)
+
+    def next_question(self, request: NextQuestionRequest) -> TransitionResult:
+        snapshot = request.snapshot.model_copy(deep=True)
+        if snapshot.state_version != request.expected_state_version:
+            raise ValueError("Stale state version")
+        if (snapshot.is_finished or snapshot.pending_turn is not None or snapshot.next_question_action is None
+                or (snapshot.conversation and snapshot.conversation.phase != "INTERVIEW")):
+            raise ValueError("Interview is not waiting for a question")
+        self._deliver_question(snapshot)
+        return self._result(snapshot)
+
+    def _deliver_question(self, snapshot: Snapshot) -> None:
+        action = snapshot.next_question_action
+        assert action is not None
+        self._ask(snapshot, action)
+        snapshot.next_question_action = None
+        if snapshot.pending_turn and snapshot.conversation and not snapshot.turns:
+            snapshot.pending_turn.introduction = (lifecycle.INTRODUCTION_BRIDGE if snapshot.conversation.introduction
+                                                   else lifecycle.SKIP_BRIDGE)
 
     def _judge(self, snapshot: Snapshot, turn: Turn) -> Judgment:
         admission = standalone_inability(turn)
         if admission is not None:
             return admission
+        coding_check = check_coding_answer(turn, snapshot.config.interaction_mode)
+        if coding_check is not None:
+            event("coding.checked", turn_id=turn.turn_id, total=coding_check.total, passed=coding_check.passed)
+            if coding_check.passed < coding_check.total:
+                return coding_check.failure_judgment(turn)
         state = snapshot.objectives[turn.objective_id]
         ids = turn.question.criterion_ids
         objective = self._prompt_objective(state, ids)
@@ -148,6 +179,8 @@ class EvidenceWorkflow:
                 if t.objective_id == turn.objective_id and set(ids).intersection(t.question.criterion_ids)
             ],
         }
+        if coding_check is not None:
+            context["coding_checks"] = {"passed": coding_check.passed, "total": coding_check.total}
         last_error = None
         for attempt in range(JUDGMENT_ATTEMPTS):
             if attempt and self.clock() >= snapshot.deadline_at:
@@ -220,7 +253,7 @@ class EvidenceWorkflow:
                 action = next_action(selected, previous, snapshot.policy)
                 if action is None:
                     raise ValueError("Paused objective has no remaining probe")
-            self._ask(snapshot, action)
+            snapshot.next_question_action = action
         else:
             self._finish(snapshot, "PLAN_COMPLETE")
 
@@ -299,8 +332,14 @@ class EvidenceWorkflow:
             contract["evidence_scope"] = previous.question.evidence_scope
             contract["depth"] = previous.question_depth
         context = {"objective": objective, "required_question_contract": contract,
-                   "question_guidance": "Give all necessary inputs or sample output inline. Ask for one decision "
-                                        "or task the candidate can complete here without opening another tool.",
+                   "question_guidance": (
+                       "State the task's intended behavior before asking one clear question. Include the inputs, code, "
+                       "or output it refers to. Specify any definitions, allowed inputs, and boundary behavior that "
+                       "change the answer, such as whether duplicates count or what to return if no result exists. "
+                       "When asking for a failing input or cause, leave that discovery to the candidate. "
+                       "In TEXT, use a fenced block for multi-line code. In VOICE, describe the exact logic and inputs "
+                       "aloud. Make the task answerable without another tool."
+                   ),
                    "interaction_mode": snapshot.config.interaction_mode,
                    "action": action,
                    "depth_definitions": DEPTH_DEFINITIONS, "probe_reason": state.probe_reason,
@@ -326,6 +365,7 @@ class EvidenceWorkflow:
                 if verdict == "ALIGNED":
                     return question
                 context["rejected_draft"] = question.text
+                seen.add(" ".join(question.text.casefold().split()))
                 errors = [ALIGNMENT_REPAIRS.get(
                     verdict,
                     "Revise the question to match the criterion, depth, mode, and single-task scope.",
@@ -401,6 +441,7 @@ class EvidenceWorkflow:
         snapshot.queue.clear()
         had_pending = snapshot.pending_turn is not None
         snapshot.pending_turn = None
+        snapshot.next_question_action = None
         closing_text = self._generate_closing(snapshot, reason, had_pending)
         lifecycle.close(snapshot, reason, self.clock(), text=closing_text)
         return snapshot

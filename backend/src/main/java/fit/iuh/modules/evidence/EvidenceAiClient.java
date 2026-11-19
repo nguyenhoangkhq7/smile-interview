@@ -52,7 +52,13 @@ public class EvidenceAiClient {
             String detail = "Không thể xử lý yêu cầu phỏng vấn. Vui lòng thử lại.";
             try {
                 JsonNode error = json.read(ex.getResponseBodyAsString());
-                if (error != null && error.path("detail").isTextual()) detail = error.path("detail").asText();
+                JsonNode errorDetail = error == null ? null : error.path("detail");
+                if (errorDetail != null && errorDetail.isTextual()) {
+                    detail = errorDetail.asText();
+                } else if (errorDetail != null && errorDetail.isArray() && ex.getStatusCode().value() == 422) {
+                    log.warn("Interview AI validation failed session_id={} operation={} errors={}",
+                            sessionId, operation, summarizeValidationErrors(errorDetail));
+                }
             } catch (IllegalStateException ignored) {
                 // Non-JSON upstream errors must not leak transport details to the UI.
             }
@@ -69,5 +75,17 @@ public class EvidenceAiClient {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
                     "Không thể kết nối dịch vụ phỏng vấn. Vui lòng thử lại.", ex);
         }
+    }
+
+    private static String summarizeValidationErrors(JsonNode details) {
+        var summary = new java.util.ArrayList<String>();
+        for (JsonNode item : details) {
+            if (summary.size() >= 5) break;
+            var loc = new java.util.ArrayList<String>();
+            for (JsonNode part : item.path("loc")) loc.add(part.asText());
+            String path = loc.isEmpty() ? "<root>" : String.join(".", loc);
+            summary.add(path + ":" + item.path("type").asText("invalid"));
+        }
+        return String.join(", ", summary);
     }
 }

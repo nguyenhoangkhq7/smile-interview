@@ -111,6 +111,7 @@ def public_session(snapshot: Snapshot) -> PublicSession:
         session_id=snapshot.session_id, state_version=snapshot.state_version,
         is_finished=snapshot.is_finished, deadline_at=snapshot.deadline_at,
         config=snapshot.config, pending_turn=pending_turn(snapshot.pending_turn),
+        awaiting_question=snapshot.next_question_action is not None,
         turns=[public_turn(turn) for turn in snapshot.turns], report=report(snapshot),
         conversation=snapshot.conversation,
     )

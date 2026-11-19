@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { historyService, SessionHistoryItem } from '@/services/historyService';
-import { AnswerRequest, ConversationAction, ConversationRequest, EvidenceSession, InterviewStartConfig, conversationPhase, evidenceInterview, interviewError } from '@/services/evidenceInterview';
+import { AnswerRequest, ConversationAction, ConversationRequest, EvidenceSession, InterviewStartConfig, NextQuestionRequest, conversationPhase, evidenceInterview, interviewError } from '@/services/evidenceInterview';
 
 const EXPIRY_RETRY_DELAY_MS = 5000;
 
@@ -21,6 +21,8 @@ export function useEvidenceInterview(id: string, readOnly = false) {
   const stopRequest = useRef<{ id: string; version: number } | null>(null);
   const inFlight = useRef(false);
   const conversationRetry = useRef<ConversationRequest | null>(null);
+  const questionRetry = useRef<NextQuestionRequest | null>(null);
+  const automaticQuestion = useRef('');
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -78,6 +80,33 @@ export function useEvidenceInterview(id: string, readOnly = false) {
     return next;
   });
 
+  const loadNextQuestion = useCallback(() => run(async () => {
+    if (!session?.awaiting_question) throw new Error('Phiên không có câu hỏi đang chờ.');
+    const version = session.state_version;
+    if (questionRetry.current?.expected_state_version !== version) {
+      questionRetry.current = { request_id: crypto.randomUUID(), expected_state_version: version };
+    }
+    try {
+      const next = await evidenceInterview.nextQuestion(id, questionRetry.current);
+      questionRetry.current = null;
+      return next;
+    } catch (cause) {
+      if (!axios.isAxiosError(cause) || cause.response?.status !== 409) throw cause;
+      const current = await evidenceInterview.get(id);
+      if (!current || current.state_version <= version) throw cause;
+      questionRetry.current = null;
+      return current;
+    }
+  }), [id, run, session]);
+
+  useEffect(() => {
+    if (!session?.awaiting_question || loading || busy || readOnly || inFlight.current) return;
+    const key = `${id}:${session.state_version}`;
+    if (automaticQuestion.current === key || Date.parse(session.deadline_at) <= Date.now()) return;
+    automaticQuestion.current = key;
+    void loadNextQuestion();
+  }, [id, session, loading, busy, readOnly, loadNextQuestion]);
+
   const stop = useCallback(() => run(async () => {
     if (!session) throw new Error('Phiên chưa bắt đầu.');
     if (stopRequest.current?.version !== session.state_version) {
@@ -125,5 +154,5 @@ export function useEvidenceInterview(id: string, readOnly = false) {
     };
   }, [session, stop, converse, readOnly]);
 
-  return { session, metadata, loading, legacy, busy, error, answer, setAnswer, secondsLeft, reload, start, submit, stop, converse };
+  return { session, metadata, loading, legacy, busy, error, answer, setAnswer, secondsLeft, reload, start, submit, stop, converse, loadNextQuestion };
 }
