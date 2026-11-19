@@ -13,7 +13,7 @@ from matching_cv.app.schemas.unified_skill_extraction import UnifiedExtractFileR
 from matching_cv.app.services.document_parser import document_parser_service
 from matching_cv.app.services.standardized_output_builder import Module1OutputError
 from matching_cv.app.services.unified_skill_service import unified_skill_service
-from skill_gap.api.routes import _get_orchestrator, _get_report_store
+from skill_gap.api.routes import _get_orchestrator
 from skill_gap.api.schemas import AnalyzeWithReportResponse
 
 logger = logging.getLogger(__name__)
@@ -75,8 +75,7 @@ async def analyze(request: Request) -> AnalyzeWithReportResponse:
         analysis_id=resolved_analysis_id,
     )
     report.matching_score = documents.matching_score
-    _get_report_store(request)[report.analysis_id] = report
-    return AnalyzeWithReportResponse(analysis_id=report.analysis_id, skills=skills, report=report)
+    return AnalyzeWithReportResponse(analysis_id=resolved_analysis_id, skills=skills, report=report)
 
 
 @router.post(
