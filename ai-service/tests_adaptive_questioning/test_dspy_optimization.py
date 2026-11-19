@@ -124,23 +124,25 @@ def test_partial_answer_cannot_be_promoted_to_pass():
 def test_labeled_compilation_saves_loads_and_runs_through_v2_provider(tmp_path):
     q_module, j_module = compiler.compile_with_labeled_few_shot(2, 2, use_extended=True)
     assert len(q_module.initial.predict.demos) == len(q_module.followup.predict.demos) == len(q_module.diagnostic.predict.demos) == 2
-    assert len(j_module.assess.predict.demos) == len(j_module.feedback.demos) == 2
+    assert len(j_module.assess.predict.demos) == 2
     compiler.save_compiled_modules(q_module, j_module, tmp_path)
     question, judgment = get_gold_question_examples()[0], get_gold_judge_examples()[1]
     lm = dspy.utils.DummyLM([
-        {"reasoning": "Target L4 rate limiting with VOICE constraints", "question": question.question.model_dump(mode="json")},
-        {"reasoning": "Grounded verbatim Terraform lock excerpt", "assessment": {
+        {"reasoning": "Lượt INITIAL mức L4 bám đúng tiêu chí.", "question": question.question.model_dump(mode="json")},
+        {"reasoning": "Đánh giá bằng chứng nguyên văn Terraform.", "assessment": {
             "observations": [o.model_dump(mode="json") for o in judgment.judgment.observations],
             "explicit_inability": judgment.judgment.explicit_inability,
             "inability_excerpt": judgment.judgment.inability_excerpt,
+            "feedback": judgment.judgment.feedback,
+            "feedback_contains_hint": judgment.judgment.feedback_contains_hint,
         }},
-        {"feedback_draft": {"feedback": judgment.judgment.feedback, "feedback_contains_hint": judgment.judgment.feedback_contains_hint}},
     ])
+    lm.adapter = dspy.JSONAdapter()
     provider = DSPyAssessmentProvider(lm=lm, compiled_dir=str(tmp_path))
     assert len(provider.question_module.initial.predict.demos) == len(provider.judge_module.assess.predict.demos) == 2
     assert provider.question(question.context) == question.question
-    lm.adapter = dspy.JSONAdapter()
     assert provider.judge(judgment.context) == judgment.judgment
+    assert len(lm.history) == 2
 
 
 @pytest.mark.parametrize("tamper", ["version", "contract", "file"])
@@ -233,10 +235,10 @@ def test_default_interview_workflow_loads_checked_in_training_demos(monkeypatch)
         build_judge_stage1_inputs(ex.context)["candidate_answer"]
         for ex in get_extended_judge_examples("train", include_base=True)
     }
-    assert 2 <= len(provider.judge_module.assess.predict.demos) <= 4
-    assert 2 <= len(provider.judge_module.feedback.demos) <= 4
+    assert 2 <= len(provider.judge_module.assess.predict.demos) <= 3
     assert all(demo["candidate_answer"] in train_j_answers and "reasoning" in demo
                for demo in provider.judge_module.assess.predict.demos)
+    assert all(len(demo["reasoning"]) <= 200 for demo in provider.judge_module.assess.predict.demos)
 
 
 def test_dev_evaluation_is_held_out_and_reports_failures():
@@ -269,10 +271,8 @@ def test_question_module_routes_actions_to_focused_cot_branches(action, expected
     assert hasattr(module.predictor_for_action(action), "predict")
 
 
-def test_reflective_judge_short_circuits_inability_and_isolates_stage2_from_rubric():
-    from adaptive_questioning.evidence.dspy_modules import (
-        EvidenceAssessment, ReflectiveJudgeModule, build_judge_stage2_inputs,
-    )
+def test_reflective_judge_short_circuits_inability_in_single_call():
+    from adaptive_questioning.evidence.dspy_modules import EvidenceAssessment, ReflectiveJudgeModule
 
     inability_ex = next(
         ex for ex in get_gold_judge_examples("train")
@@ -282,8 +282,10 @@ def test_reflective_judge_short_circuits_inability_and_isolates_stage2_from_rubr
         observations=inability_ex.judgment.observations,
         explicit_inability=True,
         inability_excerpt=inability_ex.judgment.inability_excerpt,
+        feedback="Phản hồi dài bị ghi đè khi explicit_inability=True.",
+        feedback_contains_hint=True,
     )
-    lm = dspy.utils.DummyLM([{"reasoning": "Explicit inability quoted", "assessment": assessment.model_dump(mode="json")}])
+    lm = dspy.utils.DummyLM([{"reasoning": "Ứng viên thừa nhận chưa biết.", "assessment": assessment.model_dump(mode="json")}])
     lm.adapter = dspy.JSONAdapter()
     judge = ReflectiveJudgeModule()
     with dspy.context(lm=lm, adapter=dspy.JSONAdapter()):
@@ -291,11 +293,6 @@ def test_reflective_judge_short_circuits_inability_and_isolates_stage2_from_rubr
     assert len(lm.history) == 1
     assert result.judgment.feedback == "Cảm ơn bạn đã chia sẻ."
     assert not result.judgment.feedback_contains_hint
-
-    stage2_inputs = build_judge_stage2_inputs(inability_ex.context, assessment)
-    assert "below_target" not in stage2_inputs["assessment_summary"]
-    assert "at_target" not in stage2_inputs["assessment_summary"]
-    assert "above_target" not in stage2_inputs["assessment_summary"]
 
 
 def test_compile_all_save_load_and_provider_wiring(tmp_path):

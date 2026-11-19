@@ -1,16 +1,22 @@
 """Copy-on-write transitions. Backend commits snapshots with compare-and-swap."""
+from collections import Counter, OrderedDict
+from concurrent.futures import Future, ThreadPoolExecutor
+from contextvars import copy_context
 from datetime import datetime, timedelta, timezone
-from uuid import uuid4
-from collections import Counter
 import logging
+from threading import Lock
+from time import monotonic
+from uuid import uuid4
+
 from pydantic import ValidationError
 
 from .assessment import TERMINAL, apply_judgment, eligible_criteria, next_action, standalone_inability, validate_judgment
 from .coding_verification import check_coding_answer
 from .errors import JudgmentUnavailableError, QuestionUnavailableError
 from .models import (
-    Action, ConversationRequest, InterviewSkillContext, Judgment, NextQuestionRequest, ObjectiveState,
-    Question, Snapshot, StartRequest, StoredQuestion, TransitionRequest, TransitionResult, Turn,
+    Action, Blueprint, BlueprintRequest, ConversationRequest, InterviewSkillContext, Judgment,
+    NextQuestionRequest, ObjectiveState, Question, SessionCoaching, Snapshot, StartRequest,
+    StoredQuestion, TransitionRequest, TransitionResult, Turn,
 )
 from . import lifecycle
 from .planning import BlueprintBuilder, plan, select_mode
@@ -19,15 +25,19 @@ from .policy_config import InterviewPolicy
 from .criterion_progress import CRITERION_SOFT_LIMIT, progress_for
 from .conversation import turn_introduction
 from .question_validation import question_errors
-from .provider import AssessmentProvider, encode_context
-from .reporting import public_session
+from .provider import AlignmentReview, AssessmentProvider, encode_context
+from .reporting import coaching_context, fallback_session_coaching, public_session
 from .preparation_cache import PreparationCache
 from .telemetry import event
 
 logger = logging.getLogger(__name__)
 
-GENERATION_ATTEMPTS = 2
+GENERATION_ATTEMPTS = 3
 JUDGMENT_ATTEMPTS = 2
+PREWARM_TTL_SECONDS = 600
+PREWARM_MAX_ENTRIES = 64
+MAX_CANDIDATE_BACKGROUND_CHARS = 400
+MAX_PRIOR_STEM_CHARS = 200
 
 ALIGNMENT_REPAIRS = {
     "WRONG_SKILL": "Ask the candidate to perform the behavior in the selected criterion. Remove the substitute task.",
@@ -49,35 +59,141 @@ _PROMPT_EXCLUDED_OBJECTIVE_FIELDS = {
 
 
 class EvidenceWorkflow:
-    def __init__(self, provider: AssessmentProvider, clock=None, policy: InterviewPolicy | None = None,
-                 preparation_cache: PreparationCache | None = None):
+    def __init__(
+        self,
+        provider: AssessmentProvider,
+        clock=None,
+        policy: InterviewPolicy | None = None,
+        preparation_cache: PreparationCache | None = None,
+        *,
+        prewarm_q1: bool = False,
+    ):
         self.provider = provider
         self.clock = clock or (lambda: datetime.now(timezone.utc))
         self.policy = policy or InterviewPolicy()
         self.preparation_cache = preparation_cache
+        self.prewarm_q1 = prewarm_q1
+        self._prewarm_lock = Lock()
+        self._prewarm_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="q1-prewarm")
+        self._prewarmed_q1: OrderedDict[str, tuple[float, Future[Turn | None]]] = OrderedDict()
+
+    def build_blueprint(self, request: BlueprintRequest) -> Blueprint:
+        builder = BlueprintBuilder(self.provider, self.policy, self.preparation_cache)
+        return builder.build(request.skills, opening=request.opening)
 
     def start(self, request: StartRequest) -> TransitionResult:
         policy = self.policy
         event("preparation.started", skills=len(request.skills), reuse_blueprint=request.blueprint is not None)
         builder = BlueprintBuilder(self.provider, policy, self.preparation_cache)
-        blueprint = (builder.validate(request.blueprint.model_copy(deep=True), request.skills)
-                     if request.blueprint is not None else builder.build(request.skills))
-        objectives, queue = plan(blueprint, request.skills, request.config, policy)
+
+        opening_text: str | None = None
+        if request.opening is not None and request.blueprint is None:
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                bp_future = executor.submit(copy_context().run, builder.build, request.skills, request.opening)
+                open_future = executor.submit(copy_context().run, self._generate_opening, request)
+                blueprint = bp_future.result()
+                opening_text = open_future.result()
+        else:
+            blueprint = (
+                builder.validate(request.blueprint.model_copy(deep=True), request.skills)
+                if request.blueprint is not None
+                else builder.build(request.skills, opening=request.opening)
+            )
+            if request.opening is not None:
+                opening_text = self._generate_opening(request)
+
+        objectives, queue = plan(blueprint, request.skills, request.config, policy, request.prior_attempts)
         event("preparation.planned", objectives=len(objectives), queued=len(queue))
         now = self.clock()
-        skills = [InterviewSkillContext(jd_skill_id=skill.jd_skill_id, cv_evidence_spans=skill.cv_evidence_spans)
-                  for skill in request.skills]
-        snapshot = Snapshot(session_id=request.session_id, config=request.config,
-                            skills=skills, objectives=objectives, queue=queue, policy=policy.model_copy(deep=True),
-                            deadline_at=now + timedelta(seconds=request.config.duration_seconds))
+        skills = [
+            InterviewSkillContext(
+                jd_skill_id=skill.jd_skill_id,
+                jd_skill_name=skill.jd_skill_name,
+                matched_cv_skill_name=skill.matched_cv_skill_name,
+                semantic_alignment=skill.semantic_alignment,
+                context_job=skill.context_job,
+                cv_evidence_spans=skill.cv_evidence_spans,
+            )
+            for skill in request.skills
+        ]
+        prior_stems = [
+            stem.strip()[:MAX_PRIOR_STEM_CHARS]
+            for stem in (request.prior_attempts.prior_question_stems if request.prior_attempts else [])
+            if stem and stem.strip()
+        ][:20]
+        snapshot = Snapshot(
+            session_id=request.session_id,
+            config=request.config,
+            skills=skills,
+            objectives=objectives,
+            queue=queue,
+            policy=policy.model_copy(deep=True),
+            deadline_at=now + timedelta(seconds=request.config.duration_seconds),
+            prior_question_stems=prior_stems,
+        )
         if request.opening is not None:
             snapshot.opening_context = request.opening.model_copy(deep=True)
-            opening_text = self._generate_opening(request)
-            snapshot.conversation = lifecycle.begin(request.opening, now, text=opening_text)
-            event("preparation.ready", phase="OPENING")
+            snapshot.conversation = lifecycle.begin(
+                request.opening, now, text=opening_text, interaction_mode=request.config.interaction_mode,
+            )
+            if self.prewarm_q1:
+                self._schedule_q1_prewarm(snapshot)
+            event("preparation.ready", phase=snapshot.conversation.phase)
         else:
             self._ask(snapshot, Action.INITIAL)
         return self._result(snapshot)
+
+    def _schedule_q1_prewarm(self, snapshot: Snapshot) -> None:
+        if not snapshot.queue:
+            return
+        copy = snapshot.model_copy(deep=True)
+        # Ensure prewarm has a generous deadline while the candidate reads/writes their intro.
+        copy.deadline_at = self.clock() + timedelta(seconds=max(copy.config.duration_seconds, 300))
+
+        def _compute() -> Turn | None:
+            try:
+                self._ask(copy, Action.INITIAL)
+                return copy.pending_turn
+            except Exception as exc:
+                logger.warning("Q1 prewarm failed for session %s (%s): %s",
+                               copy.session_id, type(exc).__name__, exc)
+                return None
+
+        future = self._prewarm_executor.submit(copy_context().run, _compute)
+        now = monotonic()
+        with self._prewarm_lock:
+            self._prune_prewarm_locked(now)
+            self._prewarmed_q1[snapshot.session_id] = (now, future)
+            self._prewarmed_q1.move_to_end(snapshot.session_id)
+
+    def _prune_prewarm_locked(self, now: float) -> None:
+        expired = [key for key, (created, _) in self._prewarmed_q1.items() if now - created > PREWARM_TTL_SECONDS]
+        for key in expired:
+            self._prewarmed_q1.pop(key, None)
+        while len(self._prewarmed_q1) >= PREWARM_MAX_ENTRIES:
+            self._prewarmed_q1.popitem(last=False)
+
+    def _consume_prewarmed_q1(self, snapshot: Snapshot) -> Turn | None:
+        with self._prewarm_lock:
+            entry = self._prewarmed_q1.pop(snapshot.session_id, None)
+        if entry is None:
+            return None
+        created, future = entry
+        if monotonic() - created > PREWARM_TTL_SECONDS:
+            return None
+        try:
+            turn = future.result(timeout=45)
+        except Exception:
+            return None
+        if turn is None or not snapshot.queue:
+            return None
+        state = snapshot.objectives.get(snapshot.queue[0])
+        if (state is None
+                or turn.objective_id != state.objective.objective_id
+                or turn.mode != state.selected_mode
+                or turn.question_depth != question_depth(state, Action.INITIAL)):
+            return None
+        return turn.model_copy(deep=True)
 
     def converse(self, request: ConversationRequest) -> TransitionResult:
         snapshot = request.snapshot.model_copy(deep=True)
@@ -142,11 +258,23 @@ class EvidenceWorkflow:
     def _deliver_question(self, snapshot: Snapshot) -> None:
         action = snapshot.next_question_action
         assert action is not None
-        self._ask(snapshot, action)
+        prewarmed = self._consume_prewarmed_q1(snapshot) if (not snapshot.turns and action == Action.INITIAL) else None
+        if prewarmed is not None:
+            if self.clock() >= snapshot.deadline_at:
+                self._finish(snapshot, "TIME_BUDGET")
+                return
+            state = snapshot.objectives[snapshot.queue[0]]
+            state.lifecycle = "ACTIVE"
+            self._targets(state)
+            snapshot.pending_turn = prewarmed
+            event("question.prewarm_hit", turn_id=prewarmed.turn_id, mode=state.selected_mode.value)
+        else:
+            self._ask(snapshot, action)
         snapshot.next_question_action = None
         if snapshot.pending_turn and snapshot.conversation and not snapshot.turns:
-            snapshot.pending_turn.introduction = (lifecycle.INTRODUCTION_BRIDGE if snapshot.conversation.introduction
-                                                   else lifecycle.SKIP_BRIDGE)
+            snapshot.pending_turn.introduction = lifecycle.introduction_bridge(
+                snapshot.conversation.introduction, snapshot.skills,
+            )
 
     def _judge(self, snapshot: Snapshot, turn: Turn) -> Judgment:
         admission = standalone_inability(turn)
@@ -165,7 +293,7 @@ class EvidenceWorkflow:
             "objective": objective, "turn": turn,
             "answer_lines": [{"line": index, "text": text} for index, text in
                              enumerate((turn.answer or "").splitlines(), start=1)],
-            "depth_definitions": DEPTH_DEFINITIONS,
+            "depth_definition": DEPTH_DEFINITIONS[turn.question_depth],
             "prior_observations": [item for item in state.evidence_history if item.criterion_id in ids],
             "prior_turns": [
                 {
@@ -306,6 +434,38 @@ class EvidenceWorkflow:
         snapshot.pending_turn.introduction = turn_introduction(snapshot, snapshot.pending_turn)
         event("question.ready", turn_id=snapshot.pending_turn.turn_id, mode=state.selected_mode.value)
 
+    @staticmethod
+    def _candidate_background(snapshot: Snapshot, skill: InterviewSkillContext) -> str | None:
+        """Compact, score-free background context for personalized question framing only."""
+        parts: list[str] = []
+        opening = snapshot.opening_context
+        if opening:
+            role = (opening.role_title or "").strip()
+            company = (opening.company or "").strip()
+            if role and role != "vị trí ứng tuyển":
+                parts.append(f"Vị trí: {role}" + (f" ({company})" if company else ""))
+            elif company:
+                parts.append(f"Công ty: {company}")
+        if skill.context_job and skill.context_job.strip():
+            parts.append(f"Bối cảnh CV: {skill.context_job.strip()}")
+        if (skill.semantic_alignment == "PARTIAL"
+                and skill.matched_cv_skill_name and skill.matched_cv_skill_name.strip()):
+            parts.append(f"Kỹ năng tương đương trên CV: {skill.matched_cv_skill_name.strip()}")
+        if not parts:
+            return None
+        return " | ".join(parts)[:MAX_CANDIDATE_BACKGROUND_CHARS]
+
+    @staticmethod
+    def _compact_history_turn(turn: Turn) -> dict[str, object]:
+        """Strip Turn.judgment from question history; evidence is passed separately in prior_observations."""
+        return {
+            "turn_id": turn.turn_id,
+            "action": turn.action,
+            "question_depth": turn.question_depth,
+            "question": turn.question,
+            "answer": turn.answer,
+        }
+
     def _question_context(self, snapshot: Snapshot, action: Action) -> dict[str, object]:
         state = snapshot.objectives[snapshot.queue[0]]
         skill = next(s for s in snapshot.skills if s.jd_skill_id == state.objective.skill_id)
@@ -313,47 +473,59 @@ class EvidenceWorkflow:
         if not targets:
             raise ValueError("No independent criteria available for question generation")
         objective = self._prompt_objective(state, targets)
-        # Keep the full probing chain, including older turns after yielding to
-        # another objective. Criterion IDs alone are not a cross-objective key.
-        history = [turn for turn in snapshot.turns
-                   if turn.objective_id == state.objective.objective_id
-                   and set(turn.question.criterion_ids).intersection(targets)]
-        relevant_ids = {turn.turn_id for turn in history}
-        # Other criteria within this objective are only a compact repetition
-        # guard. Turns from other objectives never enter the question context.
+        # Keep the full probing chain without Turn.judgment bloat.
+        history_turns = [turn for turn in snapshot.turns
+                         if turn.objective_id == state.objective.objective_id
+                         and set(turn.question.criterion_ids).intersection(targets)]
+        relevant_ids = {turn.turn_id for turn in history_turns}
         other_questions = [
             {"question": turn.question.text[:300], "truncated": len(turn.question.text) > 300}
             for turn in snapshot.turns
             if turn.objective_id == state.objective.objective_id and turn.turn_id not in relevant_ids
         ]
+        for stem in snapshot.prior_question_stems:
+            other_questions.append({"question": stem[:MAX_PRIOR_STEM_CHARS], "truncated": False})
         contract = {"mode": state.selected_mode, "depth": question_depth(state, action), "criterion_ids": targets}
-        if action == Action.CLARIFY and history:
-            previous = history[-1]
+        if action == Action.CLARIFY and history_turns:
+            previous = history_turns[-1]
             contract["evidence_scope"] = previous.question.evidence_scope
             contract["depth"] = previous.question_depth
-        context = {"objective": objective, "required_question_contract": contract,
-                   "question_guidance": (
-                       "State the task's intended behavior before asking one clear question. Include the inputs, code, "
-                       "or output it refers to. Specify any definitions, allowed inputs, and boundary behavior that "
-                       "change the answer, such as whether duplicates count or what to return if no result exists. "
-                       "When asking for a failing input or cause, leave that discovery to the candidate. "
-                       "In TEXT, use a fenced block for multi-line code. In VOICE, describe the exact logic and inputs "
-                       "aloud. Make the task answerable without another tool."
-                   ),
-                   "interaction_mode": snapshot.config.interaction_mode,
-                   "action": action,
-                   "depth_definitions": DEPTH_DEFINITIONS, "probe_reason": state.probe_reason,
-                   "criterion_progress": progress_for(state, targets[0]),
-                   "cv_evidence": skill.cv_evidence_spans,
-                   "history": history, "other_questions": other_questions,
-                   "prior_observations": [item for item in state.evidence_history if item.criterion_id in targets]}
+        context: dict[str, object] = {
+            "objective": objective,
+            "required_question_contract": contract,
+            "interaction_mode": snapshot.config.interaction_mode,
+            "action": action,
+            "depth_definition": DEPTH_DEFINITIONS[contract["depth"]],
+            "probe_reason": state.probe_reason,
+            "criterion_progress": progress_for(state, targets[0]),
+            "cv_evidence": skill.cv_evidence_spans,
+            "history": [self._compact_history_turn(t) for t in history_turns],
+            "other_questions": other_questions,
+            "prior_observations": [item for item in state.evidence_history if item.criterion_id in targets],
+        }
+        background = self._candidate_background(snapshot, skill)
+        if background:
+            context["candidate_background"] = background
+        guidance_parts: list[str] = []
         if action == Action.EASIER:
-            context["question_guidance"] += (" Ask about one prerequisite using a small concrete example. "
-                                             "Do not ask why the candidate could not answer.")
+            guidance_parts.append(
+                "Ask about one prerequisite using a small concrete example. Do not ask why the candidate could not answer."
+            )
+        criterion_blob = f"{objective.get('claim', '')} {objective['criteria'][0].get('description', '')}".casefold()
+        if (snapshot.config.interaction_mode == "TEXT"
+                and state.selected_mode.value == "CODING"
+                and ("deduplicate" in criterion_blob or "khử trùng" in criterion_blob)
+                and "event" in criterion_blob):
+            guidance_parts.append(
+                "Request a Python function `deduplicate_events(events)` preserving first occurrence by `event_id` and input order."
+            )
+        if guidance_parts:
+            context["question_guidance"] = " ".join(guidance_parts)
         return context
 
     def _generate_valid_question(self, context: dict[str, object], snapshot: Snapshot) -> Question | None:
         seen = {" ".join(turn.question.text.casefold().split()) for turn in snapshot.turns}
+        seen.update(" ".join(stem.casefold().split()) for stem in snapshot.prior_question_stems if stem.strip())
         for attempt in range(GENERATION_ATTEMPTS):
             if self.clock() >= snapshot.deadline_at:
                 return None
@@ -361,33 +533,66 @@ class EvidenceWorkflow:
             if not errors:
                 if self.clock() >= snapshot.deadline_at:
                     return None
-                verdict = self.provider.review_question(self._review_context(context, question))
+                try:
+                    verdict, reason = self._review_question(context, question)
+                except (ValidationError, ValueError) as exc:
+                    context["validation_error"] = f"Alignment reviewer error: {exc}"
+                    logger.warning(
+                        "Alignment review failed for session %s (attempt %s/%s): %s",
+                        snapshot.session_id, attempt + 1, GENERATION_ATTEMPTS, exc,
+                    )
+                    continue
                 if verdict == "ALIGNED":
                     return question
                 context["rejected_draft"] = question.text
                 seen.add(" ".join(question.text.casefold().split()))
-                errors = [ALIGNMENT_REPAIRS.get(
+                base_repair = ALIGNMENT_REPAIRS.get(
                     verdict,
                     "Revise the question to match the criterion, depth, mode, and single-task scope.",
-                )]
+                )
+                errors = [f"{base_repair} Chi tiết lỗi: {reason}" if reason else base_repair]
             context["validation_error"] = "; ".join(errors)
             logger.warning("Invalid question for session %s (attempt %s/%s): %s", snapshot.session_id,
                            attempt + 1, GENERATION_ATTEMPTS, context["validation_error"])
         raise QuestionUnavailableError("AI chưa tạo được câu hỏi phù hợp. Dữ liệu đã lưu được giữ nguyên; vui lòng thử lại.")
+
+    def _review_question(self, context: dict[str, object], question: Question) -> tuple[str, str]:
+        raw = self.provider.review_question(self._review_context(context, question))
+        if isinstance(raw, AlignmentReview):
+            return raw.verdict, raw.reason.strip()
+        if isinstance(raw, dict):
+            return str(raw.get("verdict", "ALIGNED")), str(raw.get("reason", "")).strip()
+        return str(raw), ""
 
     @staticmethod
     def _review_context(context, question: Question) -> str:
         objective = context["objective"]
         contract = context["required_question_contract"]
         history = context["history"]
-        return encode_context({
-            "question": question.text, "criterion": objective["criteria"][0],
-            "action": context["action"], "question_depth": contract["depth"],
-            "target_depth": objective["target_depth"], "depth_definitions": DEPTH_DEFINITIONS,
-            "mode": contract["mode"], "interaction_mode": context["interaction_mode"],
-            "probe_reason": context["probe_reason"], "unresolved": context["criterion_progress"].unresolved_aspects,
-            "history": [{"question": t.question.text, "answer": t.answer} for t in history],
-        })
+        history_pairs = []
+        for item in history:
+            if isinstance(item, dict):
+                q_field = item.get("question")
+                q_text = q_field.text if hasattr(q_field, "text") else (q_field.get("text", "") if isinstance(q_field, dict) else str(q_field))
+                history_pairs.append({"question": q_text, "answer": item.get("answer")})
+            else:
+                history_pairs.append({"question": item.question.text, "answer": item.answer})
+        payload = {
+            "question": question.text,
+            "claim": objective.get("claim", ""),
+            "criterion": objective["criteria"][0],
+            "cv_evidence": context.get("cv_evidence", []),
+            "action": context["action"],
+            "question_depth": contract["depth"],
+            "target_depth": objective["target_depth"],
+            "depth_definition": DEPTH_DEFINITIONS[contract["depth"]],
+            "mode": contract["mode"],
+            "interaction_mode": context["interaction_mode"],
+            "probe_reason": context["probe_reason"],
+            "unresolved": context["criterion_progress"].unresolved_aspects,
+            "history": history_pairs,
+        }
+        return encode_context(payload)
 
     def _question_attempt(self, context: dict[str, object], seen: set[str]) -> tuple[Question | None, list[str]]:
         try:
@@ -396,6 +601,8 @@ class EvidenceWorkflow:
             errors = [f"Invalid Question schema at {item['loc']}: {item['type']}"
                       for item in exc.errors(include_input=False, include_url=False)]
             return None, errors
+        except ValueError as exc:
+            return None, [str(exc)]
         errors = question_errors(question, context)
         if " ".join(question.text.casefold().split()) in seen:
             errors.append("The question repeats a prior turn; use a new focused question instead")
@@ -442,9 +649,39 @@ class EvidenceWorkflow:
         had_pending = snapshot.pending_turn is not None
         snapshot.pending_turn = None
         snapshot.next_question_action = None
-        closing_text = self._generate_closing(snapshot, reason, had_pending)
+        with self._prewarm_lock:
+            self._prewarmed_q1.pop(snapshot.session_id, None)
+
+        closing_text: str | None = None
+        if snapshot.turns:
+            if snapshot.conversation is not None:
+                with ThreadPoolExecutor(max_workers=2) as executor:
+                    closing_future = executor.submit(
+                        copy_context().run, self._generate_closing, snapshot, reason, had_pending,
+                    )
+                    coaching_future = executor.submit(copy_context().run, self._generate_coaching, snapshot)
+                    closing_text = closing_future.result()
+                    snapshot.coaching = coaching_future.result()
+            else:
+                snapshot.coaching = self._generate_coaching(snapshot)
+        else:
+            closing_text = self._generate_closing(snapshot, reason, had_pending)
+
         lifecycle.close(snapshot, reason, self.clock(), text=closing_text)
         return snapshot
+
+    def _generate_coaching(self, snapshot: Snapshot) -> SessionCoaching | None:
+        if not snapshot.turns:
+            return None
+        generator = getattr(self.provider, "session_coaching", None)
+        if callable(generator):
+            try:
+                generated = generator(encode_context(coaching_context(snapshot)))
+                return SessionCoaching.model_validate(generated)
+            except Exception as exc:
+                logger.warning("Falling back to deterministic session coaching (%s): %s", type(exc).__name__, exc)
+                event("coaching.fallback", error_type=type(exc).__name__)
+        return fallback_session_coaching(snapshot)
 
     def _generate_opening(self, request: StartRequest) -> str | None:
         return self._generate_dialogue(

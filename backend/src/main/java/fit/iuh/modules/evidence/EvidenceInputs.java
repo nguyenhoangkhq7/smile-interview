@@ -18,6 +18,8 @@ public class EvidenceInputs {
     private static final List<String> INTERVIEW_FIELDS = List.of(
             "jd_skill_id", "required_proficiency", "importance_weight",
             "priority", "job_tasks", "cv_evidence_spans");
+    private static final List<String> PERSONALIZATION_FIELDS = List.of(
+            "jd_skill_name", "matched_cv_skill_name", "semantic_alignment", "context_job");
     private static final List<String> RETIRED_OBJECTIVE_FIELDS = List.of(
             "required_proficiency", "extension_criterion_ids", "inferred",
             "rubric_version", "rubric_fingerprint");
@@ -46,7 +48,7 @@ public class EvidenceInputs {
         return interviewSkills(json.tree(result.skills()));
     }
 
-    private JsonNode interviewSkills(JsonNode skills) {
+    public JsonNode interviewSkills(JsonNode skills) {
         var result = (ArrayNode) json.read("[]");
         for (JsonNode skill : skills) {
             var selected = result.addObject();
@@ -59,6 +61,36 @@ public class EvidenceInputs {
             }
         }
         return result;
+    }
+
+    public JsonNode enrichPersonalization(JsonNode baseSkills, Session session) {
+        if (!(baseSkills instanceof ArrayNode) || session == null) return baseSkills;
+        String rawJson = session.getApplicationProfile() != null
+                ? session.getApplicationProfile().getSkillGapJson()
+                : session.getSkillGapJson();
+        if (rawJson == null || rawJson.isBlank()) return baseSkills;
+        return enrichPersonalization(baseSkills, json.read(rawJson));
+    }
+
+    public JsonNode enrichPersonalization(JsonNode baseSkills, JsonNode rawSkills) {
+        if (!(baseSkills instanceof ArrayNode array) || rawSkills == null || !rawSkills.isArray()) {
+            return baseSkills;
+        }
+        var bySkillId = new java.util.HashMap<String, JsonNode>();
+        for (JsonNode raw : rawSkills) {
+            String id = raw.path("jd_skill_id").asText("");
+            if (!id.isEmpty()) bySkillId.put(id, raw);
+        }
+        ArrayNode copy = array.deepCopy();
+        for (JsonNode item : copy) {
+            if (!(item instanceof ObjectNode target)) continue;
+            JsonNode raw = bySkillId.get(target.path("jd_skill_id").asText(""));
+            if (raw == null) continue;
+            for (String field : PERSONALIZATION_FIELDS) {
+                if (raw.hasNonNull(field)) target.set(field, raw.get(field));
+            }
+        }
+        return copy;
     }
 
     public static JsonNode leanBlueprint(JsonNode blueprint) {

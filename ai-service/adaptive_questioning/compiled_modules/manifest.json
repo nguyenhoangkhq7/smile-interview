@@ -1,12 +1,12 @@
 {
-  "version": "evidence-dspy-2",
-  "contract_fingerprint": "c254d3d384c0e1267e45ad91caf410a8ef0b01db70b2a53946e1f21c1999a894",
+  "version": "evidence-dspy-3",
+  "contract_fingerprint": "e311966844119b6f817521fc4a67c9037fd7ff635d30f861c0d77f2ceed58a74",
   "train_split": "train",
   "digest_format": "canonical-json-sha256",
   "files": {
-    "question_generator.json": "63002fe5f9ce50a390c1520532a0b16d286314fc8f6c8dc3e7f47f868ca06b5d",
-    "reflective_judge.json": "66735dade3a4c59d8777095e62adcd8b19bd888db356e1ab28c5a77265a48535",
-    "alignment_reviewer.json": "770b6801717a183904b6b0741332b8b477e87b709203a9391cefeb6f083597c2",
-    "blueprint_drafter.json": "50031f4540ba50e776b3d3e0314ad99dc61277d53ce9353f54c397c50cfc97a0"
+    "question_generator.json": "60bac6402488ddd7b3aeaad2d49333c80a618ee706090ca613b82ba4a1538652",
+    "reflective_judge.json": "c54a8196756eb13499596c15b0dd60887928a93e8c09eb3b4d5738e142a51bc9",
+    "alignment_reviewer.json": "543162efb5889c127644fde9fea53413310978aecd122198cc54d3b8f701951e",
+    "blueprint_drafter.json": "dbb543fa3a14612fe33309d8db6e149b90eea8b02bce624dba6dd155774567fa"
   }
 }

@@ -35,14 +35,16 @@ def command(engine, snapshot, action, introduction=""):
 @pytest.mark.parametrize("mode", ["TEXT", "VOICE"])
 def test_opening_introduction_and_farewell_are_separate_from_assessment(mode):
     provider, now, engine, snapshot = setup(mode)
-    assert snapshot.conversation.phase == "OPENING"
+    expected_start_phase = "SELF_INTRODUCTION" if mode == "TEXT" else "OPENING"
+    assert snapshot.conversation.phase == expected_start_phase
     assert snapshot.pending_turn is None and not snapshot.turns
     assert provider.question_number == 0
     assert "Smile" in snapshot.conversation.message.text
     assert "Backend Developer" in snapshot.conversation.message.text
     assert "role_title" not in snapshot.conversation.opening.model_dump()
-    snapshot = command(engine, snapshot, "NEXT").snapshot
-    assert snapshot.conversation.phase == "SELF_INTRODUCTION"
+    if mode == "VOICE":
+        snapshot = command(engine, snapshot, "NEXT").snapshot
+        assert snapshot.conversation.phase == "SELF_INTRODUCTION"
     now[0] += timedelta(seconds=100)
     result = command(engine, snapshot, "SUBMIT_INTRODUCTION", "Em tên Nam, em dùng Spring Boot.")
     snapshot = result.snapshot
@@ -66,7 +68,6 @@ def test_introduction_is_not_given_to_question_generator_or_judge():
     contexts = []
     original = provider.question
     provider.question = lambda context: (contexts.append(json.loads(context)), original(context))[1]
-    snapshot = command(engine, snapshot, "NEXT").snapshot
     command(engine, snapshot, "SUBMIT_INTRODUCTION", "SECRET_UNSCORED_INTRO")
     assert "SECRET_UNSCORED_INTRO" not in json.dumps(contexts)
 
@@ -74,7 +75,7 @@ def test_introduction_is_not_given_to_question_generator_or_judge():
 def test_skip_reload_and_early_stop():
     from pydantic import ValidationError
     _, _, engine, snapshot = setup()
-    snapshot = command(engine, snapshot, "NEXT").snapshot
+    assert snapshot.conversation.phase == "SELF_INTRODUCTION"
     bad_payload = snapshot.model_dump(mode="json")
     bad_payload["conversation"]["introduction_skipped"] = False
     with pytest.raises(ValidationError):
@@ -97,7 +98,7 @@ def test_skip_reload_and_early_stop():
 
 
 def test_invalid_and_duplicate_phase_commands_do_not_change_original():
-    _, _, engine, snapshot = setup()
+    _, _, engine, snapshot = setup("VOICE")
     original = snapshot.model_dump_json()
     with pytest.raises(ValueError):
         command(engine, snapshot, "SUBMIT_INTRODUCTION", "Too soon")
@@ -131,17 +132,12 @@ def test_http_lifecycle_returns_snapshot_and_public_only(monkeypatch):
         data = started.json()
         assert set(data) == {"snapshot", "public"}
         assert data["public"]["pending_turn"] is None
-        assert data["public"]["conversation"]["phase"] == "OPENING"
-        introduction_state = client.post("/api/v2/interview/conversation", json={
-            "snapshot": data["snapshot"], "expected_state_version": data["snapshot"]["state_version"],
-            "message_id": data["public"]["conversation"]["message"]["message_id"],
-            "action": "NEXT",
-        }).json()
+        assert data["public"]["conversation"]["phase"] == "SELF_INTRODUCTION"
         introduction = "Em tên Nam, em dùng Spring Boot."
         result = client.post("/api/v2/interview/conversation", json={
-            "snapshot": introduction_state["snapshot"],
-            "expected_state_version": introduction_state["snapshot"]["state_version"],
-            "message_id": introduction_state["public"]["conversation"]["message"]["message_id"],
+            "snapshot": data["snapshot"],
+            "expected_state_version": data["snapshot"]["state_version"],
+            "message_id": data["public"]["conversation"]["message"]["message_id"],
             "action": "SUBMIT_INTRODUCTION", "introduction": introduction, "defer_question": True,
         })
         assert result.status_code == 200
@@ -237,7 +233,7 @@ def test_dynamic_opening_and_closing_use_user_and_jd_context_without_leaking_to_
     assert opening_ctx["interaction_mode"] == "VOICE"
     assert "thanh toán" in opening_ctx["jd_summary"]
     assert "SECRET_CV_SUMMARY_5_NAM_JAVA" in opening_ctx["cv_summary"]
-    assert opening_ctx["jd_skills"][0]["skill"] == "postgresql"
+    assert opening_ctx["jd_skills"][0]["skill"] == "PostgreSQL"
     assert opening_ctx["cv_evidence"] == ["Tối ưu index PostgreSQL"]
 
     snap = command(engine, start_res.snapshot, "NEXT").snapshot
@@ -259,7 +255,7 @@ def test_dynamic_opening_and_closing_use_user_and_jd_context_without_leaking_to_
     assert closing_ctx["company"] == "Smile Fintech"
     assert closing_ctx["role_title"] == "Senior Backend Engineer"
     assert closing_ctx["candidate_introduction"] == "SECRET_INTRO_TAILORED"
-    assert closing_ctx["topics_discussed"] == ["postgresql"]
+    assert closing_ctx["topics_discussed"] == ["PostgreSQL"]
     assert closing_ctx["turns_answered"] == 1
     assert closing_ctx["termination_reason"] in {"PLAN_COMPLETE", "QUESTION_BUDGET"}
     assert "judgment" not in json.dumps(closing_ctx)
@@ -298,6 +294,7 @@ def test_dspy_provider_generates_opening_and_closing_without_slow_retries():
         {"greeting": {"text": "Chào Lan, mình là Minh từ phòng phỏng vấn AI cho vị trí QA tại Smile. Bạn giới thiệu ngắn về mình nhé?"}},
         {"farewell": {"text": "Cảm ơn Lan đã tham gia buổi trao đổi vị trí QA tại Smile hôm nay. Bạn có thể xem kết quả ngay nhé, chào bạn!"}},
     ])
+    lm.adapter = dspy.JSONAdapter()
     provider = DSPyAssessmentProvider(lm=lm)
     greeting = provider.opening_greeting(json.dumps({"candidate_name": "Lan", "role_title": "QA", "company": "Smile"}))
     farewell = provider.closing_farewell(json.dumps({"candidate_name": "Lan", "termination_reason": "PLAN_COMPLETE"}))

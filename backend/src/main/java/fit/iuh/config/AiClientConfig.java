@@ -1,19 +1,21 @@
 package fit.iuh.config;
 
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.client.ClientHttpRequestFactory;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
+import java.net.http.HttpClient;
 import java.time.Duration;
 
 /**
  * Shared configuration for HTTP clients connecting to the external AI Service (FastAPI).
- * Configures generous connect and read timeouts (default 180s) to accommodate long LLM/LangGraph inference cycles.
+ * Uses a pooled JDK HttpClient pinned to HTTP/1.1 with generous connect and read timeouts (default 180s).
  */
 @Configuration
 public class AiClientConfig {
 
-    public static SimpleClientHttpRequestFactory createRequestFactory(AppProperties appProperties) {
+    public static ClientHttpRequestFactory createRequestFactory(AppProperties appProperties) {
         int connectTimeout = appProperties != null && appProperties.getAi() != null && appProperties.getAi().getFastapi() != null
                 ? appProperties.getAi().getFastapi().getConnectTimeoutSeconds()
                 : 15;
@@ -21,8 +23,11 @@ public class AiClientConfig {
                 ? appProperties.getAi().getFastapi().getReadTimeoutSeconds()
                 : 180;
 
-        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(Duration.ofSeconds(connectTimeout));
+        HttpClient httpClient = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofSeconds(connectTimeout))
+                .build();
+        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
         requestFactory.setReadTimeout(Duration.ofSeconds(readTimeout));
         return requestFactory;
     }

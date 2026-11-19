@@ -8,7 +8,7 @@ import dspy
 
 from adaptive_questioning.evidence.depth import DEPTH_DEFINITIONS
 from adaptive_questioning.evidence.models import BlueprintDraft, Judgment, Question
-from adaptive_questioning.evidence.provider import encode_context
+from adaptive_questioning.evidence.provider import AlignmentReview, encode_context
 from .dataset import get_gold_judge_examples, get_gold_question_examples
 
 ExtendedSplit = Literal["all", "train", "dev", "val", "test"]
@@ -68,11 +68,26 @@ def get_extended_judge_examples(
     return _append_base(examples, get_gold_judge_examples, split, include_base)
 
 
+_DEFAULT_ALIGNMENT_REASONS = {
+    "ALIGNED": "Câu hỏi bám đúng tiêu chí, độ sâu và dạng yêu cầu.",
+    "GIVES_SOLUTION": "Câu hỏi tự nêu sẵn phương án hoặc đáp án cần ứng viên tự suy luận.",
+    "MULTIPLE_TASKS": "Câu hỏi gộp hai sản phẩm/yêu cầu độc lập trong cùng một lượt.",
+    "WRONG_SKILL": "Câu hỏi đo kỹ năng khác thay vì hành vi của tiêu chí đang chọn.",
+    "WRONG_DEPTH": "Độ khó câu hỏi không khớp mức độ sâu L1–L4 được yêu cầu.",
+    "INSUFFICIENT_EVIDENCE": "Câu hỏi đóng hoặc chung chung, không thu được bằng chứng kiểm chứng được.",
+    "UNANSWERABLE": "Thiếu dữ kiện đầu vào hoặc yêu cầu công cụ ngoài nên không thể trả lời trực tiếp.",
+}
+
+
 def get_alignment_examples(split: ExtendedSplit = "all") -> list[dspy.Example]:
     """Load curated QuestionAlignment examples balanced across all 7 AlignmentVerdict labels."""
     return [
         dspy.Example(
             context=encode_context(record["context"]),
+            review=AlignmentReview(
+                verdict=record["verdict"],
+                reason=record.get("reason") or _DEFAULT_ALIGNMENT_REASONS.get(record["verdict"], ""),
+            ),
             verdict=record["verdict"],
         ).with_inputs("context")
         for record in _load_records("alignments.json", split)

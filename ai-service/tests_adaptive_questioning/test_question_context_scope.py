@@ -80,7 +80,15 @@ def test_clarification_keeps_full_original_question_answer_and_scope(audit):
     first = answer(engine, initial.snapshot, "FIRST_UNCLEAR_ANSWER")
     assert first.snapshot.pending_turn.action == Action.CLARIFY
     context = question_context(provider)
-    assert context["history"] == [first.snapshot.turns[0].model_dump(mode="json")]
+    first_turn = first.snapshot.turns[0]
+    assert context["history"] == [{
+        "turn_id": first_turn.turn_id,
+        "action": first_turn.action.value,
+        "question_depth": first_turn.question_depth,
+        "question": first_turn.question.model_dump(mode="json"),
+        "answer": first_turn.answer,
+    }]
+    assert "judgment" not in context["history"][0]
     assert context["required_question_contract"]["evidence_scope"] == initial.snapshot.pending_turn.question.evidence_scope
     assert context["prior_observations"][0]["response_excerpt"] == "FIRST_UNCLEAR_ANSWER"
     second = answer(engine, first.snapshot, "SECOND_UNCLEAR_ANSWER")

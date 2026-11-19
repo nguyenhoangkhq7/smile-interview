@@ -191,10 +191,18 @@ def judge_evaluation_metric(gold: Any, pred: Any, trace=None, lm: dspy.LM | None
 
 def alignment_evaluation_metric(gold: Any, pred: Any, trace=None) -> float:
     """Exact verdict match against the AlignmentVerdict contract."""
-    verdict = getattr(pred, "verdict", None)
+    review = getattr(pred, "review", None)
+    if review is not None:
+        verdict = review.get("verdict") if isinstance(review, dict) else getattr(review, "verdict", None)
+    else:
+        verdict = getattr(pred, "verdict", None)
     if verdict not in ALIGNMENT_VERDICTS:
         return 0.0
-    return float(verdict == gold.verdict)
+    gold_verdict = getattr(gold, "verdict", None)
+    if gold_verdict is None and hasattr(gold, "review"):
+        gold_review = gold.review
+        gold_verdict = gold_review.get("verdict") if isinstance(gold_review, dict) else getattr(gold_review, "verdict", None)
+    return float(verdict == gold_verdict)
 
 
 def alignment_macro_f1(golds: list[str], preds: list[str]) -> float:

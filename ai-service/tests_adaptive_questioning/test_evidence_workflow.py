@@ -222,7 +222,14 @@ def test_snapshot_roundtrip_and_stale_turn(setup, monkeypatch):
     initial = start(engine, [input_skill]).snapshot
     objective = initial.objectives[initial.pending_turn.objective_id].objective
     assert (objective.claim, objective.jd_evidence_spans) == (task, [task])
-    expected_skills = [{"jd_skill_id": input_skill.jd_skill_id, "cv_evidence_spans": spans}]
+    expected_skills = [{
+        "jd_skill_id": input_skill.jd_skill_id,
+        "jd_skill_name": "",
+        "matched_cv_skill_name": "",
+        "semantic_alignment": "",
+        "context_job": "",
+        "cv_evidence_spans": spans,
+    }]
     dumped_initial = initial.model_dump(mode="json")
     assert dumped_initial["skills"] == expected_skills
     assert {"required_proficiency", "inferred", "extension_criterion_ids", "rubric_version"}.isdisjoint(
@@ -375,6 +382,7 @@ def test_report_evidence_points_to_its_actual_turn(setup):
     assert {e.turn_id for e in objective.evidence} == {turn_id}
     assert set(objective.evidence[0].model_dump()) == {
         "turn_id", "criterion_id", "response_excerpt", "performance", "rationale",
+        "depth_role", "observation",
     }
 
 
@@ -398,7 +406,8 @@ def test_hint_cannot_establish_independent_competence(setup, monkeypatch):
     monkeypatch.setattr(provider, "judge", hint_once)
     initial = start(engine, max_questions=2).snapshot
     result = answer(engine, initial)
-    assert not result.public.report.objectives[0].evidence
+    assert all(item.observation == "UNCLEAR" and item.performance == "UNDETERMINED"
+               for item in result.public.report.objectives[0].evidence)
     assert result.public.report.objectives[0].assessment == Assessment.INSUFFICIENT
     state = next(iter(result.snapshot.objectives.values()))
     assert state.assisted_criteria == initial.pending_turn.question.criterion_ids

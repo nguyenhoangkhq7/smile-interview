@@ -135,11 +135,14 @@ def test_switching_criteria_leaves_question_to_introduce_new_aspect(setup, monke
 def test_switching_skills_acknowledges_the_actual_previous_answer(setup, monkeypatch):
     provider, engine, _ = setup
     feedback_provider(provider, monkeypatch)
-    initial = start(engine, [skill(), skill("java")]).snapshot
+    initial = start(
+        engine,
+        [skill(priority=0.8), skill("sql_optimization", jd_skill_name="SQL Optimization", priority=0.4)],
+    ).snapshot
     result = answer(engine, initial)
     skills_by_objective = {o.objective_id: o.skill_id for o in result.public.report.objectives}
     next_skill = skills_by_objective[result.public.pending_turn.objective_id]
-    assert result.public.pending_turn.introduction == f"{FEEDBACK}\n\nTiếp theo, mình chuyển sang trao đổi về {next_skill} nhé."
+    assert result.public.pending_turn.introduction == f"{FEEDBACK}\n\nTiếp theo, mình chuyển sang trao đổi về SQL Optimization nhé."
     assert next_skill != initial.pending_turn.skill_id
     assert "introduction" not in result.public.turns[0].model_dump()
     assert "skill_id" not in result.public.turns[0].model_dump()

@@ -1096,18 +1096,16 @@
           {
             "criterion_id": "j01:c1",
             "response_excerpt": "",
-            "observation": "UNCLEAR",
+            "observation": "NO_EVIDENCE",
             "performance": "UNDETERMINED",
-            "rationale": "Chưa có lời giải về rollback và propagation.",
+            "rationale": "Ứng viên cho biết mới chỉ làm CRUD cơ bản, chưa từng xử lý quản lý transaction hoặc cấu hình propagation.",
             "resolves_contradiction": false,
-            "unresolved_aspects": [
-              "Chưa có lời giải về rollback và propagation."
-            ]
+            "unresolved_aspects": []
           }
         ],
-        "feedback": "Bạn đã nói rõ phạm vi kinh nghiệm Spring hiện tại.",
+        "feedback": "Cảm ơn bạn đã chia sẻ.",
         "explicit_inability": true,
-        "inability_excerpt": "Thực tế em mới chỉ dùng Spring Boot để viết các API CRUD cơ bản và gọi hàm có sẵn của Spring Data JPA, chứ chưa từng trực tiếp xử lý các vấn đề chuyên sâu về quản lý Transaction phức tạp hay cấu hình propagation.",
+        "inability_excerpt": "chưa từng trực tiếp xử lý các vấn đề chuyên sâu về quản lý Transaction phức tạp hay cấu hình propagation.",
         "feedback_contains_hint": false
       },
       "source_question": "Khi một phương thức @Transactional gặp RuntimeException, anh/chị cấu hình rollback và propagation như thế nào?",
@@ -1164,10 +1162,10 @@
         "observations": [
           {
             "criterion_id": "j02:c1",
-            "response_excerpt": "Em dùng S3 bucket để lưu tfstate và bật versioning, sau đó cấu hình DynamoDB table làm lock table. Mỗi khi ai đó chạy terraform apply thì sẽ lấy lock từ DynamoDB trước, nếu có người đang chạy thì sẽ báo lỗi chờ.",
+            "response_excerpt": "Em dùng S3 bucket để lưu tfstate và bật versioning, sau đó cấu hình DynamoDB table làm lock table.",
             "observation": "SUPPORTS",
             "performance": "AT_TARGET",
-            "rationale": "Nêu remote state dùng S3 và cơ chế khóa phối hợp apply bằng DynamoDB.",
+            "rationale": "Ứng viên nêu đúng remote state dùng S3 kết hợp versioning và cơ chế state locking bằng DynamoDB để phối hợp khi nhiều người cùng apply.",
             "resolves_contradiction": false,
             "unresolved_aspects": []
           }
@@ -1369,10 +1367,10 @@
         "observations": [
           {
             "criterion_id": "j05:c1",
-            "response_excerpt": "Đầu tiên em dùng kubectl describe pod để xác định container bị OOMKilled. Tiếp theo em chụp heap dump của JVM bằng cách cấu hình flag -XX:+HeapDumpOnOutOfMemoryError lưu vào persistent volume. Sau khi phân tích thấy ứng dụng Java không nhận diện được cgroup v2 của K8s dẫn đến phân bổ quá RAM máy ảo, em đã cấu hình lại cgroup v2 và thêm flag -XX:MaxRAMPercentage=75.0, đồng thời căn chỉnh memory request bằng 80% limit để container luôn đạt Guaranteed QoS Class.",
+            "response_excerpt": "căn chỉnh memory request bằng 80% limit để container luôn đạt Guaranteed QoS Class.",
             "observation": "CONTRADICTS",
             "performance": "BELOW",
-            "rationale": "Khẳng định memory request bằng 80% limit đạt Guaranteed QoS là sai; Guaranteed yêu cầu request và limit bằng nhau cho CPU và memory của từng container.",
+            "rationale": "Ứng viên mô tả bước kiểm tra pod và heap dump, nhưng khẳng định sai rằng memory request bằng 80% limit đạt Guaranteed QoS; Guaranteed yêu cầu request bằng limit cho cả CPU và memory.",
             "resolves_contradiction": false,
             "unresolved_aspects": []
           }

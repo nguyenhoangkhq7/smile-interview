@@ -118,3 +118,42 @@ test('marks intermediate turns clarified later and detects raw code snippets cle
   assert.equal(looksLikeRawCode('Nếu danh sách rỗng thì gặp lỗi chia cho 0.', 'DEBUGGING'), false);
   assert.equal(looksLikeRawCode('```js\nconst x = 1;\n```', 'CODING'), false);
 });
+
+test('distinguishes diagnostic, target and extension question badges and normalizes session coaching', () => {
+  const data = buildResult(session([
+    objective('sql-obj', 'sql', 'DEMONSTRATED_ABOVE_TARGET', {
+      evidence: [
+        { turn_id: 't-diag', criterion_id: 'c1', performance: 'AT_TARGET', depth_role: 'DIAGNOSTIC', observation: 'SUPPORTS', rationale: 'Hiểu khái niệm cơ bản' },
+        { turn_id: 't-target', criterion_id: 'c1', performance: 'AT_TARGET', depth_role: 'TARGET', observation: 'SUPPORTS', rationale: 'Áp dụng đúng index' },
+        { turn_id: 't-ext', criterion_id: 'c1', performance: 'ABOVE', depth_role: 'EXTENSION', observation: 'SUPPORTS', rationale: 'Phân tích trade-off write amplification' },
+      ],
+    }),
+  ], [
+    turn('t-diag', 'sql-obj'),
+    turn('t-target', 'sql-obj'),
+    turn('t-ext', 'sql-obj'),
+  ], {
+    coaching: {
+      overall_summary: '  Bạn nắm rất chắc tối ưu hóa truy vấn và đánh đổi chỉ mục. ',
+      top_strengths: ['Phân tích execution plan rõ ràng', 'Phân tích execution plan rõ ràng'],
+      priority_gaps: [],
+      actionable_study_steps: ['sql (Tune queries): Luyện thêm partitioning'],
+    },
+  }));
+
+  assert.equal(data.questions[0].depthRole, 'DIAGNOSTIC');
+  assert.equal(data.questions[0].badge.key, 'diagnostic');
+  assert.equal(data.questions[0].badge.label, 'Đạt nền tảng (chẩn đoán)');
+
+  assert.equal(data.questions[1].depthRole, 'TARGET');
+  assert.equal(data.questions[1].badge.key, 'strong');
+  assert.equal(data.questions[1].badge.label, 'Đạt yêu cầu');
+
+  assert.equal(data.questions[2].depthRole, 'EXTENSION');
+  assert.equal(data.questions[2].badge.key, 'extension');
+  assert.equal(data.questions[2].badge.label, 'Vượt yêu cầu (mở rộng)');
+
+  assert.equal(data.coaching?.overall_summary, 'Bạn nắm rất chắc tối ưu hóa truy vấn và đánh đổi chỉ mục.');
+  assert.deepEqual(plain(data.coaching?.top_strengths), ['Phân tích execution plan rõ ràng']);
+  assert.deepEqual(plain(data.coaching?.actionable_study_steps), ['Luyện thêm partitioning']);
+});

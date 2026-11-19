@@ -40,15 +40,19 @@ public class EvidenceVoiceController {
     @PostMapping(value = "/transcribe", produces = "application/json")
     public String transcribe(@PathVariable String sessionId, @AuthenticationPrincipal User user,
                              @Valid @RequestBody Recording recording) {
-        var state = active(sessionId, user, recording.turn_id(), recording.expected_state_version());
+        var context = interviews.voiceContext(sessionId, user);
+        var state = context != null
+                ? activeState(ensureVoiceChannel(context.state()), recording.turn_id(), recording.expected_state_version())
+                : active(sessionId, user, recording.turn_id(), recording.expected_state_version());
         var phase = state.path("conversation").path("phase").asText("INTERVIEW");
         if (!"INTERVIEW".equals(phase) && !"SELF_INTRODUCTION".equals(phase)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Chưa đến lượt trả lời.");
         }
+        var terms = context != null ? context.terms() : interviews.voiceTerms(sessionId, user);
         // Vocabulary is resolved from persisted session data, never arbitrary client hints.
         return voice.transcribe(Map.of("audio", recording.audio(),
                 "phase", recording.phase() == null ? "final" : recording.phase(),
-                "terms", interviews.voiceTerms(sessionId, user),
+                "terms", terms,
                 "topic", "SELF_INTRODUCTION".equals(phase) ? "Giới thiệu bản thân và kinh nghiệm liên quan"
                         : state.path("pending_turn").path("question").asText("").substring(0,
                           Math.min(2000, state.path("pending_turn").path("question").asText("").length()))));
@@ -86,7 +90,10 @@ public class EvidenceVoiceController {
     }
 
     private JsonNode active(String sessionId, User user, String turnId, long version) {
-        var state = voiceSession(sessionId, user);
+        return activeState(voiceSession(sessionId, user), turnId, version);
+    }
+
+    private JsonNode activeState(JsonNode state, String turnId, long version) {
         var phase = state.path("conversation").path("phase").asText("INTERVIEW");
         if (!"INTERVIEW".equals(phase)) {
             if ("FINISHED".equals(phase) || !Instant.parse(deadline(state)).isAfter(Instant.now()))
@@ -113,7 +120,10 @@ public class EvidenceVoiceController {
     }
 
     private JsonNode voiceSession(String sessionId, User user) {
-        var state = interviews.read(sessionId, user);
+        return ensureVoiceChannel(interviews.read(sessionId, user));
+    }
+
+    private JsonNode ensureVoiceChannel(JsonNode state) {
         if (!"VOICE".equals(state.path("config").path("interaction_mode").asText("TEXT"))) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Phiên này sử dụng phỏng vấn bằng văn bản.");
         }

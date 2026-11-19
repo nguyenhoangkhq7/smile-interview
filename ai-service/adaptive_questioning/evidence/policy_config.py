@@ -9,7 +9,7 @@ class InterviewPolicy(BaseModel):
     core_importance: float = Field(default=0.7, ge=0, le=1)
     reserve_followup_fraction: float = Field(default=0.3, ge=0, le=0.8)
     min_failure_contexts: int = Field(default=2, ge=2, le=5)
-    allow_extension_probes: bool = False
+    allow_extension_probes: bool = True
 
 
 def configured_policy() -> InterviewPolicy:

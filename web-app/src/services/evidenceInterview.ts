@@ -26,10 +26,20 @@ export interface EvidenceTurn {
   turn_id: string; objective_id: string; mode: QuestionMode;
   question: string; answer: string | null; feedback: string | null;
 }
+export type EvidenceDepthRole = 'TARGET' | 'DIAGNOSTIC' | 'EXTENSION';
+export type EvidenceObservation = 'SUPPORTS' | 'CONTRADICTS' | 'UNCLEAR' | 'NO_EVIDENCE';
 export interface PublicEvidence {
   turn_id: string;
   criterion_id: string; response_excerpt: string; rationale: string;
   performance: 'BELOW' | 'AT_TARGET' | 'ABOVE' | 'UNDETERMINED';
+  depth_role?: EvidenceDepthRole;
+  observation?: EvidenceObservation;
+}
+export interface SessionCoaching {
+  overall_summary: string;
+  top_strengths: string[];
+  priority_gaps: string[];
+  actionable_study_steps: string[];
 }
 export type Assessment = 'NOT_ASSESSED' | 'INSUFFICIENT_EVIDENCE' | 'NOT_DEMONSTRATED'
   | 'DEMONSTRATED_BELOW_TARGET' | 'DEMONSTRATED_AT_TARGET' | 'DEMONSTRATED_ABOVE_TARGET';
@@ -44,6 +54,7 @@ export interface ObjectiveReport {
 export interface EvidenceReport {
   termination_reason: string | null;
   objectives: ObjectiveReport[];
+  coaching?: SessionCoaching | null;
 }
 export interface EvidenceSession {
   schema_version: 2; session_id: string; state_version: number; is_finished: boolean;

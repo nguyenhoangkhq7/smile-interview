@@ -114,4 +114,32 @@ class EvidenceStoreTest {
         assertThatThrownBy(() -> store.commit(voiceCommit)).isInstanceOf(ResponseStatusException.class);
         verify(runs, never()).save(any());
     }
+
+    @Test void projectSessionLoadsTurnsOnceAndSkipsUnchangedTurnSaves() {
+        when(runs.findById("session")).thenReturn(Optional.of(existing(1)));
+        var unchanged = new fit.iuh.modules.session.entity.SessionTurn();
+        unchanged.setId(10L);
+        unchanged.setSessionId("session");
+        unchanged.setExternalTurnId("t-1");
+        unchanged.setQuestion("Q1");
+        unchanged.setAnswer("A1");
+        unchanged.setTopicTag("sql");
+        unchanged.setIsDeepDive(false);
+        when(turns.findBySessionIdOrderByIdAsc("session")).thenReturn(java.util.List.of(unchanged));
+
+        var visible = json.read("""
+            {"schema_version":2,"session_id":"session","state_version":2,"is_finished":false,
+             "report":{"objectives":[{"objective_id":"obj-1","skill_id":"sql"}]},
+             "turns":[{"turn_id":"t-1","objective_id":"obj-1","question":"Q1","answer":"A1"}],
+             "pending_turn":{"turn_id":"t-2","objective_id":"obj-1","question":"Q2"}}
+            """);
+        var result = json.tree(Map.of("snapshot", visible, "public", visible));
+        store.commit(new EvidenceStore.Commit("session", 1, UUID.randomUUID(), "hash", json.read("{}"), result));
+
+        verify(turns, times(1)).findBySessionIdOrderByIdAsc("session");
+        verify(turns, never()).findBySessionIdAndExternalTurnId(any(), any());
+        var savedCaptor = org.mockito.ArgumentCaptor.forClass(fit.iuh.modules.session.entity.SessionTurn.class);
+        verify(turns, times(1)).save(savedCaptor.capture());
+        assertThat(savedCaptor.getValue().getExternalTurnId()).isEqualTo("t-2");
+    }
 }
