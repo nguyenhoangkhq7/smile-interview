@@ -14,4 +14,9 @@ public interface SessionRepository extends JpaRepository<Session, String> {
     java.util.Optional<Session> lockById(@org.springframework.data.repository.query.Param("id") String id);
 
     java.util.List<Session> findByUserIdOrderByStartedAtDesc(java.util.UUID userId);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.transaction.annotation.Transactional
+    @org.springframework.data.jpa.repository.Query("delete from Session s where s.applicationProfile.id = :profileId")
+    int deleteByApplicationProfileId(@org.springframework.data.repository.query.Param("profileId") java.util.UUID profileId);
 }

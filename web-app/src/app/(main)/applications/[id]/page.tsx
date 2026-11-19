@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, ArrowRight, BriefcaseBusiness, CalendarDays, ChartNoAxesCombined, ChevronRight, Clock3, FileText, History, Play, RotateCcw } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BriefcaseBusiness, CalendarDays, ChartNoAxesCombined, ChevronRight, Clock3, FileText, History, Play, RotateCcw, Trash2 } from 'lucide-react';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -37,7 +37,7 @@ function Documents({ profile }: { profile: ApplicationProfile }) {
   return <div className="space-y-5">
     <section className="rounded-2xl border bg-card p-5 sm:p-6"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-lg font-semibold">Tài liệu của hồ sơ</h2></div><Link href="/interview/new" className="text-sm font-medium text-brand-orange hover:underline">Tạo hồ sơ với tài liệu mới<ChevronRight className="ml-1 inline" size={14} /></Link></div>
       <div className="mt-5 grid gap-3 sm:grid-cols-2">{[
-        { label: 'CV của bạn', name: profile.cvFilename }, { label: 'Mô tả công việc', name: profile.jdTitle },
+        { label: 'CV của bạn', name: profile.cvFilename }, { label: 'Mô tả công việc', name: profile.jdFilename || profile.jdTitle },
       ].map(item => <div key={item.label} className="flex min-w-0 items-center gap-3 rounded-xl border bg-muted/20 p-4"><span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-card text-muted-foreground"><FileText size={19} /></span><div className="min-w-0"><p className="text-xs text-muted-foreground">{item.label}</p><p className="mt-1 break-words text-sm font-medium">{item.name}</p></div></div>)}</div>
     </section>
     <section className="rounded-2xl border bg-card p-5 sm:p-6"><h2 className="text-lg font-semibold">Phân tích CV–JD ban đầu</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">Đối chiếu tài liệu; kết quả phỏng vấn ở tab Năng lực.</p>
@@ -51,8 +51,10 @@ function ProfileDetail({ id }: { id: string }) {
   const [profile, setProfile] = useState<ApplicationProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
   const [confirmRestart, setConfirmRestart] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [tab, setTab] = useState('competency');
   const load = useCallback(async () => {
     setLoading(true); setError('');
@@ -81,6 +83,21 @@ function ProfileDetail({ id }: { id: string }) {
     finally { setBusy(false); setConfirmRestart(false); }
   }
 
+  async function deleteProfile() {
+    if (deleting) return;
+    setDeleting(true);
+    setError('');
+    try {
+      await applicationProfiles.delete(id);
+      router.replace('/applications');
+    } catch (cause) {
+      setError(interviewError(cause));
+    } finally {
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  }
+
   return <div className="mx-auto max-w-6xl space-y-6 px-4 py-7 sm:px-6 sm:py-9">
     <Link className="inline-flex items-center gap-2 text-sm text-muted-foreground transition hover:text-foreground" href="/applications"><ArrowLeft size={15} />Hồ sơ ứng tuyển</Link>
     {loading && !profile && <div role="status" aria-label="Đang tải hồ sơ" className="space-y-5"><div className="h-28 animate-pulse rounded-2xl bg-muted/50" /><div className="h-96 animate-pulse rounded-2xl bg-muted/30" /></div>}
@@ -88,7 +105,10 @@ function ProfileDetail({ id }: { id: string }) {
     {profile && <>
       <header className="flex flex-wrap items-center justify-between gap-6">
         <div className="flex min-w-0 items-start gap-4"><span className="hidden size-14 shrink-0 items-center justify-center rounded-2xl border bg-card text-muted-foreground sm:flex"><BriefcaseBusiness size={25} /></span><div className="min-w-0 space-y-2"><h1 className="break-words text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">{profile.title}</h1><p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">{profile.company && <span className="inline-flex items-center gap-1.5"><BriefcaseBusiness size={14} />{profile.company}</span>}<span className="inline-flex items-center gap-1.5"><CalendarDays size={14} />Tạo {formatProfileDate(profile.createdAt)}</span><span>{profile.skills.length} kỹ năng theo JD</span></p></div></div>
-        {active ? <Link className={`${buttonVariants()} w-full shrink-0 sm:w-auto`} href={`/interview/session/${active.id}`}><Play size={16} />{active.status === 'Not started' ? `Bắt đầu lượt ${active.number}` : `Tiếp tục lượt ${active.number}`}</Link> : <Button className="w-full shrink-0 sm:w-auto" disabled={busy} onClick={() => void begin()}><Play size={16} />{busy ? 'Đang tạo lượt…' : 'Phỏng vấn lượt mới'}</Button>}
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          {active ? <Link className={`${buttonVariants()} w-full shrink-0 sm:w-auto`} href={`/interview/session/${active.id}`}><Play size={16} />{active.status === 'Not started' ? `Bắt đầu lượt ${active.number}` : `Tiếp tục lượt ${active.number}`}</Link> : <Button className="w-full shrink-0 sm:w-auto" disabled={busy} onClick={() => void begin()}><Play size={16} />{busy ? 'Đang tạo lượt…' : 'Phỏng vấn lượt mới'}</Button>}
+          <Button type="button" variant="outline" className="w-full shrink-0 text-destructive hover:bg-destructive/5 hover:text-destructive sm:w-auto" disabled={deleting} onClick={() => setConfirmDelete(true)}><Trash2 size={15} />Xóa hồ sơ</Button>
+        </div>
       </header>
 
       {active && <aside className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-orange-200/60 bg-orange-50/60 px-4 py-3"><div className="flex items-start gap-2.5"><Clock3 className="mt-0.5 shrink-0 text-brand-orange" size={17} /><p className="text-sm"><span className="font-medium">{active.status === 'In progress' ? `Lượt ${active.number} đang diễn ra.` : `Lượt ${active.number} đã sẵn sàng.`}</span><span className="ml-1 text-muted-foreground">{active.status === 'In progress' ? 'Tiếp tục từ câu hỏi đã lưu.' : 'Chọn dạng và thời lượng trước khi bắt đầu.'}</span></p></div>{active.status === 'In progress' && <Button size="sm" variant="ghost" disabled={busy} onClick={() => setConfirmRestart(true)}><RotateCcw size={14} />Bắt đầu lại</Button>}</aside>}
@@ -101,6 +121,7 @@ function ProfileDetail({ id }: { id: string }) {
       </Tabs>
     </>}
     <Dialog open={confirmRestart} onOpenChange={open => !busy && setConfirmRestart(open)}><DialogContent><DialogHeader><DialogTitle>Kết thúc lượt hiện tại và bắt đầu lại?</DialogTitle><DialogDescription>Các câu trả lời đã gửi được giữ trong lịch sử. Bạn sẽ bắt đầu một lượt mới với cùng CV/JD. Câu trả lời chưa gửi sẽ không được tính.</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" disabled={busy} onClick={() => setConfirmRestart(false)}>Quay lại</Button><Button disabled={busy} onClick={() => void begin(true)}>{busy ? 'Đang xử lý…' : 'Kết thúc và tạo lượt mới'}</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={confirmDelete} onOpenChange={open => !deleting && setConfirmDelete(open)}><DialogContent><DialogHeader><DialogTitle>Chuyển hồ sơ vào thùng rác?</DialogTitle><DialogDescription>“{profile?.title}” sẽ được giữ trong thùng rác 30 ngày. Bạn có thể khôi phục trong thời gian này; sau đó hồ sơ, lượt phỏng vấn và kế hoạch ôn tập sẽ bị xóa vĩnh viễn. CV/JD đã lưu trong thư viện tài liệu vẫn được giữ lại.</DialogDescription></DialogHeader><DialogFooter><Button type="button" variant="outline" disabled={deleting} onClick={() => setConfirmDelete(false)}>Hủy</Button><Button type="button" variant="destructive" disabled={deleting} onClick={() => void deleteProfile()}>{deleting ? 'Đang chuyển…' : 'Chuyển vào thùng rác'}</Button></DialogFooter></DialogContent></Dialog>
   </div>;
 }
 

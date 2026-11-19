@@ -14,6 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -62,14 +64,20 @@ public class ApplicationProfileService {
     public record Attempt(String id, int number, String status, LocalDateTime startedAt,
                           LocalDateTime endedAt, int answeredCount, String terminationReason) {}
     public record View(UUID id, String title, String company, String roleTitle, String cvFilename,
-                       String jdTitle, LocalDateTime createdAt, JsonNode skills, JsonNode analysis,
+                       String jdTitle, String jdFilename, LocalDateTime createdAt, JsonNode skills, JsonNode analysis,
                        List<Attempt> attempts) {}
+    public record Documents(String cvFilename, String cvFileUrl, String cvText,
+                            String jdTitle, String jdFilename, String jdFileUrl, String jdText) {}
+    public record TrashView(View profile, LocalDateTime deletedAt, LocalDateTime expiresAt) {}
 
     @Transactional
     public View create(User user, Create request) {
         Session source = sessions.lockById(request.sourceSessionId()).orElseThrow(() -> error(HttpStatus.NOT_FOUND, "Session not found"));
         requireOwner(source.getUserId(), user);
-        if (source.getApplicationProfile() != null) return view(source.getApplicationProfile());
+        if (source.getApplicationProfile() != null) {
+            requireActive(source.getApplicationProfile());
+            return view(source.getApplicationProfile());
+        }
         if (runs.existsById(source.getId()) || source.getAiInterviewSessionId() != null
                 || !turns.findBySessionIdOrderByIdAsc(source.getId()).isEmpty()) {
             throw error(HttpStatus.CONFLICT, "Create a profile from a prepared interview before starting it");
@@ -166,14 +174,58 @@ public class ApplicationProfileService {
 
     @Transactional(readOnly = true)
     public List<View> list(User user) {
-        return profiles.findByUserIdOrderByCreatedAtDesc(user.getId()).stream().map(this::view).toList();
+        return profiles.findByUserIdAndDeletedAtIsNullOrderByCreatedAtDesc(user.getId()).stream().map(this::view).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<TrashView> trash(User user) {
+        LocalDateTime now = LocalDateTime.now();
+        return profiles.findByUserIdAndDeletedAtIsNotNullOrderByDeletedAtDesc(user.getId()).stream()
+                .filter(profile -> profile.getDeletedAt().plusDays(30).isAfter(now))
+                .map(profile -> new TrashView(view(profile), profile.getDeletedAt(), profile.getDeletedAt().plusDays(30)))
+                .toList();
     }
 
     @Transactional(readOnly = true)
     public View get(UUID id, User user) {
         ApplicationProfile profile = profiles.findById(id).orElseThrow(() -> error(HttpStatus.NOT_FOUND, "Application profile not found"));
         requireOwner(profile.getUserId(), user);
+        requireActive(profile);
         return view(profile);
+    }
+
+    @Transactional
+    public void moveToTrash(UUID id, User user) {
+        ApplicationProfile profile = profiles.lockById(id).orElseThrow(() -> error(HttpStatus.NOT_FOUND, "Application profile not found"));
+        requireOwner(profile.getUserId(), user);
+        if (profile.getDeletedAt() == null) {
+            profile.setDeletedAt(LocalDateTime.now());
+            profiles.save(profile);
+        }
+    }
+
+    @Transactional
+    public void restore(UUID id, User user) {
+        ApplicationProfile profile = profiles.lockById(id).orElseThrow(() -> error(HttpStatus.NOT_FOUND, "Application profile not found"));
+        requireOwner(profile.getUserId(), user);
+        if (profile.getDeletedAt() == null) return;
+        if (!profile.getDeletedAt().plusDays(30).isAfter(LocalDateTime.now())) {
+            throw error(HttpStatus.GONE, "The retention period has expired");
+        }
+        profile.setDeletedAt(null);
+        profiles.save(profile);
+    }
+
+    @Transactional(readOnly = true)
+    public Documents documents(UUID id, User user) {
+        ApplicationProfile profile = profiles.findById(id).orElseThrow(() -> error(HttpStatus.NOT_FOUND, "Application profile not found"));
+        requireOwner(profile.getUserId(), user);
+        requireActive(profile);
+        var resume = profile.getResume();
+        var jd = profile.getJobDescription();
+        return new Documents(profile.getCvFilename(), resume.getFileUrl(), Objects.requireNonNullElse(profile.getCvText(), ""),
+                profile.getJdTitle(), uploadedFilename(jd.getFileUrl(), profile.getJdTitle()), jd.getFileUrl(),
+                Objects.requireNonNullElse(profile.getJdText(), ""));
     }
 
     @Transactional
@@ -181,6 +233,7 @@ public class ApplicationProfileService {
         // Serialize creation; repeated requests return the same unstarted attempt.
         ApplicationProfile profile = profiles.lockById(id).orElseThrow(() -> error(HttpStatus.NOT_FOUND, "Application profile not found"));
         requireOwner(profile.getUserId(), user);
+        requireActive(profile);
         List<Session> previous = sessions.findByApplicationProfileIdOrderByAttemptNumberDesc(id);
         for (Session attempt : previous) {
             if ("Not started".equals(attempt.getStatus())) return attempt(attempt);
@@ -200,9 +253,20 @@ public class ApplicationProfileService {
 
     private View view(ApplicationProfile profile) {
         return new View(profile.getId(), profile.getTitle(), profile.getCompany(), profile.getRoleTitle(),
-                profile.getCvFilename(), profile.getJdTitle(), profile.getCreatedAt(),
+                profile.getCvFilename(), profile.getJdTitle(), uploadedFilename(profile.getJobDescription().getFileUrl(), profile.getJdTitle()), profile.getCreatedAt(),
                 json.read(profile.getSkillGapJson()), json.read(profile.getGapReportJson()),
                 sessions.findByApplicationProfileIdOrderByAttemptNumberDesc(profile.getId()).stream().map(this::attempt).toList());
+    }
+
+    private String uploadedFilename(String fileUrl, String fallback) {
+        if (fileUrl == null || fileUrl.isBlank()) return fallback;
+        String segment = fileUrl.substring(fileUrl.lastIndexOf('/') + 1);
+        try {
+            segment = URLDecoder.decode(segment, StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException ignored) {
+            // Keep the stored path segment if its percent encoding is malformed.
+        }
+        return segment.replaceFirst("^\\d+_", "");
     }
 
     private Attempt attempt(Session session) {
@@ -214,6 +278,10 @@ public class ApplicationProfileService {
 
     private void requireOwner(UUID owner, User user) {
         if (user == null || !Objects.equals(owner, user.getId())) throw error(HttpStatus.FORBIDDEN, "This resource belongs to another user");
+    }
+
+    private void requireActive(ApplicationProfile profile) {
+        if (profile.getDeletedAt() != null) throw error(HttpStatus.GONE, "Application profile is in the trash");
     }
 
     private ResponseStatusException error(HttpStatus status, String message) {
