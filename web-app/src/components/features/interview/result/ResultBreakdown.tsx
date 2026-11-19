@@ -8,8 +8,9 @@ import { MarkdownContent } from '@/components/common/MarkdownContent';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
-  assessmentLabels, assessmentStatus, cleanStudyRecommendation, isBoilerplateClaim,
-  looksLikeRawCode, normalizeSameText, resultReasons, skillStatuses, uniqueFindings, type ResultData,
+  assessmentLabels, assessmentStatus, cleanStudyRecommendation, evidenceDepthLabels,
+  isBoilerplateClaim, looksLikeRawCode, normalizeSameText, questionBadge, resultReasons,
+  skillStatuses, uniqueFindings, type ResultData,
 } from './resultData';
 
 export const resultPanel = 'min-w-0 rounded-2xl border border-slate-200/80 bg-card p-4 shadow-xs sm:p-5';
@@ -54,27 +55,39 @@ export function ResultFeedback({ data }: { data: ResultData }) {
   const partialSkills = data.skills
     .filter(skill => skill.status === 'partial')
     .map(skill => `${skillLabel(skill.id, null, skill.objectives.flatMap(objective => objective.jd_evidence_spans))}: chưa kiểm tra hết tiêu chí trong lượt này.`);
-  const attentionItems = data.weaknesses.length ? data.weaknesses : partialSkills;
+  const mergedStrengths = uniqueFindings([...data.strengths, ...(data.coaching?.top_strengths ?? [])]);
+  const mergedWeaknesses = uniqueFindings([...data.weaknesses, ...(data.coaching?.priority_gaps ?? [])]);
+  const attentionItems = mergedWeaknesses.length ? mergedWeaknesses : partialSkills;
 
   return (
-    <div id="feedback" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-      <div className="space-y-2 rounded-xl border border-emerald-200/60 bg-emerald-50/70 p-3.5 text-emerald-950">
-        <h2 className="flex items-center gap-1.5 text-sm font-bold"><CircleCheck size={16} className="text-emerald-700" /> Điểm làm tốt</h2>
-        <FindingList items={data.strengths} preview={3} empty="Chưa có đủ dữ kiện để ghi nhận điểm mạnh nổi bật." />
-      </div>
-      <div className={cn(
-        'space-y-2 rounded-xl border p-3.5',
-        data.weaknesses.length ? 'border-orange-200/70 bg-orange-50/70 text-orange-950'
-          : attentionItems.length ? 'border-amber-200/70 bg-amber-50/60 text-amber-950'
-            : 'border-slate-200/80 bg-slate-50/80 text-slate-700',
-      )}>
-        <h2 className="flex items-center gap-1.5 text-sm font-bold">
-          {data.weaknesses.length ? <TriangleAlert size={16} className="text-orange-700" />
-            : attentionItems.length ? <Clock3 size={16} className="text-amber-700" />
-              : <MessageSquare size={16} className="text-slate-600" />}
-          {data.weaknesses.length ? 'Cần cải thiện' : 'Lưu ý đánh giá'}
-        </h2>
-        <FindingList items={attentionItems} preview={2} empty="Không ghi nhận thiếu sót trong các nội dung đã đánh giá." />
+    <div id="feedback" className="space-y-3">
+      {data.coaching?.overall_summary && (
+        <div className="space-y-1.5 rounded-xl border border-indigo-200/70 bg-indigo-50/70 p-3.5 text-indigo-950">
+          <h2 className="flex items-center gap-1.5 text-sm font-bold">
+            <MessageSquare size={16} className="text-indigo-700" /> Nhận xét & Coaching tổng hợp
+          </h2>
+          <p className="text-sm leading-relaxed text-slate-800">{data.coaching.overall_summary}</p>
+        </div>
+      )}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+        <div className="space-y-2 rounded-xl border border-emerald-200/60 bg-emerald-50/70 p-3.5 text-emerald-950">
+          <h2 className="flex items-center gap-1.5 text-sm font-bold"><CircleCheck size={16} className="text-emerald-700" /> Điểm làm tốt</h2>
+          <FindingList items={mergedStrengths} preview={3} empty="Chưa có đủ dữ kiện để ghi nhận điểm mạnh nổi bật." />
+        </div>
+        <div className={cn(
+          'space-y-2 rounded-xl border p-3.5',
+          mergedWeaknesses.length ? 'border-orange-200/70 bg-orange-50/70 text-orange-950'
+            : attentionItems.length ? 'border-amber-200/70 bg-amber-50/60 text-amber-950'
+              : 'border-slate-200/80 bg-slate-50/80 text-slate-700',
+        )}>
+          <h2 className="flex items-center gap-1.5 text-sm font-bold">
+            {mergedWeaknesses.length ? <TriangleAlert size={16} className="text-orange-700" />
+              : attentionItems.length ? <Clock3 size={16} className="text-amber-700" />
+                : <MessageSquare size={16} className="text-slate-600" />}
+            {mergedWeaknesses.length ? 'Cần cải thiện' : 'Lưu ý đánh giá'}
+          </h2>
+          <FindingList items={attentionItems} preview={2} empty="Không ghi nhận thiếu sót trong các nội dung đã đánh giá." />
+        </div>
       </div>
     </div>
   );
@@ -209,22 +222,17 @@ export function ResultSkills({ skills }: { skills: ResultData['skills'] }) {
   );
 }
 
-type QuestionFilter = 'all' | 'strong' | 'weak' | 'clarified' | 'partial';
-
-function questionDisplay(item: ResultData['questions'][number]) {
-  if (item.status === 'strong') return { key: 'strong' as const, label: 'Đạt yêu cầu', tone: skillStatuses.strong.tone };
-  if (item.status === 'weak') return { key: 'weak' as const, label: 'Cần cải thiện', tone: skillStatuses.weak.tone };
-  if (item.clarifiedLater) return { key: 'clarified' as const, label: 'Hỏi làm rõ tiếp', tone: 'bg-sky-50 text-sky-800 border-sky-200/70' };
-  return { key: 'partial' as const, label: 'Chưa kết luận', tone: skillStatuses.partial.tone };
-}
+type QuestionFilter = 'all' | 'strong' | 'extension' | 'diagnostic' | 'weak' | 'clarified' | 'partial';
 
 export function ResultQuestions({ questions }: { questions: ResultData['questions'] }) {
   const [filter, setFilter] = useState<QuestionFilter>('all');
   const [limit, setLimit] = useState(5);
-  const annotated = questions.map(item => ({ ...item, badge: questionDisplay(item) }));
+  const annotated = questions.map(item => ({ ...item, badge: item.badge ?? questionBadge(item) }));
   const filtered = filter === 'all' ? annotated : annotated.filter(item => item.badge.key === filter);
   const filterMeta: { id: Exclude<QuestionFilter, 'all'>; label: string }[] = [
+    { id: 'extension', label: 'Vượt yêu cầu' },
     { id: 'strong', label: 'Đạt yêu cầu' },
+    { id: 'diagnostic', label: 'Chẩn đoán nền tảng' },
     { id: 'weak', label: 'Cần cải thiện' },
     { id: 'clarified', label: 'Hỏi làm rõ' },
     { id: 'partial', label: 'Chưa kết luận' },
@@ -247,7 +255,7 @@ export function ResultQuestions({ questions }: { questions: ResultData['question
         )}
       </div>
       <div className="space-y-2.5">
-        {filtered.slice(0, limit).map(({ turn, skillId, index, evidence, badge, clarifiedLater }) => {
+        {filtered.slice(0, limit).map(({ turn, skillId, index, evidence, badge, depthRole, clarifiedLater }) => {
           const rationales = uniqueFindings(evidence.map(item => item.rationale));
           const excerpts = evidence.filter(item =>
             item.response_excerpt.trim() && !normalizeSameText(item.response_excerpt, turn.answer || ''),
@@ -271,7 +279,14 @@ export function ResultQuestions({ questions }: { questions: ResultData['question
               </summary>
               <div className="space-y-3 border-t border-slate-100 bg-slate-50/60 p-4 text-sm wrap-anywhere">
                 <div className="space-y-1">
-                  <p className="text-xs font-semibold text-slate-500 uppercase">Câu hỏi</p>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-semibold text-slate-500 uppercase">Câu hỏi</p>
+                    {depthRole && depthRole !== 'TARGET' && (
+                      <span className="rounded-md bg-slate-200/80 px-2 py-0.5 text-[11px] font-medium text-slate-700">
+                        {evidenceDepthLabels[depthRole]}
+                      </span>
+                    )}
+                  </div>
                   <MarkdownContent content={turn.question} />
                 </div>
                 <div className="space-y-1.5 rounded-lg border border-slate-200/70 bg-card p-3">
@@ -333,9 +348,10 @@ export function ResultStudy({
     return weaknesses.length || recommendations.length ? [{ ...skill, weaknesses, recommendations }] : [];
   });
   const groupedRecommendations = new Set(groups.flatMap(group => group.recommendations));
-  const additionalRecommendations = data.recommendations
-    .map(cleanStudyRecommendation)
-    .filter(item => !groupedRecommendations.has(item));
+  const additionalRecommendations = uniqueFindings([
+    ...data.recommendations.map(cleanStudyRecommendation),
+    ...(data.coaching?.actionable_study_steps ?? []),
+  ]).filter(item => !groupedRecommendations.has(item));
 
   return (
     <section id="study" className={cn(resultPanel, resultSection, 'bg-gradient-to-br from-white to-orange-50/50')}>

@@ -1,9 +1,16 @@
 """Internal V2 compute API. Only the backend owns persisted snapshots."""
-from fastapi import APIRouter, HTTPException, Request
+import logging
+import os
+from threading import Lock
 from time import monotonic
 
+from fastapi import APIRouter, HTTPException, Request
+
 from ..optimization.compiler import DEFAULT_COMPILED_DIR
-from .models import ConversationRequest, NextQuestionRequest, Snapshot, StartRequest, TransitionRequest, TransitionResult
+from .models import (
+    Blueprint, BlueprintRequest, ConversationRequest, NextQuestionRequest, Snapshot,
+    StartRequest, TransitionRequest, TransitionResult,
+)
 from .provider import DSPyAssessmentProvider
 from .policy_config import configured_policy
 from .workflow import EvidenceWorkflow
@@ -12,16 +19,41 @@ from .telemetry import event, session_id
 from .preparation_cache import PreparationCache
 
 router = APIRouter(prefix="/api/v2/interview", tags=["Evidence Interview V2"])
+_workflow_lock = Lock()
+logger = logging.getLogger(__name__)
+
+
+def init_evidence_workflow(app) -> EvidenceWorkflow | None:
+    """Eagerly initialize EvidenceWorkflow during FastAPI lifespan when credentials are configured."""
+    if not os.environ.get("OPENROUTER_API_KEY"):
+        logger.info("Skipping eager EvidenceWorkflow initialization because OPENROUTER_API_KEY is unset")
+        return None
+    with _workflow_lock:
+        if not hasattr(app.state, "evidence_workflow"):
+            app.state.evidence_workflow = EvidenceWorkflow(
+                DSPyAssessmentProvider(compiled_dir=str(DEFAULT_COMPILED_DIR)),
+                policy=configured_policy(),
+                preparation_cache=PreparationCache(),
+                prewarm_q1=True,
+            )
+        return app.state.evidence_workflow
 
 
 def workflow(request: Request) -> EvidenceWorkflow:
-    if not hasattr(request.app.state, "evidence_workflow"):
-        request.app.state.evidence_workflow = EvidenceWorkflow(
-            DSPyAssessmentProvider(compiled_dir=str(DEFAULT_COMPILED_DIR)),
-            policy=configured_policy(),
-            preparation_cache=PreparationCache(),
-        )
-    return request.app.state.evidence_workflow
+    existing = getattr(request.app.state, "evidence_workflow", None)
+    if existing is not None:
+        return existing
+    with _workflow_lock:
+        existing = getattr(request.app.state, "evidence_workflow", None)
+        if existing is None:
+            existing = EvidenceWorkflow(
+                DSPyAssessmentProvider(compiled_dir=str(DEFAULT_COMPILED_DIR)),
+                policy=configured_policy(),
+                preparation_cache=PreparationCache(),
+                prewarm_q1=True,
+            )
+            request.app.state.evidence_workflow = existing
+        return existing
 
 
 def execute(operation, payload):
@@ -43,6 +75,11 @@ def execute(operation, payload):
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     finally:
         session_id.reset(token)
+
+
+@router.post("/blueprint", response_model=Blueprint)
+def blueprint(payload: BlueprintRequest, request: Request):
+    return execute(workflow(request).build_blueprint, payload)
 
 
 @router.post("/start", response_model=TransitionResult)

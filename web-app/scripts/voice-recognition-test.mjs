@@ -99,4 +99,23 @@ const harness = handler => {
     'No speech frame is dropped or duplicated; the silence-only tail is not submitted');
   h.engine.stop();
 }
+{
+  let previewSignal = null;
+  const h = harness(({ phase, signal }) => {
+    if (phase === 'preview') {
+      previewSignal = signal;
+      return new Promise((_, reject) => {
+        signal.addEventListener('abort', () => reject(new Error('Preview aborted for final')), { once: true });
+      });
+    }
+    return accepted(phase, 'Câu trả lời cuối cùng nhanh.');
+  });
+  h.feed(4.5); await settled();
+  assert.equal(previewSignal?.aborted, false, 'Preview request is initially in-flight');
+  h.feed(1.2, 0); await settled();
+  assert.equal(previewSignal?.aborted, true, 'Stopping speech aborts in-flight preview immediately');
+  assert.equal(h.options.answer, 'Câu trả lời cuối cùng nhanh.');
+  assert.equal(h.engine.canSubmit(), true);
+  h.engine.stop();
+}
 console.log('PASS: provisional/final isolation, contextual audio, review gate, pause flush, retry, cancellation and long speech.');

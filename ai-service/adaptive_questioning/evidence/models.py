@@ -74,6 +74,10 @@ class InterviewSkillContext(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     jd_skill_id: str = Field(..., description="Identifier of the required skill in the JD")
+    jd_skill_name: str = Field(default="", max_length=200)
+    matched_cv_skill_name: str = Field(default="", max_length=200)
+    semantic_alignment: str = Field(default="", max_length=60)
+    context_job: str = Field(default="", max_length=300)
     cv_evidence_spans: list[str] = Field(default_factory=list)
 
 
@@ -156,7 +160,20 @@ class _EvidenceBase(BaseModel):
 
 
 class PublicEvidence(_EvidenceBase):
-    pass
+    depth_role: Literal["TARGET", "DIAGNOSTIC", "EXTENSION"] = "TARGET"
+    observation: Literal["SUPPORTS", "CONTRADICTS", "UNCLEAR", "NO_EVIDENCE"] = "SUPPORTS"
+
+
+class SessionCoaching(BaseModel):
+    overall_summary: str = Field(min_length=5, max_length=1200)
+    top_strengths: list[str] = Field(default_factory=list, max_length=6)
+    priority_gaps: list[str] = Field(default_factory=list, max_length=6)
+    actionable_study_steps: list[str] = Field(default_factory=list, max_length=6)
+
+
+class PriorAttemptContext(BaseModel):
+    objective_assessments: dict[str, str] = Field(default_factory=dict)
+    prior_question_stems: list[str] = Field(default_factory=list, max_length=20)
 
 
 class RecordedEvidence(_EvidenceBase):
@@ -251,6 +268,8 @@ class Snapshot(BaseModel):
     termination_reason: str | None = None
     conversation: "ConversationState | None" = None
     opening_context: "InterviewOpening | None" = None
+    coaching: SessionCoaching | None = None
+    prior_question_stems: list[str] = Field(default_factory=list)
 
 
 _RETIRED_OBJECTIVE_FIELDS = frozenset({
@@ -292,6 +311,7 @@ class StartRequest(BaseModel):
     config: InterviewConfig = Field(default_factory=InterviewConfig)
     blueprint: Blueprint | None = None
     opening: "InterviewOpening | None" = None
+    prior_attempts: PriorAttemptContext | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -300,6 +320,11 @@ class StartRequest(BaseModel):
         if isinstance(values, dict) and isinstance(values.get("blueprint"), dict):
             return {**values, "blueprint": _strip_retired_blueprint_fields(values["blueprint"])}
         return values
+
+
+class BlueprintRequest(BaseModel):
+    skills: list[InterviewSkill] = Field(min_length=1, max_length=100)
+    opening: "InterviewOpening | None" = None
 
 
 MAX_OPENING_SUMMARY_LENGTH = 2000
@@ -384,6 +409,7 @@ class ObjectiveReport(BaseModel):
 class Report(BaseModel):
     termination_reason: str | None
     objectives: list[ObjectiveReport]
+    coaching: SessionCoaching | None = None
 
 
 class PendingTurn(BaseModel):

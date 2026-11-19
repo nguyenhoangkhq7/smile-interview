@@ -141,21 +141,50 @@ public class EvidenceStore {
             String skillId = objective.path("skill_id").asText("");
             if (!objectiveId.isEmpty() && !skillId.isEmpty()) skillByObjective.put(objectiveId, skillId);
         }
-        for (JsonNode turn : visible.path("turns")) projectTurn(session.getId(), turn, skillByObjective);
-        if (visible.path("pending_turn").isObject()) projectTurn(session.getId(), visible.path("pending_turn"), skillByObjective);
+        Map<String, SessionTurn> existingTurns = new HashMap<>();
+        var loadedTurns = turns.findBySessionIdOrderByIdAsc(session.getId());
+        if (loadedTurns != null) {
+            for (SessionTurn existing : loadedTurns) {
+                if (existing.getExternalTurnId() != null) {
+                    existingTurns.put(existing.getExternalTurnId(), existing);
+                }
+            }
+        }
+        for (JsonNode turn : visible.path("turns")) {
+            projectTurn(session.getId(), turn, skillByObjective, existingTurns);
+        }
+        if (visible.path("pending_turn").isObject()) {
+            projectTurn(session.getId(), visible.path("pending_turn"), skillByObjective, existingTurns);
+        }
         sessions.save(session);
     }
 
-    private void projectTurn(String sessionId, JsonNode value, Map<String, String> skillByObjective) {
+    private void projectTurn(String sessionId, JsonNode value, Map<String, String> skillByObjective,
+                             Map<String, SessionTurn> existingTurns) {
         String turnId = value.path("turn_id").asText();
-        SessionTurn turn = turns.findBySessionIdAndExternalTurnId(sessionId, turnId).orElseGet(SessionTurn::new);
+        if (turnId.isEmpty()) return;
+        SessionTurn turn = existingTurns.get(turnId);
+        boolean isNew = turn == null;
+        if (isNew) {
+            turn = new SessionTurn();
+        }
+        String question = value.path("question").asText();
+        String answer = value.path("answer").asText("");
+        String topicTag = skillByObjective.getOrDefault(value.path("objective_id").asText(""), "");
+        boolean changed = isNew
+                || !java.util.Objects.equals(turn.getQuestion(), question)
+                || !java.util.Objects.equals(turn.getAnswer(), answer)
+                || !java.util.Objects.equals(turn.getTopicTag(), topicTag)
+                || !Boolean.FALSE.equals(turn.getIsDeepDive());
+        if (!changed) return;
         turn.setSessionId(sessionId);
         turn.setExternalTurnId(turnId);
-        turn.setQuestion(value.path("question").asText());
-        turn.setAnswer(value.path("answer").asText(""));
-        turn.setTopicTag(skillByObjective.getOrDefault(value.path("objective_id").asText(""), ""));
+        turn.setQuestion(question);
+        turn.setAnswer(answer);
+        turn.setTopicTag(topicTag);
         turn.setIsDeepDive(false);
         turns.save(turn);
+        existingTurns.put(turnId, turn);
     }
 
     static ResponseStatusException conflict(String message) {

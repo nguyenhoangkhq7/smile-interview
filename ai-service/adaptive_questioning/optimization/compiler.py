@@ -9,21 +9,19 @@ from typing import Literal
 import dspy
 
 from adaptive_questioning.evidence.dspy_modules import (
-    CandidateFeedbackSignature,
     DiagnosticQuestionSignature,
     EvidenceAssessment,
     EvidenceAssessmentSignature,
-    FeedbackDraft,
     FollowUpQuestionSignature,
     InitialQuestionSignature,
     QuestionGeneratorModule,
     ReflectiveJudgeModule,
     build_judge_stage1_inputs,
-    build_judge_stage2_inputs,
     build_question_inputs,
 )
 from adaptive_questioning.evidence.models import BlueprintDraft, Judgment, Question
 from adaptive_questioning.evidence.provider import (
+    AlignmentReview,
     BlueprintSignature,
     QuestionAlignmentSignature,
     encode_context,
@@ -46,12 +44,13 @@ from .metrics import (
 )
 
 DEFAULT_COMPILED_DIR = Path(__file__).resolve().parent.parent / "compiled_modules"
-ARTIFACT_VERSION = "evidence-dspy-2"
+ARTIFACT_VERSION = "evidence-dspy-3"
 QUESTION_FILE = "question_generator.json"
 JUDGE_FILE = "reflective_judge.json"
 ALIGNMENT_FILE = "alignment_reviewer.json"
 BLUEPRINT_FILE = "blueprint_drafter.json"
 CompileStrategy = Literal["labeled", "bootstrap", "random_search", "mipro"]
+MAX_REASONING_CHARS = 200
 
 
 def _fingerprint() -> str:
@@ -60,10 +59,8 @@ def _fingerprint() -> str:
         "followup_instructions": FollowUpQuestionSignature.instructions,
         "diagnostic_instructions": DiagnosticQuestionSignature.instructions,
         "assess_instructions": EvidenceAssessmentSignature.instructions,
-        "feedback_instructions": CandidateFeedbackSignature.instructions,
         "question_schema": Question.model_json_schema(),
         "assessment_schema": EvidenceAssessment.model_json_schema(),
-        "feedback_schema": FeedbackDraft.model_json_schema(),
     }
     return hashlib.sha256(json.dumps(contract, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
 
@@ -72,6 +69,7 @@ def _full_fingerprint() -> str:
     contract = {
         "core": _fingerprint(),
         "alignment_instructions": QuestionAlignmentSignature.instructions,
+        "alignment_schema": AlignmentReview.model_json_schema(),
         "blueprint_instructions": BlueprintSignature.instructions,
         "blueprint_schema": BlueprintDraft.model_json_schema(),
     }
@@ -94,17 +92,23 @@ def _artifact_digest(path: Path) -> str:
     return hashlib.sha256(canonical.encode()).hexdigest()
 
 
+def _clip_vietnamese(text: str, limit: int = MAX_REASONING_CHARS) -> str:
+    compact = " ".join(text.split())
+    if len(compact) <= limit:
+        return compact
+    return compact[: limit - 1].rstrip(" ,;:") + "."
+
+
 def _question_reasoning(context_text: str, question: Question) -> str:
     data = json.loads(context_text)
     action = data.get("action", "INITIAL")
-    mode = data.get("interaction_mode", "TEXT")
+    channel = data.get("interaction_mode", "TEXT")
+    mode = question.mode.value if hasattr(question.mode, "value") else str(question.mode)
     criteria = (data.get("objective") or {}).get("criteria") or [{}]
     expected = criteria[0].get("expected_evidence", "")
-    return (
-        f"Action={action}, interaction_mode={mode}, mode={question.mode}, depth=L{question.depth}. "
-        f"Target expected_evidence: {expected} "
-        f"Formulate one focused Vietnamese task preserving criterion_ids={question.criterion_ids} "
-        f"and evidence_scope='{question.evidence_scope}' without revealing the answer."
+    return _clip_vietnamese(
+        f"Lượt {action} ({channel}, {mode} L{question.depth}): bám đúng tiêu chí '{expected[:85]}', "
+        f"giữ một nhiệm vụ rõ ràng, phạm vi '{question.evidence_scope}' và không lộ đáp án."
     )
 
 
@@ -112,10 +116,10 @@ def _judge_reasoning(context_text: str, judgment: Judgment) -> str:
     data = json.loads(context_text)
     depth = (data.get("turn") or {}).get("question_depth", "")
     summary = "; ".join(
-        f"{obs.criterion_id}: {obs.observation}/{obs.performance} ({obs.rationale})"
+        f"{obs.criterion_id}: {obs.observation}/{obs.performance} — {obs.rationale}"
         for obs in judgment.observations
     )
-    return f"Assess at question_depth=L{depth} against criterion anchors: {summary}"
+    return _clip_vietnamese(f"Đánh giá ở mức L{depth} dựa trên bằng chứng nguyên văn: {summary}")
 
 
 def _project_question_examples(
@@ -135,40 +139,26 @@ def _project_question_examples(
     return grouped
 
 
-def _project_judge_examples(
-    examples: list[dspy.Example],
-) -> tuple[list[dspy.Example], list[dspy.Example]]:
-    stage1_examples, stage2_examples = [], []
+def _project_judge_examples(examples: list[dspy.Example]) -> list[dspy.Example]:
+    projected: list[dspy.Example] = []
     for example in examples:
         judgment = Judgment.model_validate(example.judgment)
         assessment = EvidenceAssessment(
             observations=judgment.observations,
             explicit_inability=judgment.explicit_inability,
             inability_excerpt=judgment.inability_excerpt,
+            feedback=judgment.feedback,
+            feedback_contains_hint=judgment.feedback_contains_hint,
         )
         s1_fields = build_judge_stage1_inputs(example.context)
-        stage1_examples.append(
+        projected.append(
             dspy.Example(
                 **s1_fields,
                 reasoning=_judge_reasoning(example.context, judgment),
                 assessment=assessment,
             ).with_inputs(*s1_fields.keys())
         )
-        if assessment.observations and not (
-            assessment.explicit_inability
-            and all(obs.observation == "NO_EVIDENCE" for obs in assessment.observations)
-        ):
-            s2_fields = build_judge_stage2_inputs(example.context, assessment)
-            stage2_examples.append(
-                dspy.Example(
-                    **s2_fields,
-                    feedback_draft=FeedbackDraft(
-                        feedback=judgment.feedback,
-                        feedback_contains_hint=judgment.feedback_contains_hint,
-                    ),
-                ).with_inputs(*s2_fields.keys())
-            )
-    return stage1_examples, stage2_examples
+    return projected
 
 
 def _stratify_examples(examples: list[dspy.Example], key_fn) -> list[dspy.Example]:
@@ -207,14 +197,8 @@ def _stage1_bucket(demo: dict) -> str:
     return "OTHER"
 
 
-def _stage2_bucket(demo: dict) -> str:
-    draft = demo.get("feedback_draft")
-    text = getattr(draft, "feedback", None) if not isinstance(draft, dict) else draft.get("feedback", "")
-    return "NONEMPTY" if (text or "").strip() else "EMPTY"
-
-
 def _diversify_demos(valid: list, fallback: list, spec: tuple) -> list:
-    """Select bootstrapped demos first while covering distinct verdict/feedback buckets."""
+    """Select bootstrapped demos first while covering distinct verdict buckets."""
     key_fn, dedup_key, target = spec
     chosen, seen_keys, seen_buckets = [], set(), set()
     for item in [*valid, *fallback]:
@@ -253,17 +237,20 @@ def _sanitize_or_backfill_demos(
             existing_contracts = {d.get("question_contract") for d in valid}
             extras = [ex for ex in fallback if ex.question_contract not in existing_contracts]
             valid.extend(extras[: min_demos - len(valid)])
-        predict.demos = valid[:4]
+        predict.demos = valid[:3]
 
-    stage1_j, stage2_j = _project_judge_examples(train_j)
-    specs = (
-        (judge_mod.assess.predict, stage1_j, (_stage1_bucket, "candidate_answer", min(4, max(min_demos, 4))), _clean_judge_demo),
-        (judge_mod.feedback, stage2_j, (_stage2_bucket, "question_and_answer", min(4, max(min_demos, 3))), None),
-    )
-    for predict, fallback, spec, cleaner in specs:
-        req_keys = set(predict.signature.input_fields)
-        valid = [cleaner(d) if cleaner else d for d in predict.demos if req_keys.issubset(d.keys())]
-        predict.demos = _diversify_demos(valid, fallback, spec) if fallback else valid[: spec[2]]
+    stage1_j = _project_judge_examples(train_j)
+    predict = judge_mod.assess.predict
+    req_keys = set(predict.signature.input_fields)
+    valid = [_clean_judge_demo(d) for d in predict.demos if req_keys.issubset(d.keys())]
+    target = min(3, max(min_demos, 3))
+    predict.demos = _diversify_demos(valid, stage1_j, (_stage1_bucket, "candidate_answer", target)) if stage1_j else valid[:target]
+
+
+def _question_demo_bucket(ex: dspy.Example) -> tuple[str, str]:
+    contract = json.loads(ex.question_contract)
+    req = contract.get("required_question_contract") or {}
+    return str(contract.get("action", "INITIAL")), str(req.get("mode", ""))
 
 
 def compile_with_labeled_few_shot(
@@ -284,22 +271,29 @@ def compile_with_labeled_few_shot(
         get_extended_judge_examples("train", include_base=True)
         if use_extended else get_gold_judge_examples("train")
     )
+    if use_extended:
+        # Prefer curated extended examples first while keeping legacy base examples in pool.
+        ext_q = get_extended_question_examples("train", include_base=False)
+        base_q = get_gold_question_examples("train")
+        train_q = ext_q + base_q
+        ext_j = get_extended_judge_examples("train", include_base=False)
+        base_j = get_gold_judge_examples("train")
+        train_j = ext_j + base_j
+
     grouped_q = _project_question_examples(train_q, question_mod)
     for branch_name, branch_examples in grouped_q.items():
         if branch_examples and k_question > 0:
-            compiled = dspy.LabeledFewShot(k=min(k_question, len(branch_examples))).compile(
-                getattr(question_mod, branch_name), trainset=branch_examples,
+            diverse = _stratify_examples(branch_examples, _question_demo_bucket)
+            compiled = dspy.LabeledFewShot(k=min(k_question, len(diverse))).compile(
+                getattr(question_mod, branch_name), trainset=diverse,
             )
             setattr(question_mod, branch_name, compiled)
 
-    stage1_j, stage2_j = _project_judge_examples(train_j)
+    stage1_j = _project_judge_examples(train_j)
     if stage1_j and k_judge > 0:
-        judge_mod.assess = dspy.LabeledFewShot(k=min(k_judge, len(stage1_j))).compile(
-            judge_mod.assess, trainset=stage1_j,
-        )
-    if stage2_j and k_judge > 0:
-        judge_mod.feedback = dspy.LabeledFewShot(k=min(k_judge, len(stage2_j))).compile(
-            judge_mod.feedback, trainset=stage2_j,
+        diverse_j = _stratify_examples(stage1_j, lambda ex: _stage1_bucket(ex.toDict()))
+        judge_mod.assess = dspy.LabeledFewShot(k=min(k_judge, len(diverse_j))).compile(
+            judge_mod.assess, trainset=diverse_j,
         )
     return question_mod, judge_mod
 
@@ -347,12 +341,11 @@ def compile_with_bootstrap_few_shot(
         ),
     )
     question_mod, judge_mod = _new_modules()
-    with dspy.context(lm=lm):
+    with dspy.context(lm=lm, adapter=dspy.JSONAdapter()):
         compiled_q = dspy.BootstrapFewShot(
             metric=question_metric, metric_threshold=metric_threshold,
             max_bootstrapped_demos=max_bootstrapped_demos, max_labeled_demos=max_labeled_demos,
         ).compile(question_mod, trainset=stratified_q)
-    with dspy.context(lm=lm, adapter=dspy.JSONAdapter()):
         compiled_j = dspy.BootstrapFewShot(
             metric=judgment_metric, metric_threshold=metric_threshold,
             max_bootstrapped_demos=max_bootstrapped_demos, max_labeled_demos=max_labeled_demos,
@@ -371,15 +364,15 @@ def _compile_aux_bootstrap(
 ) -> tuple[dspy.Predict, dspy.Predict]:
     align_mod, bp_mod = _new_aux_modules()
     stratified_align = _stratify_examples(get_alignment_examples("train"), lambda ex: ex.verdict)
-    align_k = max(7, max_bootstrapped_demos)
-    with dspy.context(lm=lm):
+    align_k = min(4, max(3, max_bootstrapped_demos))
+    with dspy.context(lm=lm, adapter=dspy.JSONAdapter()):
         compiled_a = dspy.BootstrapFewShot(
             metric=alignment_evaluation_metric, metric_threshold=metric_threshold,
             max_bootstrapped_demos=align_k, max_labeled_demos=align_k,
         ).compile(align_mod, trainset=stratified_align)
     stratified_bp = _stratify_examples(
         get_blueprint_examples("train"),
-        lambda ex: (bool(ex.allow_extension_probes), len(ex.skills)),
+        lambda ex: (bool(ex.allow_extension_probes), any(not s.get("job_tasks") for s in ex.skills)),
     )
     bp_k = min(3, max(2, max_bootstrapped_demos))
     with dspy.context(lm=lm, adapter=dspy.JSONAdapter()):
@@ -399,8 +392,8 @@ def _compile_random_search(
     lm: dspy.LM,
     *,
     adapter: dspy.Adapter | None = None,
-    max_bootstrapped_demos: int = 3,
-    max_labeled_demos: int = 4,
+    max_bootstrapped_demos: int = 2,
+    max_labeled_demos: int = 3,
     num_candidate_programs: int = 6,
     metric_threshold: float = 0.8,
 ):
@@ -412,7 +405,7 @@ def _compile_random_search(
         num_threads=1,
         metric_threshold=metric_threshold,
     )
-    ctx = dspy.context(lm=lm, adapter=adapter) if adapter is not None else dspy.context(lm=lm)
+    ctx = dspy.context(lm=lm, adapter=adapter) if adapter is not None else dspy.context(lm=lm, adapter=dspy.JSONAdapter())
     with ctx:
         return optimizer.compile(module, trainset=trainset)
 
@@ -443,7 +436,7 @@ def _compile_mipro(
         max_labeled_demos=max_labeled_demos,
         num_threads=4,
     )
-    ctx = dspy.context(lm=lm, adapter=adapter) if adapter is not None else dspy.context(lm=lm)
+    ctx = dspy.context(lm=lm, adapter=adapter) if adapter is not None else dspy.context(lm=lm, adapter=dspy.JSONAdapter())
     with ctx:
         return optimizer.compile(
             module,
@@ -466,13 +459,27 @@ def compile_all_modules(
 ) -> tuple[QuestionGeneratorModule, ReflectiveJudgeModule, dspy.Predict, dspy.Predict]:
     """Compile all 4 evidence modules (Question, Judge, Alignment, Blueprint)."""
     if strategy == "labeled":
-        compiled_q, compiled_j = compile_with_labeled_few_shot(use_extended=use_extended)
-        align_mod, bp_mod = _new_aux_modules()
-        compiled_a = dspy.LabeledFewShot(k=min(4, len(get_alignment_examples("train")))).compile(
-            align_mod, trainset=get_alignment_examples("train"),
+        compiled_q, compiled_j = compile_with_labeled_few_shot(
+            k_question=3, k_judge=3, use_extended=use_extended,
         )
-        compiled_b = dspy.LabeledFewShot(k=min(2, len(get_blueprint_examples("train")))).compile(
-            bp_mod, trainset=get_blueprint_examples("train"),
+        align_mod, bp_mod = _new_aux_modules()
+        strat_align = _stratify_examples(get_alignment_examples("train"), lambda ex: ex.verdict)
+        compiled_a = dspy.LabeledFewShot(k=min(4, len(strat_align))).compile(
+            align_mod, trainset=strat_align,
+        )
+        strat_bp = _stratify_examples(
+            get_blueprint_examples("train"),
+            lambda ex: (bool(ex.allow_extension_probes), any(not s.get("job_tasks") for s in ex.skills)),
+        )
+        # Put extension-enabled example and inferred fallback example in the compact 2-demo set.
+        ordered_bp = sorted(
+            strat_bp,
+            key=lambda ex: (
+                0 if ex.allow_extension_probes else (1 if any(not s.get("job_tasks") for s in ex.skills) else 2)
+            ),
+        )
+        compiled_b = dspy.LabeledFewShot(k=min(2, len(ordered_bp))).compile(
+            bp_mod, trainset=ordered_bp,
         )
         return compiled_q, compiled_j, compiled_a, compiled_b
 
@@ -501,7 +508,8 @@ def compile_all_modules(
         a_mod, b_mod = _new_aux_modules()
         compiled_q = _compile_random_search(
             q_mod, lambda g, p, t=None: question_generation_metric(g, p, t, lm=teacher),
-            strat_q, lm, max_bootstrapped_demos=max_bootstrapped_demos, max_labeled_demos=max_labeled_demos,
+            strat_q, lm, adapter=dspy.JSONAdapter(),
+            max_bootstrapped_demos=max_bootstrapped_demos, max_labeled_demos=max_labeled_demos,
             metric_threshold=metric_threshold,
         )
         compiled_j = _compile_random_search(
@@ -511,8 +519,8 @@ def compile_all_modules(
             metric_threshold=metric_threshold,
         )
         compiled_a = _compile_random_search(
-            a_mod, alignment_evaluation_metric, strat_a, lm,
-            max_bootstrapped_demos=max(4, max_bootstrapped_demos), max_labeled_demos=7,
+            a_mod, alignment_evaluation_metric, strat_a, lm, adapter=dspy.JSONAdapter(),
+            max_bootstrapped_demos=min(4, max(3, max_bootstrapped_demos)), max_labeled_demos=4,
             metric_threshold=metric_threshold,
         )
         compiled_b = _compile_random_search(
@@ -532,7 +540,7 @@ def compile_all_modules(
     a_mod, b_mod = _new_aux_modules()
     compiled_q = _compile_mipro(
         q_mod, lambda g, p, t=None: question_generation_metric(g, p, t, lm=teacher),
-        train_q, dev_q, lm, prompt_lm=teacher,
+        train_q, dev_q, lm, prompt_lm=teacher, adapter=dspy.JSONAdapter(),
         max_bootstrapped_demos=max_bootstrapped_demos, max_labeled_demos=0,
     )
     compiled_j = _compile_mipro(
@@ -543,7 +551,7 @@ def compile_all_modules(
     compiled_a = _compile_mipro(
         a_mod, alignment_evaluation_metric,
         get_alignment_examples("train"), get_alignment_examples("dev"), lm, prompt_lm=teacher,
-        max_bootstrapped_demos=3, max_labeled_demos=3,
+        adapter=dspy.JSONAdapter(), max_bootstrapped_demos=3, max_labeled_demos=3,
     )
     compiled_b = _compile_mipro(
         b_mod, lambda g, p, t=None: blueprint_evaluation_metric(g, p, t, lm=teacher),
@@ -699,7 +707,7 @@ def _adapter_ctx(lm: dspy.LM | None, adapter: dspy.Adapter):
 
 
 def _score_dialogues(q_module, j_module, spec: tuple) -> tuple[list[float], int]:
-    """Evaluate paired Judge -> next Question turns under production adapters."""
+    """Evaluate paired Judge -> next Question turns under production JSONAdapter."""
     pairs, teacher, lm = spec
     scores: list[float] = []
     errors = 0
@@ -710,7 +718,7 @@ def _score_dialogues(q_module, j_module, spec: tuple) -> tuple[list[float], int]
             context = json.loads(question_case.context)
             context["history"][-1]["judgment"] = Judgment.model_validate(assessment.judgment).model_dump(mode="json")
             next_case = dspy.Example(context=encode_context(context), question=question_case.question)
-            with _adapter_ctx(lm, dspy.ChatAdapter()):
+            with _adapter_ctx(lm, dspy.JSONAdapter()):
                 next_question = _retry_transient(lambda nc=next_case: q_module(context=nc.context))
             j_score = _retry_transient(lambda jc=judge_case, a=assessment: judge_evaluation_metric(jc, a, lm=teacher))
             q_score = _retry_transient(lambda nc=next_case, nq=next_question: question_generation_metric(nc, nq, lm=teacher))
@@ -733,7 +741,7 @@ def evaluate_modules_on_dev(
     questions, judgments = get_gold_question_examples(split), get_gold_judge_examples(split)
     teacher = judge_lm if judge_lm is not None else get_judge_lm()
     with dspy.context(lm=lm) if lm is not None else dspy.context():
-        q_scores, q_errs = _score_module(q_module, questions, (question_generation_metric, teacher, None))
+        q_scores, q_errs = _score_module(q_module, questions, (question_generation_metric, teacher, dspy.JSONAdapter()))
         j_scores, j_errs = _score_module(j_module, judgments, (judge_evaluation_metric, teacher, dspy.JSONAdapter()))
     dialogue_scores, d_errs = _score_dialogues(q_module, j_module, (dialogue_examples(split), teacher, lm))
     return {
@@ -768,11 +776,16 @@ def evaluate_all_modules(
     teacher = judge_lm if judge_lm is not None else get_judge_lm()
     a_golds, a_preds, a_errs = [ex.verdict for ex in alignments], [], 0
 
-    with dspy.context(lm=lm) if lm is not None else dspy.context():
-        q_scores, q_errs = _score_module(q_module, questions, (question_generation_metric, teacher, dspy.ChatAdapter()))
+    with dspy.context(lm=lm, adapter=dspy.JSONAdapter()) if lm is not None else dspy.context(adapter=dspy.JSONAdapter()):
+        q_scores, q_errs = _score_module(q_module, questions, (question_generation_metric, teacher, dspy.JSONAdapter()))
         for ex in alignments:
             try:
-                a_preds.append(_retry_transient(lambda e=ex: a_module(context=e.context).verdict))
+                pred = _retry_transient(lambda e=ex: a_module(context=e.context))
+                review = getattr(pred, "review", None)
+                verdict = (
+                    review.get("verdict") if isinstance(review, dict) else getattr(review, "verdict", None)
+                ) if review is not None else getattr(pred, "verdict", "INVALID")
+                a_preds.append(str(verdict))
             except Exception:
                 a_errs += 1
                 a_preds.append("INVALID")

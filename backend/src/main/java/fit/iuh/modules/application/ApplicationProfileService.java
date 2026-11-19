@@ -6,21 +6,56 @@ import fit.iuh.modules.evidence.*;
 import fit.iuh.modules.session.entity.Session;
 import fit.iuh.modules.session.repository.*;
 import jakarta.validation.constraints.*;
-import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 
-@Service @RequiredArgsConstructor
+@Service @Slf4j
 public class ApplicationProfileService {
+    private static final int MAX_COMPANY_LENGTH = 200;
+    private static final int MAX_ROLE_TITLE_LENGTH = 200;
+    private static final int MAX_JD_SUMMARY_LENGTH = 1500;
+    private static final String DEFAULT_ROLE_TITLE = "vị trí ứng tuyển";
+
     private final ApplicationProfileRepository profiles;
     private final SessionRepository sessions;
     private final InterviewRunRepository runs;
     private final SessionTurnRepository turns;
     private final EvidenceJson json;
+    private final EvidenceAiClient ai;
+
+    @Autowired
+    public ApplicationProfileService(
+            ApplicationProfileRepository profiles,
+            SessionRepository sessions,
+            InterviewRunRepository runs,
+            SessionTurnRepository turns,
+            EvidenceJson json,
+            EvidenceAiClient ai) {
+        this.profiles = profiles;
+        this.sessions = sessions;
+        this.runs = runs;
+        this.turns = turns;
+        this.json = json;
+        this.ai = ai;
+    }
+
+    public ApplicationProfileService(
+            ApplicationProfileRepository profiles,
+            SessionRepository sessions,
+            InterviewRunRepository runs,
+            SessionTurnRepository turns,
+            EvidenceJson json) {
+        this(profiles, sessions, runs, turns, json, null);
+    }
 
     public record Create(@NotBlank String sourceSessionId, @NotBlank @Size(max = 200) String title,
                          @Size(max = 200) String company) {}
@@ -67,7 +102,66 @@ public class ApplicationProfileService {
         source.setStatus("Not started");
         source.setEndedAt(null);
         sessions.save(source);
+        scheduleBlueprintPrewarm(profile);
         return view(profile);
+    }
+
+    private void scheduleBlueprintPrewarm(ApplicationProfile profile) {
+        if (ai == null || profile.getId() == null || profile.getBlueprintJson() != null) {
+            return;
+        }
+        UUID profileId = profile.getId();
+        Map<String, Object> payload = buildBlueprintPayload(profile);
+        Runnable task = () -> CompletableFuture.runAsync(() -> prewarmBlueprint(profileId, payload));
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    task.run();
+                }
+            });
+        } else {
+            task.run();
+        }
+    }
+
+    void prewarmBlueprint(UUID profileId, Map<String, Object> payload) {
+        if (ai == null || profileId == null) {
+            return;
+        }
+        try {
+            JsonNode blueprint = ai.blueprint(payload);
+            if (blueprint != null && blueprint.path("objectives").isArray() && !blueprint.path("objectives").isEmpty()) {
+                int updated = profiles.savePrewarmedBlueprintIfAbsent(profileId, blueprint.toString());
+                log.info("Prewarmed blueprint for profile_id={} updated={}", profileId, updated > 0);
+            }
+        } catch (Exception ex) {
+            log.debug("Background blueprint prewarm skipped for profile_id={} ({})", profileId, ex.getClass().getSimpleName());
+        }
+    }
+
+    Map<String, Object> buildBlueprintPayload(ApplicationProfile profile) {
+        JsonNode rawSkills = json.read(profile.getSkillGapJson());
+        var evidenceInputs = new EvidenceInputs(null, json);
+        JsonNode interviewSkills = evidenceInputs.enrichPersonalization(evidenceInputs.interviewSkills(rawSkills), rawSkills);
+        var opening = new HashMap<String, Object>();
+        opening.put("company", clip(profile.getCompany(), MAX_COMPANY_LENGTH));
+        opening.put("role_title", clip(firstNonBlank(profile.getRoleTitle(), profile.getJdTitle(), DEFAULT_ROLE_TITLE), MAX_ROLE_TITLE_LENGTH));
+        opening.put("jd_summary", clip(profile.getJdText(), MAX_JD_SUMMARY_LENGTH));
+        return Map.of("skills", interviewSkills, "opening", opening);
+    }
+
+    private static String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) return value;
+        }
+        return "";
+    }
+
+    private static String clip(String value, int maxLength) {
+        if (value == null) return "";
+        String normalized = value.trim().replaceAll("\\s+", " ");
+        return normalized.length() <= maxLength ? normalized : normalized.substring(0, maxLength);
     }
 
     @Transactional(readOnly = true)

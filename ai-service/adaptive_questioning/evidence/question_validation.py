@@ -5,7 +5,7 @@ from .models import Question
 
 VOICE_MAX_WORDS = 90
 _DIRECTIVE = r"(?:hãy|(?:bạn|em)\s+(?:sẽ|cần)|please)"
-_TASK_VERB = (r"(?:phân tích|chẩn đoán|xác định|giải thích|mô tả|trình bày|đề xuất|viết|triển khai|"
+_TASK_VERB = (r"(?:phân tích|chẩn đoán|xác định|chỉ ra|nêu|liệt kê|xác minh|giải thích|mô tả|trình bày|đề xuất|viết|triển khai|"
               r"thiết kế|sửa|so sánh|kiểm thử|analy[sz]e|diagnose|identify|explain|describe|propose|"
               r"write|implement|design|fix|compare|test)")
 _SECOND_WORK_PRODUCT = r"(?:đề xuất|viết|triển khai|thiết kế|sửa|so sánh|kiểm thử|propose|write|implement|design|fix|compare|test)"

@@ -67,13 +67,37 @@ public class EvidenceAiClient {
             log.warn("Interview AI transport failed session_id={} operation={} error_type={} elapsed_ms={}",
                     sessionId, operation, ex.getClass().getSimpleName(), TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
             for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
-                if (cause instanceof java.net.SocketTimeoutException) {
+                if (cause instanceof java.net.SocketTimeoutException
+                        || cause instanceof java.net.http.HttpTimeoutException) {
                     throw new ResponseStatusException(HttpStatus.GATEWAY_TIMEOUT,
                             "Chuẩn bị phỏng vấn mất quá nhiều thời gian. Vui lòng thử lại; dữ liệu hồ sơ của bạn vẫn được giữ nguyên.", ex);
                 }
             }
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
                     "Không thể kết nối dịch vụ phỏng vấn. Vui lòng thử lại.", ex);
+        }
+    }
+
+    public JsonNode blueprint(Object payload) {
+        JsonNode request = json.tree(payload);
+        long started = System.nanoTime();
+        log.info("Interview AI blueprint request started skills={}", request.path("skills").size());
+        try {
+            String body = client.post().uri("/api/v2/interview/blueprint")
+                    .contentType(MediaType.APPLICATION_JSON).body(request.toString())
+                    .retrieve().body(String.class);
+            JsonNode result = body == null ? null : json.read(body);
+            if (result == null || !result.path("objectives").isArray() || result.path("objectives").isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Invalid AI blueprint");
+            }
+            log.info("Interview AI blueprint request completed objectives={} elapsed_ms={}",
+                    result.path("objectives").size(), TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
+            return result;
+        } catch (RestClientException ex) {
+            log.warn("Interview AI blueprint request failed error_type={} elapsed_ms={}",
+                    ex.getClass().getSimpleName(), TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "Không thể chuẩn bị sẵn blueprint phỏng vấn.", ex);
         }
     }
 

@@ -1,4 +1,6 @@
-import type { Assessment, EvidenceSession, ObjectiveReport, PublicEvidence } from '@/services/evidenceInterview';
+import type {
+  Assessment, EvidenceDepthRole, EvidenceSession, ObjectiveReport, PublicEvidence, SessionCoaching,
+} from '@/services/evidenceInterview';
 
 export const assessmentLabels: Record<Assessment, string> = {
   NOT_ASSESSED: 'Chưa hỏi trong lượt này',
@@ -82,6 +84,44 @@ export function uniqueFindings(items: readonly string[]) {
   return [...new Set(items.map(item => item.trim()).filter(Boolean))];
 }
 
+export const evidenceDepthLabels: Record<EvidenceDepthRole, string> = {
+  TARGET: 'Độ sâu mục tiêu',
+  DIAGNOSTIC: 'Câu hỏi chẩn đoán nền tảng',
+  EXTENSION: 'Câu hỏi mở rộng nâng cao',
+};
+
+export function questionBadge(item: {
+  status: 'strong' | 'weak' | 'partial';
+  depthRole?: EvidenceDepthRole;
+  evidence: readonly PublicEvidence[];
+  clarifiedLater?: boolean;
+}) {
+  if (item.status === 'strong') {
+    if (item.depthRole === 'DIAGNOSTIC') {
+      return {
+        key: 'diagnostic' as const,
+        label: 'Đạt nền tảng (chẩn đoán)',
+        tone: 'bg-teal-50 text-teal-800 border-teal-200/70',
+      };
+    }
+    if (item.depthRole === 'EXTENSION' && item.evidence.some(ev => ev.performance === 'ABOVE')) {
+      return {
+        key: 'extension' as const,
+        label: 'Vượt yêu cầu (mở rộng)',
+        tone: 'bg-emerald-100/90 text-emerald-900 border-emerald-300/80',
+      };
+    }
+    return { key: 'strong' as const, label: 'Đạt yêu cầu', tone: skillStatuses.strong.tone };
+  }
+  if (item.status === 'weak') {
+    return { key: 'weak' as const, label: 'Cần cải thiện', tone: skillStatuses.weak.tone };
+  }
+  if (item.clarifiedLater) {
+    return { key: 'clarified' as const, label: 'Hỏi làm rõ tiếp', tone: 'bg-sky-50 text-sky-800 border-sky-200/70' };
+  }
+  return { key: 'partial' as const, label: 'Chưa kết luận', tone: skillStatuses.partial.tone };
+}
+
 export function buildResult({ report, turns }: EvidenceSession) {
   // A session result describes completed questions, not the full interview plan.
   // Evidence can also link a question to an objective other than its primary one.
@@ -118,18 +158,43 @@ export function buildResult({ report, turns }: EvidenceSession) {
 
   const questions = turns.map((turn, index) => {
     const evidence = byTurn.get(turn.turn_id) ?? [];
-    const status = evidence.some(item => item.performance === 'BELOW') ? 'weak'
+    const status = evidence.some(item =>
+      item.performance === 'BELOW' || item.observation === 'CONTRADICTS' || item.observation === 'NO_EVIDENCE',
+    ) ? 'weak'
       : evidence.some(item => item.performance === 'AT_TARGET' || item.performance === 'ABOVE') ? 'strong' : 'partial';
+    const depthRole: EvidenceDepthRole = evidence.some(item => item.depth_role === 'EXTENSION') ? 'EXTENSION'
+      : evidence.length > 0 && evidence.every(item => item.depth_role === 'DIAGNOSTIC') ? 'DIAGNOSTIC'
+      : 'TARGET';
     const clarifiedLater = status === 'partial' && turns.some((later, laterIndex) =>
       laterIndex > index
       && later.objective_id === turn.objective_id
       && (byTurn.get(later.turn_id)?.length ?? 0) > 0);
-    return { turn, skillId: skillByObjective.get(turn.objective_id) ?? '', index, evidence, status, clarifiedLater } as const;
+    const badge = questionBadge({ status, depthRole, evidence, clarifiedLater });
+    return {
+      turn,
+      skillId: skillByObjective.get(turn.objective_id) ?? '',
+      index,
+      evidence,
+      status,
+      depthRole,
+      clarifiedLater,
+      badge,
+    } as const;
   });
+
+  const coaching: SessionCoaching | null = report.coaching && report.coaching.overall_summary?.trim()
+    ? {
+        overall_summary: report.coaching.overall_summary.trim(),
+        top_strengths: uniqueFindings(report.coaching.top_strengths ?? []),
+        priority_gaps: uniqueFindings(report.coaching.priority_gaps ?? []),
+        actionable_study_steps: uniqueFindings((report.coaching.actionable_study_steps ?? []).map(cleanStudyRecommendation)),
+      }
+    : null;
 
   return {
     skills,
     questions,
+    coaching,
     strongSkillCount: skills.filter(skill => skill.status === 'strong').length,
     weakSkillCount: skills.filter(skill => skill.status === 'weak').length,
     partialSkillCount: skills.filter(skill => skill.status === 'partial').length,

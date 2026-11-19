@@ -57,9 +57,13 @@ def test_correct_metadata_cannot_bypass_criterion_review(setup, monkeypatch, rep
         return result
 
     # Exercise the DSPy reviewer interface offline, including rejection and regeneration.
-    review = DSPyAssessmentProvider(lm=dspy.utils.DummyLM([
-        {"verdict": "WRONG_SKILL"}, {"verdict": "ALIGNED" if repair else "WRONG_SKILL"},
-    ]))
+    lm = dspy.utils.DummyLM([
+        {"review": {"verdict": "WRONG_SKILL", "reason": "Yêu cầu viết hàm thay vì chọn ca kiểm thử."}},
+        {"review": {"verdict": "ALIGNED" if repair else "WRONG_SKILL", "reason": ""}},
+        {"review": {"verdict": "WRONG_SKILL", "reason": "Vẫn sai kỹ năng."}},
+    ])
+    lm.adapter = dspy.JSONAdapter()
+    review = DSPyAssessmentProvider(lm=lm)
     reviewed = []
 
     def inspect(context):
@@ -80,6 +84,7 @@ def test_correct_metadata_cannot_bypass_criterion_review(setup, monkeypatch, rep
 
 
 def test_ambiguous_debugging_spec_is_repaired_before_delivery(setup, monkeypatch):
+    from adaptive_questioning.evidence.dspy_modules import InitialQuestionSignature
     provider, engine, _ = setup
     generate = provider.question
     task = (
@@ -92,17 +97,23 @@ def test_ambiguous_debugging_spec_is_repaired_before_delivery(setup, monkeypatch
         "Hàm nhận một danh sách số nguyên và trả về giá trị lớn thứ hai phân biệt. "
         "Nếu không tồn tại giá trị đó, hàm phải trả `None`."
     ) + task
-    lm = dspy.utils.DummyLM([{"verdict": "UNANSWERABLE"}, {"verdict": "ALIGNED"}])
+    lm = dspy.utils.DummyLM([
+        {"review": {"verdict": "UNANSWERABLE", "reason": "Thiếu quy tắc xử lý phần tử trùng và khi không có số lớn thứ hai."}},
+        {"review": {"verdict": "ALIGNED", "reason": "Đã nêu đủ quy tắc biên."}},
+    ])
+    lm.adapter = dspy.JSONAdapter()
     reviewer = DSPyAssessmentProvider(lm=lm, compiled_dir=str(DEFAULT_COMPILED_DIR))
     reviewed = []
 
+    assert "boundary" in InitialQuestionSignature.instructions.lower()
+
     def draft(context):
         data = json.loads(context)
-        assert "boundary behavior" in data["question_guidance"]
         result = generate(context)
         if "validation_error" in data:
             assert data["rejected_draft"] == ambiguous
             assert "definitions, or expected behavior" in data["validation_error"]
+            assert "Thiếu quy tắc xử lý phần tử trùng" in data["validation_error"]
             result.text = clarified
         else:
             result.text = ambiguous
@@ -340,10 +351,10 @@ def test_deferred_answer_is_graded_once_when_question_generation_fails(setup, mo
         generation = {"snapshot": saved["snapshot"], "expected_state_version": saved["public"]["state_version"]}
         failed = client.post('/api/v2/interview/next-question', json=generation)
         assert failed.status_code == 503
-        assert len(judgments) == 1 and len(drafts) == 2
+        assert len(judgments) == 1 and len(drafts) == 3
         stale = client.post('/api/v2/interview/next-question', json={**generation, "expected_state_version": 0})
         assert stale.status_code == 422
-        assert len(drafts) == 2
+        assert len(drafts) == 3
 
         stopped = client.post('/api/v2/interview/stop', json=saved["snapshot"]).json()["public"]
         assert stopped["is_finished"] and not stopped["awaiting_question"]

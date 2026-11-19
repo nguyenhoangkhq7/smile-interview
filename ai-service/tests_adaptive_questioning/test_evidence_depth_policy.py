@@ -87,7 +87,8 @@ def test_l2_starts_directly_without_proficiency_conversion(audit):
     assert current(result).objective.depth_basis == "TASK_HEURISTIC"
     question_context = provider.contexts[-1][1]
     assert question_context["required_question_contract"]["depth"] == 2
-    assert len(question_context["depth_definitions"]) == 4
+    assert "Application:" in question_context["depth_definition"]
+    assert "depth_definitions" not in question_context
     assert {"required_proficiency", "depth_basis", "depth_rationale", "inferred", "requirement_id", "objective_id"}.isdisjoint(
         question_context["objective"]
     )
@@ -127,6 +128,7 @@ def test_ambiguous_l2_clarifies_same_depth_and_case(audit):
 
 def test_target_success_stops_without_mandatory_extension(audit):
     provider, engine, _ = audit
+    engine.policy = InterviewPolicy(allow_extension_probes=False)
     provider.extension = 3
     result = answer(engine, start(engine, [task_skill()]).snapshot, "ok")
     assert result.public.is_finished
@@ -149,7 +151,8 @@ def test_failed_l3_preserves_established_l2(audit):
     provider.performance, provider.observation = "BELOW", "CONTRADICTS"
     result = answer(engine, result.snapshot, "extension wrong")
     assert result.public.report.objectives[0].assessment == Assessment.AT
-    assert len(result.public.report.objectives[0].evidence) == 1
+    evidence = result.public.report.objectives[0].evidence
+    assert [item.depth_role for item in evidence] == ["TARGET", "EXTENSION"]
     assert len(next(iter(result.snapshot.objectives.values())).evidence_history) == 2
     assert not next(iter(result.snapshot.objectives.values())).contradictions
 
@@ -248,7 +251,7 @@ def test_invalid_question_contract_stops_after_bounded_retry(audit, field):
     provider.bad_question, provider.bad_attempts = field, 10
     with pytest.raises(QuestionUnavailableError, match="AI chưa tạo được"):
         start(engine, [task_skill()])
-    assert provider.question_number == 2
+    assert provider.question_number == 3
 
 
 def test_budget_prevents_further_generation_even_if_router_would_verify(audit):

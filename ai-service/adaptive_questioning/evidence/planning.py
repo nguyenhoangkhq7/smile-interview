@@ -3,29 +3,57 @@ from uuid import NAMESPACE_URL, uuid5
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextvars import copy_context
+import logging
 from math import ceil
 import re
 import hashlib
 import json
 from time import monotonic
+from pydantic import ValidationError
 
-from .models import Blueprint, GroundedRequirement, InterviewConfig, InterviewSkill, Mode, Objective, ObjectiveState
+from .models import (
+    Blueprint, GroundedRequirement, InterviewConfig, InterviewOpening, InterviewSkill,
+    Mode, Objective, ObjectiveState, PriorAttemptContext,
+)
 from .depth import DEPTH_DEFINITIONS, ground_depth
 from .policy_config import InterviewPolicy
 from .provider import AssessmentProvider, encode_context
 from .preparation_cache import PreparationCache
 from .telemetry import event
 
+logger = logging.getLogger(__name__)
+
 BLUEPRINT_BATCH_SIZE = 3
 BLUEPRINT_WORKERS = 3
+BLUEPRINT_BATCH_ATTEMPTS = 2
+MAX_JD_DOMAIN_SUMMARY_CHARS = 300
+MASTERED_PRIOR_ASSESSMENTS = frozenset({"DEMONSTRATED_AT_TARGET", "DEMONSTRATED_ABOVE_TARGET"})
 
 MODE_PATTERNS: dict[str, str] = {
     "DEBUGGING": r"\b(debug|diagnos\w*|troubleshoot\w*|optimi[sz]\w*)\b|chẩn đoán|tối ưu|sửa lỗi",
     "DESIGN": r"\b(design|architect|trade.?offs?)\b|thiết kế|đánh đổi",
-    "CODING": r"\b(write|implement|code|program)\b|viết|lập trình",
+    "CODING": (
+        r"\b(?:write(?!\s+(?:docs?|documentation|reports?|emails?|plans?|test\s+cases?)\b)|implement|code|program)\b"
+        r"|viết(?!\s+(?:tài\s+liệu|báo\s+cáo|test\s+case|kế\s+hoạch|email|quy\s+trình)\b)|lập trình"
+    ),
     "TECHNICAL_EXPLANATION": r"\b(explain|define|describe)\b|giải thích|định nghĩa|mô tả",
     "BEHAVIORAL": r"\b(collaborat\w*|mentor\w*|conflict|stakeholders?)\b|phối hợp|hướng dẫn|xung đột",
 }
+
+
+def blueprint_domain_context(opening: InterviewOpening | None) -> dict[str, str]:
+    """Extract compact, cache-stable JD role/company/domain metadata for blueprint drafting."""
+    if opening is None:
+        return {}
+    context: dict[str, str] = {}
+    if opening.role_title and opening.role_title.strip() and opening.role_title.strip() != "vị trí ứng tuyển":
+        context["role_title"] = opening.role_title.strip()
+    if opening.company and opening.company.strip():
+        context["company"] = opening.company.strip()
+    if opening.jd_summary and opening.jd_summary.strip():
+        summary = " ".join(opening.jd_summary.split())
+        context["jd_domain_summary"] = summary[:MAX_JD_DOMAIN_SUMMARY_CHARS]
+    return context
 
 
 def requirements_for(skills: list[InterviewSkill]) -> dict[str, GroundedRequirement]:
@@ -34,6 +62,7 @@ def requirements_for(skills: list[InterviewSkill]) -> dict[str, GroundedRequirem
         raise ValueError("Duplicate skill identifiers")
     for skill in skills:
         tasks = skill.job_tasks or [None]
+        skill_display = skill.jd_skill_name.strip() if skill.jd_skill_name else skill.jd_skill_id
         for task in tasks:
             if task and (not task.description.strip() or not task.evidence_spans
                          or any(not span.strip() for span in task.evidence_spans)):
@@ -44,7 +73,7 @@ def requirements_for(skills: list[InterviewSkill]) -> dict[str, GroundedRequirem
                 raise ValueError("Duplicate task identifiers")
             requirements[key] = {
                 "skill_id": skill.jd_skill_id,
-                "description": task.description if task else f"Đánh giá kiến thức thực hành {skill.jd_skill_id}",
+                "description": task.description if task else f"Đánh giá kiến thức thực hành {skill_display}",
                 "required_proficiency": task.required_level if task else skill.required_proficiency,
                 "inferred": task is None or task.level_basis != "EXPLICIT",
                 "has_task": task is not None,
@@ -61,28 +90,30 @@ class BlueprintBuilder:
         self.policy = policy or InterviewPolicy()
         self.cache = cache
 
-    def build(self, skills: list[InterviewSkill]) -> Blueprint:
+    def build(self, skills: list[InterviewSkill], opening: InterviewOpening | None = None) -> Blueprint:
         requirements = requirements_for(skills)
+        domain = blueprint_domain_context(opening)
         items = list(requirements.items())
         batches = [dict(items[index:index + BLUEPRINT_BATCH_SIZE])
                    for index in range(0, len(items), BLUEPRINT_BATCH_SIZE)]
         event("blueprint.started", requirements=len(items), batches=len(batches), workers=BLUEPRINT_WORKERS)
         if len(batches) <= 1:
-            results = [self._prepare_batch(1, 1, requirements)]
+            results = [self._prepare_batch(1, 1, requirements, domain)]
         else:
-            results = self._parallel_batches(batches)
+            results = self._parallel_batches(batches, domain)
         blueprint = Blueprint(objectives=[objective for batch in results for objective in batch.objectives])
-        try:
-            return self.validate(blueprint, skills)
-        except ValueError:
-            if self.cache:
-                self.cache.discard([self._batch_context(batch) for batch in batches])
-            raise
+        return self.validate(blueprint, skills)
 
-    def _parallel_batches(self, batches: list[dict[str, GroundedRequirement]]) -> list[Blueprint]:
+    def _parallel_batches(
+        self,
+        batches: list[dict[str, GroundedRequirement]],
+        domain: dict[str, str],
+    ) -> list[Blueprint]:
         executor = ThreadPoolExecutor(max_workers=BLUEPRINT_WORKERS)
-        pending = {executor.submit(copy_context().run, self._prepare_batch, index + 1, len(batches), batch): index
-                   for index, batch in enumerate(batches)}
+        pending = {
+            executor.submit(copy_context().run, self._prepare_batch, index + 1, len(batches), batch, domain): index
+            for index, batch in enumerate(batches)
+        }
         results = {}
         try:
             for future in as_completed(pending):
@@ -96,11 +127,17 @@ class BlueprintBuilder:
         executor.shutdown()
         return [results[index] for index in range(len(batches))]
 
-    def _prepare_batch(self, index: int, total: int, requirements: dict[str, GroundedRequirement]) -> Blueprint:
+    def _prepare_batch(
+        self,
+        index: int,
+        total: int,
+        requirements: dict[str, GroundedRequirement],
+        domain: dict[str, str],
+    ) -> Blueprint:
         started = monotonic()
         event("blueprint.batch_started", batch=index, total=total, requirements=len(requirements))
         try:
-            result = self._build_batch(requirements)
+            result = self._build_batch(requirements, domain)
             event("blueprint.batch_completed", batch=index, total=total,
                   elapsed_seconds=round(monotonic() - started, 2))
             return result
@@ -109,33 +146,75 @@ class BlueprintBuilder:
                   elapsed_seconds=round(monotonic() - started, 2))
             raise
 
-    def _build_batch(self, requirements: dict[str, GroundedRequirement]) -> Blueprint:
-        context = self._batch_context(requirements)
+    def _build_batch(self, requirements: dict[str, GroundedRequirement], domain: dict[str, str]) -> Blueprint:
+        base_payload = self._batch_payload(requirements, domain)
+        cache_key_context = encode_context(base_payload)
         if self.cache:
-            return self.cache.get_or_compute(context, lambda: self._generate_batch(context, requirements))
-        return self._generate_batch(context, requirements)
+            return self.cache.get_or_compute(
+                cache_key_context,
+                lambda: self._generate_batch(base_payload, requirements),
+            )
+        return self._generate_batch(base_payload, requirements)
 
-    def _batch_context(self, requirements: dict[str, GroundedRequirement]) -> str:
+    def _batch_payload(
+        self,
+        requirements: dict[str, GroundedRequirement],
+        domain: dict[str, str] | None = None,
+    ) -> dict[str, object]:
         prompt_requirements = {
             key: {k: v for k, v in req.items() if k != "has_task"}
             for key, req in requirements.items()
         }
-        return encode_context({
-            "requirements": prompt_requirements, "depth_definitions": DEPTH_DEFINITIONS,
+        payload: dict[str, object] = {
+            "requirements": prompt_requirements,
+            "depth_definitions": DEPTH_DEFINITIONS,
             "allow_extension_probes": self.policy.allow_extension_probes,
-        })
+        }
+        if domain:
+            payload.update(domain)
+        return payload
 
-    def _generate_batch(self, context: str, requirements: dict[str, GroundedRequirement]) -> Blueprint:
-        draft = self.provider.blueprint(context)
-        ids = [objective.requirement_id for objective in draft.objectives]
-        if len(ids) != len(set(ids)) or set(ids) != set(requirements):
-            raise ValueError("Blueprint must cover every requirement exactly once")
-        return Blueprint(objectives=[
-            Objective.model_validate(objective.model_dump() | {
-                "claim": requirements[objective.requirement_id]["description"],
-            })
-            for objective in draft.objectives
-        ])
+    def _batch_context(
+        self,
+        requirements: dict[str, GroundedRequirement],
+        domain: dict[str, str] | None = None,
+    ) -> str:
+        return encode_context(self._batch_payload(requirements, domain))
+
+    def _generate_batch(self, base_payload: dict[str, object], requirements: dict[str, GroundedRequirement]) -> Blueprint:
+        payload = dict(base_payload)
+        last_error: Exception | None = None
+        for attempt in range(BLUEPRINT_BATCH_ATTEMPTS):
+            try:
+                draft = self.provider.blueprint(encode_context(payload))
+                ids = [objective.requirement_id for objective in draft.objectives]
+                if len(ids) != len(set(ids)) or set(ids) != set(requirements):
+                    raise ValueError("Blueprint must cover every requirement exactly once")
+                batch_blueprint = Blueprint(objectives=[
+                    Objective.model_validate(objective.model_dump() | {
+                        "claim": requirements[objective.requirement_id]["description"],
+                    })
+                    for objective in draft.objectives
+                ])
+                # Validate at batch level before caching so valid sibling batches survive a single failure.
+                for objective in batch_blueprint.objectives:
+                    self._ground(objective, requirements[objective.requirement_id])
+                return batch_blueprint
+            except (ValidationError, ValueError) as exc:
+                last_error = exc
+                detail = (
+                    str(exc.errors(include_input=False, include_url=False))
+                    if isinstance(exc, ValidationError) else str(exc)
+                )
+                payload["validation_error"] = detail
+                logger.warning(
+                    "Invalid blueprint batch (attempt %s/%s): %s",
+                    attempt + 1, BLUEPRINT_BATCH_ATTEMPTS, detail,
+                )
+        assert last_error is not None
+        if isinstance(last_error, ValidationError):
+            raise ValueError(str(last_error)) from last_error
+        raise last_error
 
     def validate(self, blueprint: Blueprint, skills: list[InterviewSkill]) -> Blueprint:
         requirements = requirements_for(skills)
@@ -183,11 +262,20 @@ class BlueprintBuilder:
                 raise ValueError("Extension must have a distinct higher standard")
 
 
-def plan(blueprint: Blueprint, skills: list[InterviewSkill], config: InterviewConfig,
-         policy: InterviewPolicy | None = None) -> tuple[dict[str, ObjectiveState], list[str]]:
+def plan(
+    blueprint: Blueprint,
+    skills: list[InterviewSkill],
+    config: InterviewConfig,
+    policy: InterviewPolicy | None = None,
+    prior_attempts: PriorAttemptContext | None = None,
+) -> tuple[dict[str, ObjectiveState], list[str]]:
     policy = policy or InterviewPolicy()
     by_skill = {skill.jd_skill_id: skill for skill in skills}
-    ranked = sorted(blueprint.objectives, key=lambda obj: _rank(obj, by_skill[obj.skill_id], policy))
+    prior_map = prior_attempts.objective_assessments if prior_attempts else {}
+    ranked = sorted(
+        blueprint.objectives,
+        key=lambda obj: _rank(obj, by_skill[obj.skill_id], policy, prior_map),
+    )
     # First pass across skills before additional objectives of the same skill.
     first, additional, seen = [], [], set()
     for objective in ranked:
@@ -271,12 +359,24 @@ def select_mode(objective: Objective, config: InterviewConfig, usage: Counter[Mo
     return ranked[0][1].mode
 
 
-def _rank(objective: Objective, skill: InterviewSkill, policy: InterviewPolicy) -> tuple[int, int, float, float, int, str]:
+def _rank(
+    objective: Objective,
+    skill: InterviewSkill,
+    policy: InterviewPolicy,
+    prior_assessments: dict[str, str] | None = None,
+) -> tuple[int, int, int, float, float, int, str]:
+    prior_status = (prior_assessments or {}).get(objective.objective_id)
+    already_mastered = int(prior_status in MASTERED_PRIOR_ASSESSMENTS)
     core = skill.importance_weight >= policy.core_importance
-    return (-int(core), int(objective.requirement_kind == "OPTIONAL"),
-            -skill.importance_weight,
-            -skill.priority,
-            objective.estimated_seconds, objective.objective_id)
+    return (
+        already_mastered,
+        -int(core),
+        int(objective.requirement_kind == "OPTIONAL"),
+        -skill.importance_weight,
+        -skill.priority,
+        objective.estimated_seconds,
+        objective.objective_id,
+    )
 
 
 def rubric_fingerprint(objective: Objective) -> str:

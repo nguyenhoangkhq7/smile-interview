@@ -10,6 +10,27 @@ from .excerpts import source_excerpt, source_lines
 VALID_PERFORMANCE = {"BELOW", "AT_TARGET", "ABOVE"}
 SUBSTANTIVE = {"SUPPORTS", "CONTRADICTS"}
 TERMINAL = {Assessment.AT, Assessment.ABOVE, Assessment.BELOW, Assessment.NOT_DEMONSTRATED}
+_VIETNAMESE_DIACRITICS = re.compile(
+    r"[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]",
+    re.IGNORECASE,
+)
+_ENGLISH_PROSE_WORDS = frozenset({
+    "the", "candidate", "answer", "response", "provides", "correctly", "explains",
+    "failed", "however", "without", "because", "therefore", "demonstrates",
+    "does", "not", "should", "missing", "instead", "clearly", "mentions",
+})
+
+
+def _looks_like_english_prose(text: str) -> bool:
+    """Detect leaked full-English prose rationales while permitting short technical strings."""
+    cleaned = text.strip()
+    if not cleaned or _VIETNAMESE_DIACRITICS.search(cleaned):
+        return False
+    words = re.findall(r"[A-Za-z]+", cleaned.lower())
+    if len(words) < 8:
+        return False
+    hits = sum(1 for word in words if word in _ENGLISH_PROSE_WORDS)
+    return hits >= 2
 
 
 def standalone_inability(turn: Turn) -> Judgment | None:
@@ -44,6 +65,11 @@ def validate_judgment(judgment: Judgment, turn: Turn) -> None:
                          f"missing={sorted(expected - set(ids))}, "
                          f"unexpected={sorted(set(ids) - expected)}, duplicates={duplicates}")
     for item in judgment.observations:
+        if _looks_like_english_prose(item.rationale):
+            raise ValueError(
+                f"Observation rationale for criterion_id={item.criterion_id} must be written in Vietnamese, "
+                "not English prose"
+            )
         if item.performance in {"AT_TARGET", "ABOVE"} and item.unresolved_aspects:
             raise ValueError("A passed criterion cannot have unresolved required aspects")
         substantive = item.observation in SUBSTANTIVE

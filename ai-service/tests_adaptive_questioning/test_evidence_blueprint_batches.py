@@ -99,7 +99,7 @@ def test_disabled_optional_extension_cannot_block_interview_preparation():
                 objective.extension_depth = 2
             return result
 
-    result = BlueprintBuilder(ExtensionProvider()).build([skill()])
+    result = BlueprintBuilder(ExtensionProvider(), InterviewPolicy(allow_extension_probes=False)).build([skill()])
     assert result.objectives[0].target_depth == 2
     assert result.objectives[0].extension_depth is None
     assert "extension_criterion_ids" not in result.objectives[0].model_dump()

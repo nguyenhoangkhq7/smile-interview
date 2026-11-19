@@ -1,11 +1,22 @@
 """Pure report projection; internal rubric never leaks through pending turns."""
+from typing import Literal
+
 from .models import (
     Assessment, Criterion, CriterionProgress, CriterionReport, ObjectiveReport,
-    ObjectiveState, PendingTurn, PublicEvidence, PublicSession, PublicTurn, Report, Snapshot, Turn,
+    ObjectiveState, PendingTurn, PublicEvidence, PublicSession, PublicTurn,
+    RecordedEvidence, Report, SessionCoaching, Snapshot, Turn,
 )
 from .assessment import criterion_resolved
 from .policy_config import InterviewPolicy
-from .conversation import brief_feedback
+from .conversation import brief_feedback, display_skill_name
+
+
+def _depth_role(item: RecordedEvidence, target_depth: int) -> Literal["TARGET", "DIAGNOSTIC", "EXTENSION"]:
+    if item.question_depth < target_depth:
+        return "DIAGNOSTIC"
+    if item.question_depth > target_depth:
+        return "EXTENSION"
+    return "TARGET"
 
 
 def _study_recommendations(state: ObjectiveState) -> list[str]:
@@ -60,8 +71,23 @@ def objective_report(state: ObjectiveState, policy: InterviewPolicy | None = Non
     active_policy = policy or InterviewPolicy()
     obj = state.objective
     history = state.evidence_history
-    evidence = [e for e in history if e.independent and e.question_depth == obj.target_depth
-                and (e.observation in {"SUPPORTS", "CONTRADICTS"} or e.explicit_inability)]
+    evidence = [
+        PublicEvidence(
+            turn_id=item.turn_id,
+            criterion_id=item.criterion_id,
+            response_excerpt=item.response_excerpt,
+            performance=item.performance,
+            rationale=item.rationale,
+            depth_role=_depth_role(item, obj.target_depth),
+            observation=item.observation,
+        )
+        for item in history
+        if item.independent and (
+            item.observation in {"SUPPORTS", "CONTRADICTS"}
+            or item.explicit_inability
+            or (item.observation == "UNCLEAR" and item.rationale.strip())
+        )
+    ]
     target_results = list(state.criterion_results.values())
     weaknesses = list(dict.fromkeys([
         *[e.rationale for e in target_results if e.performance == "BELOW" and e.criterion_id not in state.contradictions],
@@ -75,9 +101,79 @@ def objective_report(state: ObjectiveState, policy: InterviewPolicy | None = Non
         strengths=[e.rationale for e in target_results if e.performance in {"AT_TARGET", "ABOVE"} and e.criterion_id not in state.contradictions],
         weaknesses=weaknesses,
         study_recommendations=_study_recommendations(state),
-        evidence=[PublicEvidence.model_validate(item, from_attributes=True) for item in evidence],
+        evidence=evidence,
         criteria=[criterion_report(state, c, active_policy) for c in obj.criteria],
     )
+
+
+def fallback_session_coaching(snapshot: Snapshot) -> SessionCoaching | None:
+    """Deterministic Vietnamese coaching summary grounded in recorded evidence when LLM coaching is unavailable."""
+    if not snapshot.turns:
+        return None
+    reports = [objective_report(state, snapshot.policy) for state in snapshot.objectives.values() if state.turns_spent > 0]
+    if not reports:
+        return None
+    role = (snapshot.opening_context.role_title.strip() if snapshot.opening_context else "") or "vị trí ứng tuyển"
+    strong = [r for r in reports if r.assessment in {Assessment.AT, Assessment.ABOVE}]
+    weak = [r for r in reports if r.assessment in {Assessment.BELOW, Assessment.NOT_DEMONSTRATED}]
+    partial = [r for r in reports if r.assessment == Assessment.INSUFFICIENT]
+
+    summary_parts = [f"Trong buổi phỏng vấn cho vị trí {role}, bạn đã hoàn thành {len(snapshot.turns)} lượt trao đổi."]
+    if strong:
+        names = ", ".join(dict.fromkeys(display_skill_name(r.skill_id, snapshot.skills) for r in strong))
+        summary_parts.append(f"Bạn thể hiện đạt yêu cầu ở các kỹ năng: {names}.")
+    if weak:
+        names = ", ".join(dict.fromkeys(display_skill_name(r.skill_id, snapshot.skills) for r in weak))
+        summary_parts.append(f"Cần ưu tiên củng cố thêm ở: {names}.")
+    elif partial:
+        summary_parts.append("Một số tiêu chí vẫn cần thêm dữ kiện ở lượt luyện tập sau để kết luận đầy đủ.")
+
+    top_strengths = list(dict.fromkeys(item for r in reports for item in r.strengths))[:3]
+    priority_gaps = list(dict.fromkeys(item for r in reports for item in r.weaknesses))[:3]
+    actionable = list(dict.fromkeys(item for r in reports for item in r.study_recommendations))[:4]
+    if not actionable and strong:
+        actionable = ["Tiếp tục luyện các bài toán mở rộng về hiệu năng, biên lỗi và đánh đổi thiết kế ở lượt tiếp theo."]
+    elif not actionable:
+        actionable = ["Hoàn thành thêm lượt phỏng vấn để có đủ bằng chứng chi tiết cho từng tiêu chí."]
+
+    return SessionCoaching(
+        overall_summary=" ".join(summary_parts),
+        top_strengths=top_strengths,
+        priority_gaps=priority_gaps,
+        actionable_study_steps=actionable,
+    )
+
+
+def coaching_context(snapshot: Snapshot) -> dict[str, object]:
+    """Assemble safe, evidence-grounded coaching inputs for end-of-session synthesis."""
+    reports = [objective_report(state, snapshot.policy) for state in snapshot.objectives.values() if state.turns_spent > 0]
+    opening = snapshot.opening_context
+    return {
+        "role_title": (opening.role_title.strip() if opening else "") or "vị trí ứng tuyển",
+        "company": opening.company.strip() if opening else "",
+        "termination_reason": snapshot.termination_reason,
+        "turns_answered": len(snapshot.turns),
+        "objectives": [
+            {
+                "skill": display_skill_name(item.skill_id, snapshot.skills),
+                "claim": item.claim,
+                "assessment": item.assessment.value,
+                "strengths": item.strengths[:3],
+                "weaknesses": item.weaknesses[:3],
+                "study_recommendations": item.study_recommendations[:3],
+                "evidence": [
+                    {
+                        "depth_role": ev.depth_role,
+                        "observation": ev.observation,
+                        "performance": ev.performance,
+                        "rationale": ev.rationale,
+                    }
+                    for ev in item.evidence[:4]
+                ],
+            }
+            for item in reports
+        ],
+    }
 
 
 def report(snapshot: Snapshot) -> Report:
@@ -85,6 +181,7 @@ def report(snapshot: Snapshot) -> Report:
     return Report(
         termination_reason=snapshot.termination_reason,
         objectives=objectives,
+        coaching=snapshot.coaching,
     )
 
 

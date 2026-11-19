@@ -38,7 +38,7 @@ class Clock:
 
 def test_rate_limit_retries_with_backoff_and_recovers(caplog):
     clock, attempts = Clock(), []
-    runtime = ModelRuntime(clock=clock, wait=clock.wait)
+    runtime = ModelRuntime(clock=clock, wait=clock.wait, jitter=lambda: 0.0)
 
     def compute():
         attempts.append(True)
@@ -49,7 +49,7 @@ def test_rate_limit_retries_with_backoff_and_recovers(caplog):
     with caplog.at_level(logging.INFO, logger="uvicorn.error"):
         assert runtime.call("blueprint", compute) == "recovered"
     assert len(attempts) == 3
-    assert clock.waits == [5.0, 15.0]
+    assert clock.waits == [1.0, 3.0]
     assert "interview.model.retry" in caplog.text
     assert "status=429" in caplog.text
     assert "private account information" not in caplog.text

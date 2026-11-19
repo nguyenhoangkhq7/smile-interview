@@ -20,7 +20,11 @@ DEPTH_PATTERNS: dict[str, int] = {
 
 
 def ground_depth(objective: Objective, requirement: GroundedRequirement, policy: InterviewPolicy) -> None:
-    if requirement["has_task"] and objective.depth_evidence_spans:
+    if (
+        requirement["has_task"]
+        and objective.depth_evidence_spans
+        and objective.depth_basis not in {"TASK_HEURISTIC", "CONFIGURED_FALLBACK"}
+    ):
         _validate_task_depth(objective, requirement)
         objective.depth_basis = "TASK_INTERPRETATION"
     else:

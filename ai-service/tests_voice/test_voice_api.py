@@ -116,11 +116,16 @@ def test_wrong_provider_format_does_not_become_audio(client, monkeypatch):
     assert client.post("/api/v2/voice/speech", json={"text": "Xin chào"}).status_code == 502
 
 
-def test_free_heygen_defaults_and_native_pcm(client, monkeypatch):
+def test_default_tts_is_gemini_and_heygen_still_works_when_configured(client, monkeypatch):
     import json
     for name in ("OPENROUTER_TTS_MODEL", "OPENROUTER_TTS_VOICE", "OPENROUTER_TTS_FORMAT",
                  "OPENROUTER_TTS_SAMPLE_RATE"):
         monkeypatch.delenv(name, raising=False)
+    cfg = client.get("/api/v2/voice/config").json()
+    assert (cfg["tts_model"], cfg["voice"], cfg["format"], cfg["sample_rate"]) == (
+        "google/gemini-3.8-flash-lite-tts", "Kore", "pcm", 24000)
+
+    monkeypatch.setenv("OPENROUTER_TTS_MODEL", "heygen/heygen-voice-1-turbo:free")
     cfg = client.get("/api/v2/voice/config").json()
     assert (cfg["tts_model"], cfg["voice"], cfg["format"], cfg["sample_rate"]) == (
         "heygen/heygen-voice-1-turbo:free", "nadine", "pcm", 44100)
