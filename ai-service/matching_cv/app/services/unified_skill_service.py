@@ -202,6 +202,19 @@ def deduplicate_explicit_implicit(
                 exp_id, exp_sf = explicit_slugs[imp_slug]
                 matched_info = (exp_id, exp_sf, "surface_form_match")
 
+        # Check 3b: Multi-token subset match (e.g. explicit "database design" vs implicit "Database Schema Design")
+        if not matched_info and norm_imp_label:
+            imp_tokens = set(norm_imp_label.split())
+            if len(imp_tokens) >= 2:
+                for norm_exp_sf, (exp_id, exp_sf) in explicit_surface_forms.items():
+                    exp_tokens = set(norm_exp_sf.split())
+                    if len(exp_tokens) >= 2 and (
+                        (exp_tokens.issubset(imp_tokens) and len(imp_tokens) - len(exp_tokens) <= 1)
+                        or (imp_tokens.issubset(exp_tokens) and len(exp_tokens) - len(imp_tokens) <= 1)
+                    ):
+                        matched_info = (exp_id, exp_sf, "surface_form_match")
+                        break
+
         if matched_info:
             exp_id, exp_sf, reason = matched_info
             duplicate_list.append(

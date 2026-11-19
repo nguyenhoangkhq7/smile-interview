@@ -136,6 +136,22 @@ KNOWN_ALIAS_TABLE: List[Dict[str, Any]] = [
         "canonical_label": "React",
         "aliases": ["react", "react.js", "reactjs", "react js"],
     },
+    {
+        "canonical_id": "docker",
+        "canonical_label": "Docker",
+        "aliases": ["docker", "docker compose", "docker-compose"],
+    },
+    {
+        "canonical_id": "system-design",
+        "canonical_label": "System Design",
+        "aliases": [
+            "system design",
+            "system architecture",
+            "full-stack architecture",
+            "full stack architecture",
+            "software architecture",
+        ],
+    },
 ]
 
 
@@ -295,11 +311,13 @@ class SkillClusteringService:
         s = re.sub(r"[\-_\.\/]+", " ", s)
         s = re.sub(r"\s+", " ", s).strip()
 
-        # Strip suffix variants if length allows
-        for suffix in [" development", " designing", " design", " dev"]:
+        # Strip suffix variants if length allows (keep 'design' unless preceded by 'api')
+        for suffix in [" development", " designing", " dev"]:
             if s.endswith(suffix) and len(s) > len(suffix) + 2:
                 s = s[: -len(suffix)].strip()
                 break
+        if s.endswith(" api design") or s == "api design":
+            s = s[: -len(" design")].strip()
 
         # Token plural normalization
         tokens = s.split()
@@ -369,16 +387,19 @@ class SkillClusteringService:
         if norm_a == norm_b:
             return None
 
-        # Check if B is A + generic suffix
+        def _is_valid_suffix_token(w: str) -> bool:
+            return w in GENERIC_TOOL_SUFFIXES_SET or bool(re.match(r"^v?\d+(?:\.\d+)*$", w))
+
+        # Check if B is A + generic/version suffix
         if norm_b.startswith(norm_a + " "):
             remainder = norm_b[len(norm_a) :].strip().split()
-            if remainder and all(w in GENERIC_TOOL_SUFFIXES_SET for w in remainder):
+            if remainder and all(_is_valid_suffix_token(w) for w in remainder):
                 return (skill_a, skill_b)
 
-        # Check if A is B + generic suffix
+        # Check if A is B + generic/version suffix
         if norm_a.startswith(norm_b + " "):
             remainder = norm_a[len(norm_b) :].strip().split()
-            if remainder and all(w in GENERIC_TOOL_SUFFIXES_SET for w in remainder):
+            if remainder and all(_is_valid_suffix_token(w) for w in remainder):
                 return (skill_b, skill_a)
 
         return None

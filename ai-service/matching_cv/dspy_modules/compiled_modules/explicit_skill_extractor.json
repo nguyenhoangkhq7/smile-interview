@@ -5,7 +5,7 @@
     "demos": [
       {
         "document_type": "JD",
-        "document_text": "Applicants need a PMP certification. Experience writing functional tests is required.",
+        "document_text": "Applicants need a PMP certification. Experience writing automated tests with Playwright is required.",
         "explicit_skills": [
           {
             "mention": "PMP certification",
@@ -14,10 +14,10 @@
             "source_sentence": "Applicants need a PMP certification."
           },
           {
-            "mention": "functional tests",
+            "mention": "Playwright",
             "kind": "skill",
-            "category": "Engineering Practice",
-            "source_sentence": "Experience writing functional tests is required."
+            "category": "Technology/Tool",
+            "source_sentence": "Experience writing automated tests with Playwright is required."
           }
         ]
       },
@@ -88,12 +88,6 @@
             "mention": "Airflow",
             "kind": "skill",
             "category": "Technology/Tool",
-            "source_sentence": "Built data pipelines with Python and Airflow."
-          },
-          {
-            "mention": "data pipelines",
-            "kind": "skill",
-            "category": "Technical Concept",
             "source_sentence": "Built data pipelines with Python and Airflow."
           }
         ]

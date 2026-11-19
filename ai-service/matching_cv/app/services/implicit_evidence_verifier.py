@@ -84,7 +84,142 @@ SPECIALIZED_TECH_OVERCLAIM_PATTERNS = [
         "Cloud Cost Optimization & FinOps",
         re.compile(r"\b(cost\w*|spend\w*|budget\w*|finops|bill\w*|savings?|expenditure|pricing)\b", re.IGNORECASE),
     ),  # added after seeing eval case
+    (
+        re.compile(r"\b(performance\s+optimi[sz]ation|application\s+performance\s+tuning|runtime\s+optimi[sz]ation)\b", re.IGNORECASE),
+        "Software Performance Optimization",
+        re.compile(
+            r"\b(profil\w*|memory|cpu|latency|p95|p99|response\s+times?|throughput|bottleneck\w*|slow\s+quer\w*|explain\s+analyze|benchmark\w*|render\s+time|load\s+time|concurren\w*|cache\s+hit)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        re.compile(r"\b(database\s+schema\s+design|schema\s+design|database\s+design)\b", re.IGNORECASE),
+        "Direct Database Schema Design",
+        re.compile(
+            r"\b(designed\s+(?:the\s+|our\s+|a\s+)?(?:\w+\s+){0,2}schema|architected\s+(?:the\s+|our\s+|a\s+)?(?:\w+\s+){0,2}schema|modeled\s+(?:the\s+|our\s+|a\s+)?(?:\w+\s+){0,2}schema|evolve\s+(?:the\s+|our\s+)?(?:\w+\s+){0,2}schema|designing\s+relational\s+schemas?|normali[sz]\w+|foreign\s+keys?|erd\b|entity\s+relationship)\b",
+            re.IGNORECASE,
+        ),
+    ),
 ]
+
+# Non-technical / soft-skill categories that must be rejected from technical implicit extraction
+NON_TECHNICAL_IMPLICIT_CATEGORIES: Set[str] = {
+    "soft skill",
+    "soft skills",
+    "interpersonal skill",
+    "interpersonal skills",
+    "personal trait",
+    "personality",
+    "behavioral",
+}
+
+# Bare single-word or overly broad umbrella implicit labels that must never be accepted as standalone skills
+BARE_GENERIC_IMPLICIT_LABELS: Set[str] = {
+    "integration",
+    "integrations",
+    "architecture",
+    "development",
+    "design",
+    "management",
+    "implementation",
+    "optimization",
+    "analysis",
+    "operations",
+    "testing",
+    "deployment",
+    "automation",
+    "migration",
+    "migrations",
+    "troubleshooting",
+    "debugging",
+    "security",
+    "performance",
+    "scalability",
+    "reliability",
+    "maintainability",
+    "communication",
+    "collaboration",
+    "ownership",
+    "product ownership",
+    "feature ownership",
+    "end-to-end ownership",
+    "project ownership",
+    "service ownership",
+    "team collaboration",
+    "cross-functional collaboration",
+    "cross-functional communication",
+    "algorithm design",
+    "time complexity analysis",
+    "api integration",
+    "third-party api integration",
+    "third party api integration",
+    "frontend state management",
+    "state management",
+    "state management optimization",
+    "natural language processing (nlp) integration",
+    "natural language processing integration",
+    "nlp integration",
+}
+
+# Generic modifier stems that do not create a distinct implicit skill when added to an explicit skill
+REDUNDANT_EXPLICIT_MODIFIER_STEMS: Set[str] = {
+    "schema",
+    "design",
+    "system",
+    "architectur",
+    "manag",
+    "integrat",
+    "integr",
+    "develop",
+    "implement",
+    "implem",
+    "imple",
+    "optim",
+    "api",
+    "servic",
+    "modul",
+    "applic",
+    "databas",
+    "databa",
+    "relat",
+    "frontend",
+    "backend",
+    "client",
+    "server",
+    "aa",
+    "aaa",
+    "web",
+    "ui",
+    "user",
+    "interfac",
+    "strateg",
+    "pattern",
+    "practic",
+    "workflow",
+    "complianc",
+    "compli",
+    "standard",
+}
+
+# Concept stems inherently implied when a specific tool or standard is already in explicit skills.
+# Prevents implicit extraction from restating the primary purpose of an explicit tool/standard
+# (e.g. 'WCAG AA' -> 'Accessibility Implementation', 'Storybook' -> 'Component Library Architecture').
+EXPLICIT_TOOL_IMPLIED_CONCEPT_STEMS: Dict[str, Set[str]] = {
+    "wcag": {"accessibil", "accessibl", "wcag", "a11", "a11y", "complianc"},
+    "wcag-aa": {"accessibil", "accessibl", "wcag", "a11", "a11y", "complianc"},
+    "wcag-aaa": {"accessibil", "accessibl", "wcag", "a11", "a11y", "complianc"},
+    "storybook": {"compon", "librar", "librari", "ui", "storybook", "reusabl", "shared"},
+    "react-query": {"state", "cach", "synchron", "stale"},
+    "tanstack-query": {"state", "cach", "synchron", "stale"},
+    "redux": {"state", "store"},
+    "redux-toolkit": {"state", "store"},
+    "zustand": {"state", "store"},
+    "jwt": {"authent", "author", "auth", "token", "secur"},
+    "oauth": {"authent", "author", "auth", "token", "secur"},
+    "oauth-2.0": {"authent", "author", "auth", "token", "secur"},
+    "flyway": {"migrat", "version"},
+    "liquibase": {"migrat", "version"},
+}
 
 # High-level architecture, strategy, and governance responsibility patterns (Phase 3B.2 Hardening)
 STRATEGY_OVERCLAIM_PATTERNS = [
@@ -229,6 +364,8 @@ GENERIC_ANCHOR_STEMS: Set[str] = {
     "requir",
     "strateg",
     "perform",
+    "own",
+    "owner",
 }
 
 CANONICAL_TOOL_ANCHORS: Dict[str, Set[str]] = {
@@ -462,6 +599,10 @@ class ImplicitEvidenceVerifier:
         sub_lower = sub_clean.casefold()
         ev_lower = evidence_text.casefold()
 
+        # 0. Reject bare single-word generic or umbrella labels
+        if sub_lower in BARE_GENERIC_IMPLICIT_LABELS:
+            return False
+
         # 1. Direct mention
         if re.search(rf"\b{re.escape(sub_lower)}\b", ev_lower):
             return True
@@ -592,16 +733,36 @@ class ImplicitEvidenceVerifier:
         # Track existing explicit IDs and surface forms to detect duplicates and superficial variations (Phase 5)
         known_explicit_ids: Set[str] = set()
         known_explicit_labels: Set[str] = set()
+        explicit_stem_sets: List[Tuple[Set[str], str]] = []
+        explicit_implied_concept_sets: List[Tuple[Set[str], str]] = []
         non_skill_norms: List[Tuple[str, str]] = []
         seen_ns_norms: Set[str] = set()
         if explicit_result:
             for s in explicit_result.skills or []:
-                known_explicit_ids.add(s.skill_id.lower())
-                known_explicit_labels.add(s.skill_id.lower())
+                sid_lower = s.skill_id.lower()
+                known_explicit_ids.add(sid_lower)
+                known_explicit_labels.add(sid_lower)
+                first_sf = s.surface_forms[0] if s.surface_forms else s.skill_id
+                if sid_lower in EXPLICIT_TOOL_IMPLIED_CONCEPT_STEMS:
+                    explicit_implied_concept_sets.append(
+                        (EXPLICIT_TOOL_IMPLIED_CONCEPT_STEMS[sid_lower], first_sf)
+                    )
                 for sf in s.surface_forms or []:
                     cleaned_sf = sf.strip().casefold()
                     known_explicit_labels.add(cleaned_sf)
-                    known_explicit_ids.add(skill_postprocessor.slugify_skill(cleaned_sf))
+                    sf_slug = skill_postprocessor.slugify_skill(cleaned_sf)
+                    known_explicit_ids.add(sf_slug)
+                    if sf_slug in EXPLICIT_TOOL_IMPLIED_CONCEPT_STEMS:
+                        explicit_implied_concept_sets.append(
+                            (EXPLICIT_TOOL_IMPLIED_CONCEPT_STEMS[sf_slug], sf)
+                        )
+                    sf_stems = {
+                        st
+                        for st in cls.extract_semantic_stems(cleaned_sf)
+                        if st not in SEMANTIC_FLUFF_STEMS and st not in {"aa", "aaa"}
+                    }
+                    if sf_stems:
+                        explicit_stem_sets.append((sf_stems, sf))
             for ns_ent in getattr(explicit_result, "non_skill_entities", []) or []:
                 cands_sf: List[str] = list(getattr(ns_ent, "surface_forms", []) or [])
                 for ev in getattr(ns_ent, "evidences", []) or []:
@@ -756,6 +917,81 @@ class ImplicitEvidenceVerifier:
                         ),
                         confidence_norm=0.1,
                         extra_orig={"redundant_explicit_match": stripped_fluff},
+                    )
+                    verifications.append(v_record)
+                    rejected_skills.append(cand)
+                    continue
+
+            # 3a-1b: Reject non-technical / soft-skill categories
+            cand_cat_raw = str(getattr(cand, "category_raw", None) or getattr(cand, "category", "") or "").strip().casefold()
+            if cand_cat_raw in NON_TECHNICAL_IMPLICIT_CATEGORIES:
+                cand_cat_display = getattr(cand, "category_raw", None) or getattr(cand, "category", "non-technical")
+                v_record = build_verification(
+                    assessment="unsupported",
+                    support_status="unsupported",
+                    acceptance_decision="rejected",
+                    is_accepted=False,
+                    support_reason=(
+                        f"Candidate '{cand_label_clean}' belongs to non-technical category "
+                        f"'{cand_cat_display}' and is excluded from core technical skill extraction."
+                    ),
+                    confidence_norm=0.0,
+                    extra_orig={"rejected_non_technical_category": cand_cat_display},
+                )
+                verifications.append(v_record)
+                rejected_skills.append(cand)
+                continue
+
+            # 3a-2: Reject bare generic single-word or umbrella implicit labels
+            if cand_label_clean.casefold() in BARE_GENERIC_IMPLICIT_LABELS:
+                v_record = build_verification(
+                    assessment="unsupported",
+                    support_status="unsupported",
+                    acceptance_decision="rejected",
+                    is_accepted=False,
+                    support_reason=(
+                        f"Candidate '{cand_label_clean}' is an overly broad or bare generic umbrella term "
+                        f"and cannot be accepted as a standalone implicit competency."
+                    ),
+                    confidence_norm=0.0,
+                    extra_orig={"rejected_generic_umbrella": cand_label_clean},
+                )
+                verifications.append(v_record)
+                rejected_skills.append(cand)
+                continue
+
+            # 3a-3: Reject if candidate stems are already covered by an explicit skill (plus generic modifiers)
+            if explicit_stem_sets or explicit_implied_concept_sets:
+                cand_stems = {st for st in cls.extract_semantic_stems(cand_label_clean) if st not in SEMANTIC_FLUFF_STEMS}
+                matched_exp_sf: Optional[str] = None
+                if cand_stems:
+                    for exp_stems, exp_sf in explicit_stem_sets:
+                        if cand_stems == exp_stems or (
+                            len(exp_stems) >= 2
+                            and exp_stems.issubset(cand_stems)
+                            and (cand_stems - exp_stems).issubset(REDUNDANT_EXPLICIT_MODIFIER_STEMS)
+                        ):
+                            matched_exp_sf = exp_sf
+                            break
+                    if matched_exp_sf is None and explicit_implied_concept_sets:
+                        core_cand_stems = cand_stems - REDUNDANT_EXPLICIT_MODIFIER_STEMS
+                        if core_cand_stems:
+                            for implied_stems, exp_sf in explicit_implied_concept_sets:
+                                if core_cand_stems.issubset(implied_stems):
+                                    matched_exp_sf = exp_sf
+                                    break
+                if matched_exp_sf is not None:
+                    v_record = build_verification(
+                        assessment="unsupported",
+                        support_status="unsupported",
+                        acceptance_decision="rejected",
+                        is_accepted=False,
+                        support_reason=(
+                            f"Candidate '{cand_label_clean}' is a superficial or concept-redundant variant of "
+                            f"already explicit skill '{matched_exp_sf}'."
+                        ),
+                        confidence_norm=0.1,
+                        extra_orig={"redundant_explicit_match": matched_exp_sf},
                     )
                     verifications.append(v_record)
                     rejected_skills.append(cand)

@@ -12,9 +12,21 @@ class ExplicitSkillExtractionSignature(dspy.Signature):
     semantic meaning, not exact strings.
 
     What to extract:
-    - Extract only named technologies, tools, programming languages, frameworks,
-      standards, named techniques, named certifications, and domains explicitly
-      required or demonstrated as a competency.
+    - Extract only concrete, named technical skills: programming languages,
+      frameworks, libraries, databases, infrastructure/DevOps tools, and external
+      APIs/services (including tools named inside parentheses such as "(Spring Boot)",
+      "(Apollo)", "(EC2, S3, Lambda)", "(Groq API)").
+    - Extract technical standards/protocols (e.g. "REST API", "RESTful APIs",
+      "GraphQL", "JWT", "OAuth 2.0", "WebSocket", "WCAG", "PWA", "SPA", "SSR", "BFF")
+      and foundational software/database engineering concepts explicitly stated as
+      competencies ("OOP", "MVC", "Microservices", "CI/CD", "system design",
+      "database design", "data modeling", "relational databases", "indexing",
+      "query optimization", "unit tests", "integration tests", "end-to-end tests").
+    - Extract named official certifications and core industry domains (e.g. "fintech",
+      "payments", "e-commerce", "healthcare").
+    - When two independent tools or protocols are joined by a slash (e.g. "ESLint/Prettier",
+      "REST/GraphQL APIs", "Node.js/Express"), extract each constituent tool/protocol as
+      a separate mention ("ESLint" and "Prettier"; "REST" and "GraphQL").
     - Every returned mention and source_sentence must be copied verbatim from
       document_text. Return an empty list when no qualifying competencies exist.
       Do not combine independent skills into a single mention. Preserve each
@@ -30,6 +42,21 @@ class ExplicitSkillExtractionSignature(dspy.Signature):
       ("project stakeholders", "executive leadership"), company or product context, or
       generic duties ("daily standup meetings", "writing technical documentation") unless the
       document names a specific technique or tool.
+    - Never extract adjectives or buzzword modifiers (e.g. "AI-powered",
+      "AI-assisted development", "type-safe", "responsive UI").
+    - Never extract project-specific features, application modules, business matrices,
+      or ad-hoc project algorithm descriptions (e.g. "real-time chat",
+      "interval-merging approach", "rule-based auto-scheduling algorithm",
+      "Eisenhower Matrix", "Email OTP").
+    - Never extract generic engineering actions, UI tasks, or purpose clauses
+      explained alongside a tool (e.g. "migrations", "troubleshooting", "debugging",
+      "authentication", "form validation", "optimistic updates",
+      "client-side caching", "third-party API integration", "code review",
+      "on-call rotation"). When a sentence says "used <Tool> for <generic purpose>",
+      extract ONLY the named tool, never the generic purpose.
+    - Never extract online course titles, tutorial series, or bootcamp names
+      (e.g. "The Ultimate ...", Udemy, Coursera, or Code with Mosh courses) as
+      certifications or skills; only extract official vendor/industry credentials.
     - Do NOT return kind="context" (accepted in schema only for backward
       compatibility). Omit non-skill strings entirely; if such a string must be
       emitted, label it with the matching non-skill kind ("education",
@@ -40,12 +67,13 @@ class ExplicitSkillExtractionSignature(dspy.Signature):
        -> [{"mention": "React", "kind": "skill", "category": "Technology/Tool", "source_sentence": "Built real-time user interfaces with React and TypeScript, managing application state via Redux Toolkit."},
            {"mention": "TypeScript", "kind": "skill", "category": "Technology/Tool", "source_sentence": "Built real-time user interfaces with React and TypeScript, managing application state via Redux Toolkit."},
            {"mention": "Redux Toolkit", "kind": "skill", "category": "Technology/Tool", "source_sentence": "Built real-time user interfaces with React and TypeScript, managing application state via Redux Toolkit."}]
-    2. [EN] "Holds a Certified Information Systems Security Professional credential and performs automated vulnerability scanning."
-       -> [{"mention": "Certified Information Systems Security Professional", "kind": "certification", "category": "Certification", "source_sentence": "Holds a Certified Information Systems Security Professional credential and performs automated vulnerability scanning."},
-           {"mention": "automated vulnerability scanning", "kind": "skill", "category": "Engineering Practice", "source_sentence": "Holds a Certified Information Systems Security Professional credential and performs automated vulnerability scanning."}]
-    3. [VI] "Phát triển ứng dụng di động đa nền tảng bằng Flutter và tối ưu hóa hiệu năng render UI."
-       -> [{"mention": "Flutter", "kind": "skill", "category": "Technology/Tool", "source_sentence": "Phát triển ứng dụng di động đa nền tảng bằng Flutter và tối ưu hóa hiệu năng render UI."},
-           {"mention": "tối ưu hóa hiệu năng render UI", "kind": "skill", "category": "Engineering Practice", "source_sentence": "Phát triển ứng dụng di động đa nền tảng bằng Flutter và tối ưu hóa hiệu năng render UI."}]
+    2. [EN] "Holds a Certified Information Systems Security Professional credential and configures Nginx and OAuth 2.0."
+       -> [{"mention": "Certified Information Systems Security Professional", "kind": "certification", "category": "Certification", "source_sentence": "Holds a Certified Information Systems Security Professional credential and configures Nginx and OAuth 2.0."},
+           {"mention": "Nginx", "kind": "skill", "category": "Technology/Tool", "source_sentence": "Holds a Certified Information Systems Security Professional credential and configures Nginx and OAuth 2.0."},
+           {"mention": "OAuth 2.0", "kind": "skill", "category": "Technical Standard", "source_sentence": "Holds a Certified Information Systems Security Professional credential and configures Nginx and OAuth 2.0."}]
+    3. [VI] "Phát triển ứng dụng di động đa nền tảng bằng Flutter và kết nối cơ sở dữ liệu Firebase."
+       -> [{"mention": "Flutter", "kind": "skill", "category": "Technology/Tool", "source_sentence": "Phát triển ứng dụng di động đa nền tảng bằng Flutter và kết nối cơ sở dữ liệu Firebase."},
+           {"mention": "Firebase", "kind": "skill", "category": "Technology/Tool", "source_sentence": "Phát triển ứng dụng di động đa nền tảng bằng Flutter và kết nối cơ sở dữ liệu Firebase."}]
 
     Negative examples:
     1. [EN] "Candidate has 5 years of industry experience working alongside project stakeholders and executive leadership."

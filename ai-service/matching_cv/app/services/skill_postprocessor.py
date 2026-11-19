@@ -114,6 +114,8 @@ STOPLIST_KIND_MAP: Dict[str, KindType] = {
     # Generic duties & context artifacts
     "debugging": "context",
     "gỡ lỗi": "context",
+    "troubleshooting": "context",
+    "xử lý sự cố": "context",
     "code review": "context",
     "code reviews": "context",
     "review code": "context",
@@ -126,7 +128,146 @@ STOPLIST_KIND_MAP: Dict[str, KindType] = {
     "high write throughput": "context",
     "technical designs": "context",
     "thiết kế kỹ thuật": "context",
+    # Adjectives, buzzwords & non-skill project descriptions
+    "ai-powered": "context",
+    "ai-assisted": "context",
+    "ai-assisted development": "context",
+    "type-safe": "context",
+    "responsive ui": "context",
+    "eisenhower matrix": "context",
+    "interval-merging approach": "context",
+    "rule-based auto-scheduling algorithm": "context",
+    "email otp": "context",
+    "real-time chat": "context",
+    "chat module": "context",
+    # Generic actions, UI effects & common nouns
+    "migrations": "context",
+    "migration": "context",
+    "database migrations": "context",
+    "database migration": "context",
+    "authentication": "context",
+    "authorization": "context",
+    "form validation": "context",
+    "data validation": "context",
+    "validation": "context",
+    "optimistic updates": "context",
+    "optimistic update": "context",
+    "client-side caching": "context",
+    "third-party api integration": "context",
+    "api integration": "context",
+    "task planning": "context",
+    "progress tracking": "context",
+    "coding standards": "context",
+    "database schema discussions": "context",
+    "technical documentation": "context",
+    "writing technical documentation": "context",
 }
+
+# Deterministic pattern guard for ad-hoc project approach/algorithm/buzzword phrases and online course titles
+NON_SKILL_PHRASE_PATTERN = re.compile(
+    r"^(?:ai|ml)[\-\s]+(?:powered|assisted|driven)(?:\s+[a-z0-9\-]+)*$"
+    r"|"
+    r"^rule[\-\s]+based\s+.+$"
+    r"|"
+    r"^.+\s+(?:approach|algorithm|discussions)$"
+    r"|"
+    r"^the\s+ultimate\s+.+$"
+    r"|"
+    r"\b(?:part\s+\d+\s*(?:&|and)\s*\d+|code\s+with\s+mosh|udemy|coursera)\b",
+    re.IGNORECASE,
+)
+
+# Unconditional canonical skill_id normalization map (preserves surface_forms and evidences)
+CANONICAL_SKILL_ID_MAP: Dict[str, str] = {
+    "javascript-es6": "javascript",
+    "javascript-es6+": "javascript",
+    "es6": "javascript",
+    "es6+": "javascript",
+    "html5": "html",
+    "css3": "css",
+    "wcag-aa": "wcag",
+    "wcag-aaa": "wcag",
+    "wcag-2.0": "wcag",
+    "wcag-2.1": "wcag",
+    "wcag-2.2": "wcag",
+    "next.js-app-router": "next.js",
+    "nextjs-app-router": "next.js",
+    "next.js-pages-router": "next.js",
+    "graphql-api": "graphql",
+    "graphql-apis": "graphql",
+    "restful-apis": "rest-apis",
+    "restful-api": "rest-api",
+    "express.js": "express",
+}
+
+# Parent-child sub-tool consolidation map (merged when both co-occur in the same document)
+PARENT_TOOL_CONSOLIDATION_MAP: Dict[str, str] = {
+    "docker-compose": "docker",
+    "next.js-app-router": "next.js",
+    "graphql-apis": "graphql",
+    "graphql-api": "graphql",
+    "rest-apis": "rest",
+    "rest-api": "rest",
+    "restful-apis": "rest",
+    "restful-api": "rest",
+}
+
+# Protected slash-containing terms that represent a single atomic concept and must not be split
+PROTECTED_SLASH_PREFIXES: Tuple[str, ...] = (
+    "ci/cd",
+    "ci / cd",
+    "tcp/ip",
+    "udp/ip",
+    "http/1",
+    "http/2",
+    "http/3",
+    "ssl/tls",
+    "tls/ssl",
+    "pl/sql",
+    "os/2",
+    "z/os",
+    "as/400",
+    "i/o",
+    "ui/ux",
+    "ux/ui",
+    "a/b",
+    "pub/sub",
+    "publish/subscribe",
+    "etl/elt",
+    "ar/vr",
+    "vr/ar",
+    "ai/ml",
+    "ml/ai",
+    "active/active",
+    "active/passive",
+    "blue/green",
+    "master/slave",
+    "client/server",
+    "read/write",
+)
+
+# Trailing generic suffixes attached to slash-combined skill mentions (e.g. "REST/GraphQL API integration")
+SLASH_TRAILING_GENERIC_SUFFIX_RE = re.compile(
+    r"\s+(?:apis?\s+integrations?|api\s+development|apis?|integrations?|backends?|frontends?|frameworks?|libraries|tools?|stack|endpoints?|services?)$",
+    re.IGNORECASE,
+)
+
+# Architecture / design synonym group (merged into canonical representative when co-occurring)
+ARCHITECTURE_SYNONYM_GROUP = {
+    "system-design",
+    "system-architecture",
+    "full-stack-architecture",
+    "software-architecture",
+}
+ARCHITECTURE_PREFERENCE_ORDER = [
+    "system-design",
+    "system-architecture",
+    "software-architecture",
+    "full-stack-architecture",
+]
+
+# Regex for versioned tool skill_id: e.g. "java-21" -> base "java", "python-3.11" -> "python"
+VERSIONED_SKILL_ID_PATTERN = re.compile(r"^([a-z0-9\.\-]+?)-v?\d+(?:\.\d+)*$")
 
 GENERIC_CERTIFICATION_WORDS = {
     "certification",
@@ -217,7 +358,8 @@ class SkillPostprocessor:
         kind: Optional[KindType],
     ) -> Tuple[Optional[KindType], bool]:
         """
-        Apply deterministic guard (years-of-experience regex and stoplist) regardless of LLM kind.
+        Apply deterministic guard (years-of-experience regex, stoplist, and non-skill phrase patterns)
+        regardless of LLM kind.
         Returns (effective_kind, blocked_by_guard).
         """
         norm_sf = normalize_guard_phrase(surface_form)
@@ -225,7 +367,206 @@ class SkillPostprocessor:
             return "experience_years", True
         if norm_sf in STOPLIST_KIND_MAP:
             return STOPLIST_KIND_MAP[norm_sf], True
+        if NON_SKILL_PHRASE_PATTERN.search(norm_sf):
+            return "context", True
         return kind, False
+
+    @classmethod
+    def split_slash_skill_mention(
+        cls,
+        surface_form: str,
+        kind: Optional[str],
+        category: Optional[str],
+        sentence: str,
+    ) -> Optional[List[str]]:
+        """
+        Deterministically split slash-combined skill mentions (e.g. 'ESLint/Prettier',
+        'REST/GraphQL API integration', 'REST/GraphQL APIs', 'JavaScript/TypeScript')
+        into their independent constituent skills while protecting atomic slash terms
+        ('CI/CD', 'TCP/IP', 'PL/SQL', etc.) and domain phrases ('booking/inventory systems').
+        """
+        if not surface_form or "/" not in surface_form or not sentence:
+            return None
+        if kind in ("domain", "certification", "education", "industry", "experience_years", "job_title", "context"):
+            return None
+        if category in ("Domain Knowledge", "Certification"):
+            return None
+
+        norm_sf = normalize_guard_phrase(surface_form)
+        if norm_sf.startswith(PROTECTED_SLASH_PREFIXES):
+            return None
+
+        core_sf = SLASH_TRAILING_GENERIC_SUFFIX_RE.sub("", surface_form.strip()).strip()
+        if "/" not in core_sf:
+            return None
+
+        parts = [p.strip() for p in core_sf.split("/") if p.strip()]
+        if len(parts) < 2:
+            return None
+
+        for p in parts:
+            if len(p) < 2 or not any(ch.isalpha() for ch in p):
+                return None
+            if normalize_guard_phrase(p) in STOPLIST_KIND_MAP:
+                return None
+            if not check_verbatim_mention(p, sentence):
+                return None
+
+        return parts
+
+    @classmethod
+    def _expand_slash_compound_raw_items(cls, raw_items: List[Any]) -> List[Any]:
+        """
+        Expand slash-combined skill mentions in raw_items into separate constituent items
+        and deduplicate against already-present (mention.casefold(), sentence) pairs.
+        If no item in raw_items qualifies for slash splitting, returns raw_items unchanged.
+        """
+        has_split = False
+        existing_pairs = set()
+        for item in raw_items:
+            if not isinstance(item, dict):
+                continue
+            sf = item.get("surface_form") if "surface_form" in item else item.get("mention")
+            sent = item.get("sentence") if "sentence" in item else item.get("source_sentence")
+            if isinstance(sf, str) and isinstance(sent, str):
+                parts = cls.split_slash_skill_mention(
+                    sf,
+                    item.get("kind"),
+                    item.get("category"),
+                    sent,
+                )
+                if parts is not None:
+                    has_split = True
+                else:
+                    existing_pairs.add((sf.strip().casefold(), sent.strip()))
+
+        if not has_split:
+            return raw_items
+
+        expanded: List[Any] = []
+        emitted_split_pairs = set(existing_pairs)
+        for item in raw_items:
+            if not isinstance(item, dict):
+                expanded.append(item)
+                continue
+            sf = item.get("surface_form") if "surface_form" in item else item.get("mention")
+            sent = item.get("sentence") if "sentence" in item else item.get("source_sentence")
+            if isinstance(sf, str) and isinstance(sent, str):
+                parts = cls.split_slash_skill_mention(
+                    sf,
+                    item.get("kind"),
+                    item.get("category"),
+                    sent,
+                )
+                if parts is not None:
+                    sf_key = "surface_form" if "surface_form" in item else "mention"
+                    for p in parts:
+                        pair_key = (p.casefold(), sent.strip())
+                        if pair_key not in emitted_split_pairs:
+                            emitted_split_pairs.add(pair_key)
+                            cloned = dict(item)
+                            cloned[sf_key] = p
+                            expanded.append(cloned)
+                    continue
+            expanded.append(item)
+
+        return expanded
+
+    @classmethod
+    def _consolidate_duplicate_skills(
+        cls, skills: List[ExtractedSkill]
+    ) -> List[ExtractedSkill]:
+        """
+        Deterministically normalize and consolidate redundant explicit skills within a document
+        while preserving all surface forms, sections, and evidences:
+        0. Unconditional canonical skill_id normalization (e.g. 'next.js-app-router' -> 'next.js',
+           'graphql-apis' -> 'graphql', 'javascript-es6' -> 'javascript', 'css3' -> 'css',
+           'html5' -> 'html', 'wcag-aa' -> 'wcag').
+        1. Versioned tool -> base tool (e.g. 'java-21' -> 'java' when 'java' is present).
+        2. Parent-child sub-tool -> parent tool (e.g. 'docker-compose' -> 'docker' when 'docker' is present).
+        3. Architecture synonym group -> canonical representative (e.g. 'full-stack-architecture' and
+           'system-architecture' -> 'system-design').
+        """
+        if not skills:
+            return skills
+
+        # Phase 0: Unconditional canonical skill_id normalization & merging
+        canonicalized_by_id: Dict[str, ExtractedSkill] = {}
+        canonicalized_list: List[ExtractedSkill] = []
+        for s in skills:
+            target_id = CANONICAL_SKILL_ID_MAP.get(s.skill_id, s.skill_id)
+            if target_id in canonicalized_by_id:
+                target_skill = canonicalized_by_id[target_id]
+                for sf in s.surface_forms:
+                    if sf not in target_skill.surface_forms:
+                        target_skill.surface_forms.append(sf)
+                for sec in s.sections:
+                    if sec not in target_skill.sections:
+                        target_skill.sections.append(sec)
+                target_skill.evidences.extend(s.evidences)
+            else:
+                if target_id != s.skill_id:
+                    s.skill_id = target_id
+                canonicalized_by_id[target_id] = s
+                canonicalized_list.append(s)
+
+        skills = canonicalized_list
+        if len(skills) <= 1:
+            return skills
+
+        skill_map: Dict[str, ExtractedSkill] = {s.skill_id: s for s in skills}
+
+        # Determine canonical target for architecture synonym group if >= 2 co-occur
+        arch_present = [s.skill_id for s in skills if s.skill_id in ARCHITECTURE_SYNONYM_GROUP]
+        arch_target: Optional[str] = None
+        if len(arch_present) >= 2:
+            for pref in ARCHITECTURE_PREFERENCE_ORDER:
+                if pref in skill_map:
+                    arch_target = pref
+                    break
+            if arch_target is None:
+                arch_target = arch_present[0]
+
+        redirect_map: Dict[str, str] = {}
+        for s in skills:
+            sid = s.skill_id
+            # 1. Versioned tool check (R4)
+            m_ver = VERSIONED_SKILL_ID_PATTERN.match(sid)
+            if m_ver:
+                base_id = m_ver.group(1)
+                if base_id in skill_map and base_id != sid:
+                    redirect_map[sid] = base_id
+                    continue
+
+            # 2. Explicit parent-child sub-tool check
+            if sid in PARENT_TOOL_CONSOLIDATION_MAP:
+                parent_id = PARENT_TOOL_CONSOLIDATION_MAP[sid]
+                if parent_id in skill_map and parent_id != sid:
+                    redirect_map[sid] = parent_id
+                    continue
+
+            # 3. Architecture synonym group check
+            if arch_target and sid in ARCHITECTURE_SYNONYM_GROUP and sid != arch_target:
+                redirect_map[sid] = arch_target
+
+        if not redirect_map:
+            return skills
+
+        for child_id, target_id in redirect_map.items():
+            # Follow transitive redirects if any
+            while target_id in redirect_map:
+                target_id = redirect_map[target_id]
+            child_skill = skill_map[child_id]
+            target_skill = skill_map[target_id]
+            for sf in child_skill.surface_forms:
+                if sf not in target_skill.surface_forms:
+                    target_skill.surface_forms.append(sf)
+            for sec in child_skill.sections:
+                if sec not in target_skill.sections:
+                    target_skill.sections.append(sec)
+            target_skill.evidences.extend(child_skill.evidences)
+
+        return [s for s in skills if s.skill_id not in redirect_map]
 
     @classmethod
     def is_retained_skill_entity(cls, entity: ExtractedSkill) -> bool:
@@ -268,6 +609,8 @@ class SkillPostprocessor:
                 skills.append(entity)
             else:
                 non_skill_entities.append(entity)
+
+        skills = cls._consolidate_duplicate_skills(skills)
 
         all_entities = skills + non_skill_entities
         total_mentions = sum(len(s.evidences) for s in all_entities)
@@ -551,6 +894,7 @@ class SkillPostprocessor:
             )
 
         # Legacy Extraction Path (schema_version != explicit_compact_v1)
+        raw_items = self._expand_slash_compound_raw_items(raw_items)
         for item in raw_items:
             # Check structural requirements
             if not isinstance(item, dict):
