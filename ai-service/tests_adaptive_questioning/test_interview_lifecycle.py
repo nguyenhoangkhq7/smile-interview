@@ -119,8 +119,8 @@ def test_timeout_farewell_can_be_finished_after_technical_deadline():
     assert command(engine, closed, "NEXT").snapshot.is_finished
 
 
-def test_http_lifecycle_returns_snapshot_and_public_only():
-    _, _, engine, _ = setup()
+def test_http_lifecycle_returns_snapshot_and_public_only(monkeypatch):
+    provider, _, engine, _ = setup()
     app = FastAPI()
     app.include_router(router)
     app.state.evidence_workflow = engine
@@ -132,16 +132,36 @@ def test_http_lifecycle_returns_snapshot_and_public_only():
         assert set(data) == {"snapshot", "public"}
         assert data["public"]["pending_turn"] is None
         assert data["public"]["conversation"]["phase"] == "OPENING"
-        result = client.post("/api/v2/interview/conversation", json={
+        introduction_state = client.post("/api/v2/interview/conversation", json={
             "snapshot": data["snapshot"], "expected_state_version": data["snapshot"]["state_version"],
             "message_id": data["public"]["conversation"]["message"]["message_id"],
-            "action": "SKIP_INTRODUCTION",
+            "action": "NEXT",
+        }).json()
+        introduction = "Em tên Nam, em dùng Spring Boot."
+        result = client.post("/api/v2/interview/conversation", json={
+            "snapshot": introduction_state["snapshot"],
+            "expected_state_version": introduction_state["snapshot"]["state_version"],
+            "message_id": introduction_state["public"]["conversation"]["message"]["message_id"],
+            "action": "SUBMIT_INTRODUCTION", "introduction": introduction, "defer_question": True,
         })
         assert result.status_code == 200
         updated = result.json()
         assert set(updated) == {"snapshot", "public"}
         assert updated["snapshot"]["conversation"]["phase"] == "INTERVIEW"
-        assert updated["public"]["pending_turn"]["question"]
+        assert updated["public"]["conversation"]["introduction"] == introduction
+        assert updated["public"]["awaiting_question"] and updated["public"]["pending_turn"] is None
+        assert provider.question_number == 0
+        monkeypatch.setattr(provider, "review_question", lambda _: "GIVES_SOLUTION")
+        generation = {"snapshot": updated["snapshot"], "expected_state_version": updated["snapshot"]["state_version"]}
+        failed = client.post("/api/v2/interview/next-question", json=generation)
+        assert failed.status_code == 503
+        monkeypatch.setattr(provider, "review_question", lambda _: "ALIGNED")
+        ready = client.post("/api/v2/interview/next-question", json=generation)
+        assert ready.status_code == 200
+        updated = ready.json()
+        assert not updated["public"]["awaiting_question"]
+        assert updated["public"]["conversation"]["introduction"] == introduction
+        assert "Cảm ơn" in updated["public"]["pending_turn"]["introduction"]
         snapshot = Snapshot.model_validate(updated["snapshot"])
         answered = client.post("/api/v2/interview/respond", json={
             "snapshot": updated["snapshot"], "expected_state_version": snapshot.state_version,

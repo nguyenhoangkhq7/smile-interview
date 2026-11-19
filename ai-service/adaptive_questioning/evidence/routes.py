@@ -2,7 +2,8 @@
 from fastapi import APIRouter, HTTPException, Request
 from time import monotonic
 
-from .models import ConversationRequest, Snapshot, StartRequest, TransitionRequest, TransitionResult
+from ..optimization.compiler import DEFAULT_COMPILED_DIR
+from .models import ConversationRequest, NextQuestionRequest, Snapshot, StartRequest, TransitionRequest, TransitionResult
 from .provider import DSPyAssessmentProvider
 from .policy_config import configured_policy
 from .workflow import EvidenceWorkflow
@@ -15,8 +16,11 @@ router = APIRouter(prefix="/api/v2/interview", tags=["Evidence Interview V2"])
 
 def workflow(request: Request) -> EvidenceWorkflow:
     if not hasattr(request.app.state, "evidence_workflow"):
-        request.app.state.evidence_workflow = EvidenceWorkflow(DSPyAssessmentProvider(), policy=configured_policy(),
-                                                               preparation_cache=PreparationCache())
+        request.app.state.evidence_workflow = EvidenceWorkflow(
+            DSPyAssessmentProvider(compiled_dir=str(DEFAULT_COMPILED_DIR)),
+            policy=configured_policy(),
+            preparation_cache=PreparationCache(),
+        )
     return request.app.state.evidence_workflow
 
 
@@ -49,6 +53,11 @@ def start(payload: StartRequest, request: Request):
 @router.post("/respond", response_model=TransitionResult)
 def respond(payload: TransitionRequest, request: Request):
     return execute(workflow(request).respond, payload)
+
+
+@router.post("/next-question", response_model=TransitionResult)
+def next_question(payload: NextQuestionRequest, request: Request):
+    return execute(workflow(request).next_question, payload)
 
 
 @router.post("/stop", response_model=TransitionResult)

@@ -8,7 +8,7 @@ const source = readFileSync(new URL('../src/components/features/interview/result
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } });
 const sandbox = { exports: {} };
 vm.runInNewContext(compiled.outputText, sandbox);
-const { buildResult, percent } = sandbox.exports;
+const { buildResult, percent, isBoilerplateClaim, cleanStudyRecommendation, looksLikeRawCode } = sandbox.exports;
 const plain = value => JSON.parse(JSON.stringify(value));
 
 const objective = (id, skill, assessment = 'NOT_ASSESSED', extra = {}) => ({
@@ -92,4 +92,29 @@ test('ignores a pending question and stale observations in a completed objective
   assert.equal(data.questions[0].status, 'strong');
   assert.equal(data.questions[0].evidence.length, 1);
   assert.deepEqual(plain(buildResult(session(input.report.objectives, [])).skills), []);
+});
+
+test('marks intermediate turns clarified later and detects raw code snippets cleanly', () => {
+  const data = buildResult(session([
+    objective('ai', 'ai_tools_usage', 'INSUFFICIENT_EVIDENCE', {
+      evidence: [{ turn_id: 't2', performance: 'AT_TARGET' }],
+    }),
+    objective('git', 'git', 'DEMONSTRATED_AT_TARGET', {
+      evidence: [{ turn_id: 't3', performance: 'AT_TARGET' }],
+    }),
+  ], [turn('t1', 'ai'), turn('t2', 'ai'), turn('t3', 'git')]));
+  assert.equal(data.questions[0].clarifiedLater, true);
+  assert.equal(data.questions[1].clarifiedLater, false);
+  assert.equal(data.strongSkillCount, 1);
+  assert.equal(data.partialSkillCount, 1);
+  assert.equal(isBoilerplateClaim('Đánh giá kiến thức thực hành ai_tools_usage', 'ai_tools_usage'), true);
+  assert.equal(isBoilerplateClaim('Thiết kế chỉ mục cho truy vấn chậm', 'sql'), false);
+  assert.equal(
+    cleanStudyRecommendation('ai_tools_usage (Đánh giá kiến thức thực hành ai_tools_usage): Ưu tiên ôn luyện'),
+    'Ưu tiên ôn luyện',
+  );
+  assert.equal(looksLikeRawCode('{\n  "success": false\n}', 'DESIGN'), true);
+  assert.equal(looksLikeRawCode('function sum(a, b) {\n  return a + b;\n}', 'CODING'), true);
+  assert.equal(looksLikeRawCode('Nếu danh sách rỗng thì gặp lỗi chia cho 0.', 'DEBUGGING'), false);
+  assert.equal(looksLikeRawCode('```js\nconst x = 1;\n```', 'CODING'), false);
 });

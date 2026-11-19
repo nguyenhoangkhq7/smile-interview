@@ -2,6 +2,7 @@ package fit.iuh.modules.evidence;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import fit.iuh.modules.session.entity.Session;
 import fit.iuh.modules.skillgap.client.SkillGapClient;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +18,10 @@ public class EvidenceInputs {
     private static final List<String> INTERVIEW_FIELDS = List.of(
             "jd_skill_id", "required_proficiency", "importance_weight",
             "priority", "job_tasks", "cv_evidence_spans");
+    private static final List<String> RETIRED_OBJECTIVE_FIELDS = List.of(
+            "required_proficiency", "extension_criterion_ids", "inferred",
+            "rubric_version", "rubric_fingerprint");
+    private static final List<String> RETIRED_SUITABLE_MODE_FIELDS = List.of("rationale");
 
     private final SkillGapClient gaps;
     private final EvidenceJson json;
@@ -54,6 +59,26 @@ public class EvidenceInputs {
             }
         }
         return result;
+    }
+
+    public static JsonNode leanBlueprint(JsonNode blueprint) {
+        if (!(blueprint instanceof ObjectNode root)) return blueprint;
+        ObjectNode normalized = root.deepCopy();
+        JsonNode objectives = normalized.path("objectives");
+        if (!objectives.isArray()) return normalized;
+        for (JsonNode objective : objectives) {
+            if (objective instanceof ObjectNode obj) stripRetiredObjectiveFields(obj);
+        }
+        return normalized;
+    }
+
+    private static void stripRetiredObjectiveFields(ObjectNode objective) {
+        RETIRED_OBJECTIVE_FIELDS.forEach(objective::remove);
+        JsonNode modes = objective.path("suitable_modes");
+        if (!modes.isArray()) return;
+        for (JsonNode mode : modes) {
+            if (mode instanceof ObjectNode modeObj) RETIRED_SUITABLE_MODE_FIELDS.forEach(modeObj::remove);
+        }
     }
 
     public static boolean hasTaskContract(JsonNode skills) {

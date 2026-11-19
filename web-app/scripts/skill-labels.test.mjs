@@ -27,6 +27,9 @@ test('prefers explicit names, preserves technical brands and formats Unicode IDs
   assert.equal(skillLabel('spring-boot'), 'Spring Boot');
   assert.equal(skillLabel('spring_boot'), 'Spring Boot');
   assert.equal(skillLabel('rest-api'), 'REST API');
+  assert.equal(skillLabel('ai_tools_usage'), 'Sử dụng công cụ AI');
+  assert.equal(skillLabel('english_reading'), 'Đọc hiểu tiếng Anh');
+  assert.equal(skillLabel('golang'), 'Golang');
   assert.equal(skillLabel('thị-trường-chứng-khoán'), 'thị trường chứng khoán');
   assert.equal(skillLabel('C++'), 'C++');
 });

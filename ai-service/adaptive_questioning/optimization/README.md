@@ -46,6 +46,10 @@ artifacts require recompilation; legacy artifacts are not loaded.
 
 ## Use the compiled modules
 
+The default V2 interview workflow loads the checked-in question generator and judge
+artifacts. When constructing a provider directly, pass `compiled_dir` to select the
+artifact directory.
+
 ```python
 from adaptive_questioning.evidence.provider import DSPyAssessmentProvider
 
@@ -54,10 +58,8 @@ provider = DSPyAssessmentProvider(
 )
 ```
 
-The provider's blueprint generator is unchanged. Loading demos is **opt-in**;
-normal production construction without `compiled_dir` continues to use source
-signatures. Checked-in artifacts are seeded labeled examples, not evidence of an
-improvement in model quality. Evaluate with the intended model before enabling.
+The checked-in artifacts contain labeled training examples. Use held-out evaluation
+with the intended model to measure the effect on question and judgment quality.
 
 ## Online optimization and held-out evaluation
 
@@ -90,3 +92,22 @@ python -m pytest tests_adaptive_questioning/test_dspy_optimization.py -q
 Tests use local examples and `DummyLM`: no real API calls. They cover preservation,
 train/dev separation, runtime contracts, bad evidence/metadata, semantic evaluator
 gates, compilation, artifact compatibility and actual provider calls after loading.
+
+## Extended domain-disjoint corpora (`corpora/`)
+
+To address missing coverage in the recovered 24-sample corpus (which is VOICE-only,
+lacks `CODING`/`BEHAVIORAL`/`L1`/`PROBE_DEEPER`/`VERIFY_CONTRADICTION`/multiline code,
+and shares skills across train/dev), `extended_dataset.py` exposes domain-disjoint
+`train` / `dev` / `test` splits built from `optimization/corpora/`:
+
+- `questions.json` (36 cases: 18 train / 9 dev / 9 test)
+- `judgments.json` (37 cases: 19 train / 9 dev / 9 test)
+- `alignments.json` (35 cases across all 7 `AlignmentVerdict` labels: 18 train / 9 dev / 8 test)
+- `blueprints.json` (18 cases validated via `BlueprintBuilder.validate`: 9 train / 5 dev / 4 test)
+- `dialogues.json` (12 paired `Judgment -> next Question` sequences: 6 train / 3 dev / 3 test)
+
+Verify the extended corpora and metrics offline:
+
+```powershell
+python -m pytest tests_adaptive_questioning/test_dspy_optimization.py tests_adaptive_questioning/test_extended_dspy_dataset.py -q
+```

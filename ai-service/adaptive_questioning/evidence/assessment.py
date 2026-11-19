@@ -74,6 +74,11 @@ def apply_judgment(state: ObjectiveState, turn: Turn, policy: InterviewPolicy | 
     validate_judgment(judgment, turn)
     state.turns_spent += 1
     for observation in judgment.observations:
+        if observation.performance == "ABOVE" and not (
+            policy and policy.allow_extension_probes and turn.action == Action.DEEPER
+            and turn.question_depth == state.objective.extension_depth
+        ):
+            observation.performance = "AT_TARGET"
         _record_observation(state, turn, observation)
     record_progress(state, turn)
     state.assessment = assess(state, policy)

@@ -1,0 +1,6 @@
+{
+  "operation": "respond",
+  "from": "03-intro",
+  "scenario": "Trả lời đúng phần đọc plan, bỏ ngỏ đề xuất index/query để kiểm tra phân biệt thiếu ý với mâu thuẫn.",
+  "answer": "Em thấy Seq Scan đọc toàn bộ orders rồi mới lọc status, khoảng 300 ms ở node đó. Node Sort phải sắp các dòng giữ lại theo created_at. Em mới xác định được hai điểm này trong plan, chưa chốt thứ tự cột của index hay thay đổi query cụ thể."
+}

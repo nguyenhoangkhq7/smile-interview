@@ -49,7 +49,11 @@ class ModelRuntime:
                 with self._slots:
                     self._cool_down()
                     event("model.started", operation=operation, attempt=attempt + 1)
-                    return compute()
+                    started = monotonic()
+                    result = compute()
+                    event("model.completed", operation=operation, attempt=attempt + 1,
+                          elapsed_seconds=round(monotonic() - started, 3))
+                    return result
             except Exception as error:
                 status = provider_status(error)
                 if status is None:

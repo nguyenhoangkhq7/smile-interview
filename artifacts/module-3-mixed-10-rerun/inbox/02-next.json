@@ -1,0 +1,6 @@
+{
+  "operation": "conversation",
+  "from": "01-start",
+  "action": "NEXT",
+  "scenario": "Ứng viên giả lập đọc lời chào và chuyển đến phần tự giới thiệu."
+}

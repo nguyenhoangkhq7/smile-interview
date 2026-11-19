@@ -245,11 +245,45 @@ class Snapshot(BaseModel):
     queue: list[str]
     deadline_at: datetime
     pending_turn: Turn | None = None
+    next_question_action: Action | None = None
     turns: list[Turn] = Field(default_factory=list)
     is_finished: bool = False
     termination_reason: str | None = None
     conversation: "ConversationState | None" = None
     opening_context: "InterviewOpening | None" = None
+
+
+_RETIRED_OBJECTIVE_FIELDS = frozenset({
+    "required_proficiency",
+    "extension_criterion_ids",
+    "inferred",
+    "rubric_version",
+    "rubric_fingerprint",
+})
+_RETIRED_SUITABLE_MODE_FIELDS = frozenset({"rationale"})
+
+
+def _strip_retired_objective_fields(objective: object) -> object:
+    if not isinstance(objective, dict):
+        return objective
+    cleaned = {k: v for k, v in objective.items() if k not in _RETIRED_OBJECTIVE_FIELDS}
+    modes = cleaned.get("suitable_modes")
+    if isinstance(modes, list):
+        cleaned["suitable_modes"] = [
+            {k: v for k, v in mode.items() if k not in _RETIRED_SUITABLE_MODE_FIELDS}
+            if isinstance(mode, dict) else mode
+            for mode in modes
+        ]
+    return cleaned
+
+
+def _strip_retired_blueprint_fields(blueprint: object) -> object:
+    if not isinstance(blueprint, dict):
+        return blueprint
+    objectives = blueprint.get("objectives")
+    if not isinstance(objectives, list):
+        return blueprint
+    return {**blueprint, "objectives": [_strip_retired_objective_fields(obj) for obj in objectives]}
 
 
 class StartRequest(BaseModel):
@@ -258,6 +292,14 @@ class StartRequest(BaseModel):
     config: InterviewConfig = Field(default_factory=InterviewConfig)
     blueprint: Blueprint | None = None
     opening: "InterviewOpening | None" = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def sanitize_legacy_blueprint(cls, values: object) -> object:
+        """Drop retired rubric metadata from persisted blueprints while keeping strict validation elsewhere."""
+        if isinstance(values, dict) and isinstance(values.get("blueprint"), dict):
+            return {**values, "blueprint": _strip_retired_blueprint_fields(values["blueprint"])}
+        return values
 
 
 MAX_OPENING_SUMMARY_LENGTH = 2000
@@ -303,6 +345,7 @@ class ConversationRequest(BaseModel):
     expected_state_version: int
     action: Literal["NEXT", "SUBMIT_INTRODUCTION", "SKIP_INTRODUCTION"]
     introduction: str = Field(default="", max_length=10000)
+    defer_question: bool = False
 
 
 class TransitionRequest(BaseModel):
@@ -310,6 +353,12 @@ class TransitionRequest(BaseModel):
     turn_id: str
     expected_state_version: int
     candidate_response: str = Field(min_length=1, max_length=50000)
+    defer_question: bool = False
+
+
+class NextQuestionRequest(BaseModel):
+    snapshot: Snapshot
+    expected_state_version: int
 
 
 class CriterionReport(BaseModel):
@@ -362,6 +411,7 @@ class PublicSession(BaseModel):
     deadline_at: datetime
     config: InterviewConfig
     pending_turn: PendingTurn | None
+    awaiting_question: bool = False
     turns: list[PublicTurn]
     report: Report
     conversation: ConversationState | None = None

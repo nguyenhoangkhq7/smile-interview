@@ -13,7 +13,7 @@ export function VoiceToolbar({ room }: { room: VoiceInterviewRoom }) {
     <div className={styles.actions}>
       {voice.enabled && <>
         <Button variant="ghost" size="icon" disabled={room.presenting} aria-pressed={voice.paused} aria-label={voice.paused ? 'Tiếp tục nghe' : 'Tạm dừng micro'} title={voice.paused ? 'Tiếp tục nghe' : 'Tạm dừng micro'} onClick={voice.pause}>{voice.paused ? <Play size={18} /> : <MicOff size={18} />}</Button>
-        <Button variant="ghost" size="icon" disabled={room.busy || voice.paused} aria-label="Nghe lại câu hỏi" title="Nghe lại câu hỏi" onClick={() => void voice.replay()}><RotateCcw size={18} /></Button>
+        <Button variant="ghost" size="icon" disabled={room.busy || voice.paused || room.session?.awaiting_question} aria-label="Nghe lại câu hỏi" title="Nghe lại câu hỏi" onClick={() => void voice.replay()}><RotateCcw size={18} /></Button>
         {(voice.speaking || voice.loadingSpeech) && <Button variant="ghost" size="icon" onClick={room.interrupt} aria-label="Dừng giọng đọc" title="Dừng giọng đọc"><VolumeX size={18} /></Button>}
         {!room.presenting && room.interview.answer.trim() && <Button disabled={room.cannotSubmit} onClick={() => void voice.submit()}><Check size={16} />Tôi đã trả lời xong</Button>}
       </>}

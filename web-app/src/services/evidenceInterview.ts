@@ -48,6 +48,7 @@ export interface EvidenceReport {
 export interface EvidenceSession {
   schema_version: 2; session_id: string; state_version: number; is_finished: boolean;
   deadline_at: string; config: InterviewConfig; pending_turn: PendingTurn | null;
+  awaiting_question?: boolean;
   turns: EvidenceTurn[]; report: EvidenceReport;
   conversation?: ConversationState | null;
 }
@@ -77,6 +78,9 @@ export function voiceTurn(session: EvidenceSession | null) {
 }
 export interface AnswerRequest {
   request_id: string; turn_id: string; expected_state_version: number; candidate_response: string;
+}
+export interface NextQuestionRequest {
+  request_id: string; expected_state_version: number;
 }
 
 function endpoint(id: string, operation = '') {
@@ -110,7 +114,7 @@ export const evidenceInterview = {
     const data = await requestStart(id, config);
     if (!data || data.schema_version !== 2 || data.session_id !== id || !data.config || !data.report
       || !Array.isArray(data.turns) || typeof data.is_finished !== 'boolean'
-      || (!data.is_finished && !((data.conversation?.phase === 'OPENING' || data.conversation?.phase === 'SELF_INTRODUCTION')
+      || (!data.is_finished && !data.awaiting_question && !((data.conversation?.phase === 'OPENING' || data.conversation?.phase === 'SELF_INTRODUCTION')
           && data.conversation.message?.message_id && data.conversation.message.text?.trim())
         && (typeof data.pending_turn?.question !== 'string' || !data.pending_turn.question.trim()))) {
       throw new Error('Chưa nhận được phiên phỏng vấn hợp lệ. Vui lòng bấm bắt đầu để thử lại.');
@@ -119,6 +123,9 @@ export const evidenceInterview = {
   },
   async answer(id: string, answer: AnswerRequest): Promise<EvidenceSession> {
     return (await axiosClient.post<EvidenceSession>(endpoint(id, 'respond'), answer)).data;
+  },
+  async nextQuestion(id: string, request: NextQuestionRequest): Promise<EvidenceSession> {
+    return (await axiosClient.post<EvidenceSession>(endpoint(id, 'next-question'), request)).data;
   },
   async converse(id: string, request: ConversationRequest): Promise<EvidenceSession> {
     return (await axiosClient.post<EvidenceSession>(endpoint(id, 'conversation'), request)).data;

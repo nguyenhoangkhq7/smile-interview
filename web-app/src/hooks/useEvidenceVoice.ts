@@ -121,22 +121,23 @@ class VoiceConversation {
     this.draft = options.answer;
     const phase = conversationPhase(session);
     if (phase === 'CLOSING' && this.paused) { this.paused = false; this.emit({ paused: false }); }
-    const acceptingSpeech = phase === 'SELF_INTRODUCTION' || phase === 'INTERVIEW';
-    this.microphone?.getAudioTracks().forEach(track => { track.enabled = acceptingSpeech && !this.paused; });
     const next = voiceTurn(session);
-    if (!session || !next || session.session_id !== options.id) {
+    if (!session || session.session_id !== options.id || (!next && !session.awaiting_question)) {
       this.stop(); this.update(initial); return;
     }
-    if (this.turn?.turn_id !== next.turn_id || this.turn.expected_state_version !== next.expected_state_version) {
+    const acceptingSpeech = next !== null && (phase === 'SELF_INTRODUCTION' || phase === 'INTERVIEW');
+    this.microphone?.getAudioTracks().forEach(track => { track.enabled = acceptingSpeech && !this.paused; });
+    if (this.turn?.turn_id !== next?.turn_id || this.turn?.expected_state_version !== next?.expected_state_version) {
       this.generation++; this.cancelTimer(); this.cancelSpeech(); this.recognitionAbort?.abort();
       this.queue = []; this.failed = null; this.detector.reset(); this.submitting = false;
       this.segments = []; this.contextFrames = []; this.contextMs = 0; this.segment = 0; this.baseDraft = options.answer;
       this.turn = next;
-      if (this.announcedTurn !== next.turn_id) this.announcedTurn = '';
+      if (this.announcedTurn !== next?.turn_id) this.announcedTurn = '';
       // Reloading the introduction resumes listening without repeating the greeting.
-      if (conversationPhase(session) === 'SELF_INTRODUCTION') this.announcedTurn = next.turn_id;
+      if (next && phase === 'SELF_INTRODUCTION') this.announcedTurn = next.turn_id;
       this.emit({ retryAvailable: false, error: '', listening: false, captions: '', review: null });
     }
+    if (!next) return;
     if (options.suspended || options.busy) {
       this.cancelTimer(); this.flushRecording(); this.emit({ listening: false });
       if (options.suspended) this.cancelSpeech();
@@ -150,7 +151,7 @@ class VoiceConversation {
   pause(value: boolean) {
     this.paused = value; this.cancelTimer(); this.flushRecording();
     const phase = conversationPhase(this.current().session);
-    this.microphone?.getAudioTracks().forEach(track => { track.enabled = !value && (phase === 'INTERVIEW' || phase === 'SELF_INTRODUCTION'); });
+    this.microphone?.getAudioTracks().forEach(track => { track.enabled = !value && Boolean(this.turn) && (phase === 'INTERVIEW' || phase === 'SELF_INTRODUCTION'); });
     if (value) this.cancelSpeech();
     this.emit({ paused: value, listening: false });
     if (!value) this.sync();

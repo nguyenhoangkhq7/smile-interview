@@ -175,8 +175,11 @@ public class CompetencyProjection {
                 || !expected.path("skill_id").equals(actual.path("skill_id"))
                 || !expected.path("criteria").equals(actual.path("criteria"))
                 || !expected.path("target_depth").equals(actual.path("target_depth"))) return false;
-        String fingerprint = expected.path("rubric_fingerprint").asText();
-        if (!fingerprint.isBlank()) return fingerprint.equals(actual.path("rubric_fingerprint").asText());
+        String expectedFingerprint = expected.path("rubric_fingerprint").asText();
+        String actualFingerprint = actual.path("rubric_fingerprint").asText();
+        if (!expectedFingerprint.isBlank() && !actualFingerprint.isBlank()) {
+            return expectedFingerprint.equals(actualFingerprint);
+        }
         return !expected.path("criteria").isEmpty() && expected.path("target_depth").isInt();
     }
 

@@ -19,7 +19,9 @@ def test_dspy_blueprint_draft_omits_fields_owned_by_the_builder():
     }])]
     requirements = requirements_for(skills)
     draft = ScriptedProvider().blueprint(json.dumps({"requirements": requirements})).model_dump(mode="json")
-    provider = DSPyAssessmentProvider(lm=dspy.utils.DummyLM([{"blueprint": draft}]))
+    lm = dspy.utils.DummyLM([{"blueprint": draft}])
+    lm.adapter = dspy.JSONAdapter()
+    provider = DSPyAssessmentProvider(lm=lm)
     objective = BlueprintBuilder(provider).build(skills).objectives[0]
 
     schema = BlueprintSignature.output_fields["blueprint"].annotation.model_json_schema()

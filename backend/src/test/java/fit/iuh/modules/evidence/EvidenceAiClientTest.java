@@ -109,4 +109,29 @@ class EvidenceAiClientTest {
                     .doesNotContain("PRIVATE_CV_SENTINEL");
         } finally { server.stop(0); }
     }
+
+    @Test void validation422LogsLocationsWithoutLeakingInputValues(CapturedOutput output) throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/api/v2/interview/start", exchange -> {
+            exchange.getRequestBody().readAllBytes();
+            byte[] body = """
+                    {"detail":[{"type":"extra_forbidden","loc":["body","blueprint","objectives",0,"inferred"],
+                      "msg":"Extra inputs are not permitted","input":"PRIVATE_CV_SENTINEL"}]}
+                    """.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json; charset=utf-8");
+            exchange.sendResponseHeaders(422, body.length);
+            exchange.getResponseBody().write(body); exchange.close();
+        });
+        server.start();
+        try {
+            AppProperties properties = new AppProperties();
+            properties.getAi().getFastapi().setBaseUrl("http://127.0.0.1:" + server.getAddress().getPort());
+            var client = new EvidenceAiClient(properties, new EvidenceJson(new ObjectMapper()));
+            assertThatThrownBy(() -> client.compute("start", Map.of("session_id", "bad-schema")))
+                    .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
+                            ex -> assertThat(ex.getStatusCode().value()).isEqualTo(422));
+            assertThat(output).contains("body.blueprint.objectives.0.inferred:extra_forbidden")
+                    .doesNotContain("PRIVATE_CV_SENTINEL");
+        } finally { server.stop(0); }
+    }
 }
