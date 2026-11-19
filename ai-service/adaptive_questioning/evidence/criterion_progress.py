@@ -1,13 +1,16 @@
 """Per-criterion probe budgets. Exhausting a budget never decides competence."""
 from .models import Action, CriterionProgress, ObjectiveState, Turn
-from .policy_config import InterviewPolicy
+
+CRITERION_SOFT_LIMIT = 3
+MAX_TURNS_PER_CRITERION = 6
+MAX_STAGNANT_TURNS = 2
 
 
 def progress_for(state: ObjectiveState, key: str) -> CriterionProgress:
     return state.criterion_progress.setdefault(key, CriterionProgress())
 
 
-def record_progress(state: ObjectiveState, turn: Turn, policy: InterviewPolicy) -> None:
+def record_progress(state: ObjectiveState, turn: Turn) -> None:
     if turn.judgment is None:
         return
     for item in turn.judgment.observations:
@@ -20,7 +23,10 @@ def record_progress(state: ObjectiveState, turn: Turn, policy: InterviewPolicy) 
         progress.clarification_spent |= turn.action == Action.CLARIFY
         progress.easier_spent |= turn.action == Action.EASIER
         progress.deeper_spent |= turn.action == Action.DEEPER
-        progress.stop_reason = _stop_reason(progress, policy)
+        progress.stop_reason = _stop_reason(progress)
+        if (turn.judgment.explicit_inability and item.observation == "NO_EVIDENCE"
+                and (turn.question_depth == 1 or turn.action == Action.EASIER)):
+            progress.stop_reason = "NO_PROGRESS"
 
 
 def _new_case(progress: CriterionProgress, turn: Turn, observation: str) -> bool:
@@ -33,18 +39,9 @@ def _new_case(progress: CriterionProgress, turn: Turn, observation: str) -> bool
     return True
 
 
-def _stop_reason(progress: CriterionProgress, policy: InterviewPolicy) -> str | None:
-    if progress.turns_spent >= policy.max_turns_per_criterion:
+def _stop_reason(progress: CriterionProgress) -> str | None:
+    if progress.turns_spent >= MAX_TURNS_PER_CRITERION:
         return "CRITERION_BUDGET"
-    if progress.turns_spent >= policy.criterion_soft_limit and progress.stagnant_turns >= policy.max_stagnant_turns:
+    if progress.turns_spent >= CRITERION_SOFT_LIMIT and progress.stagnant_turns >= MAX_STAGNANT_TURNS:
         return "NO_PROGRESS"
     return None
-
-
-def restore_progress(state: ObjectiveState, turns: list[Turn], policy: InterviewPolicy) -> None:
-    """Old snapshots have a ledger and turns but no per-criterion counters."""
-    if state.criterion_progress:
-        return
-    for turn in turns:
-        if turn.objective_id == state.objective.objective_id:
-            record_progress(state, turn, policy)

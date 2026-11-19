@@ -4,12 +4,13 @@ import puppeteer from 'puppeteer';
 
 const base = process.argv[2] || 'http://localhost:3217';
 const id = 'test-v2-smoke';
-const config = { mode: 'FOCUSED', focused_question_mode: 'DEBUGGING', max_questions: 10,
+const config = { interaction_mode: 'TEXT', mode: 'FOCUSED', focused_question_mode: 'DEBUGGING', max_questions: 10,
   duration_seconds: 900, max_questions_per_objective: 8 };
-const turn = { turn_id: 'turn-1', objective_id: 'objective-1', skill_id: 'postgresql',
-  mode: 'DEBUGGING', question: 'Bạn dùng EXPLAIN ANALYZE để kiểm tra truy vấn chậm như thế nào?', answer: null, feedback: null };
-const report = { schema_version: 2, state_version: 1, is_finished: false, termination_reason: null,
-  progress: 0, evidence_coverage: 0, target_attainment: null, objectives: [] };
+const turn = { turn_id: 'turn-1', objective_id: 'objective-1',
+  mode: 'DEBUGGING', question: 'Bạn dùng EXPLAIN ANALYZE để kiểm tra truy vấn chậm như thế nào?' };
+const report = { termination_reason: null, objectives: [{ objective_id: 'objective-1', skill_id: 'postgresql',
+  claim: 'Chẩn đoán truy vấn chậm', jd_evidence_spans: ['Optimize SQL'], assessment: 'NOT_ASSESSED',
+  stop_reason: null, strengths: [], weaknesses: [], evidence: [], criteria: [] }] };
 let session = null;
 const answers = [];
 const errors = [];
@@ -36,9 +37,9 @@ try {
     if (request.method() === 'OPTIONS') return send({});
     if (url.pathname === `/api/v1/sessions/${id}`) return send({ id, status: 'Not started', turns: [] });
     if (url.pathname.endsWith('/interview/start')) {
-      assert.equal(JSON.parse(request.postData()).focused_question_mode, 'DEBUGGING');
-      assert.equal(JSON.parse(request.postData()).interaction_mode, 'TEXT');
-      assert.equal(JSON.parse(request.postData()).max_questions_per_objective, 8);
+      assert.deepEqual(JSON.parse(request.postData()), {
+        focused_question_mode: 'DEBUGGING', interaction_mode: 'TEXT', max_questions: 10, duration_seconds: 900,
+      });
       session = { schema_version: 2, session_id: id, state_version: 1, is_finished: false,
         config, deadline_at: new Date(Date.now() + 900000).toISOString(), pending_turn: turn, turns: [], report };
       return send(session);
@@ -49,17 +50,15 @@ try {
       assert.deepEqual(answers[0], payload, 'Retry must preserve the exact request ID and payload');
       session = { ...session, state_version: 2, is_finished: true, pending_turn: null,
         turns: [{ ...turn, answer: payload.candidate_response, feedback: 'Đã chỉ ra cách kiểm chứng.' }],
-        report: { ...report, state_version: 2, is_finished: true, termination_reason: 'PLAN_COMPLETE',
-          progress: 1, evidence_coverage: 0.5, target_attainment: null, objectives: [{ objective_id: 'objective-1',
-            skill_id: 'postgresql', claim: 'Chẩn đoán truy vấn chậm', inferred: false, jd_evidence_spans: ['Optimize SQL'],
-            assessment: 'INSUFFICIENT_EVIDENCE', lifecycle: 'CLOSED', stop_reason: 'NO_PROGRESS',
-            excluded_reason: null, covered_criteria: ['c1'], missing_criteria: ['Kiểm chứng giả thuyết'], strengths: ['Biết đọc kế hoạch thực thi'],
+        report: { termination_reason: 'PLAN_COMPLETE',
+          objectives: [{ objective_id: 'objective-1',
+            skill_id: 'postgresql', claim: 'Chẩn đoán truy vấn chậm', jd_evidence_spans: ['Optimize SQL'],
+            assessment: 'INSUFFICIENT_EVIDENCE', stop_reason: 'NO_PROGRESS',
+            strengths: ['Biết đọc kế hoạch thực thi'],
             weaknesses: [], evidence: [{ turn_id: 'turn-1', criterion_id: 'c1', response_excerpt: payload.candidate_response,
-              rationale: 'Có cách kiểm chứng', observation: 'SUPPORTS', performance: 'AT_TARGET' }], evidence_turn_ids: ['turn-1'],
-            criteria: [{ criterion_id: 'c1', description: 'Đọc kế hoạch thực thi', assessment: 'DEMONSTRATED_AT_TARGET',
-              turns_spent: 4, stop_reason: 'SUFFICIENT_EVIDENCE' },
-              { criterion_id: 'c2', description: 'Kiểm chứng giả thuyết', assessment: 'INSUFFICIENT_EVIDENCE',
-                turns_spent: 3, stop_reason: 'NO_PROGRESS' }] }] } };
+              rationale: 'Có cách kiểm chứng', performance: 'AT_TARGET' }],
+            criteria: [{ criterion_id: 'c1', description: 'Đọc kế hoạch thực thi', assessment: 'DEMONSTRATED_AT_TARGET' },
+              { criterion_id: 'c2', description: 'Kiểm chứng giả thuyết', assessment: 'INSUFFICIENT_EVIDENCE' }] }] } };
       return send(session);
     }
     if (url.pathname.endsWith('/interview')) return send(session || {}, session ? 200 : 404);

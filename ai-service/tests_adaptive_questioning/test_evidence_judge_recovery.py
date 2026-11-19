@@ -10,6 +10,7 @@ from adaptive_questioning.evidence.errors import JudgmentUnavailableError
 from adaptive_questioning.evidence.models import Judgment, Snapshot
 from adaptive_questioning.evidence.excerpts import source_excerpt, source_lines
 from adaptive_questioning.evidence.routes import router
+from adaptive_questioning.evidence.workflow import JUDGMENT_ATTEMPTS
 from test_evidence_workflow import setup, start, answer
 
 
@@ -50,8 +51,9 @@ def test_invalid_judgment_is_retried_with_exact_targets_without_double_counting(
     assert len(calls) == 2
     expected = initial.pending_turn.question.criterion_ids
     for context in calls:
-        assert context["required_criterion_ids"] == expected
-        assert [c["criterion_id"] for c in context["target_criteria"]] == expected
+        assert "required_criterion_ids" not in context
+        assert context["turn"]["question"]["criterion_ids"] == expected
+        assert "target_criteria" not in context
         assert [c["criterion_id"] for c in context["objective"]["criteria"]] == expected
         assert context["turn"]["answer"] == "EXPLAIN ANALYZE"
     assert "validation_error" in calls[1]
@@ -88,7 +90,7 @@ def test_exhausted_judge_returns_503_and_same_answer_can_be_retried(setup, monke
         assert response.status_code == 503
         assert "chưa bị chấm điểm" in response.json()["detail"]
         assert "targeted criteria" not in response.json()["detail"]
-        assert len(calls) == initial.policy.judgment_attempts
+        assert len(calls) == JUDGMENT_ATTEMPTS
         assert initial.model_dump_json() == saved
         monkeypatch.setattr(provider, "judge", original_judge)
         retried = client.post('/api/v2/interview/respond', json=payload)
@@ -116,13 +118,6 @@ def test_judgment_retry_stops_at_deadline_without_mutating_input(setup, monkeypa
         answer(engine, initial)
     assert len(calls) == 1
     assert initial.model_dump_json() == saved
-
-
-def test_old_snapshots_default_to_bounded_judgment_retries(setup):
-    _, engine, _ = setup
-    value = start(engine).snapshot.model_dump(mode="json")
-    del value["policy"]["judgment_attempts"]
-    assert Snapshot.model_validate(value).policy.judgment_attempts == 2
 
 
 @pytest.mark.parametrize("excerpt, response", [
@@ -264,8 +259,22 @@ def test_code_judgment_recovers_with_source_lines_and_long_feedback(setup, monke
     assert judgment.observations[0].response_excerpt == source_lines((20, 33), TODO_CODE)
     assert judgment.observations[0].response_excerpt in TODO_CODE
     assert judgment.observations[0].performance == "AT_TARGET"
+    objective = result.snapshot.objectives[initial.pending_turn.objective_id]
+    stored_evidence = objective.evidence_history[0].model_dump()
+    assert objective.evidence_history[0].response_excerpt == judgment.observations[0].response_excerpt
+    assert {"response_line_range", "resolves_contradiction", "unresolved_aspects"}.isdisjoint(stored_evidence)
+    visible_evidence = result.public.report.objectives[0].evidence[0].model_dump()
+    assert visible_evidence["response_excerpt"] == judgment.observations[0].response_excerpt
+    assert "response_line_range" not in visible_evidence
+    from pydantic import ValidationError
     assert len(judgment.feedback) <= 300
     assert len(result.snapshot.turns) == 1
+    bad_payload = result.snapshot.model_dump(mode="json")
+    bad_payload["objectives"][initial.pending_turn.objective_id]["evidence_history"][0].update(
+        response_line_range=[20, 33], resolves_contradiction=False, unresolved_aspects=[],
+    )
+    with pytest.raises(ValidationError):
+        type(result.snapshot).model_validate(bad_payload)
     assert initial.model_dump_json() == saved
 
 

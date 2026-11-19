@@ -1,0 +1,39 @@
+{
+  "started_at_utc": "2026-11-18T08:02:46.476158+00:00",
+  "entrypoint": "app.main:app",
+  "transport": "FastAPI TestClient / ASGI",
+  "health": {
+    "status": "ok",
+    "service": "Smile Interview AI Service",
+    "version": "2.2.0"
+  },
+  "versions": {
+    "fastapi": "0.163.2",
+    "httpx": "0.28.1",
+    "dspy": "3.5.0",
+    "pydantic": "2.14.3",
+    "litellm": "1.110.0"
+  },
+  "sources_sha256": {
+    "adaptive_questioning/evidence/__init__.py": "091fae8ea8f41b957eb82fff9d070c5219e8eaaa2b3cd9b4000a5ae2827c0122",
+    "adaptive_questioning/evidence/assessment.py": "3714303e259b56a0b31b758b45b0585e37b58f105489126f589bba4cf705ff39",
+    "adaptive_questioning/evidence/coding_verification.py": "234c6dc4a207142618c70c080e244ba7d9b40c1bd081e1e4b3921accd955db73",
+    "adaptive_questioning/evidence/conversation.py": "ad807feebfe975eec6b0c8baf4f4fd8dfcae6876a7d1b5c8241919eb4329a129",
+    "adaptive_questioning/evidence/criterion_progress.py": "114cb4742244b9cd2466584f3f537354131e441f91b183cff50a901ce7e1e4d7",
+    "adaptive_questioning/evidence/depth.py": "a34b98bb18d7c231fd7aa013d0c7dc1033451c6500582b81a9cb1c1201299083",
+    "adaptive_questioning/evidence/errors.py": "29ec290b24dee1383fe8a4667eb67695076a4a545b2a52525eeeb7cc2a6c5153",
+    "adaptive_questioning/evidence/excerpts.py": "4638bad3966eb1f8a1ad60fe2d6c35d4d806ee94f5558ffb284539b445f59071",
+    "adaptive_questioning/evidence/lifecycle.py": "c03e783ec9efdcc691e83252d10070b61b1ccc59a94cdd97db03f8851bd6437a",
+    "adaptive_questioning/evidence/model_runtime.py": "08a477b927d5b18a682f6d021d908be6fe1a56adea252f25d55b1ccf691c5f0c",
+    "adaptive_questioning/evidence/models.py": "b432b0afc9bebba7e0d2992fe5243e3560e3ed5d555f1d9f39b84b93fe2eca22",
+    "adaptive_questioning/evidence/planning.py": "4ab17f25e31a6aec2587bec6ba29629e362448553c6d1011f94fc4b10b3d5cf7",
+    "adaptive_questioning/evidence/policy_config.py": "568a6ea2c1d9c5ac572998d9ad1b2f3424ce5369438d60d395740dbb9efc614d",
+    "adaptive_questioning/evidence/preparation_cache.py": "fbb93b65e9ba124ec7ea183e162753f6d2e76205825b00dab64c76641c72b92b",
+    "adaptive_questioning/evidence/provider.py": "e40cf0575baf351f7e16ed2f7cc3232a6716c4594ee1ee58bc2b161cc7a39125",
+    "adaptive_questioning/evidence/question_validation.py": "d6e22635baf83c903a3dfd915e3b1c2074c39efc5194d063c65dc403259cf755",
+    "adaptive_questioning/evidence/reporting.py": "9665f20e7b8adaff88f1e222779d1d037c1b995227814b47f1bce9c9fdc02611",
+    "adaptive_questioning/evidence/routes.py": "a54d33e363e7178810423e702f96b96549b8846a1e37c707f8d63447c201841d",
+    "adaptive_questioning/evidence/telemetry.py": "408af94d63533fcb53361ed769cd9aa2356baf665721aec1111dc308b110d65f",
+    "adaptive_questioning/evidence/workflow.py": "19278770cb80c2a1aae368bdad181554425cdd33dada6de746de8815b61cf85b"
+  }
+}

@@ -10,7 +10,7 @@ import ts from 'typescript';
 const require = createRequire(import.meta.url);
 const src = path.resolve(import.meta.dirname, '../src');
 
-function setup() {
+function setup(pathname = '/profile', search = '') {
   const modules = new Map();
   const storage = new Map();
   const timers = new Map();
@@ -19,14 +19,14 @@ function setup() {
   let effect;
   let timerId = 0;
   const sandbox = {
-    atob, Date, process,
+    atob, Date, process, URLSearchParams,
     localStorage: {
       getItem: key => storage.get(key) ?? null,
       setItem: (key, value) => storage.set(key, value),
       removeItem: key => storage.delete(key),
     },
     window: {
-      location: { pathname: '/profile', replace: url => redirects.push(url) },
+      location: { pathname, search, replace: url => redirects.push(url) },
       addEventListener: (name, callback) => listeners.set(name, callback),
       removeEventListener: name => listeners.delete(name),
     },
@@ -70,6 +70,13 @@ function setup() {
 
 const token = (exp, sub = 'user') => `e30.${Buffer.from(JSON.stringify({ exp, sub })).toString('base64url')}.signature`;
 const login = (app, jwt) => app.store.getState().login({ id: '1', role: 'USER' }, jwt);
+
+test('a notification keeps its result link through login and discards unrelated URL parameters', () => {
+  const app = setup('/interview/new', '?sessionId=s&jobId=j&next=elsewhere');
+  assert.equal(app.session.loginPath(), '/login?sessionId=s&jobId=j');
+  const loginPage = setup('/login', '?sessionId=s&jobId=j');
+  assert.equal('/interview/new' + loginPage.session.analysisResultSearch(), '/interview/new?sessionId=s&jobId=j');
+});
 
 test('expiry decoding rejects malformed/missing expiry and honors the exact boundary', () => {
   const app = setup();
@@ -125,7 +132,7 @@ test('401 logs out, 403 preserves login, and a late 401 cannot clear a new login
   const second = token(Math.floor(Date.now() / 1000) + 120, 'other-user');
   const fail = status => config => Promise.reject({ config, response: { status } });
   login(app, first);
-  await assert.rejects(app.client.get('/api/hr/test', { adapter: fail(403) }));
+  await assert.rejects(app.client.get('/api/v1/sessions/test', { adapter: fail(403) }));
   assert.equal(app.store.getState().token, first);
   await assert.rejects(app.client.get('/api/v1/resumes', { adapter: fail(401) }));
   assert.equal(app.store.getState().token, null);

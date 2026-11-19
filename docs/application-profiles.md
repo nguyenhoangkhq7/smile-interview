@@ -4,7 +4,7 @@ Luồng: `/applications` → tạo hồ sơ qua `/interview/new` → phân tích
 
 `ApplicationProfile` lưu chủ sở hữu, tên/công ty/vị trí, liên kết tài liệu, bản chụp nội dung và tên CV/JD, kết quả phân tích ban đầu. Một `Session` thuộc một hồ sơ và có số lượt riêng. Các phiên cũ không có hồ sơ vẫn sử dụng luồng cũ.
 
-Khi lưu hồ sơ, phiên chuẩn bị đã phân tích trở thành lượt 1 chưa bắt đầu. Thao tác lưu lặp lại trả về cùng hồ sơ. Lượt tiếp theo dùng bản phân tích của hồ sơ, không gọi lại pipeline skill-gap. Bộ tiêu chí và policy được đóng băng cùng transaction bắt đầu lượt đầu; lượt sau dùng lại bộ này để sinh câu hỏi mới, khởi tạo bằng chứng/câu trả lời từ đầu.
+Khi lưu hồ sơ, phiên chuẩn bị đã phân tích trở thành lượt 1 chưa bắt đầu. Thao tác lưu lặp lại trả về cùng hồ sơ. Lượt tiếp theo dùng bản phân tích của hồ sơ, không gọi lại pipeline skill-gap. Bộ tiêu chí (`blueprint_json`) được đóng băng cùng transaction bắt đầu lượt đầu; lượt sau dùng lại bộ này để sinh câu hỏi mới, khởi tạo bằng chứng/câu trả lời từ đầu.
 
 API yêu cầu JWT:
 
@@ -26,7 +26,7 @@ CV/JD và phân tích của hồ sơ cố định; thay đổi tài liệu cần
 
 `CompetencyProjection` tạo bảng đánh giá trực tiếp từ snapshot đã lưu khi đọc hồ sơ. Không cần migration, gọi AI hoặc chạy backfill; các lượt đã kết thúc trước khi triển khai cũng được tổng hợp. Lượt chưa kết thúc và lượt không có câu trả lời không làm thay đổi kết quả.
 
-- Tách hoàn toàn chẩn đoán tài liệu khỏi năng lực quan sát. Không cập nhật các giá trị `candidate_proficiency`/`gap_magnitude` của mốc CV–JD hoặc lấy trung bình các lượt.
+- Tách hoàn toàn chẩn đoán tài liệu khỏi năng lực quan sát. Không cập nhật dữ liệu phân tích CV–JD của hồ sơ hoặc lấy trung bình các lượt.
 - Ghép theo objective/criterion của blueprint cố định, kiểm tra mức yêu cầu, bộ tiêu chí và rubric fingerprint. Đánh giá không tương thích bị bỏ qua và có thông báo.
 - Chỉ dùng bằng chứng độc lập tại đúng target depth, trích đoạn thực sự nằm trong câu trả lời và có turn gốc. Không dùng câu dễ hơn/có gợi ý để xác nhận đạt yêu cầu. Kết luận vượt yêu cầu cần cả bằng chứng extension độc lập.
 - Giữ kết luận khi nội dung không được hỏi lại hoặc lượt mới không bổ sung bằng chứng quyết định. Kỹ năng có một số yêu cầu đạt nhưng chưa kiểm tra hết được ghi là chưa kiểm tra đầy đủ.
@@ -43,6 +43,6 @@ Giao diện hồ sơ gồm ba tab: năng lực hiện tại, lịch sử phỏng
 - Backend và migration: `scripts/verify-evidence-backend.ps1 -JavaHome <JDK>` (PostgreSQL tạm, không chạm database ứng dụng).
 - AI: `python -m pytest tests_adaptive_questioning/test_evidence_workflow.py tests_adaptive_questioning/test_evidence_depth_policy.py -q` từ `ai-service`.
 - Frontend: `npm run build`, lint các file thay đổi; sau khi chạy server: `node scripts/application-profiles-smoke.mjs http://localhost:3217`, `node scripts/competency-smoke.mjs http://localhost:3217` và `node scripts/evidence-smoke.mjs http://localhost:3217`.
-- Kiểm tra thiết kế, tìm kiếm/lọc, tab, bàn phím và tên dài: `node scripts/application-design-smoke.mjs http://localhost:3217`. Báo cáo toán trong tab tài liệu: `node scripts/markdown-math-smoke.mjs http://localhost:3217`.
+- Kiểm tra thiết kế, tìm kiếm/lọc, tab, bàn phím và tên dài: `node scripts/application-design-smoke.mjs http://localhost:3217`.
 
 Triển khai đồng thời backend, AI service và web app. Backend tự áp dụng Flyway V3 khi khởi động. Không sửa các migration V1/V2 hoặc tự chuyển các phiên cũ thành hồ sơ.

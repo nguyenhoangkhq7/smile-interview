@@ -3,7 +3,7 @@ import json
 
 import pytest
 
-from adaptive_questioning.evidence.models import Judgment, ObjectiveState, Snapshot
+from adaptive_questioning.evidence.models import Assessment, Judgment, ObjectiveState, Snapshot
 from adaptive_questioning.evidence.provider import JudgeSignature
 from test_evidence_workflow import setup, start, answer
 
@@ -33,29 +33,12 @@ def test_judge_contract_requires_only_evidence_fields(setup):
     assert_no_probability_fields(Snapshot.model_json_schema())
 
 
-def test_old_snapshot_probability_fields_are_discarded_before_judging(setup, monkeypatch):
-    provider, engine, _ = setup
-    provider.criterion_count = 2
-    first = answer(engine, start(engine).snapshot)
-    old = first.snapshot.model_dump(mode="json")
-    for state in old["objectives"].values():
+def test_probability_fields_are_rejected_by_strict_models(setup):
+    from pydantic import ValidationError
+    _, engine, _ = setup
+    payload = start(engine).snapshot.model_dump(mode="json")
+    for state in payload["objectives"].values():
         state["belief"] = [0.1, 0.2, 0.7]
-    old["turns"][0]["judgment"].update(raw_belief=[0.1, 0.2, 0.7], tag="DECISIVE_SHIFT")
-    restored = Snapshot.model_validate(old)
-    original_judge = provider.judge
-    contexts = []
-
-    def judge(context):
-        contexts.append(json.loads(context))
-        # Even a stale provider response must not persist retired fields.
-        value = original_judge(context).model_dump()
-        return Judgment.model_validate(value | {"raw_belief": [float("nan")], "tag": "obsolete"})
-
-    monkeypatch.setattr(provider, "judge", judge)
-    result = answer(engine, restored)
-    assert result.public.is_finished
-    assert result.public.report.target_attainment == 1
-    assert_no_probability_fields(restored.model_dump())
-    assert_no_probability_fields(contexts)
-    assert_no_probability_fields(result.model_dump())
+    with pytest.raises(ValidationError):
+        Snapshot.model_validate(payload)
 

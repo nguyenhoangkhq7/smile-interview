@@ -6,7 +6,7 @@ from skill_gap.services.resume_segmenter import ResumeSegmenter
 from skill_gap.services.jd_requirement_parser import JDRequirementParser
 from skill_gap.services.proficiency_estimator import ProficiencyEstimator, ProficiencyEstimating
 from skill_gap.services.gap_detector import GapDetector
-from skill_gap.services.report_generator import StaticGapAuditReport
+from skill_gap.domain.models import SkillGapReportSummary
 from skill_gap.graph.workflow import SkillGapWorkflow
 
 
@@ -14,7 +14,7 @@ class SkillGapOrchestrator:
     """
     End-to-End Pipeline orchestrating all steps of the Skill-Gap Detection module
     via a parallel LangGraph StateGraph (Fan-out CV Segmentation // JD Parsing +
-    Parallel Proficiency Estimation + Deterministic Gap Detection + Fact-based XAI Report).
+    Parallel Proficiency Estimation + Deterministic Gap Detection).
     """
 
     def __init__(
@@ -52,10 +52,7 @@ class SkillGapOrchestrator:
         jd_skills: List[ExtractedJDSkill],
         match_results: List[MatchResult],
     ) -> List[SkillGapResult]:
-        """
-        Execute the parallel LangGraph pipeline and return the list of SkillGapResult items.
-        Preserves 100% backward compatibility with all existing tests, benchmarks, and Module 3 contracts.
-        """
+        """Execute the parallel LangGraph pipeline and return the list of SkillGapResult items."""
         gap_results, _, _ = self.workflow.invoke(
             cv_text=cv_text,
             jd_text=jd_text,
@@ -73,12 +70,12 @@ class SkillGapOrchestrator:
         jd_skills: List[ExtractedJDSkill],
         match_results: List[MatchResult],
         analysis_id: Optional[str] = None,
-    ) -> Tuple[List[SkillGapResult], StaticGapAuditReport]:
+    ) -> Tuple[List[SkillGapResult], SkillGapReportSummary]:
         """
-        Execute the parallel LangGraph pipeline and return both the Module 3-compatible
-        SkillGapResult list and the Fact-based Static XAI Audit Report.
+        Execute the parallel LangGraph pipeline and return both the internal
+        SkillGapResult list and the summary report status.
         """
-        gap_results, audit_report, _ = self.workflow.invoke(
+        gap_results, report, _ = self.workflow.invoke(
             cv_text=cv_text,
             jd_text=jd_text,
             cv_skills=cv_skills,
@@ -86,4 +83,4 @@ class SkillGapOrchestrator:
             match_results=match_results,
             analysis_id=analysis_id,
         )
-        return gap_results, audit_report
+        return gap_results, report

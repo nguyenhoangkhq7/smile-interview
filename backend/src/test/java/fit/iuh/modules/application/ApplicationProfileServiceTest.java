@@ -85,7 +85,14 @@ class ApplicationProfileServiceTest {
         SkillGapClient gaps = mock(SkillGapClient.class);
         var profile = profile();
         var session = Session.builder().applicationProfile(profile).build();
-        assertThat(new EvidenceInputs(gaps, json).skills(session)).isEqualTo(json.read(profile.getSkillGapJson()));
+        profile.setSkillGapJson("""
+                [{"jd_skill_id":"sql","job_tasks":[],"jd_evidence_spans":["Tối ưu SQL"],
+                  "importance_weight":1,"candidate_proficiency":3,"suggested_strategy":"PROBE_DEPTH"}]
+                """);
+        var skills = new EvidenceInputs(gaps, json).skills(session);
+        assertThat(skills).isEqualTo(json.read("""
+                [{"jd_skill_id":"sql","job_tasks":[],"jd_evidence_spans":["Tối ưu SQL"],"importance_weight":1}]
+                """));
         verifyNoInteractions(gaps);
     }
 
@@ -98,5 +105,38 @@ class ApplicationProfileServiceTest {
         assertThatThrownBy(() -> service.create(User.builder().id(UUID.randomUUID()).build(), request))
                 .isInstanceOfSatisfying(ResponseStatusException.class, ex -> assertThat(ex.getStatusCode().value()).isEqualTo(403));
         verifyNoInteractions(profiles);
+    }
+
+    @Test void preservesRichModule2ContextAndPrewarmsBlueprintConditionally() {
+        SkillGapClient gaps = mock(SkillGapClient.class);
+        var profile = profile();
+        profile.setCompany("Smile Tech");
+        profile.setJdText("Thiết kế hệ thống phân tán Java Spring Boot");
+        profile.setSkillGapJson("""
+                [{"jd_skill_id":"spring_boot","jd_skill_name":"Spring Boot",
+                  "matched_cv_skill_name":"Java Spring","semantic_alignment":"PARTIAL",
+                  "context_job":"Xây dựng REST API tại công ty cũ","job_tasks":[],
+                  "jd_evidence_spans":["Spring Boot"],"importance_weight":0.9}]
+                """);
+        var session = Session.builder().applicationProfile(profile).build();
+        var evidenceInputs = new EvidenceInputs(gaps, json);
+        var skills = evidenceInputs.enrichPersonalization(evidenceInputs.skills(session), session);
+        var first = skills.get(0);
+        assertThat(first.path("jd_skill_name").asText()).isEqualTo("Spring Boot");
+        assertThat(first.path("matched_cv_skill_name").asText()).isEqualTo("Java Spring");
+        assertThat(first.path("semantic_alignment").asText()).isEqualTo("PARTIAL");
+        assertThat(first.path("context_job").asText()).isEqualTo("Xây dựng REST API tại công ty cũ");
+
+        EvidenceAiClient ai = mock(EvidenceAiClient.class);
+        var blueprint = json.read("{\"objectives\":[{\"objective_id\":\"obj-1\",\"skill_id\":\"spring_boot\"}]}");
+        when(ai.blueprint(any())).thenReturn(blueprint);
+        when(profiles.savePrewarmedBlueprintIfAbsent(eq(profile.getId()), any())).thenReturn(1);
+
+        var prewarmService = new ApplicationProfileService(profiles, sessions, runs, turns, json, ai);
+        var payload = prewarmService.buildBlueprintPayload(profile);
+        prewarmService.prewarmBlueprint(profile.getId(), payload);
+
+        verify(ai).blueprint(payload);
+        verify(profiles).savePrewarmedBlueprintIfAbsent(profile.getId(), blueprint.toString());
     }
 }

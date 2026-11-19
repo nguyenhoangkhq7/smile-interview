@@ -1,6 +1,6 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SerializerFunctionWrapHandler, model_serializer
 from typing import List, Optional, Literal
-from .enums import SkillType, SemanticAlignment, SeniorityLevel, RichnessLabel, QuestionStrategy
+from .enums import SkillType, SemanticAlignment, SeniorityLevel, RichnessLabel
 
 UNASSIGNED_JOB_ID = "UNASSIGNED"
 
@@ -111,29 +111,40 @@ class ProficiencyResult(BaseModel):
 
 # --- Step D Models (Skill Gap Detector) ---
 
-class SkillGapResult(BaseModel):
+class SkillGapSummary(BaseModel):
     jd_skill_id: str
     jd_skill_name: Optional[str] = None
     matched_cv_skill_name: Optional[str] = None
     semantic_alignment: SemanticAlignment
     matched_cv_skill_id: Optional[str]
-    is_substituted: bool = Field(description="True nếu kỹ năng được bù đắp bởi kỹ năng tương đương (PARTIAL)")
-    gap_magnitude: float = Field(ge=0.0, le=1.0, description="Độ thiếu hụt năng lực chuẩn hóa trên độ rộng thang đo 4.0")
-    severity: float = Field(ge=0.0, le=1.0, description="Mức độ nghiêm trọng của thiếu hụt (w_j * gap_magnitude)")
-    priority: float = Field(ge=0.0, le=1.0, description="Mức độ ưu tiên phỏng vấn tất định (w_j * gap_magnitude)")
-
-    # --- Rich Context cho Module 3 (Adaptive Question Generation) ---
+    priority: float = Field(ge=0.0, le=1.0, description="Mức độ ưu tiên (w_j * required_proficiency / 5 * gap_magnitude)")
     required_proficiency: float = Field(description="P_JD từ Bước B")
-    candidate_proficiency: float = Field(description="P_CV từ Bước C")
     cv_evidence_spans: List[str] = Field(default_factory=list, description="Các đoạn trích dẫn bằng chứng từ CV")
     context_job: Optional[str] = Field(default=None, description="Tóm tắt công việc, chức danh và mốc thời gian")
-    suggested_strategy: QuestionStrategy = Field(description="Chiến lược phỏng vấn thích ứng khuyến nghị")
-
-    degraded: bool = Field(default=False)
-    flags: List[str] = Field(default_factory=list)
     importance_weight: float = Field(default=0.0, ge=0.0, le=1.0)
-    jd_reasoning: str = ""
-    jd_evidence_spans: List[str] = Field(default_factory=list)
     job_tasks: List[JobTask] = Field(default_factory=list)
-    c_evidence: float = Field(default=0.0, ge=0.0, le=1.0)
-    recency_flag: bool = False
+    jd_evidence_spans: List[str] = Field(default_factory=list, description="Trích dẫn JD khi chưa có nhiệm vụ cụ thể")
+
+    @model_serializer(mode="wrap")
+    def serialize_skill(self, handler: SerializerFunctionWrapHandler):
+        data = handler(self)
+        if self.job_tasks or not self.jd_evidence_spans:
+            data.pop("jd_evidence_spans", None)
+        return data
+
+
+class SkillGapResult(SkillGapSummary):
+    """Internal pipeline result with proficiency/gap diagnostics."""
+
+    is_substituted: bool = Field(description="True nếu kỹ năng được bù đắp bởi kỹ năng tương đương (PARTIAL)")
+    gap_magnitude: float = Field(ge=0.0, le=1.0, description="Độ thiếu hụt năng lực chuẩn hóa trên độ rộng thang đo 4.0")
+    candidate_proficiency: float = Field(description="P_CV từ Bước C")
+    degraded: bool = False
+    flags: List[str] = Field(default_factory=list)
+
+
+class SkillGapReportSummary(BaseModel):
+    matching_score: Optional[float] = Field(
+        default=None, ge=0.0, le=1.0, description="Overall GNN CV–JD compatibility on a 0–1 scale"
+    )
+    degraded: bool = False

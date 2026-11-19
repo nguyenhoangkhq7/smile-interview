@@ -5,15 +5,14 @@ import Link from 'next/link';
 import { GripVertical, Plus } from 'lucide-react';
 import { skillLabel } from '@/components/features/applications/applicationUi';
 import { cn } from '@/lib/utils';
-import type { ObjectiveSuggestion } from '@/services/studyPlans';
+import { isCriterionRecommended, type ObjectiveSuggestion } from '@/services/studyPlans';
 
 export const studyGapDragType = 'application/x-smile-study-gap';
 
 export interface StudyGap {
   skillId: string;
-  notes: readonly string[];
   source?: { sessionId: string; attemptNumber: number } | null;
-  objective?: ObjectiveSuggestion;
+  objective: ObjectiveSuggestion;
 }
 
 export interface StudyGapActions {
@@ -22,13 +21,13 @@ export interface StudyGapActions {
   add: (gap: StudyGap) => Promise<boolean>;
 }
 
-export function StudyGapCard({ gap, actions, list = false }: {
+export function StudyGapCard({ gap, actions }: {
   gap: StudyGap;
   actions?: StudyGapActions;
-  list?: boolean;
 }) {
   const label = skillLabel(gap.skillId);
   const draggable = Boolean(actions && !actions.disabled);
+  const recommended = gap.objective.criteria.filter(isCriterionRecommended);
   return (
     <article draggable={draggable}
       onDragStart={(event) => {
@@ -47,25 +46,20 @@ export function StudyGapCard({ gap, actions, list = false }: {
         <p className="font-semibold">{label}</p>
         {draggable && <GripVertical size={15} className="shrink-0 text-(--practice-muted)" aria-hidden="true" />}
       </div>
-      {gap.objective && <div className="space-y-1.5">
+      <div className="space-y-1.5">
         <p className="text-sm font-semibold">{gap.objective.claim}</p>
-        <p className="text-(--practice-muted)">{gap.objective.criteria.filter(c => c.selectedByDefault).length} tiêu chí cần luyện · {gap.objective.criteria.length} tiêu chí của mục tiêu</p>
+        <p className="text-(--practice-muted)">{recommended.length} tiêu chí cần luyện · {gap.objective.criteria.length} tiêu chí của mục tiêu</p>
         <ul className="list-disc space-y-1 pl-4 text-(--practice-muted)">
-          {gap.objective.criteria.filter(c => c.selectedByDefault).map(c => <li key={c.criterionId}>{c.description}{c.kind === 'VERIFY' && ' · Cần kiểm chứng'}</li>)}
+          {recommended.map(c => <li key={c.criterionId}>{c.description}{c.kind === 'VERIFY' && ' · Cần kiểm chứng'}</li>)}
         </ul>
-      </div>}
-      {list ? (
-        <ul className="list-disc space-y-1 pl-4 text-(--practice-muted)">
-          {gap.notes.map(note => <li key={note}>{note}</li>)}
-        </ul>
-      ) : gap.notes[0] && <p className="text-(--practice-muted)">{gap.notes[0]}</p>}
+      </div>
       <div className="flex flex-wrap items-center justify-between gap-2">
         {gap.source && <Link draggable={false} className="font-medium text-(--practice-primary) hover:underline"
           href={`/interview/session/${encodeURIComponent(gap.source.sessionId)}/result`}>
           Xem kết quả lượt {gap.source.attemptNumber}
         </Link>}
         {actions && <button type="button" draggable={false} disabled={actions.disabled}
-          onClick={() => void actions.add(gap)} aria-label={`Thêm đầu việc cho ${gap.objective?.claim ?? label}`}
+          onClick={() => void actions.add(gap)} aria-label={`Thêm đầu việc cho ${gap.objective.claim}`}
           className="inline-flex items-center gap-1 rounded-md bg-card px-2 py-1 font-medium text-(--practice-primary) hover:underline disabled:opacity-50">
           <Plus size={13} aria-hidden="true" /> Thêm đầu việc
         </button>}

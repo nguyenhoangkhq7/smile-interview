@@ -44,11 +44,8 @@ def test_module1_to_module2_pipeline_endpoint(fixed_matching_result):
     pipe_data = pipe_res.json()
     assert pipe_data["analysis_id"] == "test-session-123"
     assert len(pipe_data["skills"]) == 2
-    assert all("matcher_source:MATCHING_CV" in skill["flags"] for skill in pipe_data["skills"])
-    assert "markdown_summary" in pipe_data["report"]
-    assert pipe_data["report"]["total_jd_skills"] == 2
+    assert set(pipe_data["report"]) == {"matching_score", "degraded"}
+    assert all("flags" not in skill for skill in pipe_data["skills"])
     kubernetes = next(skill for skill in pipe_data['skills'] if skill['jd_skill_id'] == 'kubernetes')
     assert kubernetes['jd_skill_name'] == 'Quản trị Kubernetes'
     assert kubernetes['matched_cv_skill_name'] == 'Vận hành Kubernetes'
-    audit_item = next(item for item in pipe_data['report']['items'] if item['jd_skill_id'] == 'kubernetes')
-    assert audit_item['jd_skill_name'] == 'Quản trị Kubernetes'

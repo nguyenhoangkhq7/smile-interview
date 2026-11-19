@@ -92,11 +92,8 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers("/api/auth/**").permitAll()
                     .requestMatchers("/uploads/**").permitAll()
-                    .requestMatchers("/ws/**").permitAll()
                     .requestMatchers("/actuator/health").permitAll()
-                    .requestMatchers("/api/v1/hr-realtime/**").permitAll()
                     .requestMatchers("/api/admin/**", "/api/v1/admin/**").hasRole("ADMIN")
-                    .requestMatchers("/api/hr/**").hasAnyRole("HR", "ADMIN")
                     .requestMatchers("/api/v1/**", "/api/v2/**").authenticated()
                     .anyRequest().authenticated()
             )

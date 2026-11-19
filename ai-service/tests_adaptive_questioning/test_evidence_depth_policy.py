@@ -83,12 +83,15 @@ def test_l2_starts_directly_without_proficiency_conversion(audit):
     provider, engine, _ = audit
     result = start(engine, [task_skill()])
     assert result.snapshot.pending_turn.question_depth == 2
-    assert current(result).objective.required_proficiency == 4
     assert current(result).objective.target_depth == 2
     assert current(result).objective.depth_basis == "TASK_HEURISTIC"
     question_context = provider.contexts[-1][1]
-    assert question_context["question_depth"] == 2
-    assert len(question_context["depth_definitions"]) == 4
+    assert question_context["required_question_contract"]["depth"] == 2
+    assert "Application:" in question_context["depth_definition"]
+    assert "depth_definitions" not in question_context
+    assert {"required_proficiency", "depth_basis", "depth_rationale", "inferred", "requirement_id", "objective_id"}.isdisjoint(
+        question_context["objective"]
+    )
 
 
 def test_wrong_l2_diagnoses_l1_and_l1_success_does_not_pass_target(audit):
@@ -125,6 +128,7 @@ def test_ambiguous_l2_clarifies_same_depth_and_case(audit):
 
 def test_target_success_stops_without_mandatory_extension(audit):
     provider, engine, _ = audit
+    engine.policy = InterviewPolicy(allow_extension_probes=False)
     provider.extension = 3
     result = answer(engine, start(engine, [task_skill()]).snapshot, "ok")
     assert result.public.is_finished
@@ -147,7 +151,8 @@ def test_failed_l3_preserves_established_l2(audit):
     provider.performance, provider.observation = "BELOW", "CONTRADICTS"
     result = answer(engine, result.snapshot, "extension wrong")
     assert result.public.report.objectives[0].assessment == Assessment.AT
-    assert len(result.public.report.objectives[0].evidence) == 1
+    evidence = result.public.report.objectives[0].evidence
+    assert [item.depth_role for item in evidence] == ["TARGET", "EXTENSION"]
     assert len(next(iter(result.snapshot.objectives.values())).evidence_history) == 2
     assert not next(iter(result.snapshot.objectives.values())).contradictions
 
@@ -165,7 +170,8 @@ def test_above_target_requires_predeclared_extension_and_its_evidence(audit):
 def test_hint_taints_same_criterion_even_on_later_unhinted_question(audit):
     provider, engine, _ = audit
     initial = start(engine, [task_skill()], max_questions_per_objective=2).snapshot
-    initial.pending_turn.question.assistance = "HINT"
+    state = next(iter(initial.objectives.values()))
+    state.assisted_criteria = list(initial.pending_turn.question.criterion_ids)
     first = answer(engine, initial, "repeat hinted solution")
     state = next(iter(first.snapshot.objectives.values()))
     assert not state.criterion_results
@@ -180,7 +186,7 @@ def test_feedback_hint_is_not_mistaken_for_independent_followup(audit):
     provider.observation, provider.performance = "NO_EVIDENCE", "UNDETERMINED"
     provider.feedback_hint = True
     first = answer(engine, start(engine, [task_skill()]).snapshot, "irrelevant")
-    assert first.public.report.evidence_coverage == 0
+    assert not first.public.report.objectives[0].evidence
     assert first.public.report.objectives[0].assessment == Assessment.INSUFFICIENT
     assert first.public.is_finished
 
@@ -245,7 +251,7 @@ def test_invalid_question_contract_stops_after_bounded_retry(audit, field):
     provider.bad_question, provider.bad_attempts = field, 10
     with pytest.raises(QuestionUnavailableError, match="AI chưa tạo được"):
         start(engine, [task_skill()])
-    assert provider.question_number == 2
+    assert provider.question_number == 3
 
 
 def test_budget_prevents_further_generation_even_if_router_would_verify(audit):
@@ -278,13 +284,15 @@ def test_debugging_mode_can_be_l2_without_becoming_coding(audit):
 
 def test_mixed_uses_task_fit_and_focused_honors_explicit_choice(audit):
     provider, engine, _ = audit
-    provider.modes = [SuitableMode(mode=mode, rationale="Valid task aspect") for mode in
+    provider.modes = [SuitableMode(mode=mode) for mode in
                       [Mode.TECHNICAL_EXPLANATION, Mode.DEBUGGING]]
     skills = [task_skill("Diagnose a slow query")]
     mixed = start(engine, skills)
     assert mixed.snapshot.pending_turn.mode == Mode.DEBUGGING
     provider.limit_criteria = True
-    focused = start(engine, skills, mode="FOCUSED", focused_question_mode=Mode.TECHNICAL_EXPLANATION)
+    focused = start(engine, skills, focused_question_mode=Mode.TECHNICAL_EXPLANATION)
+    assert focused.snapshot.config.mode == "FOCUSED"
+    assert focused.snapshot.config.max_questions_per_objective == 8
     assert focused.snapshot.pending_turn.mode == Mode.TECHNICAL_EXPLANATION
     followup = answer(engine, focused.snapshot)
     assert followup.snapshot.pending_turn.mode == Mode.TECHNICAL_EXPLANATION
@@ -293,8 +301,8 @@ def test_mixed_uses_task_fit_and_focused_honors_explicit_choice(audit):
 def test_mixed_prefers_essential_coverage_then_diversity(audit):
     provider, engine, _ = audit
     provider.criterion_count = 2
-    provider.modes = [SuitableMode(mode=Mode.DESIGN, rationale="Measures one aspect", criterion_indices=[0]),
-                      SuitableMode(mode=Mode.DEBUGGING, rationale="Measures all essential aspects")]
+    provider.modes = [SuitableMode(mode=Mode.DESIGN, criterion_indices=[0]),
+                      SuitableMode(mode=Mode.DEBUGGING)]
     first = start(engine, [skill("a"), skill("b")])
     assert first.snapshot.pending_turn.mode == Mode.DEBUGGING
     provider.modes[0].criterion_indices = []
@@ -315,7 +323,7 @@ def test_core_gaps_precede_core_match_and_optional_missing(audit):
     aws = next(s for s in result.snapshot.objectives.values() if s.objective.skill_id == "aws")
     assert aws.assessment == Assessment.NOT_ASSESSED
     assert aws.excluded_reason == "PLAN_BUDGET"
-    assert not result.public.report.study_recommendations
+    assert not [item for obj in result.public.report.objectives for item in obj.study_recommendations]
 
 
 def test_followup_reserve_and_early_finish_reallocate_to_unasked_objectives(audit):
@@ -334,12 +342,9 @@ def test_ambiguous_jd_is_inferred_with_configurable_fallback_and_no_title_mappin
     engine.policy = InterviewPolicy(fallback_depth=1)
     initial = start(engine, [skill(jd_evidence_spans=["Senior Java developer"])])
     obj = current(initial).objective
-    assert obj.inferred and obj.target_depth == 1
+    assert obj.target_depth == 1
+    assert "inferred" not in obj.model_dump()
     assert obj.depth_basis == "CONFIGURED_FALLBACK"
-    engine.policy = InterviewPolicy(seniority_fallback_depths={"senior": 3})
-    fallback = start(engine, [skill(jd_evidence_spans=["Senior Java developer"])])
-    assert current(fallback).objective.target_depth == 3
-    assert current(fallback).objective.depth_basis == "SENIORITY_FALLBACK"
     explicit = start(engine, [task_skill(jd_evidence_spans=["Senior Java developer"])])
     assert current(explicit).objective.target_depth == 2
 
@@ -356,32 +361,39 @@ def test_policy_and_target_survive_recovery_and_cannot_change_mid_session(audit)
     judge_context = next(values for kind, values in provider.contexts if kind == "judge")
     assert "candidate_proficiency" not in judge_context
     assert judge_context["objective"]["target_depth"] == 2
+    assert {"required_proficiency", "depth_basis", "depth_rationale", "inferred", "requirement_id", "objective_id"}.isdisjoint(
+        judge_context["objective"]
+    )
+    provider.limit_criteria = False
+    answer(engine, result.snapshot)
+    second_judge = next(values for kind, values in reversed(provider.contexts) if kind == "judge")
+    assert all("judgment" not in t and set(t) == {"action", "question_depth", "question", "evidence_scope", "answer"}
+               for t in second_judge["prior_turns"])
 
 
-def test_snapshot_without_depth_fields_resumes_conservatively(audit):
-    _, engine, _ = audit
-    payload = start(engine).snapshot.model_dump(mode="json")
-    payload.pop("policy")
-    for state in payload["objectives"].values():
-        for field in ["target_depth", "depth_basis", "depth_rationale", "depth_evidence_spans"]:
-            state["objective"].pop(field)
-        state.pop("current_question_depth")
-        state.pop("evidence_history")
-    payload["pending_turn"].pop("question_depth")
-    for field in ["depth", "mode", "evidence_scope"]:
-        payload["pending_turn"]["question"].pop(field)
-    restored = Snapshot.model_validate(payload)
-    result = answer(engine, restored)
-    assert result.public.report.objectives[0].assessment == Assessment.INSUFFICIENT
-    assert result.snapshot.pending_turn.question_depth == 2
-    assert result.public.schema_version == 2
-
-
-def test_policy_rejects_invalid_depth_and_regex():
+def test_policy_rejects_invalid_depth_and_retired_fields():
+    from pydantic import ValidationError
     with pytest.raises(ValueError):
-        InterviewPolicy(seniority_fallback_depths={"intern": 5})
+        InterviewPolicy(fallback_depth=5)
     with pytest.raises(ValueError):
-        InterviewPolicy(depth_patterns={"[": 2})
+        InterviewPolicy(fallback_depth=0)
+    assert set(InterviewPolicy.model_fields) == {
+        "fallback_depth", "core_importance", "reserve_followup_fraction",
+        "min_failure_contexts", "allow_extension_probes",
+    }
+    with pytest.raises(ValidationError):
+        InterviewPolicy.model_validate({
+            "version": "criterion-policy-2",
+            "fallback_depth": 3,
+            "generation_attempts": 2,
+            "judgment_attempts": 2,
+            "criterion_soft_limit": 3,
+            "max_turns_per_criterion": 6,
+            "max_stagnant_turns": 2,
+            "depth_patterns": {"design": 4},
+            "mode_patterns": {"CODING": "write"},
+            "seniority_fallback_depths": {"senior": 3},
+        })
 
 
 def test_api_carries_action_depth_evidence_and_recovery_through_response(audit):
@@ -408,7 +420,8 @@ def test_api_carries_action_depth_evidence_and_recovery_through_response(audit):
         updated = response.json()
         pending = updated["snapshot"]["pending_turn"]
         assert (pending["action"], pending["question_depth"]) == ("ASK_EASIER", 1)
-        assert pending["question"]["mode"] == pending["mode"]
+        assert pending["mode"] == initial["snapshot"]["pending_turn"]["mode"]
+        assert set(pending["question"]) == {"text", "criterion_ids", "evidence_scope"}
         restored = Snapshot.model_validate(updated["snapshot"])
         state = next(iter(restored.objectives.values()))
         assert state.objective.target_depth == 2
@@ -449,7 +462,7 @@ def test_complete_java_backend_intern_session_uses_followup_then_next_objective(
 
 def test_generator_cannot_substitute_unrelated_mode_for_jd_task(audit):
     provider, engine, _ = audit
-    provider.modes = [SuitableMode(mode=Mode.DESIGN, rationale="Incorrectly inferred from skill name")]
+    provider.modes = [SuitableMode(mode=Mode.DESIGN)]
     with pytest.raises(ValueError, match="JD task intent"):
         start(engine, [task_skill("Diagnose slow SQL queries", "sql")])
 
@@ -457,13 +470,13 @@ def test_generator_cannot_substitute_unrelated_mode_for_jd_task(audit):
 def test_missing_essential_in_chosen_mode_stops_with_explicit_reason(audit):
     provider, engine, _ = audit
     provider.criterion_count = 2
-    provider.modes = [SuitableMode(mode=Mode.DEBUGGING, rationale="Only criterion zero is observable", criterion_indices=[0])]
+    provider.modes = [SuitableMode(mode=Mode.DEBUGGING, criterion_indices=[0])]
     result = answer(engine, start(engine).snapshot)
     assert result.public.is_finished
     obj = result.public.report.objectives[0]
     assert obj.assessment == Assessment.INSUFFICIENT
     assert obj.stop_reason == "NO_INDEPENDENT_CRITERIA_IN_MODE"
-    assert len(obj.missing_criteria) == 1
+    assert sum(criterion.assessment == Assessment.NOT_ASSESSED for criterion in obj.criteria) == 1
 
 
 def test_question_generation_elapsed_time_cannot_publish_expired_pending_turn(audit):
@@ -547,13 +560,13 @@ def test_minh_java_backend_intern_full_walkthrough(audit):
     provider, engine, _ = audit
     provider.criterion_counts = {"java": 1, "spring": 2, "sql": 2, "aws": 1}
     java = task_skill("Use Java Collections to store unique user IDs and check membership", "java",
-                      importance_weight=0.95, priority=0.38, suggested_strategy="COMPARE_SUBSTITUTE")
+                      importance_weight=0.95, priority=0.38)
     spring = task_skill("Develop Spring Boot REST API request validation and error handling", "spring",
-                        importance_weight=0.90, priority=0.0, suggested_strategy="NONE")
+                        importance_weight=0.90, priority=0.0)
     sql = task_skill("Write SQL queries and apply indexing for order history", "sql",
-                     importance_weight=0.80, priority=0.32, suggested_strategy="COMPARE_SUBSTITUTE")
+                     importance_weight=0.80, priority=0.32)
     aws = task_skill("Explain basic AWS cloud concepts", "aws",
-                     importance_weight=0.20, priority=0.16, suggested_strategy="LEARNING_AGILITY")
+                     importance_weight=0.20, priority=0.16)
     aws.job_tasks[0].requirement_kind = "OPTIONAL"
 
     # Configure max_questions=8 so the 3 core skills get interviewed and optional AWS stays in reserve
@@ -603,4 +616,5 @@ def test_minh_java_backend_intern_full_walkthrough(audit):
     assert by_skill["sql"].strengths and by_skill["sql"].weaknesses and by_skill["sql"].study_recommendations
     assert by_skill["aws"].assessment == Assessment.NOT_ASSESSED
     assert not by_skill["aws"].study_recommendations
-    assert len(res.public.report.study_recommendations) >= 2
+    all_study = [item for obj in res.public.report.objectives for item in obj.study_recommendations]
+    assert len(all_study) >= 2

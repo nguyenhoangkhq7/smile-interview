@@ -1,7 +1,7 @@
 from typing import List
 from unittest.mock import MagicMock
 
-from skill_gap.domain.enums import QuestionStrategy, SemanticAlignment, SkillType
+from skill_gap.domain.enums import SemanticAlignment, SkillType
 from skill_gap.domain.models import (
     ExtractedCVSkill,
     ExtractedJDSkill,
@@ -30,13 +30,11 @@ def test_skill_gap_module_adapter_preserves_values() -> None:
         matched_cv_skill_id="kubernetes",
         is_substituted=False,
         gap_magnitude=0.25,
-        severity=0.10,
         priority=0.10,
         required_proficiency=4.0,
         candidate_proficiency=3.0,
         cv_evidence_spans=["Quản lý k8s cluster 2 năm"],
         context_job="DevOps Engineer (2020-2022)",
-        suggested_strategy=QuestionStrategy.PROBE_DEPTH,
         degraded=False,
         flags=["audit_verified"],
     )
@@ -56,8 +54,6 @@ def test_skill_gap_module_adapter_preserves_values() -> None:
     assert adapted.metadata["baseline_name"] == "proposed_module"
     assert adapted.metadata["matched_cv_skill_id"] == "kubernetes"
     assert adapted.metadata["is_substituted"] is False
-    assert adapted.metadata["severity"] == 0.10
-    assert adapted.metadata["suggested_strategy"] == "PROBE_DEPTH"
     assert adapted.metadata["cv_evidence_spans"] == ["Quản lý k8s cluster 2 năm"]
     assert adapted.metadata["context_job"] == "DevOps Engineer (2020-2022)"
     assert adapted.metadata["degraded"] is False
@@ -73,11 +69,9 @@ def test_skill_gap_module_adapter_adapt_all() -> None:
             matched_cv_skill_id="k8s",
             is_substituted=False,
             gap_magnitude=0.0,
-            severity=0.0,
             priority=0.0,
             required_proficiency=3.0,
             candidate_proficiency=3.0,
-            suggested_strategy=QuestionStrategy.NONE,
         ),
         SkillGapResult(
             jd_skill_id="aws",
@@ -85,11 +79,9 @@ def test_skill_gap_module_adapter_adapt_all() -> None:
             matched_cv_skill_id=None,
             is_substituted=False,
             gap_magnitude=1.0,
-            severity=0.3,
             priority=0.3,
             required_proficiency=5.0,
             candidate_proficiency=1.0,
-            suggested_strategy=QuestionStrategy.LEARNING_AGILITY,
         ),
     ]
 
@@ -115,11 +107,9 @@ def test_proposed_module_baseline_wrapper() -> None:
         matched_cv_skill_id="python",
         is_substituted=False,
         gap_magnitude=0.125,
-        severity=0.05,
         priority=0.05,
         required_proficiency=4.0,
         candidate_proficiency=3.5,
-        suggested_strategy=QuestionStrategy.PROBE_DEPTH,
     )
     fake_orchestrator.run_pipeline.return_value = [mock_gap_result]
 

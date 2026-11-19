@@ -4,59 +4,74 @@ import axiosClient from '@/lib/axiosClient';
 export const questionModes = ['CODING', 'DEBUGGING', 'DESIGN', 'TECHNICAL_EXPLANATION', 'BEHAVIORAL'] as const;
 export type QuestionMode = typeof questionModes[number];
 export type InteractionMode = 'TEXT' | 'VOICE';
-export interface InterviewConfig {
+export interface InterviewStartConfig {
   interaction_mode: InteractionMode;
-  mode: 'MIXED' | 'FOCUSED';
   focused_question_mode: QuestionMode | null;
   max_questions: number;
   duration_seconds: number;
+  max_questions_per_objective?: number;
+}
+export interface InterviewConfig extends InterviewStartConfig {
+  mode: 'MIXED' | 'FOCUSED';
   max_questions_per_objective: number;
 }
-export const defaultConfig: InterviewConfig = {
-  interaction_mode: 'TEXT', mode: 'MIXED', focused_question_mode: null, max_questions: 10,
-  duration_seconds: 900, max_questions_per_objective: 8,
+export const defaultConfig: InterviewStartConfig = {
+  interaction_mode: 'TEXT', focused_question_mode: null, max_questions: 10, duration_seconds: 900,
 };
-export interface EvidenceTurn {
-  turn_id: string; objective_id: string; skill_id: string; mode: QuestionMode;
-  question: string; answer: string | null; feedback: string | null;
-  introduction?: string;
+export interface PendingTurn {
+  turn_id: string; objective_id: string; mode: QuestionMode;
+  question: string; introduction?: string;
 }
-export interface Observation {
+export interface EvidenceTurn {
+  turn_id: string; objective_id: string; mode: QuestionMode;
+  question: string; answer: string | null; feedback: string | null;
+}
+export type EvidenceDepthRole = 'TARGET' | 'DIAGNOSTIC' | 'EXTENSION';
+export type EvidenceObservation = 'SUPPORTS' | 'CONTRADICTS' | 'UNCLEAR' | 'NO_EVIDENCE';
+export interface PublicEvidence {
   turn_id: string;
   criterion_id: string; response_excerpt: string; rationale: string;
-  observation: 'SUPPORTS' | 'CONTRADICTS' | 'UNCLEAR' | 'NO_EVIDENCE';
   performance: 'BELOW' | 'AT_TARGET' | 'ABOVE' | 'UNDETERMINED';
+  depth_role?: EvidenceDepthRole;
+  observation?: EvidenceObservation;
+}
+export interface SessionCoaching {
+  overall_summary: string;
+  top_strengths: string[];
+  priority_gaps: string[];
+  actionable_study_steps: string[];
 }
 export type Assessment = 'NOT_ASSESSED' | 'INSUFFICIENT_EVIDENCE' | 'NOT_DEMONSTRATED'
   | 'DEMONSTRATED_BELOW_TARGET' | 'DEMONSTRATED_AT_TARGET' | 'DEMONSTRATED_ABOVE_TARGET';
 export interface ObjectiveReport {
   objective_id: string; skill_id: string; claim: string; assessment: Assessment;
-  inferred: boolean; jd_evidence_spans: string[];
-  lifecycle: string; stop_reason: string | null; excluded_reason: string | null;
-  covered_criteria: string[]; missing_criteria: string[];
+  jd_evidence_spans: string[];
+  stop_reason: string | null;
   strengths: string[]; weaknesses: string[]; study_recommendations?: string[];
-  evidence: Observation[]; evidence_turn_ids: string[];
-  criteria?: { criterion_id: string; description: string; assessment: Assessment;
-    turns_spent: number; stop_reason: string | null }[];
+  evidence: PublicEvidence[];
+  criteria?: { criterion_id: string; description: string; assessment: Assessment }[];
 }
 export interface EvidenceReport {
-  schema_version: 2; state_version: number; is_finished: boolean;
-  termination_reason: string | null; progress: number; evidence_coverage: number;
-  target_attainment: number | null; study_recommendations?: string[];
+  termination_reason: string | null;
   objectives: ObjectiveReport[];
+  coaching?: SessionCoaching | null;
 }
 export interface EvidenceSession {
   schema_version: 2; session_id: string; state_version: number; is_finished: boolean;
-  deadline_at: string; config: InterviewConfig; pending_turn: EvidenceTurn | null;
+  deadline_at: string; config: InterviewConfig; pending_turn: PendingTurn | null;
+  awaiting_question?: boolean;
   turns: EvidenceTurn[]; report: EvidenceReport;
   conversation?: ConversationState | null;
+}
+export function turnSkillId(session: Pick<EvidenceSession, 'report'>, turn: { objective_id: string }): string {
+  return session.report.objectives.find(objective => objective.objective_id === turn.objective_id)?.skill_id ?? '';
 }
 export type ConversationAction = 'NEXT' | 'SUBMIT_INTRODUCTION' | 'SKIP_INTRODUCTION';
 export interface ConversationState {
   phase: 'OPENING' | 'SELF_INTRODUCTION' | 'INTERVIEW' | 'CLOSING' | 'FINISHED';
   message: { message_id: string; text: string };
-  opening: { interviewer_name: string; company: string; company_description: string; role_title: string };
-  expires_at: string; introduction: string; introduction_skipped: boolean; opening_text: string;
+  opening: { interviewer_name: string; company: string };
+  expires_at: string; introduction: string; opening_text: string;
 }
 export interface ConversationRequest {
   request_id: string; message_id: string; expected_state_version: number;
@@ -75,6 +90,9 @@ export function voiceTurn(session: EvidenceSession | null) {
 export interface AnswerRequest {
   request_id: string; turn_id: string; expected_state_version: number; candidate_response: string;
 }
+export interface NextQuestionRequest {
+  request_id: string; expected_state_version: number;
+}
 
 function endpoint(id: string, operation = '') {
   return `/api/v2/sessions/${encodeURIComponent(id)}/interview${operation ? `/${operation}` : ''}`;
@@ -82,7 +100,7 @@ function endpoint(id: string, operation = '') {
 
 const START_RETRY_DELAY_MS = 5000;
 
-async function requestStart(id: string, config: InterviewConfig): Promise<EvidenceSession | null> {
+async function requestStart(id: string, config: InterviewStartConfig): Promise<EvidenceSession | null> {
   try {
     return (await axiosClient.post<EvidenceSession | null>(endpoint(id, 'start'), config)).data;
   } catch (cause) {
@@ -103,11 +121,11 @@ export const evidenceInterview = {
       throw error;
     }
   },
-  async start(id: string, config: InterviewConfig): Promise<EvidenceSession> {
+  async start(id: string, config: InterviewStartConfig): Promise<EvidenceSession> {
     const data = await requestStart(id, config);
     if (!data || data.schema_version !== 2 || data.session_id !== id || !data.config || !data.report
       || !Array.isArray(data.turns) || typeof data.is_finished !== 'boolean'
-      || (!data.is_finished && !((data.conversation?.phase === 'OPENING' || data.conversation?.phase === 'SELF_INTRODUCTION')
+      || (!data.is_finished && !data.awaiting_question && !((data.conversation?.phase === 'OPENING' || data.conversation?.phase === 'SELF_INTRODUCTION')
           && data.conversation.message?.message_id && data.conversation.message.text?.trim())
         && (typeof data.pending_turn?.question !== 'string' || !data.pending_turn.question.trim()))) {
       throw new Error('Chưa nhận được phiên phỏng vấn hợp lệ. Vui lòng bấm bắt đầu để thử lại.');
@@ -116,6 +134,9 @@ export const evidenceInterview = {
   },
   async answer(id: string, answer: AnswerRequest): Promise<EvidenceSession> {
     return (await axiosClient.post<EvidenceSession>(endpoint(id, 'respond'), answer)).data;
+  },
+  async nextQuestion(id: string, request: NextQuestionRequest): Promise<EvidenceSession> {
+    return (await axiosClient.post<EvidenceSession>(endpoint(id, 'next-question'), request)).data;
   },
   async converse(id: string, request: ConversationRequest): Promise<EvidenceSession> {
     return (await axiosClient.post<EvidenceSession>(endpoint(id, 'conversation'), request)).data;

@@ -1,9 +1,18 @@
+import type { SkillGapResult } from '@/services/cvJdMatching';
+
 const labels: Record<string, string> = {
   'html css': 'HTML / CSS', html: 'HTML', css: 'CSS', javascript: 'JavaScript', typescript: 'TypeScript',
-  sql: 'SQL', postgresql: 'PostgreSQL', mysql: 'MySQL', java: 'Java', python: 'Python',
-  react: 'React', reactjs: 'React', nodejs: 'Node.js', git: 'Git', docker: 'Docker',
+  sql: 'SQL', postgresql: 'PostgreSQL', 'postgresql jd': 'PostgreSQL', mysql: 'MySQL', java: 'Java', python: 'Python',
+  react: 'React', reactjs: 'React', nodejs: 'Node.js', git: 'Git', docker: 'Docker', 'docker jd': 'Docker',
   'spring boot': 'Spring Boot', 'rest api': 'REST API', mongodb: 'MongoDB', aws: 'AWS',
   'react native': 'React Native', 'machine learning': 'Machine Learning', 'ci cd': 'CI/CD',
+  golang: 'Golang', go: 'Go', redis: 'Redis', oop: 'OOP',
+  'ai tools usage': 'Sử dụng công cụ AI',
+  'ai coding agent expertise': 'Sử dụng AI Coding Agent',
+  'english reading': 'Đọc hiểu tiếng Anh',
+  'crypto trading': 'Chứng khoán & Crypto',
+  'financial investment': 'Đầu tư tài chính',
+  'web development basics': 'Phát triển web cơ bản',
 };
 
 // Reproduce the old ASCII-only slug strictly for looking up names in saved evidence.
@@ -39,4 +48,10 @@ export function skillLabel(value: string, displayName?: string | null, evidenceS
   if (name && name !== value) return name;
   const known = labels[value.toLowerCase().replace(/[-_]/g, ' ')];
   return known || nameFromEvidence(value, evidenceSpans) || value.replace(/[-_]+/g, ' ');
+}
+
+export function jdSkillLabel(skill: Pick<SkillGapResult,
+  'jd_skill_id' | 'jd_skill_name' | 'jd_evidence_spans' | 'job_tasks'>) {
+  const taskSpans = skill.job_tasks?.flatMap(task => task.evidence_spans ?? []) ?? [];
+  return skillLabel(skill.jd_skill_id, skill.jd_skill_name, [...new Set([...(skill.jd_evidence_spans ?? []), ...taskSpans])]);
 }

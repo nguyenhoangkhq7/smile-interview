@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List
 
 from skill_gap.domain.models import SkillGapResult
 from skill_gap.pipeline.orchestrator import SkillGapOrchestrator
@@ -31,12 +31,6 @@ class SkillGapModuleAdapter:
                 "baseline_name": baseline_name,
                 "matched_cv_skill_id": result.matched_cv_skill_id,
                 "is_substituted": result.is_substituted,
-                "severity": result.severity,
-                "suggested_strategy": (
-                    result.suggested_strategy.value
-                    if hasattr(result.suggested_strategy, "value")
-                    else str(result.suggested_strategy)
-                ),
                 "cv_evidence_spans": list(result.cv_evidence_spans),
                 "context_job": result.context_job,
                 "degraded": result.degraded,

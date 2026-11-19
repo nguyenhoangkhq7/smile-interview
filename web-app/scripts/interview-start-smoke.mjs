@@ -43,10 +43,11 @@ try {
       return send({ schema_version: 2, session_id: id, state_version: 1, is_finished: false,
         config, deadline_at: new Date(Date.now() + 900000).toISOString(), turns: [],
         pending_turn: scenario === 'missing-question' && starts.length === 1 ? null : {
-          turn_id: 'first', objective_id: 'objective', skill_id: 'postgresql', mode: 'DEBUGGING',
-          question: 'Bạn kiểm tra truy vấn SQL chậm như thế nào?', answer: null, feedback: null },
-        report: { schema_version: 2, state_version: 1, is_finished: false, termination_reason: null,
-          progress: 0, evidence_coverage: 0, target_attainment: null, objectives: [] } });
+          turn_id: 'first', objective_id: 'objective', mode: 'DEBUGGING',
+          question: 'Bạn kiểm tra truy vấn SQL chậm như thế nào?' },
+        report: { termination_reason: null,
+          objectives: [{ objective_id: 'objective', skill_id: 'postgresql', claim: 'SQL', jd_evidence_spans: [],
+            assessment: 'NOT_ASSESSED', stop_reason: null, strengths: [], weaknesses: [], evidence: [] }] } });
     });
     await page.goto(`${base}/interview/session/${id}`, { waitUntil: 'networkidle0' });
     await page.waitForSelector('input[name="interaction-mode"][value="TEXT"]');

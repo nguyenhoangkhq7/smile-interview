@@ -1,0 +1,146 @@
+{
+  "operation": "start",
+  "scenario": "Dùng lại 6 kỹ năng nhiệm vụ và trích dẫn hư cấu của fixture trước, với lời mở đầu không có tên, công ty, CV/JD tóm tắt hay dữ liệu người dùng.",
+  "payload": {
+    "session_id": "module3-qa-rerun-mixed10-20261118",
+    "config": {
+      "interaction_mode": "TEXT",
+      "mode": "MIXED",
+      "focused_question_mode": null,
+      "max_questions": 10,
+      "max_questions_per_objective": 8,
+      "duration_seconds": 3600
+    },
+    "opening": {
+      "interviewer_name": "Minh",
+      "role_title": "Backend Engineer",
+      "attempt_number": 1
+    },
+    "skills": [
+      {
+        "jd_skill_id": "postgresql",
+        "required_proficiency": 4,
+        "importance_weight": 0.99,
+        "priority": 0.198,
+        "cv_evidence_spans": [
+          "Dùng EXPLAIN để tối ưu truy vấn báo cáo trên bảng orders và bổ sung index theo ngày tạo."
+        ],
+        "job_tasks": [
+          {
+            "task_id": "diagnose-order-query",
+            "description": "Chẩn đoán và tối ưu truy vấn PostgreSQL lọc và sắp xếp danh sách đơn hàng trên bảng lớn.",
+            "evidence_spans": [
+              "Bắt buộc: Chẩn đoán và tối ưu truy vấn PostgreSQL lọc và sắp xếp danh sách đơn hàng trên bảng lớn."
+            ],
+            "required_level": 4,
+            "requirement_kind": "REQUIRED",
+            "level_basis": "EXPLICIT"
+          }
+        ]
+      },
+      {
+        "jd_skill_id": "python",
+        "required_proficiency": 3.5,
+        "importance_weight": 0.95,
+        "priority": 0,
+        "cv_evidence_spans": [
+          "Triển khai API đơn hàng bằng Python và FastAPI, viết unit test cho xử lý sự kiện và dữ liệu trùng."
+        ],
+        "job_tasks": [
+          {
+            "task_id": "deduplicate-events",
+            "description": "Viết hàm Python loại trùng sự kiện đơn hàng theo mã sự kiện, giữ nguyên thứ tự xuất hiện đầu tiên.",
+            "evidence_spans": [
+              "Bắt buộc: Viết hàm Python loại trùng sự kiện đơn hàng theo mã sự kiện, giữ nguyên thứ tự xuất hiện đầu tiên."
+            ],
+            "required_level": 3.5,
+            "requirement_kind": "REQUIRED",
+            "level_basis": "INFERRED"
+          }
+        ]
+      },
+      {
+        "jd_skill_id": "rabbitmq",
+        "required_proficiency": 4,
+        "importance_weight": 0.91,
+        "priority": 0.546,
+        "cv_evidence_spans": [],
+        "job_tasks": [
+          {
+            "task_id": "design-payment-consumer",
+            "description": "Thiết kế consumer RabbitMQ cho sự kiện thanh toán để việc giao lại thông điệp không ghi nhận thanh toán hai lần.",
+            "evidence_spans": [
+              "Bắt buộc: Thiết kế consumer RabbitMQ cho sự kiện thanh toán để việc giao lại thông điệp không ghi nhận thanh toán hai lần."
+            ],
+            "required_level": 4,
+            "requirement_kind": "REQUIRED",
+            "level_basis": "EXPLICIT"
+          }
+        ]
+      },
+      {
+        "jd_skill_id": "http-api",
+        "required_proficiency": 3,
+        "importance_weight": 0.84,
+        "priority": 0.126,
+        "cv_evidence_spans": [
+          "Đã tích hợp retry qua SDK HTTP khi gọi dịch vụ vận chuyển."
+        ],
+        "job_tasks": [
+          {
+            "task_id": "explain-http-retry",
+            "description": "Giải thích tính idempotent của HTTP khi retry yêu cầu cập nhật đơn hàng sau timeout.",
+            "evidence_spans": [
+              "Bắt buộc: Giải thích tính idempotent của HTTP khi retry yêu cầu cập nhật đơn hàng sau timeout."
+            ],
+            "required_level": 3,
+            "requirement_kind": "REQUIRED",
+            "level_basis": "INFERRED"
+          }
+        ]
+      },
+      {
+        "jd_skill_id": "incident-collaboration",
+        "required_proficiency": 3.5,
+        "importance_weight": 0.76,
+        "priority": 0.1995,
+        "cv_evidence_spans": [
+          "Phối hợp với QA đối chiếu log khi lỗi đồng bộ đơn hàng ở môi trường production."
+        ],
+        "job_tasks": [
+          {
+            "task_id": "coordinate-mitigation",
+            "description": "Phối hợp với QA và SRE để thống nhất giảm thiểu tác động và bàn giao theo dõi trong sự cố đơn hàng.",
+            "evidence_spans": [
+              "Bắt buộc: Phối hợp với QA và SRE để thống nhất giảm thiểu tác động và bàn giao theo dõi trong sự cố đơn hàng."
+            ],
+            "required_level": 3.5,
+            "requirement_kind": "REQUIRED",
+            "level_basis": "INFERRED"
+          }
+        ]
+      },
+      {
+        "jd_skill_id": "docker",
+        "required_proficiency": 2.5,
+        "importance_weight": 0.42,
+        "priority": 0.02625,
+        "cv_evidence_spans": [
+          "Dùng Docker Compose để khởi chạy API và PostgreSQL trên máy phát triển."
+        ],
+        "job_tasks": [
+          {
+            "task_id": "write-dev-container",
+            "description": "Viết Dockerfile tối giản cho API nội bộ dùng trong môi trường phát triển.",
+            "evidence_spans": [
+              "Điểm cộng: Viết Dockerfile tối giản cho API nội bộ dùng trong môi trường phát triển."
+            ],
+            "required_level": 2.5,
+            "requirement_kind": "OPTIONAL",
+            "level_basis": "INFERRED"
+          }
+        ]
+      }
+    ]
+  }
+}

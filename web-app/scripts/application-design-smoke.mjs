@@ -9,12 +9,10 @@ const statuses = ['NEEDS_VERIFICATION', 'DEMONSTRATED_BELOW_TARGET', 'DEMONSTRAT
 const names = ['sql', 'java', 'docker', 'react', 'aws', 'html_css', 'git', 'typescript', 'javascript', 'python', 'postgresql', 'spring_boot'];
 const source = { sessionId: 'session-11', attemptNumber: 11, assessedAt: '2026-11-07T10:30:00' };
 const evidence = { source, turnId: 'sql-turn', question: '## Truy vấn chậm\n\nBạn kiểm tra **execution plan** như thế nào?',
-  responseExcerpt: 'Tôi dùng EXPLAIN ANALYZE để kiểm tra actual rows.', rationale: '**Bằng chứng:** Có cách kiểm chứng rõ ràng.', performance: 'AT_TARGET', context: 'query-a' };
+  responseExcerpt: 'Tôi dùng EXPLAIN ANALYZE để kiểm tra actual rows.', rationale: '**Bằng chứng:** Có cách kiểm chứng rõ ràng.', performance: 'AT_TARGET' };
 const competency = {
-  policyVersion: 'competency-1', completedAttempts: 11, incompatibleAssessments: 0, lastAssessment: source,
-  summary: { totalSkills: 12, meetingTarget: 5, belowTarget: 2, needsVerification: 1, incomplete: 2, notAssessed: 2 },
+  completedAttempts: 11, incompatibleAssessments: 0,
   skills: names.map((skillId, index) => ({ skillId, assessment: statuses[index], baselineAlignment: 'PARTIAL',
-    evidencedCriteria: index < 5 || index > 6 ? 2 : 0, totalCriteria: 3, lastChecked: source,
     objectives: [{ id: `${skillId}-objective`, claim: skillId === 'sql' ? 'Chẩn đoán và tối ưu hiệu năng truy vấn SQL' : `Thực hiện công việc với ${skillId}`,
       assessment: statuses[index], lastChecked: source, lastAssessment: source,
       explanation: index === 0 ? 'Có bằng chứng mâu thuẫn. Cần kiểm chứng lại với bối cảnh độc lập.' : 'Kết luận áp dụng cho nội dung đã được kiểm tra.',

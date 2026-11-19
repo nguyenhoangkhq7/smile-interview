@@ -52,9 +52,7 @@ public class SessionResponse {
             String improvements,
             String suggestedAnswer,
             String topicTag,
-            Boolean isDeepDive,
-            Integer hrRating,
-            String hrFeedback
+            Boolean isDeepDive
     ) {
         public static SessionTurnDto from(SessionTurn t) {
             if (t == null) return null;
@@ -67,9 +65,7 @@ public class SessionResponse {
                     t.getImprovements(),
                     t.getSuggestedAnswer(),
                     t.getTopicTag(),
-                    t.getIsDeepDive(),
-                    t.getHrRating(),
-                    t.getHrFeedback()
+                    t.getIsDeepDive()
             );
         }
     }

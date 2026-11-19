@@ -1,5 +1,5 @@
 import pytest
-from skill_gap.domain.enums import SemanticAlignment, QuestionStrategy
+from skill_gap.domain.enums import SemanticAlignment
 from skill_gap.domain.models import JDRequirement, ProficiencyResult, MatchResult
 from skill_gap.adapters.config import AppConfig
 from skill_gap.services.gap_detector import GapDetector
@@ -35,14 +35,13 @@ def test_gap_detector_layers():
     )
     assert gap == 0.25
     
-    # 4. Deterministic Priority test (Priority = Severity = w_j * (P_JD/5.0) * gap)
-    severity, priority = detector.compute_priorities(
+    # 4. Deterministic Priority test (Priority = w_j * (P_JD/5.0) * gap)
+    priority = detector.compute_priority(
         w_j=0.5,
         gap_magnitude=0.25,
         required_level=4.0
     )
-    assert severity == pytest.approx(0.5 * (4.0 / 5.0) * 0.25, 1e-6)
-    assert priority == severity
+    assert priority == pytest.approx(0.5 * (4.0 / 5.0) * 0.25, 1e-6)
     
     # 5. End-to-End detection
     reqs = [
@@ -72,29 +71,15 @@ def test_gap_detector_layers():
     r_java = next(r for r in results if r.jd_skill_id == "java")
     assert r_java.semantic_alignment == SemanticAlignment.MATCH
     assert r_java.gap_magnitude == 0.25
-    # Severity = w_j * (P_JD/5.0) * gap = 0.6 * (4.0/5.0) * 0.25 = 0.12
-    assert r_java.severity == pytest.approx(0.6 * (4.0 / 5.0) * 0.25, 1e-6)
-    assert r_java.suggested_strategy == QuestionStrategy.PROBE_DEPTH
+    # Priority = w_j * (P_JD/5.0) * gap = 0.6 * (4.0/5.0) * 0.25 = 0.12
+    assert r_java.priority == pytest.approx(0.6 * (4.0 / 5.0) * 0.25, 1e-6)
     
     r_rmq = next(r for r in results if r.jd_skill_id == "rabbitmq")
     assert r_rmq.semantic_alignment == SemanticAlignment.PARTIAL
     assert r_rmq.is_substituted is True
-    assert r_rmq.suggested_strategy == QuestionStrategy.COMPARE_SUBSTITUTE
 
 
-def test_strategy_at_floor_boundary():
-    """
-    Regression test cho 2 bug liên tiếp được sửa:
-
-    Bug 1 (đã sửa): strategy sai tại boundary PARTIAL.
-    - Điều kiện cũ '0.0 < s < 1.0' không thoả khi s=0 → strategy = PROBE_DEPTH (sai).
-    - Fix: dùng alignment label: PARTIAL → COMPARE_SUBSTITUTE.
-
-    Bug 2 (đang sửa): substitution_factor sai tại soft_match = floor_threshold.
-    - Công thức cũ: s = (0.40 - 0.40) / (0.85 - 0.40) = 0.0 → không tín dụng.
-    - Công thức mới: s = soft_match = 0.40 → Vue nhận 40% tín dụng cho React.
-    - Gap mới: (3.0 - 0.40 * 3.111) / 4.0 = (3.0 - 1.244) / 4.0 ≈ 0.439 (thay vì 0.75).
-    """
+def test_substitution_at_floor_boundary():
     config = AppConfig()
     llm = MockLLMClient()
     detector = GapDetector(llm_client=llm, config=config)
@@ -108,14 +93,6 @@ def test_strategy_at_floor_boundary():
     assert s == pytest.approx(0.40, 1e-9)   # không còn = 0.0
     assert alignment == SemanticAlignment.PARTIAL
 
-    # strategy vẫn phải là COMPARE_SUBSTITUTE
-    strategy = detector.classify_question_strategy(
-        alignment=alignment,
-        substitution_factor=s,
-        gap_magnitude=0.439  # gap nhỏ hơn trước vì s > 0
-    )
-    assert strategy == QuestionStrategy.COMPARE_SUBSTITUTE
-
     # Verify end-to-end qua detect()
     # gap = (3.0 - 0.40 * 3.111) / 4.0 = (3.0 - 1.244) / 4.0 = 0.439
     reqs = [JDRequirement(jd_skill_id="react", required_level=3.0, reasoning="Mid React")]
@@ -127,6 +104,5 @@ def test_strategy_at_floor_boundary():
     r = results[0]
     assert r.semantic_alignment == SemanticAlignment.PARTIAL
     assert r.is_substituted is True
-    assert r.suggested_strategy == QuestionStrategy.COMPARE_SUBSTITUTE
     # s=0.40: effective = 0.40 * 3.111 = 1.244 → gap = (3.0 - 1.244) / 4.0 ≈ 0.439
     assert r.gap_magnitude == pytest.approx(0.439, abs=1e-3)

@@ -19,7 +19,6 @@ export interface ActiveSession {
   date: string;
   hasAssessment?: boolean;
   hasQuestions?: boolean;
-  competencyFitScore?: number;
   stage?: SessionStage;
   answeredCount?: number;
   totalQuestions?: number;

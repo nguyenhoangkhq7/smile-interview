@@ -1,12 +1,12 @@
 import axiosClient from '@/lib/axiosClient';
-import type { SkillGapResult, StaticGapAuditReport } from './cvJdMatching';
+import type { SkillGapResult, SkillGapReport } from './cvJdMatching';
 import type { Assessment } from './evidenceInterview';
 
 export type CompetencyStatus = Assessment | 'NEEDS_VERIFICATION' | 'PARTIALLY_ASSESSED';
 export interface CompetencySource { sessionId: string; attemptNumber: number; assessedAt: string | null }
 export interface CompetencyEvidence {
   source: CompetencySource; turnId: string; question: string; responseExcerpt: string;
-  rationale: string; performance: string; context: string;
+  rationale: string; performance: string;
 }
 export interface CompetencyCriterion {
   id: string; description: string; essential: boolean; assessment: CompetencyStatus;
@@ -16,12 +16,48 @@ export interface CompetencyObjective {
   id: string; claim: string; assessment: CompetencyStatus; lastChecked: CompetencySource | null;
   lastAssessment: CompetencySource | null; explanation: string; criteria: CompetencyCriterion[];
 }
+export interface CompetencySkill {
+  skillId: string; baselineAlignment: string; assessment: CompetencyStatus;
+  objectives: CompetencyObjective[];
+}
 export interface CurrentCompetency {
-  policyVersion: string; completedAttempts: number; incompatibleAssessments: number;
-  lastAssessment: CompetencySource | null;
-  summary: { totalSkills: number; meetingTarget: number; belowTarget: number; needsVerification: number; incomplete: number; notAssessed: number };
-  skills: { skillId: string; baselineAlignment: string; assessment: CompetencyStatus;
-    evidencedCriteria: number; totalCriteria: number; lastChecked: CompetencySource | null; objectives: CompetencyObjective[] }[];
+  completedAttempts: number; incompatibleAssessments: number;
+  skills: CompetencySkill[];
+}
+export function newerSource(a: CompetencySource | null, b: CompetencySource | null): CompetencySource | null {
+  return !a ? b : !b || a.attemptNumber >= b.attemptNumber ? a : b;
+}
+export function competencySummary(skills: readonly CompetencySkill[]) {
+  let meetingTarget = 0, belowTarget = 0, needsVerification = 0, incomplete = 0, notAssessed = 0;
+  for (const skill of skills) {
+    if (skill.assessment === 'DEMONSTRATED_AT_TARGET' || skill.assessment === 'DEMONSTRATED_ABOVE_TARGET') meetingTarget++;
+    else if (skill.assessment === 'DEMONSTRATED_BELOW_TARGET' || skill.assessment === 'NOT_DEMONSTRATED') belowTarget++;
+    else if (skill.assessment === 'NEEDS_VERIFICATION') needsVerification++;
+    else if (skill.assessment === 'INSUFFICIENT_EVIDENCE' || skill.assessment === 'PARTIALLY_ASSESSED') incomplete++;
+    else notAssessed++;
+  }
+  return { totalSkills: skills.length, meetingTarget, belowTarget, needsVerification, incomplete, notAssessed };
+}
+export function competencyLastAssessment(skills: readonly CompetencySkill[]): CompetencySource | null {
+  let latest: CompetencySource | null = null;
+  for (const skill of skills) {
+    for (const objective of skill.objectives) {
+      latest = newerSource(latest, objective.lastAssessment);
+      for (const criterion of objective.criteria) latest = newerSource(latest, criterion.lastAssessment);
+    }
+  }
+  return latest;
+}
+export function skillLastChecked(skill: CompetencySkill): CompetencySource | null {
+  return skill.objectives.reduce<CompetencySource | null>((latest, objective) => newerSource(latest, objective.lastChecked), null);
+}
+export function skillCriteriaCounts(skill: CompetencySkill) {
+  let evidenced = 0, total = 0;
+  for (const objective of skill.objectives) {
+    total += objective.criteria.length;
+    evidenced += objective.criteria.filter(criterion => criterion.evidence.length > 0).length;
+  }
+  return { evidenced, total };
 }
 
 export type AttemptStatus = 'Not started' | 'In progress' | 'Completed' | 'Stopped early' | 'Cancelled';
@@ -32,7 +68,7 @@ export interface InterviewAttempt {
 export interface ApplicationProfile {
   id: string; title: string; company: string | null; roleTitle: string;
   cvFilename: string; jdTitle: string; createdAt: string;
-  skills: SkillGapResult[]; analysis: StaticGapAuditReport; attempts: InterviewAttempt[];
+  skills: SkillGapResult[]; analysis: SkillGapReport; attempts: InterviewAttempt[];
 }
 export const attemptLabels: Record<AttemptStatus, string> = {
   'Not started': 'Chưa bắt đầu', 'In progress': 'Đang phỏng vấn', Completed: 'Đã hoàn thành',

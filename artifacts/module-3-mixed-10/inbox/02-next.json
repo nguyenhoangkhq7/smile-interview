@@ -1,0 +1,6 @@
+{
+  "operation": "conversation",
+  "from": "01-start",
+  "action": "NEXT",
+  "scenario": "Ứng viên đọc lời mở đầu rồi chuyển sang phần tự giới thiệu."
+}

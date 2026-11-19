@@ -1,4 +1,4 @@
-// Check candidate wording and the HR boundary using fixture responses only.
+// Check candidate wording using fixture responses only.
 import assert from 'node:assert/strict';
 import puppeteer from 'puppeteer';
 
@@ -6,11 +6,11 @@ const base = process.argv[2] || 'http://localhost:3217';
 const errors = [];
 const skills = ['MATCH', 'PARTIAL', 'MISSING'].map((alignment, index) => ({
   jd_skill_id: ['postgresql', 'spring_boot', 'docker'][index], semantic_alignment: alignment,
-  matched_cv_skill_id: index === 1 ? 'java' : null, is_substituted: index === 1,
+  matched_cv_skill_id: index === 1 ? 'java' : null,
   cv_evidence_spans: index < 2 ? ['Tối ưu SQL trong dự án bán hàng.'] : [],
   context_job: 'Xây dựng dịch vụ quản lý đơn hàng', required_proficiency: 4,
-  candidate_proficiency: 3, gap_magnitude: 0.2, priority: 0.8,
-  suggested_strategy: 'PROBE_DEPTH',
+  priority: 0.8, importance_weight: 0.9,
+  job_tasks: [],
 }));
 const audit = { matching_score: 0.7654, degraded: false, items: [],
   markdown_summary: 'INTERNAL_AUDIT PROBE_DEPTH P_JD P_CV Priority' };
@@ -20,7 +20,10 @@ let many = false;
 let vietnamese = false;
 const vietnameseSkills = [
   { ...skills[0], jd_skill_id: 'ph-t-tri-n-ai-coding-agent', jd_skill_name: 'Phát triển AI Coding Agent' },
-  { ...skills[1], jd_skill_id: 'th-tr-ng-ch-ng-kho-n', jd_evidence_spans: ['Có kiến thức Thị trường chứng khoán.'] },
+  { ...skills[1], jd_skill_id: 'th-tr-ng-ch-ng-kho-n', job_tasks: [{
+    task_id: 'market-1', description: 'Phân tích thị trường', evidence_spans: ['Có kiến thức Thị trường chứng khoán.'],
+    required_level: 4, requirement_kind: 'REQUIRED', level_basis: 'INFERRED',
+  }] },
   { ...skills[2], jd_skill_id: 'khoa-h-c-m-y-t-nh', jd_evidence_spans: ['Tốt nghiệp ngành Khoa học máy tính.'] },
 ];
 const manySkills = [...skills, ...Array.from({ length: 25 }, (_, index) => ({ ...skills[index % 3],
@@ -45,6 +48,9 @@ try {
     if (request.method() === 'OPTIONS') return send({});
     if (url.pathname.endsWith('/interview')) return send({}, 404);
     if (url.pathname === '/api/auth/me') return send({ username: 'Test', role: 'USER' });
+    if (url.pathname.endsWith('/analyze-gap')) return send({
+      analysis_id: 'candidate', skills, report: { matching_score: audit.matching_score, degraded },
+    });
     if (url.pathname === '/api/v1/resumes' || url.pathname === '/api/v1/job-descriptions') return send([]);
     if (url.pathname === '/api/v1/sessions/user') return send([]);
     if (url.pathname.startsWith('/api/v1/application-profiles/')) return send({ id: 'candidate',
@@ -146,9 +152,6 @@ try {
   const legacy = await page.$eval('body', element => element.innerText);
   assert.doesNotMatch(legacy, /INTERNAL_AUDIT|INTERNAL_REASONING|Judge|Abductive|Suy luận khởi tạo|Gap/);
   assert.equal(await page.$$eval('table th', elements => elements.length), 3);
-  await visit('/hr-dashboard/candidate');
-  await page.waitForFunction(() => location.pathname === '/');
-  assert.equal(await page.$('::-p-text(INTERNAL_AUDIT)'), null);
   assert.deepEqual(errors, []);
   console.log('PASS: compact 28-skill layout, pagination, filters, search, keyboard detail dialog, mobile, candidate fields and empty/degraded states.');
 } finally { await browser.close(); }

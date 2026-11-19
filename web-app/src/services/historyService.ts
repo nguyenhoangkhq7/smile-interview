@@ -2,10 +2,9 @@ import axios from 'axios';
 import axiosClient, { API_BASE_URL } from '@/lib/axiosClient';
 import type {
   SkillGapResult,
-  StaticGapAuditReport,
+  SkillGapReport,
   HITLReportResponse,
 } from './cvJdMatching';
-import { useAuthStore } from '@/store/authStore';
 
 export interface QuestionFeedback {
   id?: string;
@@ -17,8 +16,6 @@ export interface QuestionFeedback {
   suggestedAnswer: string;
   topicTag: string;
   isDeepDive: boolean;
-  hrRating?: number;
-  hrFeedback?: string;
 }
 
 export interface SessionHistoryItem {
@@ -45,7 +42,7 @@ export interface SessionHistoryItem {
   aiInterviewSessionId?: string | null;
   currentStage?: string;
   skillGapResults?: SkillGapResult[] | null;
-  skillGapReport?: StaticGapAuditReport | null;
+  skillGapReport?: SkillGapReport | null;
   interviewReport?: HITLReportResponse | null;
 }
 
@@ -63,8 +60,6 @@ interface BackendSessionTurnDto {
   suggestedAnswer?: string;
   topicTag?: string;
   isDeepDive?: boolean;
-  hrRating?: number;
-  hrFeedback?: string;
 }
 
 interface BackendSessionResponse {
@@ -117,8 +112,6 @@ export function mapBackendSessionToHistoryItem(sess: BackendSessionResponse): Se
     suggestedAnswer: t.suggestedAnswer || '',
     topicTag: t.topicTag || '',
     isDeepDive: Boolean(t.isDeepDive),
-    hrRating: t.hrRating != null ? Number(t.hrRating) : undefined,
-    hrFeedback: t.hrFeedback || undefined,
   }));
 
   return {
@@ -143,30 +136,18 @@ export function mapBackendSessionToHistoryItem(sess: BackendSessionResponse): Se
     userFeedbackText: sess.userFeedbackText,
     aiInterviewSessionId: sess.aiInterviewSessionId,
     skillGapResults: parseJsonSafe<SkillGapResult[]>(sess.skillGapJson),
-    skillGapReport: parseJsonSafe<StaticGapAuditReport>(sess.gapReportJson),
+    skillGapReport: parseJsonSafe<SkillGapReport>(sess.gapReportJson),
     interviewReport: parseJsonSafe<HITLReportResponse>(sess.interviewReportJson),
     questions,
   };
 }
 
-function getToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return useAuthStore.getState().token;
-}
-
 export const historyService = {
-  async getHistory(allUsers = false): Promise<SessionHistoryItem[]> {
-    try {
-      const token = getToken();
-      const endpoint = !allUsers && token ? '/api/v1/sessions/user' : '/api/v1/sessions';
-      const { data } = await axiosClient.get<BackendSessionResponse[]>(endpoint, {
-        baseURL: API_BASE_URL,
-      });
-      return (data || []).map(mapBackendSessionToHistoryItem);
-    } catch (err) {
-      console.error('[historyService] Error loading history:', err);
-      return [];
-    }
+  async getHistory(): Promise<SessionHistoryItem[]> {
+    const { data } = await axiosClient.get<BackendSessionResponse[]>('/api/v1/sessions/user', {
+      baseURL: API_BASE_URL,
+    });
+    return (data || []).map(mapBackendSessionToHistoryItem);
   },
 
   async getSessionById(id: string): Promise<SessionHistoryItem | null> {

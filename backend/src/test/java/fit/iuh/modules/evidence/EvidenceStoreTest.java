@@ -83,9 +83,20 @@ class EvidenceStoreTest {
 
     @Test
     void startLocksConfiguration() {
-        assertThat(store.sameStart(existing(1), json.read("{}")).path("state_version").asInt()).isEqualTo(1);
-        assertThatThrownBy(() -> store.sameStart(existing(1), json.read("{\"mode\":\"FOCUSED\"}")))
-                .isInstanceOf(ResponseStatusException.class);
+        var run = existing(1);
+        run.setConfigJson("""
+                {"mode":"FOCUSED","focused_question_mode":"DEBUGGING","max_questions":10,
+                 "duration_seconds":900,"max_questions_per_objective":3}
+                """);
+        var matching = json.tree(new EvidenceDtos.Config(null, "DEBUGGING", 10, 900, 3));
+        assertThat(store.sameStart(run, matching).path("state_version").asInt()).isEqualTo(1);
+        var otherFocus = json.tree(new EvidenceDtos.Config(null, "DESIGN", 10, 900, 3));
+        var otherCap = json.tree(new EvidenceDtos.Config(null, "DEBUGGING", 10, 900, 8));
+        for (var changed : java.util.List.of(otherFocus, otherCap)) {
+            assertThatThrownBy(() -> store.sameStart(run, changed))
+                    .isInstanceOfSatisfying(ResponseStatusException.class,
+                            ex -> assertThat(ex.getStatusCode().value()).isEqualTo(409));
+        }
     }
 
     @Test void legacyConfigDefaultsToTextButCannotSwitchToVoice() {
@@ -102,5 +113,33 @@ class EvidenceStoreTest {
                 original.requestHash(), json.read("{\"interaction_mode\":\"VOICE\"}"), original.result());
         assertThatThrownBy(() -> store.commit(voiceCommit)).isInstanceOf(ResponseStatusException.class);
         verify(runs, never()).save(any());
+    }
+
+    @Test void projectSessionLoadsTurnsOnceAndSkipsUnchangedTurnSaves() {
+        when(runs.findById("session")).thenReturn(Optional.of(existing(1)));
+        var unchanged = new fit.iuh.modules.session.entity.SessionTurn();
+        unchanged.setId(10L);
+        unchanged.setSessionId("session");
+        unchanged.setExternalTurnId("t-1");
+        unchanged.setQuestion("Q1");
+        unchanged.setAnswer("A1");
+        unchanged.setTopicTag("sql");
+        unchanged.setIsDeepDive(false);
+        when(turns.findBySessionIdOrderByIdAsc("session")).thenReturn(java.util.List.of(unchanged));
+
+        var visible = json.read("""
+            {"schema_version":2,"session_id":"session","state_version":2,"is_finished":false,
+             "report":{"objectives":[{"objective_id":"obj-1","skill_id":"sql"}]},
+             "turns":[{"turn_id":"t-1","objective_id":"obj-1","question":"Q1","answer":"A1"}],
+             "pending_turn":{"turn_id":"t-2","objective_id":"obj-1","question":"Q2"}}
+            """);
+        var result = json.tree(Map.of("snapshot", visible, "public", visible));
+        store.commit(new EvidenceStore.Commit("session", 1, UUID.randomUUID(), "hash", json.read("{}"), result));
+
+        verify(turns, times(1)).findBySessionIdOrderByIdAsc("session");
+        verify(turns, never()).findBySessionIdAndExternalTurnId(any(), any());
+        var savedCaptor = org.mockito.ArgumentCaptor.forClass(fit.iuh.modules.session.entity.SessionTurn.class);
+        verify(turns, times(1)).save(savedCaptor.capture());
+        assertThat(savedCaptor.getValue().getExternalTurnId()).isEqualTo("t-2");
     }
 }

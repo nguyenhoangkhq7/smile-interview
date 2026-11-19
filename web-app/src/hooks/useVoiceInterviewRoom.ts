@@ -20,7 +20,7 @@ export function useVoiceInterviewRoom(interview: InterviewController, suspended:
   const turnId = session?.pending_turn?.turn_id || session?.conversation?.message.message_id;
   useEffect(() => { const box = captionBox.current; if (box) box.scrollTop = box.scrollHeight; }, [caption]);
   useEffect(() => { if (questionBox.current) questionBox.current.scrollTop = 0; }, [turnId]);
-  const status = voice.starting ? 'Đang kết nối avatar…' : !voice.enabled ? 'Sẵn sàng trò chuyện'
+  const status = session?.awaiting_question ? 'Đang chờ câu hỏi' : voice.starting ? 'Đang kết nối avatar…' : !voice.enabled ? 'Sẵn sàng trò chuyện'
     : voice.paused ? 'Micro đang tạm dừng' : busy ? 'Đang chuẩn bị câu hỏi tiếp theo…'
     : voice.listening ? 'Đang nghe bạn…' : voice.transcribing ? 'Đang nhận diện lời nói…'
     : voice.retryAvailable ? 'Chưa nhận diện được lời nói' : voice.speaking ? 'Người phỏng vấn đang nói'
@@ -29,7 +29,7 @@ export function useVoiceInterviewRoom(interview: InterviewController, suspended:
     settingsOpen, setSettingsOpen, status, caption, sent: !voice.captions && !interview.answer && Boolean(caption),
     question: phase === 'INTERVIEW' ? session?.pending_turn?.question || '' : session?.conversation?.message.text || '',
     introduction: phase === 'INTERVIEW' ? session?.pending_turn?.introduction || '' : '',
-    cannotSubmit: busy || presenting || voice.transcribing || voice.listening || voice.retryAvailable || Boolean(voice.review),
+    cannotSubmit: busy || presenting || Boolean(session?.awaiting_question) || voice.transcribing || voice.listening || voice.retryAvailable || Boolean(voice.review),
     interrupt: () => { voice.interrupt(); if (presenting) void interview.converse('NEXT'); },
     skipIntroduction: () => { setSettingsOpen(false); voice.interrupt(); void interview.converse('SKIP_INTRODUCTION'); },
     continueConversation: () => { voice.interrupt(); void interview.converse('NEXT'); },

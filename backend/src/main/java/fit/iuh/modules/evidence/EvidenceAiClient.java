@@ -52,7 +52,13 @@ public class EvidenceAiClient {
             String detail = "Không thể xử lý yêu cầu phỏng vấn. Vui lòng thử lại.";
             try {
                 JsonNode error = json.read(ex.getResponseBodyAsString());
-                if (error != null && error.path("detail").isTextual()) detail = error.path("detail").asText();
+                JsonNode errorDetail = error == null ? null : error.path("detail");
+                if (errorDetail != null && errorDetail.isTextual()) {
+                    detail = errorDetail.asText();
+                } else if (errorDetail != null && errorDetail.isArray() && ex.getStatusCode().value() == 422) {
+                    log.warn("Interview AI validation failed session_id={} operation={} errors={}",
+                            sessionId, operation, summarizeValidationErrors(errorDetail));
+                }
             } catch (IllegalStateException ignored) {
                 // Non-JSON upstream errors must not leak transport details to the UI.
             }
@@ -61,7 +67,8 @@ public class EvidenceAiClient {
             log.warn("Interview AI transport failed session_id={} operation={} error_type={} elapsed_ms={}",
                     sessionId, operation, ex.getClass().getSimpleName(), TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
             for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
-                if (cause instanceof java.net.SocketTimeoutException) {
+                if (cause instanceof java.net.SocketTimeoutException
+                        || cause instanceof java.net.http.HttpTimeoutException) {
                     throw new ResponseStatusException(HttpStatus.GATEWAY_TIMEOUT,
                             "Chuẩn bị phỏng vấn mất quá nhiều thời gian. Vui lòng thử lại; dữ liệu hồ sơ của bạn vẫn được giữ nguyên.", ex);
                 }
@@ -69,5 +76,40 @@ public class EvidenceAiClient {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
                     "Không thể kết nối dịch vụ phỏng vấn. Vui lòng thử lại.", ex);
         }
+    }
+
+    public JsonNode blueprint(Object payload) {
+        JsonNode request = json.tree(payload);
+        long started = System.nanoTime();
+        log.info("Interview AI blueprint request started skills={}", request.path("skills").size());
+        try {
+            String body = client.post().uri("/api/v2/interview/blueprint")
+                    .contentType(MediaType.APPLICATION_JSON).body(request.toString())
+                    .retrieve().body(String.class);
+            JsonNode result = body == null ? null : json.read(body);
+            if (result == null || !result.path("objectives").isArray() || result.path("objectives").isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Invalid AI blueprint");
+            }
+            log.info("Interview AI blueprint request completed objectives={} elapsed_ms={}",
+                    result.path("objectives").size(), TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
+            return result;
+        } catch (RestClientException ex) {
+            log.warn("Interview AI blueprint request failed error_type={} elapsed_ms={}",
+                    ex.getClass().getSimpleName(), TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "Không thể chuẩn bị sẵn blueprint phỏng vấn.", ex);
+        }
+    }
+
+    private static String summarizeValidationErrors(JsonNode details) {
+        var summary = new java.util.ArrayList<String>();
+        for (JsonNode item : details) {
+            if (summary.size() >= 5) break;
+            var loc = new java.util.ArrayList<String>();
+            for (JsonNode part : item.path("loc")) loc.add(part.asText());
+            String path = loc.isEmpty() ? "<root>" : String.join(".", loc);
+            summary.add(path + ":" + item.path("type").asText("invalid"));
+        }
+        return String.join(", ", summary);
     }
 }

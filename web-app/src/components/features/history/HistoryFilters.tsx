@@ -25,7 +25,7 @@ export function HistoryFilters({
         <IconSearch size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
         <Input
           type="text"
-          placeholder="Tìm kiếm theo tên file, level, category..."
+          placeholder="Tìm theo vị trí, tên CV hoặc hồ sơ ứng tuyển..."
           value={searchTerm}
           onChange={(e) => onSearch(e.target.value)}
           className="pl-9"

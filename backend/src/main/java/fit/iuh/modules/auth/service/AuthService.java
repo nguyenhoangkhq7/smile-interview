@@ -3,8 +3,6 @@ package fit.iuh.modules.auth.service;
 import fit.iuh.common.service.S3StorageService;
 import fit.iuh.modules.auth.dto.AuthResponse;
 import fit.iuh.modules.auth.dto.ChangePasswordRequest;
-import fit.iuh.modules.auth.dto.CreateHrUserRequest;
-import fit.iuh.modules.auth.dto.CreateHrUserResponse;
 import fit.iuh.modules.auth.dto.LoginRequest;
 import fit.iuh.modules.auth.dto.RegisterRequest;
 import fit.iuh.modules.auth.dto.UpdateProfileRequest;
@@ -70,41 +68,6 @@ public class AuthService {
 
         String token = jwtService.generateToken(saved);
         return toAuthResponse(token, saved);
-    }
-
-    @Transactional
-    public CreateHrUserResponse createHrUser(CreateHrUserRequest request) {
-        String targetEmail = (request.getEmail() != null && !request.getEmail().isBlank())
-                ? request.getEmail()
-                : (request.getUsername().contains("@") ? request.getUsername() : request.getUsername() + "@hr.smile.com");
-
-        if (userRepository.existsByEmail(targetEmail)) {
-            throw new IllegalArgumentException("User with email/username already exists: " + targetEmail);
-        }
-
-        String displayName = (request.getEvaluatorName() != null && !request.getEvaluatorName().isBlank())
-                ? request.getEvaluatorName()
-                : request.getUsername();
-
-        User user = User.builder()
-                .username(displayName)
-                .email(targetEmail)
-                .password(passwordEncoder.encode(request.getPassword()))
-                .role(Role.HR)
-                .build();
-
-        User saved = userRepository.save(user);
-        log.info("Admin created new HR user: {} ({}) with ID: {}", saved.getDisplayUsername(), saved.getEmail(), saved.getId());
-
-        return CreateHrUserResponse.builder()
-                .id(saved.getId())
-                .username(request.getUsername())
-                .email(saved.getEmail())
-                .evaluatorName(displayName)
-                .role(saved.getRole())
-                .createdAt(saved.getCreatedAt())
-                .message("HR account created successfully.")
-                .build();
     }
 
     public AuthResponse login(LoginRequest request) {

@@ -18,7 +18,7 @@ Phần phỏng vấn cung cấp yêu cầu cần đạt, câu trả lời gốc,
 | Bằng chứng và kết luận từng phiên | `interview_runs.snapshot_json`; bản rút gọn tại `public_json` | Có, backend lưu sau mỗi chuyển trạng thái thành công | Biết đã kiểm tra gì, biểu hiện nào đã quan sát và nguồn kết luận. |
 | Năng lực hiện tại qua các lượt | `ApplicationCompetencyService.get(profileId, user)` / API competency | Chưa lưu kết quả thành entity riêng; được tính từ lịch sử trong DB khi đọc | Quyết định nội dung hiện còn cần ưu tiên, đã đạt hay cần xác minh. |
 
-Không ghi đè `candidate_proficiency` hoặc `gap_magnitude` ban đầu bằng kết quả phỏng vấn. Hiện chưa có field số `verified_gap_magnitude`; năng lực quan sát được thể hiện bằng assessment và bằng chứng.
+Không xem kết quả phân tích tài liệu như kết luận năng lực sau phỏng vấn. Năng lực quan sát được thể hiện bằng assessment và bằng chứng qua các lượt.
 
 ### Bộ thông tin tối thiểu cần sử dụng
 
@@ -40,7 +40,7 @@ Các tên trong cột nhu cầu là ý nghĩa nghiệp vụ; field JSON chính x
 2. Đọc baseline và blueprint của hồ sơ để xác định chuẩn, khóa liên kết và tầm quan trọng.
 3. Lấy năng lực hiện tại qua `ApplicationCompetencyService` hoặc API competency có sẵn.
 4. Ghép `skills[].skillId` với `objective.skill_id`; ghép `objectives[].id` với `objective_id`; ghép `criteria[].id` với `criterion_id`. Kiểm tra rubric tương thích khi lấy chi tiết từ phiên nguồn.
-5. Dựa vào kết luận mục tiêu và tiêu chí liên quan để chọn nội dung ôn. Nếu cần giải thích hoặc tạo bài luyện, đọc snapshot của phiên nguồn; không chỉ dựa vào một câu study_recommendations.
+5. Dựa vào kết luận mục tiêu và tiêu chí liên quan để chọn nội dung ôn. Nếu cần giải thích hoặc tạo bài luyện, đọc snapshot của phiên nguồn; không chỉ dựa vào `objectives[].study_recommendations`.
 6. Lưu đầu việc/ghi chú/checklist trong dữ liệu của module ôn luyện, kèm các khóa nguồn cần thiết. Khi đọc lại kế hoạch sau một lượt phỏng vấn mới, đối chiếu kết luận tổng hợp mới; không tự đánh dấu hoàn thành đầu việc.
 
 Nếu chỉ truy vấn SQL, hiện lấy được toàn bộ dữ liệu gốc nhưng **không có sẵn bảng năng lực hiện tại để SELECT**. Cần tái sử dụng bộ tổng hợp qua backend/service. Nếu hai bên muốn chỉ đọc kết quả tổng hợp từ DB, phải triển khai thêm entity lưu kết quả; đây là phương án đã thảo luận, chưa được triển khai trong hiện trạng bàn giao.
@@ -69,7 +69,7 @@ Các cột JSON dưới đây hiện là PostgreSQL TEXT, cần parse JSON trong
 | `application_profiles.skill_gap_json` | Mảng phân tích CV/JD ban đầu, chưa phải năng lực được kiểm chứng. |
 | `application_profiles.gap_report_json` | Báo cáo phân tích tài liệu ban đầu. |
 | `application_profiles.blueprint_json` | Bộ mục tiêu và tiêu chí chung; được lưu khi bắt đầu lượt đầu. Có thể null trước đó. |
-| `application_profiles.policy_json` | Chính sách đánh giá được cố định cùng blueprint. |
+| `application_profiles.policy_json` | Cột legacy (nullable); không còn ghi hoặc gửi lại khi start phiên mới. |
 | `sessions.id`, `application_profile_id`, `attempt_number` | Liên kết phiên với hồ sơ và số thứ tự lượt. Phiên cũ có thể không thuộc hồ sơ. |
 | `sessions.status`, `started_at`, `ended_at` | Trạng thái và thời gian của lượt. Dùng snapshot để xác nhận phiên đã kết thúc; status Completed không có nghĩa đạt năng lực. |
 | `interview_runs.session_id`, `state_version` | Khóa phiên và phiên bản trạng thái được backend commit. |
@@ -105,30 +105,26 @@ Các cột hồ sơ lặp lại trên mỗi hàng phiên; nhóm dữ liệu theo
 
 ## 2. Gap dự đoán trước phỏng vấn
 
-Nguồn: từng phần tử `application_profiles.skill_gap_json[]`. Snapshot cũng giữ đầu vào tại `skills[]`, nhưng contract InterviewSkill không giữ mọi field của kết quả C2; ví dụ `severity` không thuộc contract này.
+Nguồn dữ liệu là từng phần tử trong `application_profiles.skill_gap_json[]`. Các field dùng để lập kế hoạch được truyền khi khởi tạo. Sau khi lập kế hoạch, `snapshot.skills[]` lưu `jd_skill_id` và `cv_evidence_spans`. Mục tiêu đã được chuẩn hóa theo JD nằm ở `snapshot.objectives`.
 
 | Field | Ý nghĩa và cách dùng |
 |---|---|
 | `jd_skill_id` | ID kỹ năng theo JD. |
+| `jd_skill_name`, `matched_cv_skill_name` | Tên hiển thị của kỹ năng JD và kỹ năng CV được ghép. |
 | `matched_cv_skill_id` | Kỹ năng trong CV được ghép với kỹ năng JD; có thể null. |
 | `semantic_alignment` | MATCH/PARTIAL/MISSING: mức khớp từ tài liệu, không phải kết luận năng lực sau phỏng vấn. |
-| `is_substituted` | Có dùng kỹ năng tương đương để ghép hay không. |
 | `required_proficiency` | Mức yêu cầu 1–5 ước lượng từ JD. |
-| `candidate_proficiency` | Mức năng lực ước lượng từ CV; không cập nhật thành điểm năng lực quan sát sau mỗi lượt. |
-| `gap_magnitude` | Độ thiếu hụt dự đoán chuẩn hóa 0–1, không phải xác suất yếu hoặc phần trăm kiến thức thiếu. |
 | `importance_weight` | Độ quan trọng của kỹ năng trong JD. |
-| `severity`, `priority` | Mức nghiêm trọng/ưu tiên ban đầu, theo trọng số và gap. Không phản ánh tự động tiến bộ qua phỏng vấn. |
-| `cv_evidence_spans`, `jd_evidence_spans` | Trích dẫn tài liệu hỗ trợ phân tích. |
-| `jd_reasoning`, `context_job` | Giải thích mức yêu cầu và ngữ cảnh kinh nghiệm trong CV. |
+| `priority` | Ưu tiên ban đầu của kỹ năng theo phân tích JD/CV. |
+| `cv_evidence_spans`, `context_job` | Trích dẫn và bối cảnh kinh nghiệm trong CV. |
+| `jd_evidence_spans` | Trích dẫn JD cấp kỹ năng khi chưa có nhiệm vụ cụ thể. |
 | `job_tasks[]` | Các nhiệm vụ cụ thể trong JD. |
 | `job_tasks[].task_id`, `description`, `evidence_spans` | ID, nội dung và nguồn trích của nhiệm vụ. |
 | `job_tasks[].required_level`, `requirement_kind`, `level_basis` | Mức yêu cầu; REQUIRED/OPTIONAL/UNSPECIFIED; cơ sở EXPLICIT/INFERRED/FALLBACK. |
-| `c_evidence` | Tỷ lệ bằng chứng CV giàu ngữ cảnh; không phải confidence năng lực phỏng vấn. |
-| `recency_flag` | Cờ recency của kỹ năng theo phân tích CV. |
-| `degraded`, `flags` | Cảnh báo fallback/chất lượng/provenance của pipeline. |
-| `suggested_strategy` | Gợi ý chiến lược hỏi ban đầu, không phải kế hoạch học. |
 
-Nguồn định nghĩa: `ai-service/skill_gap/domain/models.py` và `ai-service/adaptive_questioning/schemas/skill_gap_input.py`.
+`application_profiles.gap_report_json` lưu `matching_score` và trạng thái `degraded` của lần phân tích. Các trường phục vụ chẩn đoán tĩnh trước đây (`is_substituted`, `candidate_proficiency`, `gap_magnitude`) đã được loại bỏ khỏi output REST của `ai-service`.
+
+Xem định nghĩa tại `ai-service/skill_gap/domain/models.py` và `ai-service/adaptive_questioning/evidence/models.py`.
 
 ## 3. Chuẩn người dùng cần đạt
 
@@ -142,7 +138,7 @@ Nguồn: `application_profiles.blueprint_json.objectives[]`, hoặc `snapshot_js
 | `target_depth` | Độ sâu cần kiểm tra: L1 nền tảng, L2 vận dụng, L3 phân tích/giải quyết vấn đề, L4 thiết kế/đánh đổi. Không quy đổi trực tiếp từ proficiency 1–5. |
 | `depth_basis`, `depth_rationale`, `depth_evidence_spans` | Cơ sở, giải thích và trích dẫn khi xác định target depth. |
 | `requirement_kind`, `inferred`, `jd_evidence_spans` | Tính bắt buộc, thông tin suy luận và nguồn JD. |
-| `rubric_version`, `rubric_fingerprint` | Phiên bản và dấu vân tay chuẩn đánh giá; không ghép kết quả khác chuẩn chỉ vì trùng tên kỹ năng. |
+| `rubric_fingerprint` | Dấu vân tay chuẩn đánh giá; không ghép kết quả khác chuẩn chỉ vì trùng tên kỹ năng. |
 | `criteria[].criterion_id`, `description` | ID và nội dung tiêu chí cụ thể. |
 | `criteria[].expected_evidence` | Biểu hiện cần quan sát để đánh giá tiêu chí. |
 | `criteria[].below_target`, `at_target`, `above_target` | Mô tả chuẩn dưới/đạt/vượt yêu cầu; là đầu vào để xác định mục tiêu học. |
@@ -163,7 +159,6 @@ Nguồn: `snapshot_json.turns[]`. `pending_turn` là câu đang chờ trả lờ
 | `question_depth` | Độ sâu thực tế của câu hỏi; có thể khác target_depth. |
 | `question.text` | Nội dung câu hỏi gốc. |
 | `question.criterion_ids` | Tiêu chí được hỏi. Luồng hiện tại nhắm một tiêu chí mỗi câu. |
-| `question.assistance` | NONE/CLARIFICATION/HINT: điều kiện hỗ trợ khi hỏi. |
 | `question.evidence_scope` | ID bối cảnh/bài toán dùng để đối chiếu trường hợp đã kiểm tra. Do generator khai báo, không bảo đảm mọi paraphrase được nhận diện. |
 | `answer` | Câu trả lời gốc được gửi để chấm. VOICE được chấm trên văn bản phiên âm đã gửi. |
 | `judgment.observations[]` | Các quan sát cho câu trả lời; cấu trúc ở mục 5. |
@@ -205,7 +200,7 @@ Nguồn trạng thái mục tiêu: `snapshot_json.objectives[objective_id]`.
 | `criterion_progress[criterion_id].observed_cases`, `stagnant_turns`, `stop_reason` | Các bối cảnh đã quan sát, số lượt không thêm tiến triển theo heuristic và lý do dừng. |
 | `lifecycle`, `excluded_reason`, `stop_reason` | Tiến trình, lý do không được chọn hoặc dừng mục tiêu. CLOSED không đồng nghĩa đạt. |
 
-Snapshot cũng có `schema_version`, `engine_version`, `state_version`, `is_finished`, `termination_reason`, `config` và `policy`. Dùng chúng để kiểm tra phiên bản và điều kiện đánh giá. Dữ liệu cũ thiếu depth/provenance không tự được xem là tương đương bằng chứng mới.
+Snapshot cũng có `schema_version`, `state_version`, `is_finished`, `termination_reason`, `config` và `policy`. Dùng chúng để kiểm tra phiên bản và điều kiện đánh giá. Dữ liệu cũ thiếu depth/provenance không tự được xem là tương đương bằng chứng mới.
 
 ## 6. Báo cáo và năng lực hiện tại
 
@@ -215,14 +210,12 @@ Nguồn: `interview_runs.public_json.report`.
 
 | Field | Ý nghĩa và giới hạn |
 |---|---|
-| `objectives[].criteria[]` | ID, mô tả, assessment, số lượt và lý do dừng theo tiêu chí trong report. |
+| `objectives[].criteria[]` | ID, mô tả, cờ essential và assessment theo tiêu chí trong report. |
 | `objectives[].strengths`, `weaknesses` | Các diễn giải từ bằng chứng; weaknesses không thay thế kết luận đủ bằng chứng của toàn mục tiêu. |
-| `objectives[].covered_criteria`, `missing_criteria` | Phần đã có kết quả target không mâu thuẫn và phần chưa được giải quyết. Covered không có nghĩa mọi phần đều đạt; missing không đồng nghĩa đã xác nhận yếu. |
-| `objectives[].evidence`, `evidence_turn_ids` | Bằng chứng đã lọc, chủ yếu độc lập ở target. Không bao gồm đầy đủ mọi chẩn đoán dễ hơn/hỗ trợ. |
-| `study_recommendations`, `objectives[].study_recommendations` | Gợi ý ôn dưới dạng chuỗi, được suy ra theo rule. Có thể đề xuất củng cố hoặc ôn khi chưa đủ kết luận; không phải danh sách gap đã được xác nhận hoàn toàn. |
-| `progress` | Tỷ lệ mục tiêu được chọn đã đóng. Không phải tiến độ học hoặc tỷ lệ đạt. |
-| `evidence_coverage` | Độ bao phủ kết quả tiêu chí không mâu thuẫn trong các mục tiêu được chọn; có thể bao gồm thể hiện dưới chuẩn. Không phải phần trăm năng lực. |
-| `target_attainment` | Tỷ lệ AT/ABOVE trong nhóm mục tiêu có assessment AT/ABOVE/BELOW theo implementation hiện tại; null nếu nhóm rỗng. Không dùng để kết luận tất cả yêu cầu JD đã đạt. |
+| `objectives[].evidence[]` | Bằng chứng đã lọc, chủ yếu là bằng chứng độc lập ở độ sâu mục tiêu. Báo cáo gửi ID lượt, ID tiêu chí, trích dẫn, nhận định, mức thể hiện và lý do. Chi tiết khoảng dòng, xử lý mâu thuẫn và phần chưa xác minh nằm trong snapshot. |
+| `objectives[].study_recommendations` | Gợi ý ôn dưới dạng chuỗi trên từng mục tiêu, được suy ra theo rule. Có thể đề xuất củng cố hoặc ôn khi chưa đủ kết luận; không phải danh sách gap đã được xác nhận hoàn toàn. |
+
+Các báo cáo đã lưu trước khi thu gọn có thể chứa `covered_criteria`, `missing_criteria`, `evidence_turn_ids`, `progress`, `evidence_coverage` và `target_attainment`. Từ báo cáo mới, dùng kết quả theo tiêu chí và trích dẫn tại `evidence[]`.
 
 ### Năng lực tổng hợp qua các lượt
 
@@ -329,7 +322,7 @@ Không bắt buộc lưu bảng mới. Có thể tạo read model/DTO dùng chun
 | `reason`, `unresolved_aspects`, `source_evidence` | Lý do đề xuất, phần chưa rõ và trích dẫn nguồn. |
 | `source_state_version`, `competency_policy_version` | Truy vết snapshot và rule khi sinh đề xuất; không đại diện riêng lẻ cho toàn bộ lịch sử hồ sơ. |
 
-`study_recommendations` hiện là chuỗi; không nên parse câu tiếng Việt để đoán lại criterion ID hoặc loại đề xuất. Có thể giữ chuỗi cho UI và bổ sung cấu trúc trên cho tích hợp.
+`objectives[].study_recommendations` hiện là chuỗi; không nên parse câu tiếng Việt để đoán lại criterion ID hoặc loại đề xuất. Có thể giữ chuỗi cho UI và bổ sung cấu trúc trên cho tích hợp.
 
 ### Chỉ cần bổ sung nếu muốn ôn tự động sâu hơn
 

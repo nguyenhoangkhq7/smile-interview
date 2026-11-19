@@ -1,0 +1,6 @@
+{
+  "operation": "respond",
+  "from": "03-intro",
+  "scenario": "Hai lần nộp câu trả lời thiếu ý không được commit; ứng viên bổ sung đề xuất SQL khi gửi lại câu đang chờ. Đây là đầu vào khác với hai lần trước.",
+  "answer": "Seq Scan phải đọc toàn bộ bảng orders để lọc status, mất khoảng 300 ms trong số liệu trên; sau đó Sort sắp kết quả theo created_at. Em sẽ thử CREATE INDEX idx_orders_status_created_at ON orders (status, created_at DESC); vì status là điều kiện bằng và trong nhóm này thứ tự created_at đã có sẵn trong B-tree. Em sẽ kiểm chứng lại bằng EXPLAIN ANALYZE với cùng tham số truy vấn."
+}

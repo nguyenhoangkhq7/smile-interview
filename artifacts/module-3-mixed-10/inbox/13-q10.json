@@ -1,0 +1,6 @@
+{
+  "operation": "respond",
+  "from": "12-q09",
+  "scenario": "Trả lời đầy đủ câu cuối bằng ghi chú bàn giao với trạng thái, giả thuyết, metric và người phụ trách. Chờ hệ thống tự chốt ngân sách.",
+  "answer": "Bàn giao INC-024, 15:40. SRE đã rollback worker đồng bộ về bản ổn định lúc 15:26. QA đã smoke luồng tạo đơn, thanh toán và cập nhật trạng thái trên canary. Dev tạm khóa đợt deploy mới. Giả thuyết chưa xác nhận: bản worker mới đánh dấu sự kiện đã xử lý trước khi ghi trạng thái, nên một số lần retry không cập nhật đơn. Ca sau theo dõi trong 60 phút: SRE trực giữ dashboard backlog, tuổi sự kiện cũ nhất và tỷ lệ xử lý lỗi, báo incident lead nếu backlog lại tăng trong 5 phút. QA đối soát 20 đơn bị ảnh hưởng với log thanh toán và gắn kết quả vào ticket. Dev phụ trách xác minh giả thuyết bằng trace ID và chỉ đề xuất mở lại rollout sau khi sửa và test tái hiện. Em ghi ticket, link dashboard và checklist owner vào incident log, rồi yêu cầu người trực ca sau xác nhận đã nhận bàn giao."
+}

@@ -5,7 +5,6 @@ package fit.iuh.modules.auth.entity;
  */
 public enum Role {
     ADMIN,
-    HR,
     CANDIDATE,
     USER
 }

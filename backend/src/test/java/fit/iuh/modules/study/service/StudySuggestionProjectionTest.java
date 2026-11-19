@@ -41,7 +41,7 @@ class StudySuggestionProjectionTest {
         String turnId = "t" + turn;
         var item = snapshot.withArray("turns").addObject().put("turn_id", turnId).put("objective_id", "a")
                 .put("answer", "Original answer " + turn);
-        item.putObject("question").put("text", "Explain the example").put("assistance", "NONE")
+        item.putObject("question").put("text", "Explain the example")
                 .putArray("criterion_ids").add(criterion);
         var evidence = state().withArray("evidence_history").addObject().put("criterion_id", criterion)
                 .put("turn_id", turnId).put("independent", true).put("question_depth", 3)
@@ -62,7 +62,7 @@ class StudySuggestionProjectionTest {
         answer(1, "c1", "AT_TARGET"); answer(2, "c2", "BELOW"); answer(3, "c3", "BELOW");
         var criteria = project().getFirst().criteria();
         assertThat(criteria).hasSize(5);
-        assertThat(criteria.stream().filter(c -> c.selectedByDefault()).map(c -> c.criterionId()))
+        assertThat(criteria.stream().filter(c -> Set.of("REVIEW", "VERIFY").contains(c.kind())).map(c -> c.criterionId()))
                 .containsExactly("c2", "c3");
         assertThat(criteria.stream().map(c -> c.kind())).containsExactly("MET", "REVIEW", "REVIEW", "UNASSESSED", "UNASSESSED");
         assertThat(criteria.get(3).source()).isNull();
@@ -71,7 +71,7 @@ class StudySuggestionProjectionTest {
 
     @Test void repeatedQuestionsForOneCriterionProduceOneChecklistSuggestion() {
         answer(1, "c2", "BELOW"); answer(2, "c2", "BELOW"); answer(3, "c2", "BELOW");
-        assertThat(project().getFirst().criteria().stream().filter(c -> c.selectedByDefault()).map(c -> c.criterionId()))
+        assertThat(project().getFirst().criteria().stream().filter(c -> Set.of("REVIEW", "VERIFY").contains(c.kind())).map(c -> c.criterionId()))
                 .containsExactly("c2");
     }
 
@@ -81,7 +81,6 @@ class StudySuggestionProjectionTest {
         var item = project().getFirst().criteria().getFirst();
         assertThat(item.kind()).isEqualTo("VERIFY");
         assertThat(item.assessment()).isEqualTo("NOT_ASSESSED");
-        assertThat(item.selectedByDefault()).isTrue();
     }
 
     @Test void contradictoryEvidenceRequiresVerification() {
@@ -101,6 +100,5 @@ class StudySuggestionProjectionTest {
         answer(1, "c1", "AT_TARGET"); state().putArray("assisted_criteria").add("c1");
         var item = project().getFirst().criteria().getFirst();
         assertThat(item.kind()).isEqualTo("REINFORCE");
-        assertThat(item.selectedByDefault()).isFalse();
     }
 }

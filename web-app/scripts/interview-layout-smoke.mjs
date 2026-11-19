@@ -9,12 +9,13 @@ const config = { mode: 'MIXED', focused_question_mode: null, max_questions: 40,
   duration_seconds: 3600, max_questions_per_objective: 8 };
 const code = `SELECT ${'very_long_column_name, '.repeat(20)}id FROM users;`;
 const markdown = `## Phân tích truy vấn\n\n**Bối cảnh:** truy vấn chậm.\n\n- Đọc kế hoạch thực thi\n- Kiểm tra chỉ mục\n\n\`\`\`sql\n${code}\n\`\`\`\n\n| Chỉ số | Giá trị |\n| --- | --- |\n| Rows | 100 |\n\n[Liên kết không an toàn](javascript:alert(1))`;
-const turn = number => ({ turn_id: `turn-${number}`, objective_id: 'objective', skill_id: 'postgresql',
-  mode: 'DEBUGGING', question: `${markdown}\n\nCâu hỏi số ${number}.`, answer: null, feedback: null });
+const turn = number => ({ turn_id: `turn-${number}`, objective_id: 'objective',
+  mode: 'DEBUGGING', question: `${markdown}\n\nCâu hỏi số ${number}.` });
 let session = { schema_version: 2, session_id: id, state_version: 1, is_finished: false,
   config, deadline_at: new Date(Date.now() + 3600000).toISOString(), turns: [], pending_turn: turn(1),
-  report: { schema_version: 2, state_version: 1, is_finished: false, termination_reason: null,
-    progress: 0, evidence_coverage: 0, target_attainment: null, objectives: [] } };
+  report: { termination_reason: null,
+    objectives: [{ objective_id: 'objective', skill_id: 'postgresql', claim: 'SQL', jd_evidence_spans: [],
+      assessment: 'NOT_ASSESSED', stop_reason: null, strengths: [], weaknesses: [], evidence: [] }] } };
 const browser = await puppeteer.launch({ headless: true });
 try {
   const page = await browser.newPage();
@@ -35,7 +36,8 @@ try {
     if (url.pathname.endsWith('/respond')) {
       const answer = JSON.parse(request.postData());
       session = { ...session, state_version: session.state_version + 1,
-        turns: [...session.turns, { ...session.pending_turn, answer: answer.candidate_response,
+        turns: [...session.turns, { turn_id: session.pending_turn.turn_id, objective_id: session.pending_turn.objective_id,
+          mode: session.pending_turn.mode, question: session.pending_turn.question, answer: answer.candidate_response,
           feedback: 'Bạn đã nêu cách kiểm tra kế hoạch thực thi.' }],
         pending_turn: { ...turn(session.turns.length + 2),
           introduction: 'Bạn đã nêu cách kiểm tra kế hoạch thực thi.\n\nMình muốn làm rõ thêm một ý trong câu trả lời vừa rồi.' } };

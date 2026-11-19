@@ -1,6 +1,7 @@
 package fit.iuh.modules.session.controller;
 
 import fit.iuh.common.service.S3StorageService;
+import fit.iuh.exception.ResourceNotFoundException;
 import fit.iuh.modules.auth.entity.User;
 import fit.iuh.modules.session.entity.JobDescription;
 import fit.iuh.modules.session.entity.Resume;
@@ -57,7 +58,7 @@ public class DocumentUploadController {
         log.info("[DocumentUpload] Uploading documents for sessionId={}", sessionId);
         UUID userId = currentUser != null ? currentUser.getId() : null;
 
-        Session session = sessionRepository.findById(sessionId)
+        Session session = sessionRepository.lockById(sessionId)
                 .orElseGet(() -> {
                     Session newSession = Session.builder()
                             .id(sessionId)
@@ -70,6 +71,9 @@ public class DocumentUploadController {
                     return sessionRepository.save(newSession);
                 });
 
+        if (!java.util.Objects.equals(userId, session.getUserId())) {
+            throw new ResourceNotFoundException("Session not found");
+        }
         if (session.getApplicationProfile() != null) {
             throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT,
                     "Application profile documents are fixed; prepare a new profile to change CV/JD");
@@ -80,15 +84,15 @@ public class DocumentUploadController {
         if (interviewType != null && !interviewType.isBlank()) {
             session.setInterviewType(interviewType);
         }
-        if (userId != null && session.getUserId() == null) {
-            session.setUserId(userId);
-        }
-
         if (resumeId != null && session.getResume() == null) {
-            resumeRepository.findById(resumeId).ifPresent(session::setResume);
+            session.setResume(resumeRepository.findById(resumeId)
+                    .filter(item -> java.util.Objects.equals(userId, item.getUserId()))
+                    .orElseThrow(() -> new ResourceNotFoundException("Resume not found")));
         }
         if (jdId != null && session.getJobDescription() == null) {
-            jobDescriptionRepository.findById(jdId).ifPresent(session::setJobDescription);
+            session.setJobDescription(jobDescriptionRepository.findById(jdId)
+                    .filter(item -> java.util.Objects.equals(userId, item.getUserId()))
+                    .orElseThrow(() -> new ResourceNotFoundException("Job description not found")));
         }
 
         // Process CV
@@ -187,6 +191,10 @@ public class DocumentUploadController {
         }
         jd = jobDescriptionRepository.save(jd);
         session.setJobDescription(jd);
+        if (hasNewCv || hasNewJd) {
+            session.setSkillGapJson(null);
+            session.setGapReportJson(null);
+        }
 
         sessionRepository.save(session);
 

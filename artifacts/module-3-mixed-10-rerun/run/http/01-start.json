@@ -1,0 +1,825 @@
+{
+  "step": "01-start",
+  "started_at_utc": "2026-11-18T07:58:44.608243+00:00",
+  "completed_at_utc": "2026-11-18T07:59:14.231418+00:00",
+  "elapsed_seconds": 29.624,
+  "scenario": "Dùng lại 6 kỹ năng nhiệm vụ và trích dẫn hư cấu của fixture trước, với lời mở đầu không có tên, công ty, CV/JD tóm tắt hay dữ liệu người dùng.",
+  "snapshot_source_step": null,
+  "request": {
+    "method": "POST",
+    "path": "/api/v2/interview/start",
+    "body": {
+      "session_id": "module3-qa-rerun-mixed10-20261118",
+      "config": {
+        "interaction_mode": "TEXT",
+        "mode": "MIXED",
+        "focused_question_mode": null,
+        "max_questions": 10,
+        "max_questions_per_objective": 8,
+        "duration_seconds": 3600
+      },
+      "opening": {
+        "interviewer_name": "Minh",
+        "role_title": "Backend Engineer",
+        "attempt_number": 1
+      },
+      "skills": [
+        {
+          "jd_skill_id": "postgresql",
+          "required_proficiency": 4,
+          "importance_weight": 0.99,
+          "priority": 0.198,
+          "cv_evidence_spans": [
+            "Dùng EXPLAIN để tối ưu truy vấn báo cáo trên bảng orders và bổ sung index theo ngày tạo."
+          ],
+          "job_tasks": [
+            {
+              "task_id": "diagnose-order-query",
+              "description": "Chẩn đoán và tối ưu truy vấn PostgreSQL lọc và sắp xếp danh sách đơn hàng trên bảng lớn.",
+              "evidence_spans": [
+                "Bắt buộc: Chẩn đoán và tối ưu truy vấn PostgreSQL lọc và sắp xếp danh sách đơn hàng trên bảng lớn."
+              ],
+              "required_level": 4,
+              "requirement_kind": "REQUIRED",
+              "level_basis": "EXPLICIT"
+            }
+          ]
+        },
+        {
+          "jd_skill_id": "python",
+          "required_proficiency": 3.5,
+          "importance_weight": 0.95,
+          "priority": 0,
+          "cv_evidence_spans": [
+            "Triển khai API đơn hàng bằng Python và FastAPI, viết unit test cho xử lý sự kiện và dữ liệu trùng."
+          ],
+          "job_tasks": [
+            {
+              "task_id": "deduplicate-events",
+              "description": "Viết hàm Python loại trùng sự kiện đơn hàng theo mã sự kiện, giữ nguyên thứ tự xuất hiện đầu tiên.",
+              "evidence_spans": [
+                "Bắt buộc: Viết hàm Python loại trùng sự kiện đơn hàng theo mã sự kiện, giữ nguyên thứ tự xuất hiện đầu tiên."
+              ],
+              "required_level": 3.5,
+              "requirement_kind": "REQUIRED",
+              "level_basis": "INFERRED"
+            }
+          ]
+        },
+        {
+          "jd_skill_id": "rabbitmq",
+          "required_proficiency": 4,
+          "importance_weight": 0.91,
+          "priority": 0.546,
+          "cv_evidence_spans": [],
+          "job_tasks": [
+            {
+              "task_id": "design-payment-consumer",
+              "description": "Thiết kế consumer RabbitMQ cho sự kiện thanh toán để việc giao lại thông điệp không ghi nhận thanh toán hai lần.",
+              "evidence_spans": [
+                "Bắt buộc: Thiết kế consumer RabbitMQ cho sự kiện thanh toán để việc giao lại thông điệp không ghi nhận thanh toán hai lần."
+              ],
+              "required_level": 4,
+              "requirement_kind": "REQUIRED",
+              "level_basis": "EXPLICIT"
+            }
+          ]
+        },
+        {
+          "jd_skill_id": "http-api",
+          "required_proficiency": 3,
+          "importance_weight": 0.84,
+          "priority": 0.126,
+          "cv_evidence_spans": [
+            "Đã tích hợp retry qua SDK HTTP khi gọi dịch vụ vận chuyển."
+          ],
+          "job_tasks": [
+            {
+              "task_id": "explain-http-retry",
+              "description": "Giải thích tính idempotent của HTTP khi retry yêu cầu cập nhật đơn hàng sau timeout.",
+              "evidence_spans": [
+                "Bắt buộc: Giải thích tính idempotent của HTTP khi retry yêu cầu cập nhật đơn hàng sau timeout."
+              ],
+              "required_level": 3,
+              "requirement_kind": "REQUIRED",
+              "level_basis": "INFERRED"
+            }
+          ]
+        },
+        {
+          "jd_skill_id": "incident-collaboration",
+          "required_proficiency": 3.5,
+          "importance_weight": 0.76,
+          "priority": 0.1995,
+          "cv_evidence_spans": [
+            "Phối hợp với QA đối chiếu log khi lỗi đồng bộ đơn hàng ở môi trường production."
+          ],
+          "job_tasks": [
+            {
+              "task_id": "coordinate-mitigation",
+              "description": "Phối hợp với QA và SRE để thống nhất giảm thiểu tác động và bàn giao theo dõi trong sự cố đơn hàng.",
+              "evidence_spans": [
+                "Bắt buộc: Phối hợp với QA và SRE để thống nhất giảm thiểu tác động và bàn giao theo dõi trong sự cố đơn hàng."
+              ],
+              "required_level": 3.5,
+              "requirement_kind": "REQUIRED",
+              "level_basis": "INFERRED"
+            }
+          ]
+        },
+        {
+          "jd_skill_id": "docker",
+          "required_proficiency": 2.5,
+          "importance_weight": 0.42,
+          "priority": 0.02625,
+          "cv_evidence_spans": [
+            "Dùng Docker Compose để khởi chạy API và PostgreSQL trên máy phát triển."
+          ],
+          "job_tasks": [
+            {
+              "task_id": "write-dev-container",
+              "description": "Viết Dockerfile tối giản cho API nội bộ dùng trong môi trường phát triển.",
+              "evidence_spans": [
+                "Điểm cộng: Viết Dockerfile tối giản cho API nội bộ dùng trong môi trường phát triển."
+              ],
+              "required_level": 2.5,
+              "requirement_kind": "OPTIONAL",
+              "level_basis": "INFERRED"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "snapshot": {
+        "schema_version": 2,
+        "session_id": "module3-qa-rerun-mixed10-20261118",
+        "state_version": 1,
+        "config": {
+          "interaction_mode": "TEXT",
+          "mode": "MIXED",
+          "focused_question_mode": null,
+          "max_questions": 10,
+          "duration_seconds": 3600,
+          "max_questions_per_objective": 8
+        },
+        "policy": {
+          "fallback_depth": 2,
+          "core_importance": 0.7,
+          "reserve_followup_fraction": 0.3,
+          "min_failure_contexts": 2,
+          "allow_extension_probes": false
+        },
+        "skills": [
+          {
+            "jd_skill_id": "postgresql",
+            "cv_evidence_spans": [
+              "Dùng EXPLAIN để tối ưu truy vấn báo cáo trên bảng orders và bổ sung index theo ngày tạo."
+            ]
+          },
+          {
+            "jd_skill_id": "python",
+            "cv_evidence_spans": [
+              "Triển khai API đơn hàng bằng Python và FastAPI, viết unit test cho xử lý sự kiện và dữ liệu trùng."
+            ]
+          },
+          {
+            "jd_skill_id": "rabbitmq",
+            "cv_evidence_spans": []
+          },
+          {
+            "jd_skill_id": "http-api",
+            "cv_evidence_spans": [
+              "Đã tích hợp retry qua SDK HTTP khi gọi dịch vụ vận chuyển."
+            ]
+          },
+          {
+            "jd_skill_id": "incident-collaboration",
+            "cv_evidence_spans": [
+              "Phối hợp với QA đối chiếu log khi lỗi đồng bộ đơn hàng ở môi trường production."
+            ]
+          },
+          {
+            "jd_skill_id": "docker",
+            "cv_evidence_spans": [
+              "Dùng Docker Compose để khởi chạy API và PostgreSQL trên máy phát triển."
+            ]
+          }
+        ],
+        "objectives": {
+          "29fb8ec0-16e2-56cd-9ad3-2d497f0f6d74": {
+            "objective": {
+              "requirement_id": "postgresql:diagnose-order-query",
+              "skill_id": "postgresql",
+              "target_depth": 3,
+              "depth_basis": "TASK_INTERPRETATION",
+              "depth_rationale": "Yêu cầu chẩn đoán (diagnose) và tối ưu (optimize) trên bảng lớn đòi hỏi khả năng phân tích nguyên nhân gốc rễ và đánh giá giải pháp thay vì chỉ áp dụng cú pháp cơ bản.",
+              "depth_evidence_spans": [
+                "Bắt buộc: Chẩn đoán và tối ưu truy vấn PostgreSQL lọc và sắp xếp danh sách đơn hàng trên bảng lớn."
+              ],
+              "extension_depth": null,
+              "criteria": [
+                {
+                  "description": "Xác định các chỉ mục (index) phù hợp để tối ưu truy vấn lọc và sắp xếp trên bảng lớn.",
+                  "expected_evidence": "Đề xuất lệnh CREATE INDEX hoặc phân tích EXPLAIN ANALYZE cho thấy việc sử dụng index giảm thời gian quét toàn bộ bảng (seq scan).",
+                  "below_target": "Không đề xuất chỉ mục hoặc đề xuất sai loại chỉ mục (ví dụ: B-tree cho hàm phức tạp không hỗ trợ).",
+                  "at_target": "Đề xuất đúng chỉ mục B-tree cho cột điều kiện lọc/sắp xếp, giải thích lý do dựa trên cấu trúc dữ liệu.",
+                  "above_target": "Phân tích trade-off giữa chi phí ghi (write overhead) của index mới và lợi ích đọc (read performance), đề xuất partial index hoặc covering index nếu phù hợp.",
+                  "essential": true,
+                  "criterion_id": "29fb8ec0-16e2-56cd-9ad3-2d497f0f6d74:c1"
+                },
+                {
+                  "description": "Chẩn đoán nguyên nhân hiệu năng thấp của truy vấn hiện tại.",
+                  "expected_evidence": "Sử dụng công cụ như EXPLAIN/EXPLAIN ANALYZE để chỉ ra các bước thực thi tốn kém (ví dụ: Sort, Seq Scan).",
+                  "below_target": "Không sử dụng công cụ chẩn đoán hoặc đưa ra phỏng đoán không có cơ sở từ execution plan.",
+                  "at_target": "Chỉ ra chính xác bước thực thi gây nghẽn cổ chai (bottleneck) và giải thích tại sao nó chậm.",
+                  "above_target": "Phân tích sâu về memory usage (work_mem) hoặc disk I/O impact trong quá trình sort/hash operations.",
+                  "essential": true,
+                  "criterion_id": "29fb8ec0-16e2-56cd-9ad3-2d497f0f6d74:c2"
+                }
+              ],
+              "suitable_modes": [
+                {
+                  "mode": "DEBUGGING",
+                  "criterion_indices": []
+                },
+                {
+                  "mode": "DESIGN",
+                  "criterion_indices": []
+                }
+              ],
+              "estimated_seconds": 180,
+              "objective_id": "29fb8ec0-16e2-56cd-9ad3-2d497f0f6d74",
+              "claim": "Chẩn đoán và tối ưu truy vấn PostgreSQL lọc và sắp xếp danh sách đơn hàng trên bảng lớn.",
+              "requirement_kind": "REQUIRED",
+              "jd_evidence_spans": [
+                "Bắt buộc: Chẩn đoán và tối ưu truy vấn PostgreSQL lọc và sắp xếp danh sách đơn hàng trên bảng lớn."
+              ]
+            },
+            "selected_mode": "DEBUGGING",
+            "excluded_reason": null,
+            "lifecycle": "PLANNED",
+            "assessment": "NOT_ASSESSED",
+            "stop_reason": null,
+            "turns_spent": 0,
+            "evidence_history": [],
+            "assisted_criteria": [],
+            "criterion_results": {},
+            "contradictions": [],
+            "criterion_progress": {},
+            "active_criterion_id": null,
+            "probe_reason": "Initial evidence for an essential criterion"
+          },
+          "2b0a116f-4a69-54ca-8fa8-b36d764d4366": {
+            "objective": {
+              "requirement_id": "python:deduplicate-events",
+              "skill_id": "python",
+              "target_depth": 2,
+              "depth_basis": "TASK_INTERPRETATION",
+              "depth_rationale": "Nhiệm vụ là viết một hàm cụ thể với yêu cầu rõ ràng về logic (loại trùng, giữ thứ tự), thuộc mức độ áp dụng kiến thức lập trình cơ bản.",
+              "depth_evidence_spans": [
+                "Bắt buộc: Viết hàm Python loại trùng sự kiện đơn hàng theo mã sự kiện, giữ nguyên thứ tự xuất hiện đầu tiên."
+              ],
+              "extension_depth": null,
+              "criteria": [
+                {
+                  "description": "Viết hàm Python loại bỏ các sự kiện trùng lặp theo mã sự kiện.",
+                  "expected_evidence": "Code Python thực hiện việc lọc list/dict, giữ lại phần tử đầu tiên gặp được của mỗi mã sự kiện duy nhất.",
+                  "below_target": "Code không chạy được, lỗi cú pháp, hoặc xóa tất cả các bản sao thay vì giữ lại một.",
+                  "at_target": "Code hoạt động chính xác, loại bỏ trùng lặp và trả về danh sách kết quả.",
+                  "above_target": "Tối ưu hóa bộ nhớ hoặc thời gian chạy (ví dụ: sử dụng generator, dict comprehension hiệu quả) cho tập dữ liệu lớn.",
+                  "essential": true,
+                  "criterion_id": "2b0a116f-4a69-54ca-8fa8-b36d764d4366:c1"
+                },
+                {
+                  "description": "Giữ nguyên thứ tự xuất hiện đầu tiên của các sự kiện sau khi loại trùng.",
+                  "expected_evidence": "Kết quả đầu ra có cùng thứ tự tương đối với lần xuất hiện đầu tiên của mỗi ID duy nhất so với đầu vào.",
+                  "below_target": "Thứ tự bị thay đổi ngẫu nhiên hoặc bị đảo ngược mà không yêu cầu.",
+                  "at_target": "Duy trì đúng thứ tự xuất hiện ban đầu của các phần tử được giữ lại.",
+                  "above_target": "Giải thích cách triển khai đảm bảo tính ổn định (stable) của thuật toán và độ phức tạp thời gian O(n).",
+                  "essential": true,
+                  "criterion_id": "2b0a116f-4a69-54ca-8fa8-b36d764d4366:c2"
+                }
+              ],
+              "suitable_modes": [
+                {
+                  "mode": "CODING",
+                  "criterion_indices": []
+                }
+              ],
+              "estimated_seconds": 120,
+              "objective_id": "2b0a116f-4a69-54ca-8fa8-b36d764d4366",
+              "claim": "Viết hàm Python loại trùng sự kiện đơn hàng theo mã sự kiện, giữ nguyên thứ tự xuất hiện đầu tiên.",
+              "requirement_kind": "REQUIRED",
+              "jd_evidence_spans": [
+                "Bắt buộc: Viết hàm Python loại trùng sự kiện đơn hàng theo mã sự kiện, giữ nguyên thứ tự xuất hiện đầu tiên."
+              ]
+            },
+            "selected_mode": "CODING",
+            "excluded_reason": null,
+            "lifecycle": "PLANNED",
+            "assessment": "NOT_ASSESSED",
+            "stop_reason": null,
+            "turns_spent": 0,
+            "evidence_history": [],
+            "assisted_criteria": [],
+            "criterion_results": {},
+            "contradictions": [],
+            "criterion_progress": {},
+            "active_criterion_id": null,
+            "probe_reason": "Initial evidence for an essential criterion"
+          },
+          "9bba5d04-deb3-5dba-b886-0a4d32a374d7": {
+            "objective": {
+              "requirement_id": "rabbitmq:design-payment-consumer",
+              "skill_id": "rabbitmq",
+              "target_depth": 4,
+              "depth_basis": "TASK_INTERPRETATION",
+              "depth_rationale": "Yêu cầu thiết kế consumer cho hệ thống thanh toán (vốn nhạy cảm với lỗi) để giải quyết vấn đề redelivery, đòi hỏi cân nhắc các trade-off về độ tin cậy, hiệu năng và kiến trúc hệ thống.",
+              "depth_evidence_spans": [
+                "Bắt buộc: Thiết kế consumer RabbitMQ cho sự kiện thanh toán để việc giao lại thông điệp không ghi nhận thanh toán hai lần."
+              ],
+              "extension_depth": null,
+              "criteria": [
+                {
+                  "description": "Thiết kế cơ chế xử lý tin nhắn (consumer) để tránh ghi nhận thanh toán hai lần khi có thông điệp bị giao lại (redelivery).",
+                  "expected_evidence": "Đề xuất cơ chế idempotency (tính bất biến) như lưu trữ transaction_id đã xử lý trong database/cache trước khi xử lý logic nghiệp vụ.",
+                  "below_target": "Không đề xuất cơ chế nào để xử lý trùng lặp, hoặc chỉ dựa vào RabbitMQ auto-ack mặc định mà không kiểm tra trạng thái.",
+                  "at_target": "Triển khai kiểm tra xem transaction_id đã tồn tại chưa trước khi thực hiện ghi nhận thanh toán.",
+                  "above_target": "Thiết kế hệ thống chịu lỗi cao hơn, ví dụ: sử dụng distributed lock hoặc outbox pattern để đảm bảo tính nhất quán cuối cùng (eventual consistency) và xử lý race conditions.",
+                  "essential": true,
+                  "criterion_id": "9bba5d04-deb3-5dba-b886-0a4d32a374d7:c1"
+                },
+                {
+                  "description": "Xử lý lỗi và ack/nack tin nhắn đúng cách trong ngữ cảnh thanh toán.",
+                  "expected_evidence": "Code hoặc thiết kế minh bạch việc gửi ACK khi thành công và NACK/Requeue khi lỗi tạm thời, không mất tin nhắn quan trọng.",
+                  "below_target": "Bỏ qua xử lý ngoại lệ, dẫn đến mất tin nhắn hoặc treo consumer.",
+                  "at_target": "Xử lý ngoại lệ cơ bản, retry với backoff khi có lỗi tạm thời.",
+                  "above_target": "Thiết kế Dead Letter Exchange (DLQ) cho các tin nhắn lỗi vĩnh viễn và cơ chế monitoring/alerting cho việc tiêu thụ thất bại.",
+                  "essential": true,
+                  "criterion_id": "9bba5d04-deb3-5dba-b886-0a4d32a374d7:c2"
+                }
+              ],
+              "suitable_modes": [
+                {
+                  "mode": "DESIGN",
+                  "criterion_indices": []
+                },
+                {
+                  "mode": "TECHNICAL_EXPLANATION",
+                  "criterion_indices": []
+                }
+              ],
+              "estimated_seconds": 180,
+              "objective_id": "9bba5d04-deb3-5dba-b886-0a4d32a374d7",
+              "claim": "Thiết kế consumer RabbitMQ cho sự kiện thanh toán để việc giao lại thông điệp không ghi nhận thanh toán hai lần.",
+              "requirement_kind": "REQUIRED",
+              "jd_evidence_spans": [
+                "Bắt buộc: Thiết kế consumer RabbitMQ cho sự kiện thanh toán để việc giao lại thông điệp không ghi nhận thanh toán hai lần."
+              ]
+            },
+            "selected_mode": "DESIGN",
+            "excluded_reason": null,
+            "lifecycle": "PLANNED",
+            "assessment": "NOT_ASSESSED",
+            "stop_reason": null,
+            "turns_spent": 0,
+            "evidence_history": [],
+            "assisted_criteria": [],
+            "criterion_results": {},
+            "contradictions": [],
+            "criterion_progress": {},
+            "active_criterion_id": null,
+            "probe_reason": "Initial evidence for an essential criterion"
+          },
+          "c176cea4-105f-50c6-8075-6e0fe0742d0d": {
+            "objective": {
+              "requirement_id": "http-api:explain-http-retry",
+              "skill_id": "http-api",
+              "target_depth": 3,
+              "depth_basis": "TASK_INTERPRETATION",
+              "depth_rationale": "Yêu cầu đòi hỏi ứng viên không chỉ giải thích khái niệm mà còn phải áp dụng nó vào một tình huống cụ thể (retry sau timeout) để giải quyết vấn đề tiềm ẩn (dữ liệu bị ghi đè/sai lệch), đây là mức độ phân tích và giải quyết vấn đề.",
+              "depth_evidence_spans": [
+                "Bắt buộc: Giải thích tính idempotent của HTTP khi retry yêu cầu cập nhật đơn hàng sau timeout."
+              ],
+              "extension_depth": null,
+              "criteria": [
+                {
+                  "description": "Giải thích khái niệm tính idempotent (lặp lại vô hại) trong ngữ cảnh HTTP và tại sao nó quan trọng khi retry.",
+                  "expected_evidence": "Ứng viên định nghĩa rõ ràng rằng một yêu cầu là idempotent nếu việc thực hiện nhiều lần cùng một hành động cho kết quả cuối cùng giống như thực hiện một lần. Ví dụ: GET, PUT, DELETE là idempotent; POST thường không phải.",
+                  "below_target": "Không hiểu hoặc nhầm lẫn giữa idempotent và an toàn (safe). Cho rằng mọi request đều an toàn khi retry mà không có lý do chính đáng.",
+                  "at_target": "Định nghĩa đúng tính idempotent. Nhận diện được rằng việc gửi lại yêu cầu cập nhật đơn hàng (thường dùng PUT/PATCH) cần đảm bảo tính nhất quán dữ liệu để tránh ghi đè sai hoặc tạo bản ghi trùng lặp.",
+                  "above_target": "Phân tích sâu hơn về các trường hợp edge case: ví dụ như xử lý race condition khi hai retry xảy ra đồng thời, hoặc cách thiết kế API để đảm bảo idempotency thông qua Idempotency-Key header.",
+                  "essential": true,
+                  "criterion_id": "c176cea4-105f-50c6-8075-6e0fe0742d0d:c1"
+                },
+                {
+                  "description": "Áp dụng kiến thức về idempotent để đề xuất cơ chế retry an toàn cho việc cập nhật đơn hàng sau timeout.",
+                  "expected_evidence": "Đề xuất chiến lược retry cụ thể (ví dụ: exponential backoff) kết hợp với việc sử dụng phương thức HTTP phù hợp (PUT thay vì POST) hoặc cơ chế kiểm tra trạng thái trước khi cập nhật.",
+                  "below_target": "Đề xuất retry đơn giản mà không xem xét hậu quả của việc cập nhật trùng lặp. Không phân biệt giữa các phương thức HTTP.",
+                  "at_target": "Khuyến nghị sử dụng PUT/PATCH cho việc cập nhật trạng thái đơn hàng thay vì POST để tận dụng tính idempotent. Đề xuất cơ chế retry có giới hạn và backoff để tránh tải hệ thống.",
+                  "above_target": "Thiết kế giải pháp bao gồm việc lưu trữ request ID duy nhất ở phía server để phát hiện và bỏ qua các retry trùng lặp, đảm bảo tính nhất quán tuyệt đối ngay cả khi có lỗi mạng phức tạp.",
+                  "essential": true,
+                  "criterion_id": "c176cea4-105f-50c6-8075-6e0fe0742d0d:c2"
+                }
+              ],
+              "suitable_modes": [
+                {
+                  "mode": "TECHNICAL_EXPLANATION",
+                  "criterion_indices": [
+                    0
+                  ]
+                },
+                {
+                  "mode": "DESIGN",
+                  "criterion_indices": [
+                    1
+                  ]
+                }
+              ],
+              "estimated_seconds": 180,
+              "objective_id": "c176cea4-105f-50c6-8075-6e0fe0742d0d",
+              "claim": "Giải thích tính idempotent của HTTP khi retry yêu cầu cập nhật đơn hàng sau timeout.",
+              "requirement_kind": "REQUIRED",
+              "jd_evidence_spans": [
+                "Bắt buộc: Giải thích tính idempotent của HTTP khi retry yêu cầu cập nhật đơn hàng sau timeout."
+              ]
+            },
+            "selected_mode": "TECHNICAL_EXPLANATION",
+            "excluded_reason": null,
+            "lifecycle": "PLANNED",
+            "assessment": "NOT_ASSESSED",
+            "stop_reason": null,
+            "turns_spent": 0,
+            "evidence_history": [],
+            "assisted_criteria": [],
+            "criterion_results": {},
+            "contradictions": [],
+            "criterion_progress": {},
+            "active_criterion_id": null,
+            "probe_reason": "Initial evidence for an essential criterion"
+          },
+          "6f3398e3-51cd-5b7c-9db4-bd42a2c9d471": {
+            "objective": {
+              "requirement_id": "incident-collaboration:coordinate-mitigation",
+              "skill_id": "incident-collaboration",
+              "target_depth": 2,
+              "depth_basis": "TASK_INTERPRETATION",
+              "depth_rationale": "Yêu cầu tập trung vào việc áp dụng quy trình phối hợp đã biết vào một tình huống cụ thể. Đây là kỹ năng ứng dụng quy tắc làm việc nhóm và quy trình incident response.",
+              "depth_evidence_spans": [
+                "Bắt buộc: Phối hợp với QA và SRE để thống nhất giảm thiểu tác động và bàn giao theo dõi trong sự cố đơn hàng."
+              ],
+              "extension_depth": null,
+              "criteria": [
+                {
+                  "description": "Xác định vai trò và trách nhiệm của Dev, QA và SRE trong giai đoạn giảm thiểu tác động (mitigation) của sự cố đơn hàng.",
+                  "expected_evidence": "Liệt kê rõ ràng ai làm gì: SRE giám sát hệ thống và rollback nếu cần, QA xác nhận regression hoặc test hotfix, Dev triển khai fix hoặc hỗ trợ debug.",
+                  "below_target": "Không rõ vai trò, gộp chung chung tất cả mọi người vào một nhóm hoặc đổ lỗi cho bộ phận khác.",
+                  "at_target": "Nhận diện đúng vai trò cốt lõi của từng bên. SRE tập trung vào ổn định hệ thống, QA đảm bảo chất lượng fix, Dev thực hiện sửa lỗi code.",
+                  "above_target": "Đề xuất quy trình phối hợp chặt chẽ hơn, ví dụ: kênh chat chuyên dụng cho incident, hoặc checklist chung để đảm bảo không bỏ sót bước bàn giao.",
+                  "essential": true,
+                  "criterion_id": "6f3398e3-51cd-5b7c-9db4-bd42a2c9d471:c1"
+                },
+                {
+                  "description": "Thực hiện quy trình bàn giao theo dõi (handover) sau khi sự cố được khắc phục tạm thời.",
+                  "expected_evidence": "Mô tả cách chuyển giao thông tin từ đội phản ứng sự cố sang đội vận hành hoặc phát triển sản phẩm, bao gồm logs, root cause sơ bộ, và các bước tiếp theo.",
+                  "below_target": "Bỏ qua bước bàn giao hoặc bàn giao thiếu thông tin, dẫn đến sự cố tái diễn hoặc không ai chịu trách nhiệm theo dõi.",
+                  "at_target": "Bàn giao đầy đủ thông tin kỹ thuật và bối cảnh sự cố. Xác nhận rõ ràng ai sẽ theo dõi các dấu hiệu tái diễn.",
+                  "above_target": "Tự động hóa phần nào quá trình bàn giao bằng cách tạo ticket tự động từ incident log, hoặc đề xuất post-mortem structure để ngăn ngừa sự cố tương lai.",
+                  "essential": true,
+                  "criterion_id": "6f3398e3-51cd-5b7c-9db4-bd42a2c9d471:c2"
+                }
+              ],
+              "suitable_modes": [
+                {
+                  "mode": "BEHAVIORAL",
+                  "criterion_indices": [
+                    0,
+                    1
+                  ]
+                }
+              ],
+              "estimated_seconds": 150,
+              "objective_id": "6f3398e3-51cd-5b7c-9db4-bd42a2c9d471",
+              "claim": "Phối hợp với QA và SRE để thống nhất giảm thiểu tác động và bàn giao theo dõi trong sự cố đơn hàng.",
+              "requirement_kind": "REQUIRED",
+              "jd_evidence_spans": [
+                "Bắt buộc: Phối hợp với QA và SRE để thống nhất giảm thiểu tác động và bàn giao theo dõi trong sự cố đơn hàng."
+              ]
+            },
+            "selected_mode": "BEHAVIORAL",
+            "excluded_reason": null,
+            "lifecycle": "PLANNED",
+            "assessment": "NOT_ASSESSED",
+            "stop_reason": null,
+            "turns_spent": 0,
+            "evidence_history": [],
+            "assisted_criteria": [],
+            "criterion_results": {},
+            "contradictions": [],
+            "criterion_progress": {},
+            "active_criterion_id": null,
+            "probe_reason": "Initial evidence for an essential criterion"
+          },
+          "ceeec39e-4c0f-5292-b463-073378621ab6": {
+            "objective": {
+              "requirement_id": "docker:write-dev-container",
+              "skill_id": "docker",
+              "target_depth": 2,
+              "depth_basis": "TASK_INTERPRETATION",
+              "depth_rationale": "Yêu cầu là viết một artifact cụ thể (Dockerfile) theo hướng dẫn 'tối giản'. Đây là kỹ năng ứng dụng công cụ Docker vào một task bounded.",
+              "depth_evidence_spans": [
+                "Điểm cộng: Viết Dockerfile tối giản cho API nội bộ dùng trong môi trường phát triển."
+              ],
+              "extension_depth": null,
+              "criteria": [
+                {
+                  "description": "Viết Dockerfile tối giản cho API nội bộ, chỉ bao gồm các phụ thuộc cần thiết cho môi trường phát triển.",
+                  "expected_evidence": "Cung cấp mã Dockerfile hợp lệ cú pháp PostgreSQL/Node.js/etc (tùy ngữ cảnh API), sử dụng multi-stage build hoặc image base nhẹ (alpine/distroless), copy source code và cài đặt dependencies.",
+                  "below_target": "Dockerfile không hợp lệ cú pháp, hoặc include toàn bộ thư mục dự án không cần thiết, hoặc sử dụng image base quá nặng (ubuntu full) mà không có lý do.",
+                  "at_target": "Dockerfile hợp lệ, tối giản, chỉ cài đặt runtime và dependencies cần thiết. Sử dụng lệnh COPY chính xác.",
+                  "above_target": "Sử dụng multi-stage build để tách build environment khỏi runtime environment, giảm kích thước image đáng kể. Tối ưu cache layers.",
+                  "essential": true,
+                  "criterion_id": "ceeec39e-4c0f-5292-b463-073378621ab6:c1"
+                },
+                {
+                  "description": "Giải thích lý do chọn các thành phần trong Dockerfile dựa trên nhu cầu môi trường phát triển.",
+                  "expected_evidence": "Giải thích tại sao lại dùng image base đó, tại sao không install dev tools thừa thãi, và cách container này hỗ trợ developer local.",
+                  "below_target": "Không giải thích được hoặc giải thích sai về mục đích của các lệnh trong Dockerfile.",
+                  "at_target": "Giải thích rõ ràng rằng mục tiêu là 'tối giản' và 'phát triển', nên loại bỏ các package không cần thiết để tăng tốc độ build và chạy.",
+                  "above_target": "Đề xuất cấu hình volume mount để live reload, hoặc sử dụng .dockerignore để tối ưu hiệu suất sync file.",
+                  "essential": true,
+                  "criterion_id": "ceeec39e-4c0f-5292-b463-073378621ab6:c2"
+                }
+              ],
+              "suitable_modes": [
+                {
+                  "mode": "CODING",
+                  "criterion_indices": [
+                    0
+                  ]
+                },
+                {
+                  "mode": "TECHNICAL_EXPLANATION",
+                  "criterion_indices": [
+                    1
+                  ]
+                }
+              ],
+              "estimated_seconds": 120,
+              "objective_id": "ceeec39e-4c0f-5292-b463-073378621ab6",
+              "claim": "Viết Dockerfile tối giản cho API nội bộ dùng trong môi trường phát triển.",
+              "requirement_kind": "OPTIONAL",
+              "jd_evidence_spans": [
+                "Điểm cộng: Viết Dockerfile tối giản cho API nội bộ dùng trong môi trường phát triển."
+              ]
+            },
+            "selected_mode": null,
+            "excluded_reason": "PLAN_BUDGET",
+            "lifecycle": "EXCLUDED",
+            "assessment": "NOT_ASSESSED",
+            "stop_reason": null,
+            "turns_spent": 0,
+            "evidence_history": [],
+            "assisted_criteria": [],
+            "criterion_results": {},
+            "contradictions": [],
+            "criterion_progress": {},
+            "active_criterion_id": null,
+            "probe_reason": "Initial evidence for an essential criterion"
+          }
+        },
+        "queue": [
+          "29fb8ec0-16e2-56cd-9ad3-2d497f0f6d74",
+          "2b0a116f-4a69-54ca-8fa8-b36d764d4366",
+          "9bba5d04-deb3-5dba-b886-0a4d32a374d7",
+          "c176cea4-105f-50c6-8075-6e0fe0742d0d",
+          "6f3398e3-51cd-5b7c-9db4-bd42a2c9d471"
+        ],
+        "deadline_at": "2026-11-18T08:59:12.325584Z",
+        "pending_turn": null,
+        "turns": [],
+        "is_finished": false,
+        "termination_reason": null,
+        "conversation": {
+          "phase": "OPENING",
+          "message": {
+            "message_id": "77431e64-f1da-4414-a4a5-7d3713b7b066",
+            "text": "Xin chào, tôi là Minh, người phỏng vấn AI mô phỏng của bạn. Chào mừng bạn đến với buổi thực hành cho vị trí Backend Engineer. Hôm nay chúng ta sẽ cùng khám phá các kỹ năng như Python, PostgreSQL và RabbitMQ thông qua các tình huống thực tế. Bạn có thể chia sẻ ngắn gọn về bản thân và kinh nghiệm liên quan không?"
+          },
+          "opening": {
+            "interviewer_name": "Minh",
+            "company": ""
+          },
+          "expires_at": "2026-11-18T08:02:12.325584Z",
+          "introduction": "",
+          "opening_text": "Xin chào, tôi là Minh, người phỏng vấn AI mô phỏng của bạn. Chào mừng bạn đến với buổi thực hành cho vị trí Backend Engineer. Hôm nay chúng ta sẽ cùng khám phá các kỹ năng như Python, PostgreSQL và RabbitMQ thông qua các tình huống thực tế. Bạn có thể chia sẻ ngắn gọn về bản thân và kinh nghiệm liên quan không?"
+        },
+        "opening_context": {
+          "interviewer_name": "Minh",
+          "company": "",
+          "role_title": "Backend Engineer",
+          "candidate_name": "",
+          "jd_summary": "",
+          "cv_summary": "",
+          "attempt_number": 1
+        }
+      },
+      "public": {
+        "schema_version": 2,
+        "session_id": "module3-qa-rerun-mixed10-20261118",
+        "state_version": 1,
+        "is_finished": false,
+        "deadline_at": "2026-11-18T08:59:12.325584Z",
+        "config": {
+          "interaction_mode": "TEXT",
+          "mode": "MIXED",
+          "focused_question_mode": null,
+          "max_questions": 10,
+          "duration_seconds": 3600,
+          "max_questions_per_objective": 8
+        },
+        "pending_turn": null,
+        "turns": [],
+        "report": {
+          "termination_reason": null,
+          "objectives": [
+            {
+              "objective_id": "29fb8ec0-16e2-56cd-9ad3-2d497f0f6d74",
+              "skill_id": "postgresql",
+              "claim": "Chẩn đoán và tối ưu truy vấn PostgreSQL lọc và sắp xếp danh sách đơn hàng trên bảng lớn.",
+              "jd_evidence_spans": [
+                "Bắt buộc: Chẩn đoán và tối ưu truy vấn PostgreSQL lọc và sắp xếp danh sách đơn hàng trên bảng lớn."
+              ],
+              "assessment": "NOT_ASSESSED",
+              "stop_reason": null,
+              "strengths": [],
+              "weaknesses": [],
+              "study_recommendations": [],
+              "evidence": [],
+              "criteria": [
+                {
+                  "criterion_id": "29fb8ec0-16e2-56cd-9ad3-2d497f0f6d74:c1",
+                  "description": "Xác định các chỉ mục (index) phù hợp để tối ưu truy vấn lọc và sắp xếp trên bảng lớn.",
+                  "assessment": "NOT_ASSESSED"
+                },
+                {
+                  "criterion_id": "29fb8ec0-16e2-56cd-9ad3-2d497f0f6d74:c2",
+                  "description": "Chẩn đoán nguyên nhân hiệu năng thấp của truy vấn hiện tại.",
+                  "assessment": "NOT_ASSESSED"
+                }
+              ]
+            },
+            {
+              "objective_id": "2b0a116f-4a69-54ca-8fa8-b36d764d4366",
+              "skill_id": "python",
+              "claim": "Viết hàm Python loại trùng sự kiện đơn hàng theo mã sự kiện, giữ nguyên thứ tự xuất hiện đầu tiên.",
+              "jd_evidence_spans": [
+                "Bắt buộc: Viết hàm Python loại trùng sự kiện đơn hàng theo mã sự kiện, giữ nguyên thứ tự xuất hiện đầu tiên."
+              ],
+              "assessment": "NOT_ASSESSED",
+              "stop_reason": null,
+              "strengths": [],
+              "weaknesses": [],
+              "study_recommendations": [],
+              "evidence": [],
+              "criteria": [
+                {
+                  "criterion_id": "2b0a116f-4a69-54ca-8fa8-b36d764d4366:c1",
+                  "description": "Viết hàm Python loại bỏ các sự kiện trùng lặp theo mã sự kiện.",
+                  "assessment": "NOT_ASSESSED"
+                },
+                {
+                  "criterion_id": "2b0a116f-4a69-54ca-8fa8-b36d764d4366:c2",
+                  "description": "Giữ nguyên thứ tự xuất hiện đầu tiên của các sự kiện sau khi loại trùng.",
+                  "assessment": "NOT_ASSESSED"
+                }
+              ]
+            },
+            {
+              "objective_id": "9bba5d04-deb3-5dba-b886-0a4d32a374d7",
+              "skill_id": "rabbitmq",
+              "claim": "Thiết kế consumer RabbitMQ cho sự kiện thanh toán để việc giao lại thông điệp không ghi nhận thanh toán hai lần.",
+              "jd_evidence_spans": [
+                "Bắt buộc: Thiết kế consumer RabbitMQ cho sự kiện thanh toán để việc giao lại thông điệp không ghi nhận thanh toán hai lần."
+              ],
+              "assessment": "NOT_ASSESSED",
+              "stop_reason": null,
+              "strengths": [],
+              "weaknesses": [],
+              "study_recommendations": [],
+              "evidence": [],
+              "criteria": [
+                {
+                  "criterion_id": "9bba5d04-deb3-5dba-b886-0a4d32a374d7:c1",
+                  "description": "Thiết kế cơ chế xử lý tin nhắn (consumer) để tránh ghi nhận thanh toán hai lần khi có thông điệp bị giao lại (redelivery).",
+                  "assessment": "NOT_ASSESSED"
+                },
+                {
+                  "criterion_id": "9bba5d04-deb3-5dba-b886-0a4d32a374d7:c2",
+                  "description": "Xử lý lỗi và ack/nack tin nhắn đúng cách trong ngữ cảnh thanh toán.",
+                  "assessment": "NOT_ASSESSED"
+                }
+              ]
+            },
+            {
+              "objective_id": "c176cea4-105f-50c6-8075-6e0fe0742d0d",
+              "skill_id": "http-api",
+              "claim": "Giải thích tính idempotent của HTTP khi retry yêu cầu cập nhật đơn hàng sau timeout.",
+              "jd_evidence_spans": [
+                "Bắt buộc: Giải thích tính idempotent của HTTP khi retry yêu cầu cập nhật đơn hàng sau timeout."
+              ],
+              "assessment": "NOT_ASSESSED",
+              "stop_reason": null,
+              "strengths": [],
+              "weaknesses": [],
+              "study_recommendations": [],
+              "evidence": [],
+              "criteria": [
+                {
+                  "criterion_id": "c176cea4-105f-50c6-8075-6e0fe0742d0d:c1",
+                  "description": "Giải thích khái niệm tính idempotent (lặp lại vô hại) trong ngữ cảnh HTTP và tại sao nó quan trọng khi retry.",
+                  "assessment": "NOT_ASSESSED"
+                },
+                {
+                  "criterion_id": "c176cea4-105f-50c6-8075-6e0fe0742d0d:c2",
+                  "description": "Áp dụng kiến thức về idempotent để đề xuất cơ chế retry an toàn cho việc cập nhật đơn hàng sau timeout.",
+                  "assessment": "NOT_ASSESSED"
+                }
+              ]
+            },
+            {
+              "objective_id": "6f3398e3-51cd-5b7c-9db4-bd42a2c9d471",
+              "skill_id": "incident-collaboration",
+              "claim": "Phối hợp với QA và SRE để thống nhất giảm thiểu tác động và bàn giao theo dõi trong sự cố đơn hàng.",
+              "jd_evidence_spans": [
+                "Bắt buộc: Phối hợp với QA và SRE để thống nhất giảm thiểu tác động và bàn giao theo dõi trong sự cố đơn hàng."
+              ],
+              "assessment": "NOT_ASSESSED",
+              "stop_reason": null,
+              "strengths": [],
+              "weaknesses": [],
+              "study_recommendations": [],
+              "evidence": [],
+              "criteria": [
+                {
+                  "criterion_id": "6f3398e3-51cd-5b7c-9db4-bd42a2c9d471:c1",
+                  "description": "Xác định vai trò và trách nhiệm của Dev, QA và SRE trong giai đoạn giảm thiểu tác động (mitigation) của sự cố đơn hàng.",
+                  "assessment": "NOT_ASSESSED"
+                },
+                {
+                  "criterion_id": "6f3398e3-51cd-5b7c-9db4-bd42a2c9d471:c2",
+                  "description": "Thực hiện quy trình bàn giao theo dõi (handover) sau khi sự cố được khắc phục tạm thời.",
+                  "assessment": "NOT_ASSESSED"
+                }
+              ]
+            },
+            {
+              "objective_id": "ceeec39e-4c0f-5292-b463-073378621ab6",
+              "skill_id": "docker",
+              "claim": "Viết Dockerfile tối giản cho API nội bộ dùng trong môi trường phát triển.",
+              "jd_evidence_spans": [
+                "Điểm cộng: Viết Dockerfile tối giản cho API nội bộ dùng trong môi trường phát triển."
+              ],
+              "assessment": "NOT_ASSESSED",
+              "stop_reason": null,
+              "strengths": [],
+              "weaknesses": [],
+              "study_recommendations": [],
+              "evidence": [],
+              "criteria": [
+                {
+                  "criterion_id": "ceeec39e-4c0f-5292-b463-073378621ab6:c1",
+                  "description": "Viết Dockerfile tối giản cho API nội bộ, chỉ bao gồm các phụ thuộc cần thiết cho môi trường phát triển.",
+                  "assessment": "NOT_ASSESSED"
+                },
+                {
+                  "criterion_id": "ceeec39e-4c0f-5292-b463-073378621ab6:c2",
+                  "description": "Giải thích lý do chọn các thành phần trong Dockerfile dựa trên nhu cầu môi trường phát triển.",
+                  "assessment": "NOT_ASSESSED"
+                }
+              ]
+            }
+          ]
+        },
+        "conversation": {
+          "phase": "OPENING",
+          "message": {
+            "message_id": "77431e64-f1da-4414-a4a5-7d3713b7b066",
+            "text": "Xin chào, tôi là Minh, người phỏng vấn AI mô phỏng của bạn. Chào mừng bạn đến với buổi thực hành cho vị trí Backend Engineer. Hôm nay chúng ta sẽ cùng khám phá các kỹ năng như Python, PostgreSQL và RabbitMQ thông qua các tình huống thực tế. Bạn có thể chia sẻ ngắn gọn về bản thân và kinh nghiệm liên quan không?"
+          },
+          "opening": {
+            "interviewer_name": "Minh",
+            "company": ""
+          },
+          "expires_at": "2026-11-18T08:02:12.325584Z",
+          "introduction": "",
+          "opening_text": "Xin chào, tôi là Minh, người phỏng vấn AI mô phỏng của bạn. Chào mừng bạn đến với buổi thực hành cho vị trí Backend Engineer. Hôm nay chúng ta sẽ cùng khám phá các kỹ năng như Python, PostgreSQL và RabbitMQ thông qua các tình huống thực tế. Bạn có thể chia sẻ ngắn gọn về bản thân và kinh nghiệm liên quan không?"
+        }
+      }
+    }
+  }
+}

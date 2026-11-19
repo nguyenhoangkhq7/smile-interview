@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Dict
 from dotenv import load_dotenv
@@ -7,12 +8,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from matching_cv.app.api.v1.endpoints.unified import router as matching_cv_router
 from skill_gap.api.routes import router as skill_gap_router
-from adaptive_questioning.evidence.routes import router as evidence_router
+from adaptive_questioning.evidence.routes import init_evidence_workflow, router as evidence_router
 from voice.routes import router as voice_router
 
 _ROOT_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(_ROOT_DIR.parent / ".env")
 load_dotenv(_ROOT_DIR / ".env", override=True)
+
+
+@asynccontextmanager
+async def app_lifespan(application: FastAPI):
+    init_evidence_workflow(application)
+    yield
 
 
 def create_app() -> FastAPI:
@@ -25,6 +32,7 @@ def create_app() -> FastAPI:
             "Module 3 (Evidence-based Adaptive Interviewing)"
         ),
         version="2.2.0",
+        lifespan=app_lifespan,
     )
 
     application.add_middleware(
@@ -34,8 +42,6 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-
-    application.state.report_store = {}
 
     application.include_router(matching_cv_router)
     application.include_router(skill_gap_router)

@@ -19,7 +19,6 @@ from skill_gap.domain.enums import SeniorityLevel, RichnessLabel
 from skill_gap.domain.models import (
     JobBlock,
     SpanMapping,
-    JDRequirement,
     SpanRichness,
     UNASSIGNED_JOB_ID,
 )

@@ -1,7 +1,7 @@
 import json
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Union
 from pydantic import BaseModel, Field
 
 from skill_gap.baselines.base import BaselineInput

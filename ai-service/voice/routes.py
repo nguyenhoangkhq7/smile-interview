@@ -16,23 +16,29 @@ from pydantic import BaseModel, Field
 from .recognition import transcribe_audio
 
 _stt_client: httpx.AsyncClient | None = None
+_tts_client: httpx.AsyncClient | None = None
+_simli_client: httpx.AsyncClient | None = None
 
 
 @asynccontextmanager
 async def voice_lifespan(app):
-    global _stt_client
+    global _stt_client, _tts_client, _simli_client
     try:
         yield
     finally:
-        if _stt_client is not None:
-            await _stt_client.aclose()
-            _stt_client = None
+        for client in (_stt_client, _tts_client, _simli_client):
+            if client is not None:
+                await client.aclose()
+        _stt_client = None
+        _tts_client = None
+        _simli_client = None
 
 
 router = APIRouter(prefix="/api/v2/voice", tags=["Interview voice"], lifespan=voice_lifespan)
 log = logging.getLogger(__name__)
 OPENROUTER = "https://openrouter.ai/api/v1"
 MAX_AUDIO_BYTES = 1_500_000  # 45 seconds of 16 kHz, mono, signed 16-bit WAV
+DEFAULT_TTS_MODEL = "google/gemini-3.8-flash-lite-tts"
 
 
 class Transcription(BaseModel):
@@ -50,8 +56,33 @@ class AvatarSession(BaseModel):
     max_session_length: int = Field(ge=1, le=7200)
 
 
+def _pooled_limits() -> httpx.Limits:
+    return httpx.Limits(max_connections=20, max_keepalive_connections=10, keepalive_expiry=60)
+
+
+def _get_stt_client() -> httpx.AsyncClient:
+    global _stt_client
+    if _stt_client is None:
+        _stt_client = httpx.AsyncClient(timeout=httpx.Timeout(45, connect=10), limits=_pooled_limits())
+    return _stt_client
+
+
+def _get_tts_client() -> httpx.AsyncClient:
+    global _tts_client
+    if _tts_client is None:
+        _tts_client = httpx.AsyncClient(timeout=httpx.Timeout(60, connect=10), limits=_pooled_limits())
+    return _tts_client
+
+
+def _get_simli_client() -> httpx.AsyncClient:
+    global _simli_client
+    if _simli_client is None:
+        _simli_client = httpx.AsyncClient(timeout=httpx.Timeout(20, connect=10), limits=_pooled_limits())
+    return _simli_client
+
+
 def settings() -> dict:
-    tts_model = os.getenv("OPENROUTER_TTS_MODEL", "heygen/heygen-voice-1-turbo:free")
+    tts_model = os.getenv("OPENROUTER_TTS_MODEL", DEFAULT_TTS_MODEL)
     heygen = tts_model.startswith("heygen/")
     return {
         "enabled": bool(os.getenv("OPENROUTER_API_KEY"))
@@ -103,12 +134,14 @@ async def avatar_session(payload: AvatarSession):
     if cfg["format"] != "pcm":
         raise HTTPException(503, "Simli cần giọng đọc định dạng PCM trên máy chủ.")
     try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(20, connect=10)) as client:
-            response = await client.post("https://api.simli.ai/compose/token",
-                headers={"x-simli-api-key": os.environ["SIMLI_API_KEY"].strip(), "Content-Type": "application/json"},
-                json={"faceId": os.environ["SIMLI_FACE_ID"].strip(), "handleSilence": True,
-                      "maxSessionLength": payload.max_session_length,
-                      "maxIdleTime": min(300, payload.max_session_length), "audioInputFormat": "pcm16"})
+        client = _get_simli_client()
+        response = await client.post(
+            "https://api.simli.ai/compose/token",
+            headers={"x-simli-api-key": os.environ["SIMLI_API_KEY"].strip(), "Content-Type": "application/json"},
+            json={"faceId": os.environ["SIMLI_FACE_ID"].strip(), "handleSilence": True,
+                  "maxSessionLength": payload.max_session_length,
+                  "maxIdleTime": min(300, payload.max_session_length), "audioInputFormat": "pcm16"},
+        )
         if not response.is_success:
             log.warning("Simli session token failed: status=%s", response.status_code)
             if response.status_code == 429:
@@ -126,7 +159,6 @@ async def avatar_session(payload: AvatarSession):
 
 @router.post("/transcribe")
 async def transcribe(payload: Transcription):
-    global _stt_client
     auth = headers()
     try:
         audio = base64.b64decode(payload.audio, validate=True)
@@ -141,10 +173,7 @@ async def transcribe(payload: Transcription):
         raise HTTPException(422, "Âm thanh phải là WAV mono 16 kHz, 16 bit, tối đa 45 giây.") from None
     cfg = settings()
     try:
-        if _stt_client is None:
-            _stt_client = httpx.AsyncClient(timeout=httpx.Timeout(45, connect=10),
-                limits=httpx.Limits(max_connections=20, max_keepalive_connections=10, keepalive_expiry=60))
-        result = await transcribe_audio(_stt_client, f"{OPENROUTER}/audio/transcriptions", auth,
+        result = await transcribe_audio(_get_stt_client(), f"{OPENROUTER}/audio/transcriptions", auth,
                                        cfg, payload, check_provider)
         log.info("Voice transcription: model=%s audio_seconds=%.2f phase=%s verification=%s",
                  cfg["stt_model"], duration, payload.phase, result["verification"])
@@ -184,7 +213,8 @@ async def speech(payload: Speech):
             "response_format": cfg["format"]}
     if cfg["tts_model"].startswith("google/"):
         body["instructions"] = "Đọc bằng tiếng Việt tự nhiên, rõ ràng, như người phỏng vấn; giữ cách phát âm tiếng Anh của thuật ngữ kỹ thuật."
-    client = httpx.AsyncClient(timeout=httpx.Timeout(60, connect=10))
+    client = _get_tts_client()
+    response: httpx.Response | None = None
     try:
         response = await client.send(client.build_request("POST", f"{OPENROUTER}/audio/speech",
                                                         headers=auth, json=body), stream=True)
@@ -195,7 +225,8 @@ async def speech(payload: Speech):
         if content_type not in ("audio/pcm", "audio/mpeg", "application/octet-stream"):
             raise HTTPException(502, "OpenRouter không trả về âm thanh đúng định dạng.")
     except BaseException as exc:
-        await client.aclose()
+        if response is not None:
+            await response.aclose()
         if isinstance(exc, httpx.HTTPError):
             raise HTTPException(502, "Không kết nối được dịch vụ đọc giọng nói OpenRouter.") from None
         raise
@@ -206,7 +237,6 @@ async def speech(payload: Speech):
                 yield chunk
         finally:
             await response.aclose()
-            await client.aclose()
 
     log.info("Voice synthesis: model=%s characters=%d", cfg["tts_model"], len(text))
     return StreamingResponse(chunks(), media_type="audio/pcm" if cfg["format"] == "pcm" else "audio/mpeg",

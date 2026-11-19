@@ -51,7 +51,7 @@ class CompetencyProjectionTest {
             state.putObject("criterion_results").set(skill + "-c1", evidence.deepCopy());
             ObjectNode turn = turns.addObject().put("turn_id", turnId).put("objective_id", skill + "-task")
                     .put("answer", "I use EXPLAIN ANALYZE to inspect the plan.");
-            turn.putObject("question").put("text", "How would you diagnose this incident?").put("assistance", "NONE");
+            turn.putObject("question").put("text", "How would you diagnose this incident?");
         }
         Session session = Session.builder().id("s" + number).attemptNumber(number).applicationProfile(profile)
                 .status("Completed").endedAt(LocalDateTime.of(2026, 11, 7, 10, number)).build();
@@ -72,9 +72,8 @@ class CompetencyProjectionTest {
 
     @Test void cvDiagnosisNeverBecomesAbilityAndAbsentBlueprintIsSupported() {
         View result = view();
-        assertThat(result.summary().notAssessed()).isEqualTo(2);
-        assertThat(result.summary().meetingTarget()).isZero();
-        assertThat(result.lastAssessment()).isNull();
+        assertThat(result.skills()).hasSize(2).allSatisfy(skill -> assertThat(skill.assessment()).isEqualTo(NONE));
+        assertThat(result.skills().getFirst().objectives().getFirst().lastAssessment()).isNull();
         profile.setBlueprintJson(null);
         assertThat(view().skills()).allSatisfy(skill -> assertThat(skill.assessment()).isEqualTo(NONE));
     }
@@ -88,7 +87,7 @@ class CompetencyProjectionTest {
         assertThat(evidence.source().sessionId()).isEqualTo("s1");
         assertThat(evidence.responseExcerpt()).isEqualTo("EXPLAIN ANALYZE");
         assertThat(profile.getSkillGapJson()).isEqualTo(baseline);
-        assertThat(result.summary().meetingTarget()).isEqualTo(1);
+        assertThat(result.skills().stream().filter(s -> AT.equals(s.assessment())).count()).isEqualTo(1);
     }
 
     @Test void unaskedAndInconclusiveLaterChecksKeepPreviousAssessment() {
@@ -98,8 +97,8 @@ class CompetencyProjectionTest {
         View result = view(unknown, first, other); // Input order must not affect the result.
         assertThat(sql(result).assessment()).isEqualTo(AT);
         assertThat(sql(result).objectives().getFirst().lastAssessment().attemptNumber()).isEqualTo(1);
-        assertThat(sql(result).lastChecked().attemptNumber()).isEqualTo(3);
-        assertThat(result.summary().meetingTarget()).isEqualTo(2);
+        assertThat(sql(result).objectives().getFirst().lastChecked().attemptNumber()).isEqualTo(3);
+        assertThat(result.skills()).allSatisfy(s -> assertThat(s.assessment()).isEqualTo(AT));
     }
 
     @Test void runningAndZeroAnswerCancelledAttemptsDoNotUpdateAbility() {
@@ -109,7 +108,7 @@ class CompetencyProjectionTest {
         View result = view(first, running, cancelled);
         assertThat(result.completedAttempts()).isEqualTo(1);
         assertThat(sql(result).assessment()).isEqualTo(AT);
-        assertThat(result.lastAssessment().attemptNumber()).isEqualTo(1);
+        assertThat(sql(result).objectives().getFirst().lastAssessment().attemptNumber()).isEqualTo(1);
     }
 
     @Test void conflictingResultsNeedTwoLaterIndependentConsistentAttempts() {
@@ -130,13 +129,12 @@ class CompetencyProjectionTest {
         assertThat(sql(view(first, second, third)).assessment()).isEqualTo(BELOW);
     }
 
-    @Test void hintedEasierUnmeasuredAndUngroundedEvidenceCannotReplaceVerifiedAbility() {
-        for (String invalid : List.of("hint", "easier", "unknown-depth", "invented-excerpt", "not-independent")) {
+    @Test void easierUnmeasuredAndUngroundedEvidenceCannotReplaceVerifiedAbility() {
+        for (String invalid : List.of("easier", "unknown-depth", "invented-excerpt", "not-independent")) {
             var first = attempt(1, Map.of("sql", AT), "A");
             var second = attempt(2, Map.of("sql", BELOW), "B");
             var evidence = (ObjectNode) state(second).path("evidence_history").get(0);
             switch (invalid) {
-                case "hint" -> ((ObjectNode) second.snapshot().path("turns").get(0).path("question")).put("assistance", "HINT");
                 case "easier" -> evidence.put("question_depth", 2);
                 case "unknown-depth" -> evidence.remove("question_depth");
                 case "invented-excerpt" -> evidence.put("response_excerpt", "invented quote");
@@ -155,6 +153,17 @@ class CompetencyProjectionTest {
         View result = view(first, changed);
         assertThat(result.incompatibleAssessments()).isEqualTo(1);
         assertThat(sql(result).assessment()).isEqualTo(AT);
+    }
+
+    @Test void compatibleObjectivesMatchWithoutRubricVersion() {
+        var blueprint = (ObjectNode) json.read(profile.getBlueprintJson());
+        for (var objective : blueprint.path("objectives")) {
+            ((ObjectNode) objective).remove("rubric_fingerprint");
+        }
+        profile.setBlueprintJson(blueprint.toString());
+        var currentRun = attempt(1, Map.of("sql", AT), "A");
+        ((ObjectNode) state(currentRun).path("objective")).remove("rubric_fingerprint");
+        assertThat(sql(view(currentRun)).assessment()).isEqualTo(AT);
     }
 
     @Test void incompleteCheckDoesNotClaimFailureOrExceedingTheTarget() {
@@ -184,7 +193,6 @@ class CompetencyProjectionTest {
         profile.setBlueprintJson(blueprint.toString());
         View result = view(attempt(1, Map.of("sql", AT), "A"));
         assertThat(sql(result).assessment()).isEqualTo(PARTIAL);
-        assertThat(result.summary().meetingTarget()).isZero();
     }
 
     @Test void aboveTargetRequiresIndependentExtensionEvidence() {
@@ -219,8 +227,16 @@ class CompetencyProjectionTest {
         var first = attempt(1, Map.of("sql", AT), "A");
         var second = attempt(2, Map.of("sql", AT), "B"); state(second).put("assessment", INSUFFICIENT);
         var result = view(first, second);
-        assertThat(result.lastAssessment().attemptNumber()).isEqualTo(2);
+        assertThat(sql(result).objectives().getFirst().criteria().getFirst().lastAssessment().attemptNumber()).isEqualTo(2);
         assertThat(sql(result).objectives().getFirst().lastAssessment().attemptNumber()).isEqualTo(1);
+        assertThat(sql(result).assessment()).isEqualTo(AT);
+    }
+
+    @Test void legacyBlueprintFingerprintRemainsCompatibleWithLeanAttemptSnapshot() {
+        var currentRun = attempt(1, Map.of("sql", AT), "A");
+        ((ObjectNode) state(currentRun).path("objective")).remove("rubric_fingerprint");
+        View result = view(currentRun);
+        assertThat(result.incompatibleAssessments()).isZero();
         assertThat(sql(result).assessment()).isEqualTo(AT);
     }
 }

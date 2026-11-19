@@ -1,6 +1,7 @@
 import io
 import pytest
 import pypdf
+from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 from fastapi.testclient import TestClient
 
 from main import create_app
@@ -11,7 +12,19 @@ def create_in_memory_pdf(text_content: str) -> bytes:
     """Helper to create a valid minimal PDF in-memory containing text."""
     writer = pypdf.PdfWriter()
     page = writer.add_blank_page(width=300, height=300)
-    # Using pypdf annotations or simple text writer
+    page[NameObject("/Resources")] = DictionaryObject({
+        NameObject("/Font"): DictionaryObject({
+            NameObject("/F1"): DictionaryObject({
+                NameObject("/Type"): NameObject("/Font"),
+                NameObject("/Subtype"): NameObject("/Type1"),
+                NameObject("/BaseFont"): NameObject("/Helvetica"),
+            }),
+        }),
+    })
+    contents = DecodedStreamObject()
+    literal = text_content.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+    contents.set_data(f"BT /F1 12 Tf 20 240 Td ({literal}) Tj ET".encode("ascii"))
+    page[NameObject("/Contents")] = writer._add_object(contents)
     buf = io.BytesIO()
     writer.write(buf)
     return buf.getvalue()
@@ -68,4 +81,4 @@ def test_multipart_pdf_upload_pipeline(dual_input_client):
     assert response.status_code == 200
     res_data = response.json()
     assert res_data["analysis_id"] == "test-multipart-pdf-1"
-    assert "report" in res_data
+    assert set(res_data["report"]) == {"matching_score", "degraded"}
