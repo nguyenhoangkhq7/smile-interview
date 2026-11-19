@@ -178,7 +178,7 @@ def test_03_invalid_descriptor_rejection():
         None,
     ]
     for sample in invalid_samples:
-        rec = map_descriptor_to_proficiency(sample, side="CV_DEMONSTRATED")
+        rec = map_descriptor_to_proficiency(sample, side="CV_DEMONSTRATED", allow_years_heuristic=False)
         assert rec.is_missing is True, f"Did not reject invalid sample '{sample}'"
         assert rec.numeric_level is None
         assert rec.normalized_weight is None
@@ -649,3 +649,68 @@ def test_15_integration_with_refined_backend_graph():
     grounded_supp_cids = {g_supp.skill_nodes[e.target_id].canonical_skill_id for e in grounded_supp}
     assert "docker" in grounded_supp_cids
     assert len(grounded_supp) == len(grounded_strict) + 1
+
+
+# ==============================================================================
+# 16. Years of Experience Heuristic Mapping (Project Adaptation)
+# ==============================================================================
+def test_16_years_heuristic_proficiency_mapping():
+    """Verify numeric years and months of experience map to appropriate Table 3 levels."""
+    test_cases = [
+        # (< 0.5 year -> Basic / 1.0)
+        ("3 months", 1.0, "Basic", 0.10),
+        ("0.3 years", 1.0, "Basic", 0.10),
+        # (0.5 - 0.9 year -> Beginner / 3.0)
+        ("6 months", 3.0, "Beginner", 0.30),
+        ("9 months", 3.0, "Beginner", 0.30),
+        # (1 - 2.9 years -> Intermediate / 4.0)
+        ("1 year", 4.0, "Intermediate", 0.40),
+        ("2 years", 4.0, "Intermediate", 0.40),
+        ("2.5 years", 4.0, "Intermediate", 0.40),
+        # (3 - 4.9 years -> Proficient / 5.0)
+        ("3+ years", 5.0, "Proficient", 0.50),
+        ("3 years of experience", 5.0, "Proficient", 0.50),
+        ("4 yrs", 5.0, "Proficient", 0.50),
+        ("3-5 years", 5.0, "Proficient", 0.50),
+        # (5 - 7.9 years -> Experienced / 8.0)
+        ("5+ years of experience", 8.0, "Experienced", 0.80),
+        ("6 years", 8.0, "Experienced", 0.80),
+        ("7 yrs", 8.0, "Experienced", 0.80),
+        # (>= 8 years -> Strong / 10.0)
+        ("8+ years", 10.0, "Strong", 1.00),
+        ("9+ years of experience", 10.0, "Strong", 1.00),
+        ("10 years", 10.0, "Strong", 1.00),
+        # Vietnamese expressions
+        ("3 năm kinh nghiệm", 5.0, "Proficient", 0.50),
+        ("hơn 5 năm", 8.0, "Experienced", 0.80),
+        ("tối thiểu 8 năm", 10.0, "Strong", 1.00),
+    ]
+
+    for expr, expected_level, expected_desc, expected_weight in test_cases:
+        rec = map_descriptor_to_proficiency(expr, side="CV_DEMONSTRATED", allow_years_heuristic=True)
+        assert rec.is_missing is False, f"Failed to map years expression '{expr}'"
+        assert rec.numeric_level == expected_level, f"Level mismatch for '{expr}': {rec.numeric_level} != {expected_level}"
+        assert rec.raw_descriptor == expected_desc
+        assert rec.normalized_weight == pytest.approx(expected_weight)
+        assert rec.mapping_source == "years_heuristic_mapping"
+        assert rec.decision_class == "PROJECT_ADAPTATION"
+
+    # Noise strings without explicit numbers must still be rejected
+    noise_samples = ["years of experience", "years", "năm kinh nghiệm", "primary", "good"]
+    for noise in noise_samples:
+        rec = map_descriptor_to_proficiency(noise, side="CV_DEMONSTRATED", allow_years_heuristic=True)
+        assert rec.is_missing is True, f"Should have rejected '{noise}'"
+
+    # Full skill item extraction with evidence sentence containing years
+    cv_item = SkillInputItem(
+        occurrence_id="occ_java_years",
+        canonical_skill_id="java",
+        surface_name="Java",
+        source_document="CV",
+        evidence_sentences=["Backend engineer with 3+ years of experience in Java and Spring Boot."],
+    )
+    extracted = extract_skill_proficiency(cv_item, allow_years_heuristic=True)
+    assert extracted.is_missing is False
+    assert extracted.numeric_level == 5.0
+    assert extracted.raw_descriptor == "Proficient"
+    assert extracted.normalized_weight == pytest.approx(0.50)

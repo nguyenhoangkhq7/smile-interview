@@ -714,10 +714,14 @@ class PaperAlignedGraphBuilder:
 
             # Extract separate CV demonstrated proficiency and JD required proficiency
             cv_prof = extract_skill_proficiency(
-                cv_sk, allow_paper_table6_7_descriptors=self.config.allow_paper_table6_7_descriptors
+                cv_sk,
+                allow_paper_table6_7_descriptors=self.config.allow_paper_table6_7_descriptors,
+                allow_years_heuristic=self.config.allow_years_heuristic,
             )
             jd_prof = extract_skill_proficiency(
-                jd_sk, allow_paper_table6_7_descriptors=self.config.allow_paper_table6_7_descriptors
+                jd_sk,
+                allow_paper_table6_7_descriptors=self.config.allow_paper_table6_7_descriptors,
+                allow_years_heuristic=self.config.allow_years_heuristic,
             )
 
             w_cv = compute_tensor_edge_weight(
@@ -823,7 +827,9 @@ class PaperAlignedGraphBuilder:
             )
 
             cv_prof = extract_skill_proficiency(
-                cv_sk, allow_paper_table6_7_descriptors=self.config.allow_paper_table6_7_descriptors
+                cv_sk,
+                allow_paper_table6_7_descriptors=self.config.allow_paper_table6_7_descriptors,
+                allow_years_heuristic=self.config.allow_years_heuristic,
             )
             w_cv = compute_tensor_edge_weight(
                 cv_prof,
@@ -893,7 +899,9 @@ class PaperAlignedGraphBuilder:
             )
 
             jd_prof = extract_skill_proficiency(
-                jd_sk, allow_paper_table6_7_descriptors=self.config.allow_paper_table6_7_descriptors
+                jd_sk,
+                allow_paper_table6_7_descriptors=self.config.allow_paper_table6_7_descriptors,
+                allow_years_heuristic=self.config.allow_years_heuristic,
             )
             w_jd = compute_tensor_edge_weight(
                 jd_prof,
