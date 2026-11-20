@@ -137,7 +137,10 @@ def test_switching_skills_acknowledges_the_actual_previous_answer(setup, monkeyp
     feedback_provider(provider, monkeypatch)
     initial = start(
         engine,
-        [skill(priority=0.8), skill("sql_optimization", jd_skill_name="SQL Optimization", priority=0.4)],
+        [
+            skill(importance_weight=0.9),
+            skill("sql_optimization", jd_skill_name="SQL Optimization", importance_weight=0.8),
+        ],
     ).snapshot
     result = answer(engine, initial)
     skills_by_objective = {o.objective_id: o.skill_id for o in result.public.report.objectives}

@@ -2,6 +2,7 @@
 from collections import Counter, OrderedDict
 from concurrent.futures import Future, ThreadPoolExecutor
 from contextvars import copy_context
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import logging
 from threading import Lock
@@ -14,12 +15,13 @@ from .assessment import TERMINAL, apply_judgment, eligible_criteria, next_action
 from .coding_verification import check_coding_answer
 from .errors import JudgmentUnavailableError, QuestionUnavailableError
 from .models import (
-    Action, Blueprint, BlueprintRequest, ConversationRequest, InterviewSkillContext, Judgment,
+    Action, Blueprint, BlueprintRequest, ConversationRequest, InterviewConfig, InterviewSkillContext,
+    InterviewVerification, Judgment,
     NextQuestionRequest, ObjectiveState, Question, SessionCoaching, Snapshot, StartRequest,
     StoredQuestion, TransitionRequest, TransitionResult, Turn,
 )
 from . import lifecycle
-from .planning import BlueprintBuilder, plan, select_mode
+from .planning import ALL_COMPATIBLE_SKILLS_MASTERED, BlueprintBuilder, plan, select_mode
 from .depth import DEPTH_DEFINITIONS, question_depth
 from .policy_config import InterviewPolicy
 from .criterion_progress import CRITERION_SOFT_LIMIT, progress_for
@@ -29,6 +31,7 @@ from .provider import AlignmentReview, AssessmentProvider, encode_context
 from .reporting import coaching_context, fallback_session_coaching, public_session
 from .preparation_cache import PreparationCache
 from .telemetry import event
+from .verification import prepare_verification
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +61,14 @@ _PROMPT_EXCLUDED_OBJECTIVE_FIELDS = {
 }
 
 
+@dataclass(frozen=True)
+class _PrewarmedQuestion:
+    created: float
+    config: InterviewConfig
+    verification: InterviewVerification | None
+    future: Future[Turn | None]
+
+
 class EvidenceWorkflow:
     def __init__(
         self,
@@ -75,7 +86,7 @@ class EvidenceWorkflow:
         self.prewarm_q1 = prewarm_q1
         self._prewarm_lock = Lock()
         self._prewarm_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="q1-prewarm")
-        self._prewarmed_q1: OrderedDict[str, tuple[float, Future[Turn | None]]] = OrderedDict()
+        self._prewarmed_q1: OrderedDict[str, _PrewarmedQuestion] = OrderedDict()
 
     def build_blueprint(self, request: BlueprintRequest) -> Blueprint:
         builder = BlueprintBuilder(self.provider, self.policy, self.preparation_cache)
@@ -87,7 +98,9 @@ class EvidenceWorkflow:
         builder = BlueprintBuilder(self.provider, policy, self.preparation_cache)
 
         opening_text: str | None = None
-        if request.opening is not None and request.blueprint is None:
+        has_mastered_skills = bool(request.prior_attempts and request.prior_attempts.mastered_skill_ids)
+        parallel_opening = request.opening is not None and request.blueprint is None and not has_mastered_skills
+        if parallel_opening:
             with ThreadPoolExecutor(max_workers=2) as executor:
                 bp_future = executor.submit(copy_context().run, builder.build, request.skills, request.opening)
                 open_future = executor.submit(copy_context().run, self._generate_opening, request)
@@ -99,11 +112,16 @@ class EvidenceWorkflow:
                 if request.blueprint is not None
                 else builder.build(request.skills, opening=request.opening)
             )
-            if request.opening is not None:
-                opening_text = self._generate_opening(request)
 
         objectives, queue = plan(blueprint, request.skills, request.config, policy, request.prior_attempts)
         event("preparation.planned", objectives=len(objectives), queued=len(queue))
+        if queue and request.opening is not None and not parallel_opening:
+            opening_text = self._generate_opening(request)
+        ordered = [objectives[key] for key in queue]
+        ordered.extend(state for state in objectives.values()
+                       if state.excluded_reason == "PLAN_BUDGET"
+                       and state.objective.estimated_seconds <= request.config.duration_seconds)
+        verification = prepare_verification(request, ordered, self.provider)
         now = self.clock()
         skills = [
             InterviewSkillContext(
@@ -127,10 +145,13 @@ class EvidenceWorkflow:
             skills=skills,
             objectives=objectives,
             queue=queue,
+            verification=verification,
             policy=policy.model_copy(deep=True),
             deadline_at=now + timedelta(seconds=request.config.duration_seconds),
             prior_question_stems=prior_stems,
         )
+        if not queue:
+            return self._result(self._finish(snapshot, ALL_COMPATIBLE_SKILLS_MASTERED))
         if request.opening is not None:
             snapshot.opening_context = request.opening.model_copy(deep=True)
             snapshot.conversation = lifecycle.begin(
@@ -163,11 +184,11 @@ class EvidenceWorkflow:
         now = monotonic()
         with self._prewarm_lock:
             self._prune_prewarm_locked(now)
-            self._prewarmed_q1[snapshot.session_id] = (now, future)
+            self._prewarmed_q1[snapshot.session_id] = _PrewarmedQuestion(now, copy.config, copy.verification, future)
             self._prewarmed_q1.move_to_end(snapshot.session_id)
 
     def _prune_prewarm_locked(self, now: float) -> None:
-        expired = [key for key, (created, _) in self._prewarmed_q1.items() if now - created > PREWARM_TTL_SECONDS]
+        expired = [key for key, entry in self._prewarmed_q1.items() if now - entry.created > PREWARM_TTL_SECONDS]
         for key in expired:
             self._prewarmed_q1.pop(key, None)
         while len(self._prewarmed_q1) >= PREWARM_MAX_ENTRIES:
@@ -176,13 +197,11 @@ class EvidenceWorkflow:
     def _consume_prewarmed_q1(self, snapshot: Snapshot) -> Turn | None:
         with self._prewarm_lock:
             entry = self._prewarmed_q1.pop(snapshot.session_id, None)
-        if entry is None:
-            return None
-        created, future = entry
-        if monotonic() - created > PREWARM_TTL_SECONDS:
+        if (entry is None or monotonic() - entry.created > PREWARM_TTL_SECONDS
+                or entry.config != snapshot.config or entry.verification != snapshot.verification):
             return None
         try:
-            turn = future.result(timeout=45)
+            turn = entry.future.result(timeout=45)
         except Exception:
             return None
         if turn is None or not snapshot.queue:
@@ -191,7 +210,8 @@ class EvidenceWorkflow:
         if (state is None
                 or turn.objective_id != state.objective.objective_id
                 or turn.mode != state.selected_mode
-                or turn.question_depth != question_depth(state, Action.INITIAL)):
+                or turn.question_depth != question_depth(state, Action.INITIAL)
+                or turn.question.criterion_ids != self._targets(state.model_copy(deep=True))):
             return None
         return turn.model_copy(deep=True)
 
@@ -435,7 +455,7 @@ class EvidenceWorkflow:
         event("question.ready", turn_id=snapshot.pending_turn.turn_id, mode=state.selected_mode.value)
 
     @staticmethod
-    def _candidate_background(snapshot: Snapshot, skill: InterviewSkillContext) -> str | None:
+    def _candidate_background(snapshot: Snapshot, skill: InterviewSkillContext | None) -> str | None:
         """Compact, score-free background context for personalized question framing only."""
         parts: list[str] = []
         opening = snapshot.opening_context
@@ -446,10 +466,9 @@ class EvidenceWorkflow:
                 parts.append(f"Vị trí: {role}" + (f" ({company})" if company else ""))
             elif company:
                 parts.append(f"Công ty: {company}")
-        if skill.context_job and skill.context_job.strip():
+        if skill is not None and skill.context_job.strip():
             parts.append(f"Bối cảnh CV: {skill.context_job.strip()}")
-        if (skill.semantic_alignment == "PARTIAL"
-                and skill.matched_cv_skill_name and skill.matched_cv_skill_name.strip()):
+        if skill is not None and skill.semantic_alignment == "PARTIAL" and skill.matched_cv_skill_name.strip():
             parts.append(f"Kỹ năng tương đương trên CV: {skill.matched_cv_skill_name.strip()}")
         if not parts:
             return None
@@ -498,12 +517,15 @@ class EvidenceWorkflow:
             "depth_definition": DEPTH_DEFINITIONS[contract["depth"]],
             "probe_reason": state.probe_reason,
             "criterion_progress": progress_for(state, targets[0]),
-            "cv_evidence": skill.cv_evidence_spans,
             "history": [self._compact_history_turn(t) for t in history_turns],
             "other_questions": other_questions,
             "prior_observations": [item for item in state.evidence_history if item.criterion_id in targets],
         }
-        background = self._candidate_background(snapshot, skill)
+        if snapshot.verification is None:
+            context["cv_evidence"] = skill.cv_evidence_spans
+        else:
+            self._add_verification_context(context, snapshot.verification, state)
+        background = self._candidate_background(snapshot, skill if snapshot.verification is None else None)
         if background:
             context["candidate_background"] = background
         guidance_parts: list[str] = []
@@ -523,13 +545,34 @@ class EvidenceWorkflow:
             context["question_guidance"] = " ".join(guidance_parts)
         return context
 
+    @staticmethod
+    def _add_verification_context(
+        context: dict[str, object], verification: InterviewVerification, state: ObjectiveState,
+    ) -> None:
+        focus = verification.focus_by_criterion.get(state.active_criterion_id)
+        jd_excerpt = (focus.jd_excerpt if focus else None) or verification.jd_by_objective.get(
+            state.objective.objective_id
+        )
+        sources = {"jd_excerpt": jd_excerpt} if jd_excerpt is not None else {}
+        context["verification_context"] = sources
+        context["cv_evidence"] = []
+        if not context["history"]:
+            if focus is None:
+                event("verification.jd_context", reason="no_verified_focus")
+            else:
+                sources["detail_to_verify"] = focus.detail_to_verify
+                context["cv_evidence"] = [focus.cv_excerpt]
+
     def _generate_valid_question(self, context: dict[str, object], snapshot: Snapshot) -> Question | None:
         seen = {" ".join(turn.question.text.casefold().split()) for turn in snapshot.turns}
         seen.update(" ".join(stem.casefold().split()) for stem in snapshot.prior_question_stems if stem.strip())
         for attempt in range(GENERATION_ATTEMPTS):
             if self.clock() >= snapshot.deadline_at:
                 return None
+            if attempt == GENERATION_ATTEMPTS - 1:
+                self._fall_back_to_jd(context)
             question, errors = self._question_attempt(context, seen)
+            failure = None
             if not errors:
                 if self.clock() >= snapshot.deadline_at:
                     return None
@@ -539,11 +582,12 @@ class EvidenceWorkflow:
                     context["validation_error"] = f"Alignment reviewer error: {exc}"
                     logger.warning(
                         "Alignment review failed for session %s (attempt %s/%s): %s",
-                        snapshot.session_id, attempt + 1, GENERATION_ATTEMPTS, exc,
+                        snapshot.session_id, attempt + 1, GENERATION_ATTEMPTS, type(exc).__name__,
                     )
                     continue
                 if verdict == "ALIGNED":
                     return question
+                failure = verdict
                 context["rejected_draft"] = question.text
                 seen.add(" ".join(question.text.casefold().split()))
                 base_repair = ALIGNMENT_REPAIRS.get(
@@ -553,8 +597,17 @@ class EvidenceWorkflow:
                 errors = [f"{base_repair} Chi tiết lỗi: {reason}" if reason else base_repair]
             context["validation_error"] = "; ".join(errors)
             logger.warning("Invalid question for session %s (attempt %s/%s): %s", snapshot.session_id,
-                           attempt + 1, GENERATION_ATTEMPTS, context["validation_error"])
+                           attempt + 1, GENERATION_ATTEMPTS, failure or context["validation_error"])
         raise QuestionUnavailableError("AI chưa tạo được câu hỏi phù hợp. Dữ liệu đã lưu được giữ nguyên; vui lòng thử lại.")
+
+    @staticmethod
+    def _fall_back_to_jd(context: dict[str, object]) -> None:
+        sources = context.get("verification_context")
+        if isinstance(sources, dict) and sources.pop("detail_to_verify", None) is not None:
+            context["cv_evidence"] = []
+            context.pop("rejected_draft", None)
+            context["validation_error"] = "Use a hypothetical case from the JD for the same criterion."
+            event("verification.jd_context", reason="cv_drafts_rejected")
 
     def _review_question(self, context: dict[str, object], question: Question) -> tuple[str, str]:
         raw = self.provider.review_question(self._review_context(context, question))
@@ -592,6 +645,8 @@ class EvidenceWorkflow:
             "unresolved": context["criterion_progress"].unresolved_aspects,
             "history": history_pairs,
         }
+        if "verification_context" in context:
+            payload["verification_context"] = context["verification_context"]
         return encode_context(payload)
 
     def _question_attempt(self, context: dict[str, object], seen: set[str]) -> tuple[Question | None, list[str]]:

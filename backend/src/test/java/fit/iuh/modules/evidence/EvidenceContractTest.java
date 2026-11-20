@@ -1,6 +1,9 @@
 package fit.iuh.modules.evidence;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import fit.iuh.modules.session.entity.JobDescription;
+import fit.iuh.modules.session.entity.Resume;
+import fit.iuh.modules.session.entity.Session;
 import fit.iuh.modules.skillgap.dto.SkillGapDtos.SkillGapResultDto;
 import org.junit.jupiter.api.Test;
 import java.util.List;
@@ -83,5 +86,22 @@ class EvidenceContractTest {
                 "candidate_proficiency", "is_substituted", "gap_magnitude")) {
             assertThat(output.has(auditField)).isFalse();
         }
+    }
+
+    @Test void verificationUsesSessionDocumentsForLegacySkillSpans() throws Exception {
+        var session = Session.builder()
+                .resume(Resume.builder().rawText("Java dùng tập hợp.\nBáo cáo hiệu năng.").build())
+                .jobDescription(JobDescription.builder().rawText("Đọc\u00a0kế hoạch thực thi.").build())
+                .build();
+        var skills = new ObjectMapper().readTree("""
+                [{"cv_evidence_spans":["Java dùng tập hợp.","Java dùng báo cáo","java dùng tập hợp.", " "],
+                  "jd_evidence_spans":["Đọc kế hoạch thực thi."]}]
+                """);
+
+        var sources = EvidenceInputs.verificationSources(session, skills);
+
+        assertThat(sources.path("cv").size()).isEqualTo(1);
+        assertThat(sources.path("cv").path("Java dùng tập hợp.").asText()).isEqualTo("Java dùng tập hợp.");
+        assertThat(sources.path("jd").path("Đọc kế hoạch thực thi.").asText()).isEqualTo("Đọc\u00a0kế hoạch thực thi.");
     }
 }

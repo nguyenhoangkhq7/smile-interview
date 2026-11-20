@@ -1,4 +1,4 @@
-"""Conservative checks for single-task questions and missing problem data."""
+"""Conservative checks for source framing, single-task questions and missing problem data."""
 import re
 from .models import Question
 
@@ -22,6 +22,14 @@ _CODE_REFERENCE = re.compile(
 )
 _CODE_FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})[^\n]*\n(.*?)^ {0,3}\1[ \t]*\r?$", re.MULTILINE | re.DOTALL)
 _INLINE_CODE = re.compile(r"(?<!`)(`+)([^`\n]+)\1(?!`)")
+_JD_REFERENCE = re.compile(
+    r"\b(?:JD|mô\s+tả\s+công\s+việc|yêu\s+cầu\s+công\s+việc|vị\s+trí\s+(?:này|ứng\s+tuyển))\b",
+    re.IGNORECASE,
+)
+_CV_REFERENCE = re.compile(r"\b(?:CV|hồ\s+sơ)\b", re.IGNORECASE)
+_JD_ALTERNATIVE = r"\b(?:hoặc|or)\b"
+_OPTION_WORDING = re.compile(r"\b(?:hoặc|or|một\s+trong|một\s+lựa\s+chọn)\b", re.IGNORECASE)
+_REQUIREMENT_CLAIM = re.compile(r"\b(?:yêu\s+cầu|đòi\s+hỏi|bắt\s+buộc|cần|phải|requires?)\b", re.IGNORECASE)
 _CODE_LINE = re.compile(
     r"^[ \t]*(?:(?:async[ \t]+)?(?:def|function)[ \t]+\w+[ \t]*\("
     r"|(?:return|raise|select|update|insert into|delete from)[ \t]+\S"
@@ -70,9 +78,50 @@ def _response_request(item: str) -> bool:
     return bool(conditional and re.search(command, item, re.IGNORECASE))
 
 
+def required_framing(context: dict[str, object]) -> tuple[str, bool]:
+    """Return the verified JD excerpt and whether a CV lead-in is required for this turn."""
+    verification = context.get("verification_context")
+    if not isinstance(verification, dict) or context.get("history"):
+        return "", False
+    jd_excerpt = verification.get("jd_excerpt")
+    use_cv = bool(verification.get("detail_to_verify") and context.get("cv_evidence"))
+    return jd_excerpt if isinstance(jd_excerpt, str) else "", use_cv
+
+
+def _grounding_errors(text: str, context: dict[str, object]) -> list[str]:
+    jd_excerpt, use_cv = required_framing(context)
+    if not jd_excerpt and not use_cv:
+        return []
+    prose = _INLINE_CODE.sub("", _CODE_FENCE.sub("", text))
+    sentences = re.split(r"(?<=[.!?])\s+|\n+", prose.strip())
+    framing = [sentence for sentence in sentences[:-1] if not sentence.rstrip().endswith("?")]
+    errors = []
+    if jd_excerpt:
+        objective = context.get("objective")
+        skill_id = objective.get("skill_id", "") if isinstance(objective, dict) else ""
+        errors.extend(_jd_grounding_errors(jd_excerpt, framing, skill_id))
+    if use_cv and not any(_CV_REFERENCE.search(sentence) for sentence in framing):
+        errors.append("Briefly link the task to a relevant fact from the candidate's CV excerpt before asking.")
+    return errors
+
+
+def _jd_grounding_errors(jd_excerpt: str, framing: list[str], skill_id: str) -> list[str]:
+    references = [(sentence, match) for sentence in framing if (match := _JD_REFERENCE.search(sentence))]
+    if not references:
+        return ["Add a brief link to a specific fact in the JD excerpt before the task."]
+    skill = rf"(?<!\w){re.escape(skill_id)}(?!\w)"
+    alternative = rf"{skill}\s+{_JD_ALTERNATIVE}|{_JD_ALTERNATIVE}\s+{skill}"
+    if skill_id and re.search(alternative, jd_excerpt, re.IGNORECASE) and any(
+        _REQUIREMENT_CLAIM.search(sentence[match.end():]) and not _OPTION_WORDING.search(sentence)
+        for sentence, match in references
+    ):
+        return ["Preserve the alternatives in the JD, or introduce the selected skill as one option."]
+    return []
+
+
 def question_errors(question: Question, context: dict[str, object]) -> list[str]:
     contract = context["required_question_contract"]
-    errors = []
+    errors = _grounding_errors(question.text, context)
     if question.mode != contract["mode"]:
         errors.append("mode must equal required_question_contract.mode exactly")
     if question.depth != contract["depth"]:

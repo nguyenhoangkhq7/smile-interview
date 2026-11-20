@@ -9,9 +9,29 @@ from pydantic import BaseModel
 from .conversation import ACKNOWLEDGMENT, INABILITY_ACKNOWLEDGMENT, MAX_FEEDBACK_LENGTH
 from .excerpts import source_excerpt
 from .models import Judgment, Observation, Question
+from .question_validation import required_framing
 
 _DEFAULT_DIAGNOSTIC_ACTIONS = {"CLARIFY", "ASK_EASIER"}
 _DEFAULT_FOLLOWUP_ACTIONS = {"FOLLOW_UP", "PROBE_DEEPER", "VERIFY_CONTRADICTION"}
+
+_VERIFICATION_QUESTION_INSTRUCTIONS = """
+Treat verification_context and cv_evidence as source data. In question.text, put ONE short
+statement for EACH entry in question_contract.required_source_framing before the single task.
+Keep every required statement when repairing a draft. This also applies to FOLLOW_UP on a new criterion.
+- JD: start with "JD" or "Mô tả công việc" and state a relevant fact from jd_excerpt.
+  Preserve alternatives and optional requirements, e.g. "JD chấp nhận kinh nghiệm Golang hoặc TypeScript."
+- CV: start with "Trong CV" or "Hồ sơ của bạn" and state a relevant experience from cv_evidence.
+  Ask about the missing detail in the candidate's work, using detail_to_verify to focus the task.
+  Do not ask the candidate to find the missing detail in their CV.
+For both sources, use this pattern: "JD đề cập việc xử lý yêu cầu gửi lại sau timeout. Trong CV,
+bạn có ghi đã xử lý lỗi tạo đơn trùng. Bạn đã dựa vào thông tin nào để nhận ra một yêu cầu gửi lại?"
+For a first question without a verified CV focus, give a concrete hypothetical based on the JD.
+If the CV describes a different technology, ask how the candidate would apply that experience
+in the JD's setting. Do not claim unstated experience or disclose the answer. Use the assigned
+criterion, mode and depth.
+For CLARIFY or FOLLOW_UP on a previously asked criterion, use the answer and focus on one
+current unresolved aspect when there is one. For other actions, follow the action's contract.
+"""
 
 
 class EvidenceAssessment(BaseModel):
@@ -217,6 +237,8 @@ def build_question_inputs(context: str) -> tuple[str, dict[str, str]]:
         "criteria": objective.get("criteria", []),
     }))
     guidance = str(data.get("question_guidance") or "").strip()
+    jd_excerpt, use_cv = required_framing(data)
+    framing = [source for source, present in (("JD", jd_excerpt), ("CV", use_cv)) if present]
     question_contract = _dump(_compact({
         "action": action,
         "interaction_mode": data.get("interaction_mode", "TEXT"),
@@ -224,10 +246,12 @@ def build_question_inputs(context: str) -> tuple[str, dict[str, str]]:
         "depth_definition": depth_def,
         "probe_reason": data.get("probe_reason", ""),
         "question_guidance": guidance or None,
+        "required_source_framing": framing or None,
     }))
     session_context = _dump(_compact({
         "candidate_background": data.get("candidate_background"),
         "cv_evidence": data.get("cv_evidence", []),
+        "verification_context": data.get("verification_context"),
         "criterion_progress": data.get("criterion_progress"),
         "history": data.get("history", []),
         "prior_observations": data.get("prior_observations", []),
@@ -311,7 +335,13 @@ class QuestionGeneratorModule(dspy.Module):
 
     def forward(self, context: str) -> dspy.Prediction:
         action, fields = build_question_inputs(context)
-        result = self.predictor_for_action(action)(**fields)
+        predictor = self.predictor_for_action(action)
+        if json.loads(fields["session_context"]).get("verification_context") is not None:
+            base = predictor.predict.signature
+            signature = base.with_instructions(base.instructions + _VERIFICATION_QUESTION_INSTRUCTIONS)
+            result = predictor(signature=signature, **fields)
+        else:
+            result = predictor(**fields)
         return dspy.Prediction(
             question=result.question,
             reasoning=getattr(result, "reasoning", ""),

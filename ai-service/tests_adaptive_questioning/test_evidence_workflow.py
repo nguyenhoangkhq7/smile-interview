@@ -258,7 +258,7 @@ def test_snapshot_roundtrip_and_stale_turn(setup, monkeypatch):
     result = answer(engine, restored)
     assert result.public.state_version == 2
     assert result.snapshot.model_dump(mode="json")["skills"] == expected_skills
-    assert seen_cv == [spans, spans]
+    assert seen_cv == [[], []]  # Only source-verified CV excerpts enter questions in new sessions.
 
 
 def test_timeout_marks_unasked_objective_not_assessed(setup):

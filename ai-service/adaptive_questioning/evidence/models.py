@@ -173,6 +173,7 @@ class SessionCoaching(BaseModel):
 
 class PriorAttemptContext(BaseModel):
     objective_assessments: dict[str, str] = Field(default_factory=dict)
+    mastered_skill_ids: set[str] = Field(default_factory=set)
     prior_question_stems: list[str] = Field(default_factory=list, max_length=20)
 
 
@@ -236,6 +237,38 @@ class ObjectiveState(BaseModel):
     probe_reason: str = "Initial evidence for an essential criterion"
 
 
+class VerificationSources(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    cv: dict[str, str] = Field(default_factory=dict)
+    jd: dict[str, str] = Field(default_factory=dict)
+
+
+class VerificationFocus(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    cv_excerpt: str
+    detail_to_verify: str
+    jd_excerpt: str | None = None
+
+
+class InterviewVerification(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    jd_by_objective: dict[str, str] = Field(default_factory=dict)
+    focus_by_criterion: dict[str, VerificationFocus] = Field(default_factory=dict)
+
+
+class VerificationFocusDraft(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    criterion_id: str = Field(min_length=1)
+    cv_span_index: int = Field(ge=0, strict=True)
+    jd_span_index: int | None = Field(default=None, ge=0, strict=True)
+    detail_to_verify: str = Field(min_length=3, max_length=240)
+
+
+class VerificationBatchDraft(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    focuses: list[VerificationFocusDraft]
+
+
 class Turn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     turn_id: str
@@ -261,6 +294,7 @@ class Snapshot(BaseModel):
     objectives: dict[str, ObjectiveState]
     queue: list[str]
     deadline_at: datetime
+    verification: InterviewVerification | None = None
     pending_turn: Turn | None = None
     next_question_action: Action | None = None
     turns: list[Turn] = Field(default_factory=list)
@@ -312,6 +346,7 @@ class StartRequest(BaseModel):
     blueprint: Blueprint | None = None
     opening: "InterviewOpening | None" = None
     prior_attempts: PriorAttemptContext | None = None
+    verification_sources: VerificationSources | None = None
 
     @model_validator(mode="before")
     @classmethod

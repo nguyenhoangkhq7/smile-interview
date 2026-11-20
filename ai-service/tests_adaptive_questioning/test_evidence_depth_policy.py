@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from adaptive_questioning.evidence.assessment import apply_judgment
-from adaptive_questioning.evidence.models import Action, Assessment, Mode, Snapshot, SuitableMode
+from adaptive_questioning.evidence.models import Action, Assessment, InterviewOpening, Mode, Snapshot, StartRequest, SuitableMode
 from adaptive_questioning.evidence.policy_config import InterviewPolicy
 from adaptive_questioning.evidence.workflow import EvidenceWorkflow
 from adaptive_questioning.evidence.errors import QuestionUnavailableError
@@ -310,7 +310,7 @@ def test_mixed_prefers_essential_coverage_then_diversity(audit):
     assert {s.selected_mode for s in diverse.snapshot.objectives.values()} == {Mode.DESIGN, Mode.DEBUGGING}
 
 
-def test_core_gaps_precede_core_match_and_optional_missing(audit):
+def test_core_skills_fill_the_plan_before_low_importance_optional_skill(audit):
     _, engine, _ = audit
     skills = [task_skill(name="java", importance_weight=0.95, priority=0.3),
               task_skill(name="spring", importance_weight=0.9, priority=0),
@@ -324,6 +324,77 @@ def test_core_gaps_precede_core_match_and_optional_missing(audit):
     assert aws.assessment == Assessment.NOT_ASSESSED
     assert aws.excluded_reason == "PLAN_BUDGET"
     assert not [item for obj in result.public.report.objectives for item in obj.study_recommendations]
+
+
+def test_jd_importance_selects_matched_skill_with_only_one_question(audit):
+    _, engine, _ = audit
+    matched = task_skill(name="spring", importance_weight=0.95, priority=0.0,
+                         semantic_alignment="MATCH", cv_evidence_spans=["Built Spring REST APIs"])
+    missing = task_skill(name="sql", importance_weight=0.80, priority=0.60,
+                         semantic_alignment="MISSING")
+    matched.job_tasks[0].requirement_kind = "OPTIONAL"
+    missing.job_tasks[0].requirement_kind = "REQUIRED"
+
+    result = start(engine, [missing, matched], max_questions=1)
+
+    assert result.snapshot.pending_turn.skill_id == "spring"
+    assert len(result.snapshot.queue) == 1
+
+
+def test_gap_priority_does_not_break_importance_ties(audit):
+    _, engine, _ = audit
+    skills = [skill("spring", priority=0.0), skill("sql", priority=0.6)]
+    original = start(engine, skills, max_questions=1)
+
+    skills[0].priority, skills[1].priority = skills[1].priority, skills[0].priority
+    replanned = start(engine, skills, max_questions=1)
+
+    assert original.snapshot.queue == replanned.snapshot.queue
+
+
+def test_retake_skips_mastered_skill_even_if_it_has_the_highest_weight(audit):
+    _, engine, _ = audit
+    skills = [task_skill(name="java", importance_weight=0.95),
+              task_skill(name="sql", importance_weight=0.85),
+              task_skill(name="redis", importance_weight=0.80)]
+    result = engine.start(StartRequest(
+        session_id="retake", skills=skills, config={"max_questions": 3},
+        prior_attempts={"mastered_skill_ids": ["java"]},
+    ))
+
+    assert [result.snapshot.objectives[key].objective.skill_id for key in result.snapshot.queue] == ["sql", "redis"]
+    java = next(state for state in result.snapshot.objectives.values() if state.objective.skill_id == "java")
+    assert java.excluded_reason == "SKILL_ALREADY_MASTERED"
+    assert java.assessment == Assessment.NOT_ASSESSED
+    for _ in range(2):
+        result = answer(engine, result.snapshot)
+    assert result.public.is_finished
+    assert result.public.report.termination_reason == "PLAN_COMPLETE"
+    assert [turn.skill_id for turn in result.snapshot.turns] == ["sql", "redis"]
+
+
+@pytest.mark.parametrize("focused", [False, True])
+def test_retake_finishes_when_all_compatible_skills_were_mastered(audit, monkeypatch, focused):
+    provider, engine, _ = audit
+    skills = [task_skill("Write Java functions to validate order totals", "java")]
+    config = {}
+    if focused:
+        skills.append(task_skill("Explain Redis cache expiration", "redis"))
+        config["focused_question_mode"] = Mode.CODING
+    monkeypatch.setattr(engine, "_generate_opening", lambda _: pytest.fail("No opening should be generated"))
+
+    result = engine.start(StartRequest(
+        session_id="mastered", skills=skills, config=config, opening=InterviewOpening(),
+        prior_attempts={"mastered_skill_ids": ["java"]},
+    ))
+
+    assert result.public.is_finished
+    assert result.public.pending_turn is None
+    assert result.public.report.termination_reason == "ALL_COMPATIBLE_SKILLS_MASTERED"
+    assert provider.question_number == 0
+    if focused:
+        redis = next(state for state in result.snapshot.objectives.values() if state.objective.skill_id == "redis")
+        assert redis.excluded_reason == "MODE_FILTER"
 
 
 def test_followup_reserve_and_early_finish_reallocate_to_unasked_objectives(audit):

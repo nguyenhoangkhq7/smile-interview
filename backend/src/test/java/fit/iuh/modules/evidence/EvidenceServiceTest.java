@@ -6,6 +6,8 @@ import fit.iuh.modules.session.entity.Session;
 import fit.iuh.modules.session.repository.SessionRepository;
 import fit.iuh.modules.session.repository.SessionTurnRepository;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.web.server.ResponseStatusException;
 import java.util.Optional;
 import java.util.UUID;
@@ -125,12 +127,18 @@ class EvidenceServiceTest {
         profile.setCompany("Acme");
         profile.setBlueprintJson("{\"objectives\":[]}");
         profile.setPolicyJson("{\"fallback_depth\":1}");
+        profile.setCvText("CV. Đã xử lý lỗi tạo đơn\r\nhàng trùng. Kết thúc.");
+        profile.setJdText("JD. Xử lý yêu cầu\t gửi lại sau timeout. Kết thúc.");
         var session = Session.builder().id("s").userId(owner.getId()).roleTitle("Backend")
                 .applicationProfile(profile).build();
         when(sessions.findById("s")).thenReturn(Optional.of(session));
         when(runs.findById("s")).thenReturn(Optional.empty());
         when(turns.findBySessionIdOrderByIdAsc("s")).thenReturn(java.util.List.of());
-        when(inputs.skills(session)).thenReturn(json.read("[{\"jd_skill_id\":\"sql\"}]"));
+        when(inputs.skills(session)).thenReturn(json.read("""
+                [{"jd_skill_id":"sql",
+                  "cv_evidence_spans":["Đã xử lý lỗi tạo đơn hàng trùng.","Cụm do mô hình thêm"],
+                  "job_tasks":[{"evidence_spans":["Xử lý yêu cầu gửi lại sau timeout.","Xử lý sau khi thanh toán"]}]}]
+                """));
         var aiResult = json.read("{\"snapshot\":{\"state_version\":1},\"public\":{\"state_version\":1}}");
         when(ai.compute(eq("start"), any())).thenReturn(aiResult);
         when(store.commit(any())).thenReturn(aiResult.path("public"));
@@ -141,6 +149,10 @@ class EvidenceServiceTest {
         verify(ai).compute(eq("start"), payloadCaptor.capture());
         assertThat(payloadCaptor.getValue().has("blueprint")).isTrue();
         assertThat(payloadCaptor.getValue().has("policy")).isFalse();
+        assertThat(payloadCaptor.getValue().path("verification_sources")).isEqualTo(json.read("""
+                {"cv":{"Đã xử lý lỗi tạo đơn hàng trùng.":"Đã xử lý lỗi tạo đơn\\r\\nhàng trùng."},
+                 "jd":{"Xử lý yêu cầu gửi lại sau timeout.":"Xử lý yêu cầu\\t gửi lại sau timeout."}}
+                """));
     }
 
     @Test void startStripsRetiredFieldsFromLegacyProfileBlueprint() {
@@ -286,10 +298,19 @@ class EvidenceServiceTest {
         assertThat(fallback.path("awaiting_question").asBoolean()).isTrue();
     }
 
-    @Test void startPopulatesPriorAttemptContextOnAttemptTwoPlus() {
+    @ParameterizedTest
+    @CsvSource({
+            "DEMONSTRATED_BELOW_TARGET, CONTRADICTS, BELOW, 3, DEMONSTRATED_BELOW_TARGET, false",
+            "DEMONSTRATED_AT_TARGET, SUPPORTS, AT_TARGET, 3, DEMONSTRATED_AT_TARGET, true",
+            "DEMONSTRATED_AT_TARGET, SUPPORTS, AT_TARGET, 2, INSUFFICIENT_EVIDENCE, false",
+    })
+    void startUsesOnlyVerifiedMasteryFromPriorAttempts(
+            String assessment, String observation, String performance, int depth,
+            String expectedAssessment, boolean mastered
+    ) {
         var profile = new fit.iuh.modules.application.ApplicationProfile();
         profile.setId(UUID.randomUUID());
-        profile.setSkillGapJson("[{\"jd_skill_id\":\"sql\"}]");
+        profile.setSkillGapJson("[{\"jd_skill_id\":\"sql\",\"semantic_alignment\":\"MATCH\"}]");
         profile.setBlueprintJson("""
             {"objectives":[{"objective_id":"obj-sql","skill_id":"sql","claim":"Tune queries","target_depth":3,
               "criteria":[{"criterion_id":"c1","description":"Explain plan","essential":true}]}]}
@@ -308,12 +329,12 @@ class EvidenceServiceTest {
              "objectives":{"obj-sql":{
                "objective":{"objective_id":"obj-sql","skill_id":"sql","claim":"Tune queries","target_depth":3,
                  "criteria":[{"criterion_id":"c1","description":"Explain plan","essential":true}]},
-               "assessment":"DEMONSTRATED_BELOW_TARGET","lifecycle":"CLOSED","turns_spent":1,
-               "evidence_history":[{"turn_id":"t1","criterion_id":"c1","independent":true,"question_depth":3,
-                 "evidence_scope":"s1","observation":"CONTRADICTS","performance":"BELOW",
+               "assessment":"%s","lifecycle":"CLOSED","turns_spent":1,
+               "evidence_history":[{"turn_id":"t1","criterion_id":"c1","independent":true,"question_depth":%d,
+                 "evidence_scope":"s1","observation":"%s","performance":"%s",
                  "response_excerpt":"Use EXPLAIN ANALYZE","rationale":"Chưa nêu cách đọc nút thực thi."}]
              }}}
-            """);
+            """.formatted(assessment, depth, observation, performance));
 
         when(sessions.findById("s-2")).thenReturn(Optional.of(attempt2));
         when(runs.findById("s-2")).thenReturn(Optional.empty());
@@ -332,7 +353,9 @@ class EvidenceServiceTest {
         verify(ai).compute(eq("start"), payloadCaptor.capture());
         var priorAttempts = payloadCaptor.getValue().path("prior_attempts");
         assertThat(priorAttempts.path("objective_assessments").path("obj-sql").asText())
-                .isEqualTo("DEMONSTRATED_BELOW_TARGET");
+                .isEqualTo(expectedAssessment);
+        assertThat(priorAttempts.path("mastered_skill_ids"))
+                .isEqualTo(json.read(mastered ? "[\"sql\"]" : "[]"));
         assertThat(priorAttempts.path("prior_question_stems").get(0).asText())
                 .isEqualTo("How do you inspect a slow SQL query in PostgreSQL?");
     }
