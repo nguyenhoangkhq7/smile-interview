@@ -114,7 +114,7 @@ def test_above_grade_is_capped_when_extension_was_not_asked(setup):
 
 
 def test_structured_judge_uses_json_adapter_on_first_invocation():
-    lm = dspy.utils.DummyLM([{"reasoning": "No observations to record", "assessment": {"observations": []}}])
+    lm = dspy.utils.DummyLM([{"plan": "No observations to record", "reasoning": "No observations to record", "assessment": {"observations": []}}])
     lm.adapter = dspy.JSONAdapter()
     provider = DSPyAssessmentProvider(lm=lm)
     original = provider.judge_module
