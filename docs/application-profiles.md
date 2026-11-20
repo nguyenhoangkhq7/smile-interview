@@ -34,7 +34,7 @@ CV/JD và phân tích của hồ sơ cố định; thay đổi tài liệu cần
 - Bằng chứng theo từng tiêu chí không tự thay thế kết luận đầy đủ của AI cho cả yêu cầu. Nếu bằng chứng mới làm kết luận cũ không còn đáng tin nhưng chưa có kết luận đầy đủ mới, hiển thị chưa đủ bằng chứng.
 - Giao diện hiển thị tổng quan, từng kỹ năng/yêu cầu/tiêu chí, lượt kiểm tra gần nhất và liên kết về câu trả lời gốc. Bằng chứng không hợp lệ hoặc chưa được kiểm tra không được xem là thất bại. Hoàn thành việc học sau này chỉ cập nhật tiến độ học.
 
-Quy tắc tổng hợp có phiên bản `competency-1`. Khi điều chỉnh quy tắc, bảng hiện tại được tính lại từ lịch sử gốc, không mất dữ liệu đánh giá của từng lượt. Trọng tâm hỏi ở lượt mới hiện vẫn do bộ lập kế hoạch phỏng vấn chọn; tính năng này chưa tự thay đổi mức ưu tiên câu hỏi theo tiến độ tổng hợp.
+Quy tắc tổng hợp có phiên bản `competency-1`. Khi điều chỉnh quy tắc, bảng hiện tại được tính lại từ lịch sử gốc, không mất dữ liệu đánh giá của từng lượt. Từ lượt thứ hai trên cùng hồ sơ, bộ lập kế hoạch bỏ qua kỹ năng đã được tổng hợp là đạt hoặc vượt yêu cầu qua phỏng vấn. Các kỹ năng còn cần đánh giá được xếp theo độ quan trọng trong JD. Nếu các kỹ năng phù hợp với dạng hỏi đã được xác nhận đạt, lượt kết thúc trước phần hỏi và hiển thị kết quả đó.
 
 ## Kiểm tra
 

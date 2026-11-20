@@ -22,6 +22,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 @Service @RequiredArgsConstructor @Slf4j
@@ -34,6 +35,8 @@ public class EvidenceService {
     private static final int MAX_PRIOR_QUESTION_STEM_LENGTH = 200;
     private static final int MAX_PRIOR_QUESTION_STEMS = 20;
     private static final String DEFAULT_ROLE_TITLE = "vị trí ứng tuyển";
+    private static final Set<String> MASTERED_ASSESSMENTS =
+            Set.of("DEMONSTRATED_AT_TARGET", "DEMONSTRATED_ABOVE_TARGET");
 
     public record VoiceContext(JsonNode state, List<String> terms) {}
 
@@ -99,6 +102,7 @@ public class EvidenceService {
         JsonNode baseSkills = inputs.skills(session);
         JsonNode enrichedSkills = new EvidenceInputs(null, json).enrichPersonalization(baseSkills, session);
         start.put("skills", enrichedSkills);
+        start.put("verification_sources", EvidenceInputs.verificationSources(session, enrichedSkills));
         var profile = session.getApplicationProfile();
         start.put("opening", openingContext(session, user));
         if (profile != null && profile.getBlueprintJson() != null) {
@@ -251,9 +255,11 @@ public class EvidenceService {
             return null;
         }
         Map<String, String> objectiveAssessments = new LinkedHashMap<>();
+        var masteredSkillIds = new LinkedHashSet<String>();
         try {
             var projection = new CompetencyProjection(json).project(profile, priorAttempts, savedRuns);
             for (var skill : projection.skills()) {
+                if (MASTERED_ASSESSMENTS.contains(skill.assessment())) masteredSkillIds.add(skill.skillId());
                 for (var objective : skill.objectives()) {
                     if (objective.id() != null && !objective.id().isBlank()
                             && objective.assessment() != null && !"NOT_ASSESSED".equals(objective.assessment())) {
@@ -291,11 +297,12 @@ public class EvidenceService {
                 }
             }
         }
-        if (objectiveAssessments.isEmpty() && priorQuestionStems.isEmpty()) {
+        if (objectiveAssessments.isEmpty() && priorQuestionStems.isEmpty() && masteredSkillIds.isEmpty()) {
             return null;
         }
         return Map.of(
                 "objective_assessments", objectiveAssessments,
+                "mastered_skill_ids", List.copyOf(masteredSkillIds),
                 "prior_question_stems", List.copyOf(priorQuestionStems)
         );
     }

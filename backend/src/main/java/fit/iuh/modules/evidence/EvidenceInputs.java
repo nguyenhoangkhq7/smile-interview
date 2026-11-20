@@ -2,6 +2,7 @@ package fit.iuh.modules.evidence;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import fit.iuh.modules.session.entity.Session;
 import fit.iuh.modules.skillgap.client.SkillGapClient;
@@ -11,6 +12,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Objects;
+import java.util.regex.Pattern;
 
 /** Resolves the C2 contract once, before the immutable interview snapshot is created. */
 @Component @RequiredArgsConstructor
@@ -24,6 +27,8 @@ public class EvidenceInputs {
             "required_proficiency", "extension_criterion_ids", "inferred",
             "rubric_version", "rubric_fingerprint");
     private static final List<String> RETIRED_SUITABLE_MODE_FIELDS = List.of("rationale");
+    private static final Pattern WHITESPACE = Pattern.compile("\\s+", Pattern.UNICODE_CHARACTER_CLASS);
+    private static final Pattern WORDS = Pattern.compile("\\S+", Pattern.UNICODE_CHARACTER_CLASS);
 
     private final SkillGapClient gaps;
     private final EvidenceJson json;
@@ -61,6 +66,59 @@ public class EvidenceInputs {
             }
         }
         return result;
+    }
+
+    static ObjectNode verificationSources(Session session, JsonNode skills) {
+        var profile = session.getApplicationProfile();
+        var resume = session.getResume();
+        var job = session.getJobDescription();
+        var cv = DocumentText.from(profile != null ? profile.getCvText() : resume == null ? null : resume.getRawText());
+        var jd = DocumentText.from(profile != null ? profile.getJdText() : job == null ? null : job.getRawText());
+        var sources = JsonNodeFactory.instance.objectNode();
+        var cvSources = sources.putObject("cv");
+        var jdSources = sources.putObject("jd");
+        for (JsonNode skill : skills) {
+            addVerifiedSpans(cvSources, skill.path("cv_evidence_spans"), cv);
+            addVerifiedSpans(jdSources, skill.path("jd_evidence_spans"), jd);
+            for (JsonNode task : skill.path("job_tasks")) {
+                addVerifiedSpans(jdSources, task.path("evidence_spans"), jd);
+            }
+        }
+        return sources;
+    }
+
+    private static void addVerifiedSpans(ObjectNode result, JsonNode spans, DocumentText document) {
+        for (JsonNode span : spans) {
+            if (!span.isTextual() || result.has(span.textValue())) continue;
+            var excerpt = document.excerpt(span.textValue());
+            if (excerpt != null) result.put(span.textValue(), excerpt);
+        }
+    }
+
+    private record DocumentText(String original, String collapsed, int[] offsets) {
+        static DocumentText from(String text) {
+            String original = Objects.requireNonNullElse(text, "");
+            var collapsed = new StringBuilder(original.length());
+            int[] offsets = new int[original.length()];
+            var words = WORDS.matcher(original);
+            while (words.find()) {
+                if (!collapsed.isEmpty()) collapsed.append(' ');
+                for (int index = words.start(); index < words.end(); index++) {
+                    offsets[collapsed.length()] = index;
+                    collapsed.append(original.charAt(index));
+                }
+            }
+            return new DocumentText(original, collapsed.toString(), offsets);
+        }
+
+        String excerpt(String span) {
+            String needle = WHITESPACE.matcher(span).replaceAll(" ").strip();
+            if (needle.isEmpty()) return null;
+            if (original.contains(span)) return span;
+            int start = collapsed.indexOf(needle);
+            if (start < 0) return null;
+            return original.substring(offsets[start], offsets[start + needle.length() - 1] + 1);
+        }
     }
 
     public JsonNode enrichPersonalization(JsonNode baseSkills, Session session) {

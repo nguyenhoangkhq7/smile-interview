@@ -28,6 +28,7 @@ BLUEPRINT_WORKERS = 3
 BLUEPRINT_BATCH_ATTEMPTS = 2
 MAX_JD_DOMAIN_SUMMARY_CHARS = 300
 MASTERED_PRIOR_ASSESSMENTS = frozenset({"DEMONSTRATED_AT_TARGET", "DEMONSTRATED_ABOVE_TARGET"})
+ALL_COMPATIBLE_SKILLS_MASTERED = "ALL_COMPATIBLE_SKILLS_MASTERED"
 
 MODE_PATTERNS: dict[str, str] = {
     "DEBUGGING": r"\b(debug|diagnos\w*|troubleshoot\w*|optimi[sz]\w*)\b|chẩn đoán|tối ưu|sửa lỗi",
@@ -272,16 +273,17 @@ def plan(
     policy = policy or InterviewPolicy()
     by_skill = {skill.jd_skill_id: skill for skill in skills}
     prior_map = prior_attempts.objective_assessments if prior_attempts else {}
+    mastered = prior_attempts.mastered_skill_ids if prior_attempts else set()
     ranked = sorted(
         blueprint.objectives,
-        key=lambda obj: _rank(obj, by_skill[obj.skill_id], policy, prior_map),
+        key=lambda obj: _rank(obj, by_skill[obj.skill_id], prior_map),
     )
     # First pass across skills before additional objectives of the same skill.
     first, additional, seen = [], [], set()
     for objective in ranked:
         (additional if objective.skill_id in seen else first).append(objective)
         seen.add(objective.skill_id)
-    return _allocate(first + additional, by_skill, config, policy)
+    return _allocate(first + additional, by_skill, config, policy, mastered)
 
 
 def _allocate(
@@ -289,12 +291,14 @@ def _allocate(
     by_skill: dict[str, InterviewSkill],
     config: InterviewConfig,
     policy: InterviewPolicy,
+    mastered: set[str],
 ) -> tuple[dict[str, ObjectiveState], list[str]]:
     states, queue, remaining = {}, [], config.duration_seconds
     mode_usage: Counter[Mode] = Counter()
     core_skills = {
         obj.skill_id for obj in objectives
-        if by_skill[obj.skill_id].importance_weight >= policy.core_importance
+        if obj.skill_id not in mastered
+        and by_skill[obj.skill_id].importance_weight >= policy.core_importance
         and obj.requirement_kind != "OPTIONAL"
     }
     initial_limit = min(
@@ -302,8 +306,16 @@ def _allocate(
         max(len(core_skills), 1, config.max_questions - ceil(config.max_questions * policy.reserve_followup_fraction)),
     )
     compatible = 0
+    mastered_in_mode = False
     for obj in objectives:
         modes = [item.mode for item in obj.suitable_modes]
+        if obj.skill_id in mastered:
+            mastered_in_mode |= config.focused_question_mode is None or config.focused_question_mode in modes
+            states[obj.objective_id] = ObjectiveState(
+                objective=obj, lifecycle="EXCLUDED",
+                excluded_reason="SKILL_ALREADY_MASTERED", stop_reason="SKILL_ALREADY_MASTERED",
+            )
+            continue
         mode = select_mode(obj, config, mode_usage)
         state = ObjectiveState(objective=obj)
         compatible += int(mode in modes)
@@ -323,6 +335,8 @@ def _allocate(
             remaining -= obj.estimated_seconds
         states[obj.objective_id] = state
     if not compatible:
+        if mastered_in_mode:
+            return states, queue
         raise ValueError("Không có mục tiêu phù hợp dạng phỏng vấn đã chọn")
     if not queue:
         raise ValueError("Thời lượng không đủ cho một mục tiêu; hãy tăng thời lượng")
@@ -362,18 +376,13 @@ def select_mode(objective: Objective, config: InterviewConfig, usage: Counter[Mo
 def _rank(
     objective: Objective,
     skill: InterviewSkill,
-    policy: InterviewPolicy,
-    prior_assessments: dict[str, str] | None = None,
-) -> tuple[int, int, int, float, float, int, str]:
-    prior_status = (prior_assessments or {}).get(objective.objective_id)
-    already_mastered = int(prior_status in MASTERED_PRIOR_ASSESSMENTS)
-    core = skill.importance_weight >= policy.core_importance
+    prior_assessments: dict[str, str],
+) -> tuple[float, int, int, int, str]:
+    prior_status = prior_assessments.get(objective.objective_id)
     return (
-        already_mastered,
-        -int(core),
-        int(objective.requirement_kind == "OPTIONAL"),
         -skill.importance_weight,
-        -skill.priority,
+        int(prior_status in MASTERED_PRIOR_ASSESSMENTS),
+        int(objective.requirement_kind == "OPTIONAL"),
         objective.estimated_seconds,
         objective.objective_id,
     )
