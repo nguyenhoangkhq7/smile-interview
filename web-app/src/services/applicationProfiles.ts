@@ -67,8 +67,15 @@ export interface InterviewAttempt {
 }
 export interface ApplicationProfile {
   id: string; title: string; company: string | null; roleTitle: string;
-  cvFilename: string; jdTitle: string; createdAt: string;
+  cvFilename: string; jdTitle: string; jdFilename?: string; createdAt: string;
   skills: SkillGapResult[]; analysis: SkillGapReport; attempts: InterviewAttempt[];
+}
+export interface ApplicationDocuments {
+  cvFilename: string; cvFileUrl: string | null; cvText: string;
+  jdTitle: string; jdFilename: string; jdFileUrl: string | null; jdText: string;
+}
+export interface ApplicationTrashEntry {
+  profile: ApplicationProfile; deletedAt: string; expiresAt: string;
 }
 export const attemptLabels: Record<AttemptStatus, string> = {
   'Not started': 'Chưa bắt đầu', 'In progress': 'Đang phỏng vấn', Completed: 'Đã hoàn thành',
@@ -80,6 +87,18 @@ export const applicationProfiles = {
   async list(signal?: AbortSignal): Promise<ApplicationProfile[]> { return (await axiosClient.get(base, { signal })).data; },
   async get(id: string, signal?: AbortSignal): Promise<ApplicationProfile> {
     return (await axiosClient.get(`${base}/${encodeURIComponent(id)}`, { signal })).data;
+  },
+  async documents(id: string, signal?: AbortSignal): Promise<ApplicationDocuments> {
+    return (await axiosClient.get(`${base}/${encodeURIComponent(id)}/documents`, { signal })).data;
+  },
+  async trash(signal?: AbortSignal): Promise<ApplicationTrashEntry[]> {
+    return (await axiosClient.get(`${base}/trash`, { signal })).data;
+  },
+  async delete(id: string): Promise<void> {
+    await axiosClient.delete(`${base}/${encodeURIComponent(id)}`);
+  },
+  async restore(id: string): Promise<void> {
+    await axiosClient.post(`${base}/${encodeURIComponent(id)}/restore`);
   },
   async create(sourceSessionId: string, title: string, company: string): Promise<ApplicationProfile> {
     return (await axiosClient.post(base, { sourceSessionId, title, company })).data;

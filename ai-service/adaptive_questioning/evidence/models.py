@@ -80,6 +80,17 @@ class InterviewSkillContext(BaseModel):
     context_job: str = Field(default="", max_length=300)
     cv_evidence_spans: list[str] = Field(default_factory=list)
 
+    @model_validator(mode="before")
+    @classmethod
+    def coerce_null_optional_strings(cls, values: object) -> object:
+        if not isinstance(values, dict):
+            return values
+        coerced = dict(values)
+        for field_name in ("jd_skill_name", "matched_cv_skill_name", "semantic_alignment", "context_job"):
+            if field_name in coerced and coerced[field_name] is None:
+                coerced[field_name] = ""
+        return coerced
+
 
 class InterviewSkill(InterviewSkillContext):
     model_config = ConfigDict(extra="ignore")

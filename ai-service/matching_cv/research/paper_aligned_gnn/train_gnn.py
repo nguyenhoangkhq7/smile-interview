@@ -147,53 +147,66 @@ def evaluate_baseline_ndcg(
     test_graphs: List[HeteroData],
     manifest_pairs: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
-    """Compute baseline metrics (Rule Coverage & SBERT Doc Cosine) on the test split."""
+    """Compute baseline metrics (SBERT Cosine Similarity & Rule Coverage) on the test split."""
     meta_by_pair = {p["pair_id"]: p for p in manifest_pairs}
-    by_jd: Dict[str, Dict[str, List[float]]] = {}
 
-    cov_preds: List[float] = []
-    targets: List[float] = []
+    def _compute_metrics_for_field(field_name: str, default_val: float = 0.5) -> Dict[str, float]:
+        by_jd: Dict[str, Dict[str, List[float]]] = {}
+        preds: List[float] = []
+        targets: List[float] = []
+        for g in test_graphs:
+            pid = getattr(g, "pair_id", "")
+            meta = meta_by_pair.get(pid, {})
+            val = float(meta.get(field_name, default_val))
+            t = float(g.y.view(-1).item())
+            preds.append(val)
+            targets.append(t)
+            jd_id = getattr(g, "jd_id", "unknown")
+            by_jd.setdefault(jd_id, {"preds": [], "targets": []})
+            by_jd[jd_id]["preds"].append(val)
+            by_jd[jd_id]["targets"].append(t)
 
-    for g in test_graphs:
-        pid = getattr(g, "pair_id", "")
-        meta = meta_by_pair.get(pid, {})
-        cov = meta.get("coverage_score", 0.5)
-        t = float(g.y.view(-1).item())
+        ndcg_5_list, ndcg_10_list = [], []
+        for data in by_jd.values():
+            if len(data["targets"]) > 1:
+                t_vec = np.array([data["targets"]])
+                p_vec = np.array([data["preds"]])
+                ndcg_5_list.append(float(ndcg_score(t_vec, p_vec, k=min(5, len(data["targets"])))))
+                ndcg_10_list.append(float(ndcg_score(t_vec, p_vec, k=min(10, len(data["targets"])))))
 
-        cov_preds.append(cov)
-        targets.append(t)
+        p_arr = np.array(preds, dtype=np.float64)
+        t_arr = np.array(targets, dtype=np.float64)
+        mse = float(np.mean((p_arr - t_arr) ** 2))
+        rmse = float(np.sqrt(mse))
+        mae = float(np.mean(np.abs(p_arr - t_arr)))
+        if np.std(p_arr) > 1e-8 and np.std(t_arr) > 1e-8:
+            pearson_r, _ = scipy.stats.pearsonr(p_arr, t_arr)
+            spearman_rho, _ = scipy.stats.spearmanr(p_arr, t_arr)
+        else:
+            pearson_r, spearman_rho = 0.0, 0.0
 
-        jd_id = getattr(g, "jd_id", "unknown")
-        if jd_id not in by_jd:
-            by_jd[jd_id] = {"cov": [], "targets": []}
-        by_jd[jd_id]["cov"].append(cov)
-        by_jd[jd_id]["targets"].append(t)
-
-    # NDCG of coverage
-    ndcg_5_cov = []
-    for jd_id, data in by_jd.items():
-        if len(data["targets"]) > 1:
-            t_vec = np.array([data["targets"]])
-            c_vec = np.array([data["cov"]])
-            k5 = min(5, len(data["targets"]))
-            ndcg_5_cov.append(float(ndcg_score(t_vec, c_vec, k=k5)))
-
-    cov_arr = np.array(cov_preds)
-    t_arr = np.array(targets)
-    cov_mse = float(np.mean((cov_arr - t_arr) ** 2))
-    cov_mae = float(np.mean(np.abs(cov_arr - t_arr)))
-    cov_pearson, _ = scipy.stats.pearsonr(cov_arr, t_arr) if np.std(cov_arr) > 1e-8 else (0.0, 0.0)
-    cov_spearman, _ = scipy.stats.spearmanr(cov_arr, t_arr) if np.std(cov_arr) > 1e-8 else (0.0, 0.0)
-
-    return {
-        "coverage_baseline": {
-            "mse": round(cov_mse, 6),
-            "mae": round(cov_mae, 6),
-            "pearson_r": round(float(cov_pearson), 4),
-            "spearman_rho": round(float(cov_spearman), 4),
-            "mean_ndcg_5": round(float(np.mean(ndcg_5_cov)), 4) if ndcg_5_cov else 0.0,
+        return {
+            "mse": round(mse, 6),
+            "rmse": round(rmse, 6),
+            "mae": round(mae, 6),
+            "pearson_r": round(float(pearson_r), 4),
+            "spearman_rho": round(float(spearman_rho), 4),
+            "paper_tolerance_acc_5pt": round(
+                compute_paper_tolerance_accuracy(preds, targets, scale="0_1", tolerance_points_on_100=5.0), 4
+            ),
+            "paper_tolerance_acc_10pt": round(
+                compute_paper_tolerance_accuracy(preds, targets, scale="0_1", tolerance_points_on_100=10.0), 4
+            ),
+            "mean_ndcg_5": round(float(np.mean(ndcg_5_list)), 4) if ndcg_5_list else 0.0,
+            "mean_ndcg_10": round(float(np.mean(ndcg_10_list)), 4) if ndcg_10_list else 0.0,
         }
+
+    result: Dict[str, Any] = {
+        "coverage_baseline": _compute_metrics_for_field("coverage_score", 0.5),
     }
+    if any("sbert_cosine_score" in p for p in manifest_pairs):
+        result["sbert_cosine_baseline"] = _compute_metrics_for_field("sbert_cosine_score", 0.5)
+    return result
 
 
 def train_model(
@@ -204,7 +217,13 @@ def train_model(
     weight_decay: float = 1e-5,
     patience: int = 25,
     seed: int = 42,
-) -> None:
+    use_skill_dependency_edges: bool | None = None,
+    use_reverse_skill_dependency_edges: bool = True,
+    skill_dependency_gate_init: float = 0.15,
+    skill_dependency_mode: str = "light_sbert_diffusion",
+    baseline_checkpoint: str | None = None,
+    report_out: str | None = None,
+) -> Dict[str, Any]:
     set_seed(seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info(f"Using training device: {device}")
@@ -218,7 +237,13 @@ def train_model(
     with open(proc_path / "manifest.json", "r", encoding="utf-8") as f:
         manifest = json.load(f)
 
-    logger.info(f"Loaded datasets: Train={len(train_graphs)}, Val={len(val_graphs)}, Test={len(test_graphs)}")
+    if use_skill_dependency_edges is None:
+        use_skill_dependency_edges = bool(manifest.get("enable_skill_dependencies", False))
+
+    logger.info(
+        f"Loaded datasets: Train={len(train_graphs)}, Val={len(val_graphs)}, Test={len(test_graphs)} | "
+        f"use_skill_dependency_edges={use_skill_dependency_edges}"
+    )
 
     # Model configuration
     model_cfg = PaperAlignedGNNConfig(
@@ -236,6 +261,10 @@ def train_model(
         missing_resume_weight_for_gat=0.0,
         add_self_loops_in_gat=False,
         score_scale="0_1",
+        use_skill_dependency_edges=use_skill_dependency_edges,
+        use_reverse_skill_dependency_edges=use_reverse_skill_dependency_edges,
+        skill_dependency_gate_init=skill_dependency_gate_init,
+        skill_dependency_mode=skill_dependency_mode,
     )
 
     model = PaperAlignedHybridGNN(config=model_cfg).to(device)
@@ -306,8 +335,14 @@ def train_model(
     val_best_metrics = evaluate_dataset(model, val_graphs, device)
     train_best_metrics = evaluate_dataset(model, train_graphs, device)
 
-    # Compute baseline comparison
+    # Compute baseline comparisons (SBERT Cosine + optional Bipartite v1 GNN checkpoint)
     baseline_metrics = evaluate_baseline_ndcg(test_graphs, manifest.get("pairs_metadata", []))
+    if baseline_checkpoint and Path(baseline_checkpoint).is_file():
+        b_svc = GNNInferenceService(checkpoint_path=baseline_checkpoint)
+        b_model, _ = b_svc.get_model(checkpoint_path=baseline_checkpoint)
+        baseline_metrics["bipartite_gnn_v1_baseline"] = evaluate_dataset(
+            b_model, test_graphs, next(b_model.parameters()).device
+        )
 
     logger.info("=" * 70)
     logger.info("FINAL TEST EVALUATION RESULTS:")
@@ -323,18 +358,46 @@ def train_model(
     logger.info(f"  Test NDCG@10 (Ranking):  {test_metrics['mean_ndcg_10']:.4f}")
     logger.info("-" * 70)
     logger.info("BASELINE COMPARISON (Test Set):")
-    cov_b = baseline_metrics["coverage_baseline"]
-    logger.info(f"  Coverage Baseline MSE:   {cov_b['mse']:.5f} vs GNN MSE: {test_metrics['mse']:.5f}")
-    logger.info(f"  Coverage Baseline MAE:   {cov_b['mae']:.4f} vs GNN MAE: {test_metrics['mae']:.4f}")
-    logger.info(f"  Coverage Baseline NDCG@5:{cov_b['mean_ndcg_5']:.4f} vs GNN NDCG@5: {test_metrics['mean_ndcg_5']:.4f}")
+    if "sbert_cosine_baseline" in baseline_metrics:
+        sb = baseline_metrics["sbert_cosine_baseline"]
+        logger.info(
+            f"  SBERT Cosine Baseline:   MSE={sb['mse']:.5f}, MAE={sb['mae']:.4f}, "
+            f"Spearman={sb['spearman_rho']:.4f}, NDCG@5={sb['mean_ndcg_5']:.4f}"
+        )
+    if "bipartite_gnn_v1_baseline" in baseline_metrics:
+        bv1 = baseline_metrics["bipartite_gnn_v1_baseline"]
+        logger.info(
+            f"  Bipartite GNN v1 Base:   MSE={bv1['mse']:.5f}, MAE={bv1['mae']:.4f}, "
+            f"Spearman={bv1['spearman_rho']:.4f}, NDCG@5={bv1['mean_ndcg_5']:.4f}"
+        )
     logger.info("=" * 70)
 
     # Build Checkpoint Dictionary matching GNNInferenceService contract
     checkpoint_path = Path(checkpoint_out)
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
+    learned_dep_gates = [
+        round(
+            float(
+                (
+                    0.5 * torch.sigmoid(layer.dep_gate)
+                    if model_cfg.skill_dependency_mode == "light_sbert_diffusion"
+                    else torch.tanh(layer.dep_gate)
+                ).item()
+            ),
+            6,
+        )
+        for layer in model.layers
+        if getattr(layer, "dep_gate", None) is not None
+    ]
+
     ckpt_payload = {
         "architecture": "PaperAlignedHybridGNN",
+        "model_version": (
+            "dependency-aware-hybrid-gnn-v2"
+            if model_cfg.use_skill_dependency_edges
+            else "paper-aligned-2025-v1"
+        ),
         "is_trained": True,
         "supervision_target": "skill_score",
         "dataset_repository": "synthetic_cv_jd_dataset_v2",
@@ -359,6 +422,10 @@ def train_model(
             "missing_resume_weight_for_gat": model_cfg.missing_resume_weight_for_gat,
             "add_self_loops_in_gat": model_cfg.add_self_loops_in_gat,
             "score_scale": model_cfg.score_scale,
+            "use_skill_dependency_edges": model_cfg.use_skill_dependency_edges,
+            "use_reverse_skill_dependency_edges": model_cfg.use_reverse_skill_dependency_edges,
+            "skill_dependency_gate_init": model_cfg.skill_dependency_gate_init,
+            "skill_dependency_mode": model_cfg.skill_dependency_mode,
         },
         "training_config": {
             "epochs": epochs,
@@ -368,6 +435,7 @@ def train_model(
             "patience": patience,
             "optimizer": "AdamW",
             "loss_function": "MSELoss",
+            "learned_dependency_gates_tanh": learned_dep_gates,
         },
         "best_epoch": best_epoch,
         "stopped_early": no_improve_epochs >= patience,
@@ -389,7 +457,19 @@ def train_model(
     validated_state, validated_config = inference_service.validate_checkpoint_payload(
         ckpt_payload, str(checkpoint_path)
     )
-    logger.info(f"Checkpoint successfully validated! Architecture verified: {validated_config.score_scale}")
+    logger.info(
+        f"Checkpoint successfully validated! Scale={validated_config.score_scale}, "
+        f"use_skill_dependency_edges={validated_config.use_skill_dependency_edges}"
+    )
+
+    summary_report = {k: v for k, v in ckpt_payload.items() if k != "model_state_dict"}
+    if report_out:
+        rp = Path(report_out)
+        rp.parent.mkdir(parents=True, exist_ok=True)
+        with open(rp, "w", encoding="utf-8") as f:
+            json.dump(summary_report, f, indent=2)
+        logger.info(f"Evaluation report saved to: {rp}")
+    return summary_report
 
 
 if __name__ == "__main__":
@@ -403,7 +483,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--checkpoint-out",
         type=str,
-        default=r"ai-service\matching_cv\data\checkpoints\paper_aligned_gnn\paper_aligned_hybrid_gnn_v1.pt",
+        default=r"ai-service\matching_cv\data\checkpoints\paper_aligned_gnn\paper_aligned_hybrid_gnn_v2_dep.pt",
         help="Target file path for trained PyTorch checkpoint",
     )
     parser.add_argument("--epochs", type=int, default=45, help="Maximum number of training epochs")
@@ -411,6 +491,49 @@ if __name__ == "__main__":
     parser.add_argument("--weight-decay", type=float, default=1e-5, help="Weight decay")
     parser.add_argument("--patience", type=int, default=25, help="Early stopping patience")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    parser.add_argument(
+        "--enable-skill-dependencies",
+        dest="use_skill_dependency_edges",
+        action="store_true",
+        default=None,
+        help="Explicitly enable intra-skill prerequisite dependency message passing",
+    )
+    parser.add_argument(
+        "--no-skill-dependencies",
+        dest="use_skill_dependency_edges",
+        action="store_false",
+        help="Disable intra-skill prerequisite dependency message passing (bipartite baseline)",
+    )
+    parser.add_argument(
+        "--no-reverse-skill-dependencies",
+        action="store_true",
+        help="Disable reverse prerequisite_of edges in dependency propagation",
+    )
+    parser.add_argument(
+        "--dep-gate-init",
+        type=float,
+        default=0.15,
+        help="Initial value for learnable dependency residual gate",
+    )
+    parser.add_argument(
+        "--dep-mode",
+        type=str,
+        choices=["light_sbert_diffusion", "modified_gat"],
+        default="light_sbert_diffusion",
+        help="Intra-skill prerequisite propagation operator",
+    )
+    parser.add_argument(
+        "--baseline-checkpoint",
+        type=str,
+        default=r"ai-service\matching_cv\data\checkpoints\paper_aligned_gnn\paper_aligned_hybrid_gnn_v1.pt",
+        help="Optional baseline checkpoint to evaluate on the same test split for direct comparison",
+    )
+    parser.add_argument(
+        "--report-out",
+        type=str,
+        default=None,
+        help="Optional path to save JSON evaluation report",
+    )
     args = parser.parse_args()
 
     train_model(
@@ -421,4 +544,10 @@ if __name__ == "__main__":
         weight_decay=args.weight_decay,
         patience=args.patience,
         seed=args.seed,
+        use_skill_dependency_edges=args.use_skill_dependency_edges,
+        use_reverse_skill_dependency_edges=not args.no_reverse_skill_dependencies,
+        skill_dependency_gate_init=args.dep_gate_init,
+        skill_dependency_mode=args.dep_mode,
+        baseline_checkpoint=args.baseline_checkpoint,
+        report_out=args.report_out,
     )

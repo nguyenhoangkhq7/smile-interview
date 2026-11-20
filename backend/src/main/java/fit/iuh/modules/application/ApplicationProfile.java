@@ -26,4 +26,5 @@ public class ApplicationProfile {
     @Column(columnDefinition = "text") private String blueprintJson;
     @Column(columnDefinition = "text") private String policyJson;
     @Column(nullable = false) private LocalDateTime createdAt;
+    @Column(name = "deleted_at") private LocalDateTime deletedAt;
 }

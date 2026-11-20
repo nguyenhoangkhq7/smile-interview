@@ -225,22 +225,33 @@ class CompetencyLineageRecord(BaseModel):
 
 
 class PaperAlignedBipartiteEdge(BaseModel):
-    """Directed bipartite edge between a document node ('resume'/'job') and an entity node ('skill')."""
+    """Directed edge in the Resume-Job-Skill heterogeneous graph (document<->skill or skill<->skill prerequisite)."""
 
     edge_id: str = Field(..., description="Unique edge identifier")
     source_type: Literal["resume", "job", "skill"] = Field(...)
-    edge_type: Literal["has_skill", "requires_skill", "in_resume", "required_by_job"] = Field(...)
+    edge_type: Literal[
+        "has_skill",
+        "requires_skill",
+        "in_resume",
+        "required_by_job",
+        "prerequisite_to",
+        "prerequisite_of",
+    ] = Field(...)
     target_type: Literal["resume", "job", "skill"] = Field(...)
     source_id: str = Field(...)
     target_id: str = Field(...)
     is_reverse_edge: bool = Field(
         default=False,
-        description="False for document->entity edges, True for entity->document reverse message-passing edges",
+        description="False for forward edges (doc->skill or prerequisite_to), True for reverse message-passing edges",
     )
     proficiency: ProficiencyRecord = Field(..., description="Proficiency metadata and numeric mapping")
     tensor_weight: float = Field(
         ...,
         description="Numeric scalar weight placed in PyG edge_attr according to normalization policy",
+    )
+    dependency_source: Optional[str] = Field(
+        default=None,
+        description="Origin of skill-to-skill prerequisite edge ('stage4_llm_reasoning' or 'curated_skill_dag')",
     )
 
 
@@ -259,18 +270,20 @@ class PaperAlignedGraphIntegrityReport(BaseModel):
     correct_edge_indices_and_directions: bool = Field(default=True)
     correct_reverse_edges: bool = Field(default=True)
     no_accidental_confusable_merges: bool = Field(default=True)
+    skill_dependency_dag_valid: bool = Field(default=True)
     node_counts: Dict[str, int] = Field(default_factory=dict)
     edge_counts: Dict[str, int] = Field(default_factory=dict)
     shared_skill_count: int = Field(default=0)
     resume_only_skill_count: int = Field(default=0)
     job_only_skill_count: int = Field(default=0)
+    skill_dependency_edge_count: int = Field(default=0)
     errors: List[str] = Field(default_factory=list)
     warnings: List[str] = Field(default_factory=list)
 
 
 @dataclass
 class PaperAlignedGraphConfig:
-    """Configuration for building a paper-aligned bipartite Resume-Job graph."""
+    """Configuration for building a Resume-Job-Skill heterogeneous graph."""
 
     merge_policy: MergePolicyType = "verified_equivalence"
     graph_policy: Literal["policy_a_legacy", "policy_b_semantic"] = "policy_a_legacy"
@@ -286,6 +299,10 @@ class PaperAlignedGraphConfig:
     include_reverse_edges: bool = True
     filter_context_non_competencies: bool = True
     filter_unsupported_implicit: bool = True
+    enable_skill_dependencies: bool = True
+    dependency_scope: Literal["jd_anchored", "jd_only", "all_skills"] = "jd_anchored"
+    use_curated_dependency_dag: bool = True
+    use_stage4_dependency_reasoning: bool = True
 
 
 class PaperAlignedGraphData(BaseModel):

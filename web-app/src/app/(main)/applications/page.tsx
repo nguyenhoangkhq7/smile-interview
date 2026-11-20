@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, BriefcaseBusiness, FileText, Plus, Search, SlidersHorizontal } from 'lucide-react';
+import { ArrowRight, BriefcaseBusiness, FileText, Plus, Search, SlidersHorizontal, Trash2 } from 'lucide-react';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { ApplicationProfile, applicationProfiles } from '@/services/applicationProfiles';
 import { interviewError } from '@/services/evidenceInterview';
-import { activeAttempt, AttemptBadge, finishedAttempt, formatProfileDate, searchText } from '@/components/features/applications/applicationUi';
+import { activeAttempt, finishedAttempt, searchText } from '@/components/features/applications/applicationUi';
+import { ApplicationFolderCard } from '@/components/features/applications/ApplicationFolderCard';
 
 type Filter = 'all' | 'active' | 'ready' | 'results';
 const filters: { value: Filter; label: string }[] = [
@@ -41,7 +42,10 @@ function Profiles() {
       <div className="space-y-2"><h1 className="text-3xl font-semibold tracking-tight">Hồ sơ ứng tuyển</h1>
         <p className="max-w-xl text-sm leading-6 text-muted-foreground">Chuẩn bị cho từng vị trí. Phỏng vấn nhiều lượt và theo dõi kết quả trong cùng một hồ sơ.</p>
       </div>
-      <Link className={`${buttonVariants()} shrink-0`} href="/interview/new"><Plus size={16} />Tạo hồ sơ ứng tuyển</Link>
+      <div className="flex flex-wrap items-center gap-2">
+        <Link className={`${buttonVariants({ variant: 'outline' })} shrink-0`} href="/applications/trash"><Trash2 size={15} />Thùng rác</Link>
+        <Link className={`${buttonVariants()} shrink-0`} href="/interview/new"><Plus size={16} />Tạo hồ sơ ứng tuyển</Link>
+      </div>
     </header>
 
     {error && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/20 bg-destructive/5 p-4 text-sm"><p>{error}</p><Button variant="outline" onClick={() => void load()}>Thử lại</Button></div>}
@@ -66,18 +70,9 @@ function Profiles() {
 
     {profiles.length > 0 && !filtered.length && <div className="rounded-2xl border border-dashed py-14 text-center"><SlidersHorizontal className="mx-auto mb-3 text-muted-foreground" size={24} /><h2 className="font-semibold">Không tìm thấy hồ sơ phù hợp</h2><p className="mt-2 text-sm text-muted-foreground">Thử tên vị trí khác hoặc bỏ bộ lọc.</p><Button variant="outline" className="mt-5" onClick={() => { setQuery(''); setFilter('all'); }}>Xóa bộ lọc</Button></div>}
 
-    <div className="grid gap-4 md:grid-cols-2">{filtered.map(profile => {
-      const active = activeAttempt(profile.attempts);
-      const completed = profile.attempts.filter(a => finishedAttempt(a) && a.answeredCount > 0).length;
-      return <Link href={`/applications/${profile.id}`} key={profile.id} className="group flex min-w-0 flex-col rounded-2xl border bg-card p-5 transition hover:border-brand-orange/40 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-orange sm:p-6">
-        <div className="mb-5 flex items-start justify-between gap-3"><span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-muted/60 text-muted-foreground"><BriefcaseBusiness size={21} /></span>{active ? <AttemptBadge attempt={active} /> : <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800">{completed ? 'Đã có kết quả' : 'Sẵn sàng phỏng vấn'}</span>}</div>
-        <h2 className="line-clamp-2 min-h-14 break-words text-lg font-semibold leading-7 tracking-tight group-hover:text-brand-orange" title={profile.title}>{profile.title}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{profile.company || 'Chưa thêm công ty'}</p>
-        <p className="mt-5 flex min-w-0 items-center gap-2 text-sm text-muted-foreground"><FileText className="shrink-0" size={15} /><span className="truncate" title={profile.cvFilename}>{profile.cvFilename}</span></p>
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 pb-5 text-xs text-muted-foreground"><span>{profile.skills.length} kỹ năng theo JD</span><span>{profile.attempts.length} lượt phỏng vấn</span><span>Tạo {formatProfileDate(profile.createdAt)}</span></div>
-        <div className="mt-auto flex items-center justify-between gap-3 border-t pt-4 text-sm"><span className="text-muted-foreground">{completed ? `${completed} lượt có kết quả` : 'Chưa có lượt hoàn thành'}</span><span className="flex shrink-0 items-center gap-1.5 font-medium text-brand-orange">{active?.status === 'In progress' ? 'Tiếp tục' : 'Mở hồ sơ'}<ArrowRight size={16} /></span></div>
-      </Link>;
-    })}</div>
+    <div className="grid gap-5 md:grid-cols-2">{filtered.map((profile, index) => (
+      <ApplicationFolderCard key={profile.id} profile={profile} index={index} />
+    ))}</div>
   </div>;
 }
 

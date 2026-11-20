@@ -59,8 +59,15 @@ class PaperAlignedGNNConfig:
     # Score scale support ('0_1' matches Table 5 MSE=0.0020; '0_100' matches HR 0-100 scale)
     score_scale: ScoreScaleType = "0_1"
 
+    # PROJECT_ADAPTATION: Intra-Skill Prerequisite Dependency Message Passing
+    # Default False preserves 100% state_dict compatibility with v1 bipartite checkpoints.
+    use_skill_dependency_edges: bool = False
+    use_reverse_skill_dependency_edges: bool = True
+    skill_dependency_gate_init: float = 0.15
+    skill_dependency_mode: Literal["light_sbert_diffusion", "modified_gat"] = "light_sbert_diffusion"
+
     def get_decision_audit(self) -> Dict[str, DecisionClassification]:
-        return {
+        audit: Dict[str, DecisionClassification] = {
             "num_layers_2": "PAPER_EXPLICIT",
             "job_skill_graphconv": "PAPER_EXPLICIT",
             "resume_skill_modified_gat_eq2": "PAPER_EXPLICIT",
@@ -71,6 +78,9 @@ class PaperAlignedGNNConfig:
             "bidirectional_bipartite_message_flow": "IMPLEMENTATION_ASSUMPTION",
             "missing_job_weight_for_graphconv_fallback": "IMPLEMENTATION_ASSUMPTION",
         }
+        if self.use_skill_dependency_edges:
+            audit["skill_prerequisite_dependency_gat"] = "PROJECT_ADAPTATION"
+        return audit
 
 
 class PaperModifiedGATConv(nn.Module):
@@ -289,6 +299,53 @@ class PaperBipartiteHybridLayer(nn.Module):
         self.act = nn.LeakyReLU(negative_slope=config.leaky_relu_slope)
         self.drop = nn.Dropout(config.dropout)
 
+        # 3. Optional Intra-Skill Prerequisite Dependency Message Passing (PROJECT_ADAPTATION)
+        # Supports two modes:
+        # - 'light_sbert_diffusion' (default): Parameter-efficient SBERT-cosine weighted DAG diffusion
+        #   (inspired by LightGCN/APPNP) with learnable scalar gates (2-4 params total, prevents small-sample overfitting).
+        # - 'modified_gat': Full Equation (2) Modified GAT on skill prerequisite edges.
+        if config.use_skill_dependency_edges:
+            if config.skill_dependency_mode == "modified_gat":
+                self.skill_prereq_gat: Optional[PaperModifiedGATConv] = PaperModifiedGATConv(
+                    in_channels=out_dim,
+                    out_channels=out_dim,
+                    heads=config.num_heads,
+                    negative_slope=config.leaky_relu_slope,
+                    dropout=config.dropout,
+                    bias=False,
+                )
+                if config.use_reverse_skill_dependency_edges:
+                    self.skill_prereq_rev_gat: Optional[PaperModifiedGATConv] = PaperModifiedGATConv(
+                        in_channels=out_dim,
+                        out_channels=out_dim,
+                        heads=config.num_heads,
+                        negative_slope=config.leaky_relu_slope,
+                        dropout=config.dropout,
+                        bias=False,
+                    )
+                else:
+                    self.skill_prereq_rev_gat = None
+                self.norm_skill_dep: Optional[nn.LayerNorm] = nn.LayerNorm(out_dim)
+                self.dep_rev_gate: Optional[nn.Parameter] = None
+            else:
+                self.skill_prereq_gat = None
+                self.skill_prereq_rev_gat = None
+                self.norm_skill_dep = None
+                self.dep_rev_gate = (
+                    nn.Parameter(torch.tensor(float(config.skill_dependency_gate_init) * 0.5, dtype=torch.float32))
+                    if config.use_reverse_skill_dependency_edges
+                    else None
+                )
+            self.dep_gate: Optional[nn.Parameter] = nn.Parameter(
+                torch.tensor(float(config.skill_dependency_gate_init), dtype=torch.float32)
+            )
+        else:
+            self.skill_prereq_gat = None
+            self.skill_prereq_rev_gat = None
+            self.dep_gate = None
+            self.dep_rev_gate = None
+            self.norm_skill_dep = None
+
     def _prepare_job_edge_weights(
         self,
         edge_attr: Optional[torch.Tensor],
@@ -359,6 +416,8 @@ class PaperBipartiteHybridLayer(nn.Module):
         skill_update = torch.zeros_like(base_skill)
         res_to_skill_alpha = torch.empty((0, self.config.num_heads), dtype=dtype, device=device)
         res_to_skill_ei = torch.empty((2, 0), dtype=torch.long, device=device)
+        prereq_alpha = torch.empty((0, self.config.num_heads), dtype=dtype, device=device)
+        prereq_ei = torch.empty((2, 0), dtype=torch.long, device=device)
 
         if num_skills > 0:
             if et_job_to_skill in graph.edge_types and graph[et_job_to_skill].edge_index.numel() > 0:
@@ -379,7 +438,108 @@ class PaperBipartiteHybridLayer(nn.Module):
                 )
                 skill_update = skill_update + m_rs
 
-            h_skill_next = self.drop(self.norm_skill(self.act(skill_update) + base_skill))
+            h_skill_pre = self.norm_skill(self.act(skill_update) + base_skill)
+
+            # --- 1B. Intra-Skill Prerequisite Dependency Propagation (PROJECT_ADAPTATION) ---
+            if self.config.use_skill_dependency_edges and self.dep_gate is not None:
+                et_prereq_fwd = ("skill", "prerequisite_to", "skill")
+                et_prereq_rev = ("skill", "prerequisite_of", "skill")
+
+                if self.config.skill_dependency_mode == "modified_gat" and self.skill_prereq_gat is not None:
+                    dep_msg = torch.zeros_like(h_skill_pre)
+                    has_dep = False
+                    if et_prereq_fwd in graph.edge_types and graph[et_prereq_fwd].edge_index.numel() > 0:
+                        ei_pf = graph[et_prereq_fwd].edge_index.to(device=device)
+                        ea_pf = getattr(graph[et_prereq_fwd], "edge_attr", None)
+                        w_pf = (
+                            ea_pf.view(-1).to(dtype=dtype, device=device)
+                            if ea_pf is not None and ea_pf.numel() == ei_pf.size(1)
+                            else torch.ones((ei_pf.size(1),), dtype=dtype, device=device)
+                        )
+                        m_pf, (prereq_ei, prereq_alpha) = self.skill_prereq_gat(
+                            h_skill_pre, ei_pf, edge_weight=w_pf, return_attention_weights=True
+                        )
+                        dep_msg = dep_msg + m_pf
+                        has_dep = True
+
+                    if (
+                        self.skill_prereq_rev_gat is not None
+                        and et_prereq_rev in graph.edge_types
+                        and graph[et_prereq_rev].edge_index.numel() > 0
+                    ):
+                        ei_pr = graph[et_prereq_rev].edge_index.to(device=device)
+                        ea_pr = getattr(graph[et_prereq_rev], "edge_attr", None)
+                        w_pr = (
+                            ea_pr.view(-1).to(dtype=dtype, device=device)
+                            if ea_pr is not None and ea_pr.numel() == ei_pr.size(1)
+                            else torch.ones((ei_pr.size(1),), dtype=dtype, device=device)
+                        )
+                        m_pr = self.skill_prereq_rev_gat(h_skill_pre, ei_pr, edge_weight=w_pr)
+                        dep_msg = dep_msg + m_pr
+                        has_dep = True
+
+                    if has_dep and self.norm_skill_dep is not None:
+                        gate_scale = torch.tanh(self.dep_gate)
+                        h_skill_next = self.drop(
+                            self.norm_skill_dep(h_skill_pre + gate_scale * self.act(dep_msg))
+                        )
+                    else:
+                        h_skill_next = self.drop(h_skill_pre)
+                else:
+                    # Norm-preserving Convex SBERT-Weighted DAG Diffusion (APPNP-style):
+                    # For nodes with incoming prerequisite edges:
+                    #   h_v' = (1 - lam) * h_v + lam * sum_{u -> v} alpha_{uv} * h_u
+                    # where alpha_{uv} = w^{SBERT}_{uv} / sum_{k -> v} w^{SBERT}_{kv}
+                    # and lam = 0.5 * sigmoid(dep_gate) in (0, 0.5).
+                    # Preserves exact feature scale across JDs regardless of prerequisite density.
+                    h_updated = h_skill_pre
+                    if et_prereq_fwd in graph.edge_types and graph[et_prereq_fwd].edge_index.numel() > 0:
+                        ei_pf = graph[et_prereq_fwd].edge_index.to(device=device)
+                        ea_pf = getattr(graph[et_prereq_fwd], "edge_attr", None)
+                        w_pf = (
+                            ea_pf.view(-1).to(dtype=dtype, device=device).clamp(min=1e-4)
+                            if ea_pf is not None and ea_pf.numel() == ei_pf.size(1)
+                            else torch.ones((ei_pf.size(1),), dtype=dtype, device=device)
+                        )
+                        dst_pf = ei_pf[1]
+                        denom_pf = torch.zeros((num_skills,), dtype=dtype, device=device)
+                        denom_pf.index_add_(0, dst_pf, w_pf)
+                        has_in_pf = (denom_pf > 0).unsqueeze(-1)
+                        alpha_pf = w_pf / denom_pf[dst_pf].clamp(min=1e-8)
+                        prereq_ei = ei_pf
+                        prereq_alpha = alpha_pf.unsqueeze(-1)
+                        msg_pf = torch.zeros_like(h_skill_pre)
+                        msg_pf.index_add_(0, dst_pf, alpha_pf.unsqueeze(-1) * h_skill_pre[ei_pf[0]])
+                        lam_pf = 0.5 * torch.sigmoid(self.dep_gate)
+                        blended_pf = (1.0 - lam_pf) * h_updated + lam_pf * msg_pf
+                        h_updated = torch.where(has_in_pf, blended_pf, h_updated)
+
+                    if (
+                        self.dep_rev_gate is not None
+                        and et_prereq_rev in graph.edge_types
+                        and graph[et_prereq_rev].edge_index.numel() > 0
+                    ):
+                        ei_pr = graph[et_prereq_rev].edge_index.to(device=device)
+                        ea_pr = getattr(graph[et_prereq_rev], "edge_attr", None)
+                        w_pr = (
+                            ea_pr.view(-1).to(dtype=dtype, device=device).clamp(min=1e-4)
+                            if ea_pr is not None and ea_pr.numel() == ei_pr.size(1)
+                            else torch.ones((ei_pr.size(1),), dtype=dtype, device=device)
+                        )
+                        dst_pr = ei_pr[1]
+                        denom_pr = torch.zeros((num_skills,), dtype=dtype, device=device)
+                        denom_pr.index_add_(0, dst_pr, w_pr)
+                        has_in_pr = (denom_pr > 0).unsqueeze(-1)
+                        alpha_pr = w_pr / denom_pr[dst_pr].clamp(min=1e-8)
+                        msg_pr = torch.zeros_like(h_skill_pre)
+                        msg_pr.index_add_(0, dst_pr, alpha_pr.unsqueeze(-1) * h_skill_pre[ei_pr[0]])
+                        lam_pr = 0.5 * torch.sigmoid(self.dep_rev_gate)
+                        blended_pr = (1.0 - lam_pr) * h_updated + lam_pr * msg_pr
+                        h_updated = torch.where(has_in_pr, blended_pr, h_updated)
+
+                    h_skill_next = self.drop(h_updated)
+            else:
+                h_skill_next = self.drop(h_skill_pre)
         else:
             h_skill_next = base_skill
 
@@ -415,6 +575,8 @@ class PaperBipartiteHybridLayer(nn.Module):
             "skill_to_resume_alpha": skill_to_res_alpha,
             "resume_to_skill_edge_index": res_to_skill_ei,
             "resume_to_skill_alpha": res_to_skill_alpha,
+            "skill_prerequisite_edge_index": prereq_ei,
+            "skill_prerequisite_alpha": prereq_alpha,
         }
         return h_resume_next, h_job_next, h_skill_next, layer_attn
 
@@ -567,6 +729,28 @@ class PaperAlignedHybridGNN(nn.Module):
                         if isinstance(canonical_ids, list) and s_idx < len(canonical_ids):
                             resume_skill_canonical_attention_map[canonical_ids[s_idx]] = round(float(a_val), 6)
 
+        # Extract final-layer skill prerequisite dependency attention weights (explainability)
+        prereq_alpha_final = final_attn.get("skill_prerequisite_alpha")
+        prereq_ei_final = final_attn.get("skill_prerequisite_edge_index")
+        skill_dependency_attention_map: Dict[str, float] = {}
+        if (
+            prereq_alpha_final is not None
+            and prereq_ei_final is not None
+            and prereq_alpha_final.numel() > 0
+            and hasattr(graph["skill"], "node_ids")
+        ):
+            skill_ids = graph["skill"].node_ids
+            canonical_ids = getattr(graph["skill"], "canonical_ids", None)
+            if isinstance(skill_ids, list) and (not skill_ids or isinstance(skill_ids[0], str)):
+                p_alpha_mean = prereq_alpha_final.mean(dim=-1).detach().cpu().tolist()
+                p_src_idx = prereq_ei_final[0].detach().cpu().tolist()
+                p_dst_idx = prereq_ei_final[1].detach().cpu().tolist()
+                for s_i, d_i, a_v in zip(p_src_idx, p_dst_idx, p_alpha_mean):
+                    if 0 <= s_i < len(skill_ids) and 0 <= d_i < len(skill_ids):
+                        s_label = canonical_ids[s_i] if isinstance(canonical_ids, list) and s_i < len(canonical_ids) else skill_ids[s_i]
+                        d_label = canonical_ids[d_i] if isinstance(canonical_ids, list) and d_i < len(canonical_ids) else skill_ids[d_i]
+                        skill_dependency_attention_map[f"{s_label}->{d_label}"] = round(float(a_v), 6)
+
         return {
             "raw_score": raw_score,
             "bounded_score": bounded_score,
@@ -579,6 +763,7 @@ class PaperAlignedHybridGNN(nn.Module):
             "layer_attentions": layer_attentions,
             "resume_skill_attention_map": resume_skill_attention_map,
             "resume_skill_canonical_attention_map": resume_skill_canonical_attention_map,
+            "skill_dependency_attention_map": skill_dependency_attention_map,
             "decision_audit": self.config.get_decision_audit(),
         }
 

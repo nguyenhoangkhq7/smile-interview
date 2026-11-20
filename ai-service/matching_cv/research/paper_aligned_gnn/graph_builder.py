@@ -40,12 +40,17 @@ from matching_cv.research.paper_aligned_gnn.schemas import (
     PaperAlignedGraphData,
     PaperAlignedGraphIntegrityReport,
     PaperAlignedSkillNode,
+    ProficiencyRecord,
     SkillInputItem,
 )
 from matching_cv.research.paper_aligned_gnn.shared_skill_matcher import (
     are_confusable_distinct_skills,
     combine_shared_embeddings,
     match_and_merge_skills,
+)
+from matching_cv.research.paper_aligned_gnn.skill_dependency_resolver import (
+    detect_directed_cycles,
+    resolve_skill_dependency_edges,
 )
 
 
@@ -937,10 +942,74 @@ class PaperAlignedGraphBuilder:
                     )
                 )
 
+        # 3D. Resolve Skill-to-Skill Prerequisite Dependency Edges (Dependency-Aware Extension)
+        skill_dependency_audit: Dict[str, Any] = {
+            "enabled": bool(self.config.enable_skill_dependencies),
+            "scope": self.config.dependency_scope,
+            "total_edges": 0,
+            "from_stage4_llm": 0,
+            "from_curated_dag": 0,
+            "cycles_blocked": 0,
+            "edges": [],
+        }
+        if self.config.enable_skill_dependencies:
+            resolved_deps, skill_dependency_audit = resolve_skill_dependency_edges(
+                skill_nodes=skill_nodes,
+                reasoning_results=reasoning_results,
+                scope=self.config.dependency_scope,
+                use_curated_dag=self.config.use_curated_dependency_dag,
+                use_stage4_reasoning=self.config.use_stage4_dependency_reasoning,
+            )
+            for dep in resolved_deps:
+                dep_prof = ProficiencyRecord(
+                    side="JD_REQUIRED",
+                    is_missing=True,
+                    mapping_source="missing",
+                    extraction_method=f"skill_dependency:{dep.dependency_source}",
+                    decision_class="PROJECT_ADAPTATION",
+                )
+                edges.append(
+                    PaperAlignedBipartiteEdge(
+                        edge_id=f"{dep.source_node_id}__prerequisite_to__{dep.target_node_id}",
+                        source_type="skill",
+                        edge_type="prerequisite_to",
+                        target_type="skill",
+                        source_id=dep.source_node_id,
+                        target_id=dep.target_node_id,
+                        is_reverse_edge=False,
+                        proficiency=dep_prof,
+                        tensor_weight=dep.weight,
+                        dependency_source=dep.dependency_source,
+                    )
+                )
+                if self.config.include_reverse_edges:
+                    edges.append(
+                        PaperAlignedBipartiteEdge(
+                            edge_id=f"{dep.target_node_id}__prerequisite_of__{dep.source_node_id}",
+                            source_type="skill",
+                            edge_type="prerequisite_of",
+                            target_type="skill",
+                            source_id=dep.target_node_id,
+                            target_id=dep.source_node_id,
+                            is_reverse_edge=True,
+                            proficiency=dep_prof,
+                            tensor_weight=dep.weight,
+                            dependency_source=dep.dependency_source,
+                        )
+                    )
+
         # Deterministic ordering of skill_nodes and edges
+        # Reverse prerequisite_of edges are ordered by their forward (target_id, source_id)
+        # pair so exported PyG tensors remain exact element-wise transposes of prerequisite_to.
         skill_nodes = dict(sorted(skill_nodes.items(), key=lambda x: x[0]))
         edges.sort(
-            key=lambda e: (e.source_type, e.edge_type, e.target_type, e.source_id, e.target_id)
+            key=lambda e: (
+                e.source_type,
+                e.edge_type,
+                e.target_type,
+                e.target_id if e.edge_type == "prerequisite_of" else e.source_id,
+                e.source_id if e.edge_type == "prerequisite_of" else e.target_id,
+            )
         )
 
         graph_id_str = f"paper_graph_{self.config.merge_policy}_{pair_id or run_id[:8]}"
@@ -1027,7 +1096,12 @@ class PaperAlignedGraphBuilder:
             edges=edges,
             merge_audit=all_audit,
             diagnostics={
-                "architecture": "PaperAlignedBipartiteGraph",
+                "architecture": (
+                    "DependencyAwareHeteroGraph"
+                    if self.config.enable_skill_dependencies
+                    else "PaperAlignedBipartiteGraph"
+                ),
+                "skill_dependency_audit": skill_dependency_audit,
                 "entity_scope": "skill_only_adaptation",
                 "entity_scope_classification": "PROJECT_ADAPTATION",
                 "embedding_source_classification": "PROJECT_ADAPTATION",
@@ -1188,12 +1262,21 @@ class PaperAlignedGraphBuilder:
         if not c1_one_resume_one_job:
             errors.append("Graph must have exactly one Resume node ('resume_0') and one Job node ('job_0').")
 
-        # Check 2: No doc-doc or skill-skill edges
+        # Check 2: No doc-doc or unintended skill-skill edges
         c2_no_forbidden_edges = True
+        allowed_skill_skill_types = (
+            {"prerequisite_to", "prerequisite_of"}
+            if self.config.enable_skill_dependencies
+            else set()
+        )
         for e in graph_data.edges:
             if e.source_type == "skill" and e.target_type == "skill":
-                c2_no_forbidden_edges = False
-                errors.append(f"Forbidden skill-to-skill edge detected: {e.edge_id}")
+                if e.edge_type not in allowed_skill_skill_types:
+                    c2_no_forbidden_edges = False
+                    errors.append(f"Forbidden skill-to-skill edge detected: {e.edge_id}")
+                elif e.source_id == e.target_id:
+                    c2_no_forbidden_edges = False
+                    errors.append(f"Self-loop skill-to-skill edge detected: {e.edge_id}")
             if e.source_type in ("resume", "job") and e.target_type in ("resume", "job"):
                 c2_no_forbidden_edges = False
                 errors.append(f"Forbidden document-to-document edge detected: {e.edge_id}")
@@ -1203,6 +1286,8 @@ class PaperAlignedGraphBuilder:
         job_connected_skills: Set[str] = set()
         forward_edges_map: Dict[Tuple[str, str, str], PaperAlignedBipartiteEdge] = {}
         reverse_edges_map: Dict[Tuple[str, str, str], PaperAlignedBipartiteEdge] = {}
+        prereq_forward_map: Dict[Tuple[str, str], PaperAlignedBipartiteEdge] = {}
+        prereq_reverse_map: Dict[Tuple[str, str], PaperAlignedBipartiteEdge] = {}
 
         c9_directions_ok = True
         for e in graph_data.edges:
@@ -1225,6 +1310,17 @@ class PaperAlignedGraphBuilder:
                         errors.append(f"requires_skill target missing from skill_nodes: {e.target_id}")
                     job_connected_skills.add(e.target_id)
                     forward_edges_map[("job", "requires_skill", e.target_id)] = e
+                elif e.edge_type == "prerequisite_to":
+                    if e.source_type != "skill" or e.target_type != "skill":
+                        c9_directions_ok = False
+                        errors.append(f"Invalid prerequisite_to edge endpoints: {e.edge_id}")
+                    if e.source_id not in graph_data.skill_nodes or e.target_id not in graph_data.skill_nodes:
+                        c9_directions_ok = False
+                        errors.append(f"prerequisite_to endpoint missing from skill_nodes: {e.edge_id}")
+                    if math.isnan(e.tensor_weight) or math.isinf(e.tensor_weight) or e.tensor_weight <= 0.0:
+                        c9_directions_ok = False
+                        errors.append(f"Invalid prerequisite_to weight ({e.tensor_weight}) on {e.edge_id}")
+                    prereq_forward_map[(e.source_id, e.target_id)] = e
                 else:
                     c9_directions_ok = False
                     errors.append(f"Unexpected forward edge_type: {e.edge_type}")
@@ -1239,6 +1335,14 @@ class PaperAlignedGraphBuilder:
                         c9_directions_ok = False
                         errors.append(f"Invalid reverse required_by_job edge endpoints: {e.edge_id}")
                     reverse_edges_map[(e.source_id, "required_by_job", "job")] = e
+                elif e.edge_type == "prerequisite_of":
+                    if e.source_type != "skill" or e.target_type != "skill":
+                        c9_directions_ok = False
+                        errors.append(f"Invalid reverse prerequisite_of edge endpoints: {e.edge_id}")
+                    if e.source_id not in graph_data.skill_nodes or e.target_id not in graph_data.skill_nodes:
+                        c9_directions_ok = False
+                        errors.append(f"prerequisite_of endpoint missing from skill_nodes: {e.edge_id}")
+                    prereq_reverse_map[(e.source_id, e.target_id)] = e
                 else:
                     c9_directions_ok = False
                     errors.append(f"Unexpected reverse edge_type: {e.edge_type}")
@@ -1319,7 +1423,7 @@ class PaperAlignedGraphBuilder:
                     errors.append(f"Node {nid} contains NaN or Inf in embedding vector")
                     break
 
-        # Check 10: Reverse edges consistency
+        # Check 10: Reverse edges consistency (bipartite + prerequisite edges)
         c10_reverse_ok = True
         if self.config.include_reverse_edges:
             if len(reverse_edges_map) != len(forward_edges_map):
@@ -1337,6 +1441,29 @@ class PaperAlignedGraphBuilder:
                     if abs(rev_e.tensor_weight - fwd_e.tensor_weight) > 1e-6:
                         c10_reverse_ok = False
                         errors.append(f"Reverse edge weight mismatch on {rev_e.edge_id}")
+            if len(prereq_reverse_map) != len(prereq_forward_map):
+                c10_reverse_ok = False
+                errors.append(
+                    f"Reverse prerequisite edge count ({len(prereq_reverse_map)}) != forward prerequisite edge count ({len(prereq_forward_map)})"
+                )
+            for (u_id, v_id), fwd_e in prereq_forward_map.items():
+                rev_key = (v_id, u_id)
+                if rev_key not in prereq_reverse_map:
+                    c10_reverse_ok = False
+                    errors.append(f"Missing reverse prerequisite_of edge for {fwd_e.edge_id}")
+                else:
+                    rev_e = prereq_reverse_map[rev_key]
+                    if abs(rev_e.tensor_weight - fwd_e.tensor_weight) > 1e-6:
+                        c10_reverse_ok = False
+                        errors.append(f"Reverse prerequisite edge weight mismatch on {rev_e.edge_id}")
+
+        # Check 10b: Prerequisite DAG Acyclicity
+        c_dag_valid = True
+        if prereq_forward_map:
+            prereq_cycles = detect_directed_cycles(list(prereq_forward_map.keys()))
+            if prereq_cycles:
+                c_dag_valid = False
+                errors.append(f"Directed cycle detected in prerequisite_to subgraph: {prereq_cycles[:3]}")
 
         # Check 11: No accidental merge of confusable distinct skill identities
         c11_no_confusable_merges = True
@@ -1385,11 +1512,13 @@ class PaperAlignedGraphBuilder:
             correct_edge_indices_and_directions=c9_directions_ok,
             correct_reverse_edges=c10_reverse_ok,
             no_accidental_confusable_merges=c11_no_confusable_merges,
+            skill_dependency_dag_valid=c_dag_valid,
             node_counts=node_counts,
             edge_counts=edge_counts,
             shared_skill_count=shared_cnt,
             resume_only_skill_count=cv_only_cnt,
             job_only_skill_count=jd_only_cnt,
+            skill_dependency_edge_count=len(prereq_forward_map),
             errors=errors,
             warnings=warnings,
         )
@@ -1438,28 +1567,40 @@ class PaperAlignedGraphBuilder:
             "skill": skill_id_to_idx,
         }
 
-        # 3. Bipartite Edges & Proficiency Attributes
+        # 3. Bipartite & Skill-Dependency Edges & Attributes
         canonical_bipartite_edge_types: List[Tuple[str, str, str]] = [
             ("job", "requires_skill", "skill"),
             ("skill", "required_by_job", "job"),
             ("resume", "has_skill", "skill"),
             ("skill", "in_resume", "resume"),
         ]
+        has_dep_edges = any(
+            e.edge_type in ("prerequisite_to", "prerequisite_of") for e in graph_data.edges
+        )
+        skill_dependency_edge_types: List[Tuple[str, str, str]] = (
+            [
+                ("skill", "prerequisite_to", "skill"),
+                ("skill", "prerequisite_of", "skill"),
+            ]
+            if (self.config.enable_skill_dependencies or has_dep_edges)
+            else []
+        )
+        all_exported_edge_types = canonical_bipartite_edge_types + skill_dependency_edge_types
 
         grouped_pairs: Dict[Tuple[str, str, str], List[Tuple[int, int]]] = {
-            et: [] for et in canonical_bipartite_edge_types
+            et: [] for et in all_exported_edge_types
         }
         grouped_weights: Dict[Tuple[str, str, str], List[float]] = {
-            et: [] for et in canonical_bipartite_edge_types
+            et: [] for et in all_exported_edge_types
         }
         grouped_effective_weights: Dict[Tuple[str, str, str], List[float]] = {
-            et: [] for et in canonical_bipartite_edge_types
+            et: [] for et in all_exported_edge_types
         }
         grouped_raw_levels: Dict[Tuple[str, str, str], List[float]] = {
-            et: [] for et in canonical_bipartite_edge_types
+            et: [] for et in all_exported_edge_types
         }
         grouped_has_prof: Dict[Tuple[str, str, str], List[bool]] = {
-            et: [] for et in canonical_bipartite_edge_types
+            et: [] for et in all_exported_edge_types
         }
 
         job_missing_eff = (
@@ -1474,8 +1615,11 @@ class PaperAlignedGraphBuilder:
             grouped_pairs.setdefault(et, []).append((u_idx, v_idx))
             stored_w = float(edge.tensor_weight)
             grouped_weights.setdefault(et, []).append(stored_w)
+            is_dep_edge = edge.edge_type in ("prerequisite_to", "prerequisite_of")
             is_job_edge = edge.edge_type in ("requires_skill", "required_by_job")
-            if edge.proficiency.is_missing:
+            if is_dep_edge:
+                eff_w = stored_w
+            elif edge.proficiency.is_missing:
                 eff_w = job_missing_eff if is_job_edge else resume_missing_eff
             else:
                 eff_w = stored_w
@@ -1536,10 +1680,27 @@ class PaperAlignedGraphBuilder:
                     "numerical_consistency_verified": True,
                 }
 
+        # Export skill-to-skill prerequisite edges (SBERT-weighted)
+        for et in skill_dependency_edge_types:
+            pairs = grouped_pairs.get(et, [])
+            if pairs:
+                src_indices = [p[0] for p in pairs]
+                dst_indices = [p[1] for p in pairs]
+                pyg[et].edge_index = torch.tensor([src_indices, dst_indices], dtype=torch.long)
+                pyg[et].edge_attr = torch.tensor(grouped_weights[et], dtype=torch.float32).unsqueeze(1)
+                pyg[et].edge_effective_weight = torch.tensor(
+                    grouped_effective_weights[et], dtype=torch.float32
+                ).unsqueeze(1)
+            else:
+                pyg[et].edge_index = torch.empty((2, 0), dtype=torch.long)
+                pyg[et].edge_attr = torch.empty((0, 1), dtype=torch.float32)
+                pyg[et].edge_effective_weight = torch.empty((0, 1), dtype=torch.float32)
+
         pyg.graph_id = graph_data.graph_id
         pyg.pair_id = graph_data.pair_id
         pyg.merge_policy = graph_data.merge_policy
         pyg.edge_weight_normalization = graph_data.edge_weight_normalization
+        pyg.enable_skill_dependencies = bool(self.config.enable_skill_dependencies or has_dep_edges)
 
         num_nodes_by_type = {nt: int(pyg[nt].num_nodes) for nt in pyg.node_types}
         num_edges_by_type = {

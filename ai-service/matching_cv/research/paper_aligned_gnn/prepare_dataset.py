@@ -213,6 +213,19 @@ def build_pair_graph(
     pyg.label = pair.get("label", "UNCERTAIN")
     pyg.slot_id = pair.get("construction", {}).get("slot_id") or pair["pair_id"].split("_")[-1]
 
+    # Compute real SBERT Mean Max-Cosine Similarity Baseline (JD skills -> best CV skill)
+    sbert_cosine_score = 0.0
+    jd_vecs = [it.embedding_vector for it in jd_items if it.embedding_vector]
+    cv_vecs = [it.embedding_vector for it in cv_items if it.embedding_vector]
+    if jd_vecs and cv_vecs:
+        jd_mat = torch.tensor(jd_vecs, dtype=torch.float32)
+        cv_mat = torch.tensor(cv_vecs, dtype=torch.float32)
+        jd_mat = torch.nn.functional.normalize(jd_mat, p=2, dim=-1)
+        cv_mat = torch.nn.functional.normalize(cv_mat, p=2, dim=-1)
+        sim_mat = torch.matmul(jd_mat, cv_mat.T)
+        max_per_jd = sim_mat.max(dim=-1).values.clamp(min=0.0, max=1.0)
+        sbert_cosine_score = round(float(max_per_jd.mean().item()), 6)
+
     meta = {
         "pair_id": pair["pair_id"],
         "jd_id": jd_id,
@@ -221,9 +234,11 @@ def build_pair_graph(
         "slot_id": pyg.slot_id,
         "final_score": target_score,
         "coverage_score": float(pair["scores"].get("coverage_score", target_score)),
+        "sbert_cosine_score": sbert_cosine_score,
         "shared_skills": summary.get("shared_skills", 0),
         "resume_only_skills": summary.get("resume_only_skills", 0),
         "job_only_skills": summary.get("job_only_skills", 0),
+        "skill_dependency_edges": report.skill_dependency_edge_count,
         "is_valid": report.is_valid,
     }
     return pyg, meta
@@ -236,6 +251,8 @@ def run_dataset_preparation(
     train_ratio: float = 0.7,
     val_ratio: float = 0.1,
     test_ratio: float = 0.2,
+    enable_skill_dependencies: bool = True,
+    dependency_scope: str = "jd_anchored",
 ) -> None:
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
@@ -248,6 +265,8 @@ def run_dataset_preparation(
     cfg = PaperAlignedGraphConfig(
         embedding_dim=settings.STAGE3_EMBEDDING_DIM,
         edge_weight_normalization="scaled_0_1",
+        enable_skill_dependencies=enable_skill_dependencies,
+        dependency_scope=dependency_scope,
     )
     builder = PaperAlignedGraphBuilder(cfg)
 
@@ -307,7 +326,12 @@ def run_dataset_preparation(
         if (idx + 1) % 20 == 0 or (idx + 1) == len(pairs):
             logger.info(f"Processed {idx + 1}/{len(pairs)} pairs...")
 
-    logger.info(f"Split results: Train={len(train_graphs)}, Val={len(val_graphs)}, Test={len(test_graphs)}")
+    total_dep_edges = sum(m.get("skill_dependency_edges", 0) for m in metadata_list)
+    avg_dep_edges = round(total_dep_edges / max(1, len(metadata_list)), 2)
+    logger.info(
+        f"Split results: Train={len(train_graphs)}, Val={len(val_graphs)}, Test={len(test_graphs)} | "
+        f"Skill Dependencies enabled={enable_skill_dependencies}, total_prereq_edges={total_dep_edges} (avg={avg_dep_edges}/pair)"
+    )
 
     # Save graphs
     torch.save(train_graphs, output_path / "train_graphs.pt")
@@ -317,6 +341,10 @@ def run_dataset_preparation(
     manifest = {
         "dataset_name": "synthetic_cv_jd_dataset_v2",
         "total_pairs": len(pairs),
+        "enable_skill_dependencies": enable_skill_dependencies,
+        "dependency_scope": dependency_scope,
+        "total_skill_dependency_edges": total_dep_edges,
+        "avg_skill_dependency_edges_per_pair": avg_dep_edges,
         "split_counts": {
             "train": len(train_graphs),
             "val": len(val_graphs),
@@ -359,9 +387,23 @@ if __name__ == "__main__":
         default=r"ai-service\matching_cv\data\processed\paper_aligned_gnn",
         help="Directory to save serialized graphs and manifest",
     )
+    parser.add_argument(
+        "--no-skill-dependencies",
+        action="store_true",
+        help="Disable skill prerequisite dependency edges (strict Baghbanzadeh & Wu bipartite baseline)",
+    )
+    parser.add_argument(
+        "--dependency-scope",
+        type=str,
+        choices=["jd_anchored", "jd_only", "all_skills"],
+        default="jd_anchored",
+        help="Scope of prerequisite edges to include in the graph",
+    )
     args = parser.parse_args()
     run_dataset_preparation(
         raw_dir=args.raw_dir,
         processed_file=args.processed_file,
         output_dir=args.output_dir,
+        enable_skill_dependencies=not args.no_skill_dependencies,
+        dependency_scope=args.dependency_scope,
     )

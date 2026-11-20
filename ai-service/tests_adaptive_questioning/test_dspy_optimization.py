@@ -128,8 +128,8 @@ def test_labeled_compilation_saves_loads_and_runs_through_v2_provider(tmp_path):
     compiler.save_compiled_modules(q_module, j_module, tmp_path)
     question, judgment = get_gold_question_examples()[0], get_gold_judge_examples()[1]
     lm = dspy.utils.DummyLM([
-        {"reasoning": "Lượt INITIAL mức L4 bám đúng tiêu chí.", "question": question.question.model_dump(mode="json")},
-        {"reasoning": "Đánh giá bằng chứng nguyên văn Terraform.", "assessment": {
+        {"plan": "Lượt INITIAL mức L4 bám đúng tiêu chí.", "reasoning": "Lượt INITIAL mức L4 bám đúng tiêu chí.", "question": question.question.model_dump(mode="json")},
+        {"plan": "Đánh giá bằng chứng nguyên văn Terraform.", "reasoning": "Đánh giá bằng chứng nguyên văn Terraform.", "assessment": {
             "observations": [o.model_dump(mode="json") for o in judgment.judgment.observations],
             "explicit_inability": judgment.judgment.explicit_inability,
             "inability_excerpt": judgment.judgment.inability_excerpt,
@@ -285,7 +285,7 @@ def test_reflective_judge_short_circuits_inability_in_single_call():
         feedback="Phản hồi dài bị ghi đè khi explicit_inability=True.",
         feedback_contains_hint=True,
     )
-    lm = dspy.utils.DummyLM([{"reasoning": "Ứng viên thừa nhận chưa biết.", "assessment": assessment.model_dump(mode="json")}])
+    lm = dspy.utils.DummyLM([{"plan": "Ứng viên thừa nhận chưa biết.", "reasoning": "Ứng viên thừa nhận chưa biết.", "assessment": assessment.model_dump(mode="json")}])
     lm.adapter = dspy.JSONAdapter()
     judge = ReflectiveJudgeModule()
     with dspy.context(lm=lm, adapter=dspy.JSONAdapter()):

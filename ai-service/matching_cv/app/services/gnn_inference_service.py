@@ -41,19 +41,25 @@ PINNED_SBERT_MODEL_ID = "sentence-transformers/paraphrase-multilingual-mpnet-bas
 PINNED_SBERT_REVISION = "4328cf26390c98c5e3c738b4460a05b95f4911f5"
 EXPECTED_EMBEDDING_DIM = 768
 
-# Default checkpoint path for trained PaperAlignedHybridGNN
+# Default checkpoint path for trained Dependency-Aware PaperAlignedHybridGNN (v2)
+# Baseline bipartite checkpoint remains preserved at paper_aligned_hybrid_gnn_v1.pt for ablation comparison.
 PAPER_ALIGNED_CKPT_PATH = str(
-    Path(__file__).resolve().parents[2] / "data/checkpoints/paper_aligned_gnn/paper_aligned_hybrid_gnn_v1.pt"
+    Path(__file__).resolve().parents[2] / "data/checkpoints/paper_aligned_gnn/paper_aligned_hybrid_gnn_v2_dep.pt"
 )
 
 ALLOWED_PAPER_NODE_TYPES = {"resume", "job", "skill"}
 LEGACY_FORBIDDEN_NODE_TYPES = {"cv", "jd", "evidence", "requirement"}
-ALLOWED_PAPER_EDGE_TYPES = {
+BIPARTITE_PAPER_EDGE_TYPES = {
     ("resume", "has_skill", "skill"),
     ("skill", "in_resume", "resume"),
     ("job", "requires_skill", "skill"),
     ("skill", "required_by_job", "job"),
 }
+SKILL_DEPENDENCY_EDGE_TYPES = {
+    ("skill", "prerequisite_to", "skill"),
+    ("skill", "prerequisite_of", "skill"),
+}
+ALLOWED_PAPER_EDGE_TYPES = BIPARTITE_PAPER_EDGE_TYPES | SKILL_DEPENDENCY_EDGE_TYPES
 
 
 class GNNInputValidationError(ValueError):
@@ -256,6 +262,10 @@ class GNNInferenceService:
             "missing_resume_weight_for_gat",
             "add_self_loops_in_gat",
             "score_scale",
+            "use_skill_dependency_edges",
+            "use_reverse_skill_dependency_edges",
+            "skill_dependency_gate_init",
+            "skill_dependency_mode",
         }
         filtered_cfg = {k: v for k, v in raw_cfg.items() if k in valid_cfg_keys}
         cfg = PaperAlignedGNNConfig(**filtered_cfg)
@@ -404,12 +414,12 @@ class GNNInferenceService:
                 "GRAPH_INTEGRITY_VIOLATION: 'skill' node features contain NaN or Inf values."
             )
 
-        # Validate edge types (strictly bipartite document <-> skill; no skill <-> skill edges)
+        # Validate edge types (document <-> skill bipartite edges + validated skill prerequisite DAG edges)
         for et in graph.edge_types:
             if et not in ALLOWED_PAPER_EDGE_TYPES:
                 raise GNNInputValidationError(
-                    f"GRAPH_INTEGRITY_VIOLATION: Forbidden or non-bipartite edge type {et} detected. "
-                    "PaperAlignedHybridGNN only permits document-skill bipartite edges."
+                    f"GRAPH_INTEGRITY_VIOLATION: Forbidden edge type {et} detected. "
+                    "PaperAlignedHybridGNN only permits document-skill bipartite edges and skill prerequisite edges."
                 )
             e_store = graph[et]
             ei = getattr(e_store, "edge_index", None)
@@ -429,6 +439,10 @@ class GNNInferenceService:
                 if int(ei[1].min().item()) < 0 or int(ei[1].max().item()) >= max_dst:
                     raise GNNInputValidationError(
                         f"GRAPH_INTEGRITY_VIOLATION: Target index out of bounds in edge type {et}."
+                    )
+                if et in SKILL_DEPENDENCY_EDGE_TYPES and bool((ei[0] == ei[1]).any().item()):
+                    raise GNNInputValidationError(
+                        f"GRAPH_INTEGRITY_VIOLATION: Self-loop detected in skill dependency edge type {et}."
                     )
 
             ea = getattr(e_store, "edge_attr", None)
@@ -451,6 +465,7 @@ class GNNInferenceService:
         direction_pairs = [
             (("resume", "has_skill", "skill"), ("skill", "in_resume", "resume")),
             (("job", "requires_skill", "skill"), ("skill", "required_by_job", "job")),
+            (("skill", "prerequisite_to", "skill"), ("skill", "prerequisite_of", "skill")),
         ]
         for fwd_et, rev_et in direction_pairs:
             if fwd_et in graph.edge_types and rev_et in graph.edge_types:
