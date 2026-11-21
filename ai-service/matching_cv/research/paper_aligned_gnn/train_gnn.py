@@ -209,19 +209,83 @@ def evaluate_baseline_ndcg(
     return result
 
 
+def evaluate_pairwise_ordering(
+    model: PaperAlignedHybridGNN,
+    paired_records: List[Dict[str, Any]],
+    device: torch.device,
+) -> Dict[str, Any]:
+    """Evaluate pairwise directional ordering (score(g_higher) > score(g_lower)) on counterfactual pairs."""
+    if not paired_records:
+        return {"count": 0, "accuracy": 0.0, "mean_gap": 0.0, "min_gap": 0.0, "details": []}
+    model.eval()
+    correct = 0
+    gaps: List[float] = []
+    details: List[Dict[str, Any]] = []
+    with torch.no_grad():
+        for rec in paired_records:
+            g_hi = rec["g_higher"].to(device)
+            g_lo = rec["g_lower"].to(device)
+            s_hi = float(model(g_hi)["bounded_score"].view(-1).item())
+            s_lo = float(model(g_lo)["bounded_score"].view(-1).item())
+            gap = s_hi - s_lo
+            if gap > 0.0:
+                correct += 1
+            gaps.append(gap)
+            details.append({
+                "kind": rec.get("kind"),
+                "base_skill": rec.get("base_skill") or rec.get("skill") or rec.get("jd_id"),
+                "advanced_skill": rec.get("advanced_skill"),
+                "score_higher": round(s_hi, 4),
+                "score_lower": round(s_lo, 4),
+                "gap": round(gap, 4),
+                "passed": gap > 0.0,
+            })
+    return {
+        "count": len(paired_records),
+        "accuracy": round(correct / len(paired_records), 4),
+        "mean_gap": round(float(np.mean(gaps)), 4),
+        "min_gap": round(float(np.min(gaps)), 4),
+        "max_gap": round(float(np.max(gaps)), 4),
+        "details": details,
+    }
+
+
+def _jitter_cv_edge_weights_for_robustness(g: HeteroData, prob: float = 0.15) -> HeteroData:
+    """Randomly nudge a small fraction of CV edge weights toward neutral fallback (0.45-0.55) during training."""
+    et_fwd = ("resume", "has_skill", "skill")
+    et_rev = ("skill", "in_resume", "resume")
+    if et_fwd not in g.edge_types or g[et_fwd].edge_attr.numel() == 0:
+        return g
+    g_copy = g.clone()
+    ea = g_copy[et_fwd].edge_attr.clone()
+    mask = torch.rand_like(ea) < prob
+    if mask.any():
+        neutral = torch.empty_like(ea).uniform_(0.42, 0.58)
+        ea = torch.where(mask, neutral, ea)
+        g_copy[et_fwd].edge_attr = ea
+        if et_rev in g_copy.edge_types and g_copy[et_rev].edge_attr.shape == ea.shape:
+            g_copy[et_rev].edge_attr = ea.clone()
+    return g_copy
+
+
 def train_model(
     processed_dir: str,
     checkpoint_out: str,
-    epochs: int = 45,
+    epochs: int = 55,
     lr: float = 1e-3,
     weight_decay: float = 1e-5,
-    patience: int = 25,
+    patience: int = 30,
     seed: int = 42,
     use_skill_dependency_edges: bool | None = None,
     use_reverse_skill_dependency_edges: bool = True,
     skill_dependency_gate_init: float = 0.15,
-    skill_dependency_mode: str = "light_sbert_diffusion",
+    skill_dependency_mode: str = "asymmetric_sbert_diffusion",
+    use_value_weight_modulation: bool = True,
+    missing_resume_weight_for_gat: float = 0.45,
+    asym_loss_weight: float = 0.35,
+    depth_loss_weight: float = 0.35,
     baseline_checkpoint: str | None = None,
+    v2_checkpoint: str | None = None,
     report_out: str | None = None,
 ) -> Dict[str, Any]:
     set_seed(seed)
@@ -234,6 +298,27 @@ def train_model(
     val_graphs: List[HeteroData] = torch.load(proc_path / "val_graphs.pt", map_location="cpu", weights_only=False)
     test_graphs: List[HeteroData] = torch.load(proc_path / "test_graphs.pt", map_location="cpu", weights_only=False)
 
+    asym_train_pairs: List[Dict[str, Any]] = (
+        torch.load(proc_path / "asymmetric_train_pairs.pt", map_location="cpu", weights_only=False)
+        if (proc_path / "asymmetric_train_pairs.pt").is_file()
+        else []
+    )
+    asym_eval_pairs: List[Dict[str, Any]] = (
+        torch.load(proc_path / "asymmetric_eval_pairs.pt", map_location="cpu", weights_only=False)
+        if (proc_path / "asymmetric_eval_pairs.pt").is_file()
+        else []
+    )
+    depth_train_pairs: List[Dict[str, Any]] = (
+        torch.load(proc_path / "depth_train_pairs.pt", map_location="cpu", weights_only=False)
+        if (proc_path / "depth_train_pairs.pt").is_file()
+        else []
+    )
+    depth_eval_pairs: List[Dict[str, Any]] = (
+        torch.load(proc_path / "depth_eval_pairs.pt", map_location="cpu", weights_only=False)
+        if (proc_path / "depth_eval_pairs.pt").is_file()
+        else []
+    )
+
     with open(proc_path / "manifest.json", "r", encoding="utf-8") as f:
         manifest = json.load(f)
 
@@ -242,7 +327,10 @@ def train_model(
 
     logger.info(
         f"Loaded datasets: Train={len(train_graphs)}, Val={len(val_graphs)}, Test={len(test_graphs)} | "
-        f"use_skill_dependency_edges={use_skill_dependency_edges}"
+        f"AsymTrain={len(asym_train_pairs)}, AsymZeroShotEval={len(asym_eval_pairs)}, "
+        f"DepthTrain={len(depth_train_pairs)}, DepthEval={len(depth_eval_pairs)} | "
+        f"dep={use_skill_dependency_edges}, rev={use_reverse_skill_dependency_edges}, "
+        f"mode={skill_dependency_mode}, val_mod={use_value_weight_modulation}"
     )
 
     # Model configuration
@@ -258,7 +346,8 @@ def train_model(
         use_job_edge_weights=True,
         missing_job_weight_for_graphconv=1.0,
         use_resume_edge_weights=True,
-        missing_resume_weight_for_gat=0.0,
+        missing_resume_weight_for_gat=missing_resume_weight_for_gat,
+        use_value_weight_modulation=use_value_weight_modulation,
         add_self_loops_in_gat=False,
         score_scale="0_1",
         use_skill_dependency_edges=use_skill_dependency_edges,
@@ -275,35 +364,121 @@ def train_model(
     best_loss = float("inf")
     best_epoch = 0
     best_state_dict = None
+    no_improve_epochs = 0
 
     logger.info("Starting training loop...")
+    batch_size = 2
     for epoch in range(1, epochs + 1):
         model.train()
         indices = list(range(len(train_graphs)))
         random.shuffle(indices)
 
-        train_loss_accum = 0.0
+        asym_pool = list(range(len(asym_train_pairs)))
+        depth_pool = list(range(len(depth_train_pairs)))
+        random.shuffle(asym_pool)
+        random.shuffle(depth_pool)
+        asym_ptr = 0
+        depth_ptr = 0
 
-        for i, idx in enumerate(indices):
-            g = train_graphs[idx].to(device)
+        train_loss_accum = 0.0
+        asym_loss_accum = 0.0
+        depth_loss_accum = 0.0
+        n_batches = 0
+
+        # Joint mini-batch optimization: combine real dataset MSE with small weighted
+        # pairwise ranking losses inside the SAME gradient step so AdamW never cancels
+        # loss weights via separate auxiliary optimizer steps.
+        for start in range(0, len(indices), batch_size):
+            batch_idxs = indices[start : start + batch_size]
             optimizer.zero_grad()
-            out = model(g)
-            loss = criterion(out["raw_score"].view(-1), g.y.view(-1).to(device))
-            loss.backward()
+
+            real_losses = []
+            for idx in batch_idxs:
+                g_raw = train_graphs[idx]
+                g = _jitter_cv_edge_weights_for_robustness(g_raw, prob=0.06).to(device)
+                out = model(g)
+                real_losses.append(criterion(out["raw_score"].view(-1), g.y.view(-1).to(device)))
+            real_mse = torch.stack(real_losses).mean()
+            total_loss = real_mse
+            train_loss_accum += float(real_mse.item()) * len(batch_idxs)
+
+            if asym_train_pairs and asym_loss_weight > 0.0:
+                a_idx = asym_pool[asym_ptr % len(asym_pool)]
+                asym_ptr += 1
+                rec = asym_train_pairs[a_idx]
+                g_hi = rec["g_higher"].to(device)
+                g_lo = rec["g_lower"].to(device)
+                margin = 0.26 if rec.get("kind") == "solo" else 0.08
+                s_hi = model(g_hi)["raw_score"].view(-1)
+                s_lo = model(g_lo)["raw_score"].view(-1)
+                rank_a = F.relu(margin - (s_hi - s_lo)).mean()
+                # Soft realism bands on solo pairs: supersede in [0.58, 0.78], prereq-only in [0.20, 0.38]
+                if rec.get("kind") == "solo":
+                    rank_a = (
+                        rank_a
+                        + 0.25 * F.relu(s_hi - 0.78).pow(2).mean()
+                        + 0.25 * F.relu(0.58 - s_hi).pow(2).mean()
+                        + 0.35 * F.relu(0.20 - s_lo).pow(2).mean()
+                        + 0.25 * F.relu(s_lo - 0.38).pow(2).mean()
+                    )
+                total_loss = total_loss + asym_loss_weight * rank_a
+                asym_loss_accum += float(rank_a.item())
+
+            if depth_train_pairs and depth_loss_weight > 0.0:
+                d_idx = depth_pool[depth_ptr % len(depth_pool)]
+                depth_ptr += 1
+                rec = depth_train_pairs[d_idx]
+                g_hi = rec["g_higher"].to(device)
+                g_lo = rec["g_lower"].to(device)
+                kind_d = str(rec.get("kind", ""))
+                margin_d = 0.16 if "high_vs_low" in kind_d else 0.07
+                s_hi = model(g_hi)["raw_score"].view(-1)
+                s_lo = model(g_lo)["raw_score"].view(-1)
+                rank_d = F.relu(margin_d - (s_hi - s_lo)).mean()
+                # Soft calibration floors prevent small-graph / mid-tier / basic-tier collapse to 0.0
+                if "high_vs_low" in kind_d:
+                    rank_d = (
+                        rank_d
+                        + 0.25 * F.relu(0.76 - s_hi).pow(2).mean()
+                        + 0.25 * F.relu(0.35 - s_lo).pow(2).mean()
+                    )
+                elif "mid_vs_low" in kind_d:
+                    rank_d = (
+                        rank_d
+                        + 0.25 * F.relu(0.55 - s_hi).pow(2).mean()
+                        + 0.25 * F.relu(0.35 - s_lo).pow(2).mean()
+                    )
+                else:
+                    rank_d = (
+                        rank_d
+                        + 0.25 * F.relu(0.76 - s_hi).pow(2).mean()
+                        + 0.20 * F.relu(0.55 - s_lo).pow(2).mean()
+                    )
+                total_loss = total_loss + depth_loss_weight * rank_d
+                depth_loss_accum += float(rank_d.item())
+
+            total_loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
+            n_batches += 1
 
-            train_loss_accum += float(loss.item())
+        avg_train_loss = train_loss_accum / max(1, len(indices))
+        avg_asym_loss = asym_loss_accum / max(1, n_batches)
+        avg_depth_loss = depth_loss_accum / max(1, n_batches)
 
-        avg_train_loss = train_loss_accum / len(indices)
         scheduler.step()
 
-        # Validation evaluation
+        # Validation evaluation (real val_graphs only; never peeks at test_graphs or held-out eval pairs!)
         val_metrics = evaluate_dataset(model, val_graphs, device)
         val_loss = val_metrics["mse"]
 
-        # Track combined loss across train and val to avoid single-JD bias
-        tracking_loss = 0.6 * avg_train_loss + 0.4 * val_loss
+        # Track combined loss across real train/val plus auxiliary ranking compliance
+        tracking_loss = (
+            0.55 * avg_train_loss
+            + 0.45 * val_loss
+            + 0.10 * avg_asym_loss
+            + 0.10 * avg_depth_loss
+        )
 
         if tracking_loss < best_loss - 1e-5:
             best_loss = tracking_loss
@@ -334,15 +509,25 @@ def train_model(
     test_metrics = evaluate_dataset(model, test_graphs, device)
     val_best_metrics = evaluate_dataset(model, val_graphs, device)
     train_best_metrics = evaluate_dataset(model, train_graphs, device)
+    asym_eval_metrics = evaluate_pairwise_ordering(model, asym_eval_pairs, device)
+    depth_eval_metrics = evaluate_pairwise_ordering(model, depth_eval_pairs, device)
 
-    # Compute baseline comparisons (SBERT Cosine + optional Bipartite v1 GNN checkpoint)
+    # Compute baseline comparisons (SBERT Cosine + v1 Bipartite + v2 Dependency)
     baseline_metrics = evaluate_baseline_ndcg(test_graphs, manifest.get("pairs_metadata", []))
     if baseline_checkpoint and Path(baseline_checkpoint).is_file():
         b_svc = GNNInferenceService(checkpoint_path=baseline_checkpoint)
         b_model, _ = b_svc.get_model(checkpoint_path=baseline_checkpoint)
-        baseline_metrics["bipartite_gnn_v1_baseline"] = evaluate_dataset(
-            b_model, test_graphs, next(b_model.parameters()).device
-        )
+        b_dev = next(b_model.parameters()).device
+        baseline_metrics["bipartite_gnn_v1_baseline"] = evaluate_dataset(b_model, test_graphs, b_dev)
+        baseline_metrics["bipartite_gnn_v1_asym_zero_shot"] = evaluate_pairwise_ordering(b_model, asym_eval_pairs, b_dev)
+        baseline_metrics["bipartite_gnn_v1_depth_eval"] = evaluate_pairwise_ordering(b_model, depth_eval_pairs, b_dev)
+    if v2_checkpoint and Path(v2_checkpoint).is_file():
+        v2_svc = GNNInferenceService(checkpoint_path=v2_checkpoint)
+        v2_model, _ = v2_svc.get_model(checkpoint_path=v2_checkpoint)
+        v2_dev = next(v2_model.parameters()).device
+        baseline_metrics["dependency_gnn_v2_baseline"] = evaluate_dataset(v2_model, test_graphs, v2_dev)
+        baseline_metrics["dependency_gnn_v2_asym_zero_shot"] = evaluate_pairwise_ordering(v2_model, asym_eval_pairs, v2_dev)
+        baseline_metrics["dependency_gnn_v2_depth_eval"] = evaluate_pairwise_ordering(v2_model, depth_eval_pairs, v2_dev)
 
     logger.info("=" * 70)
     logger.info("FINAL TEST EVALUATION RESULTS:")
@@ -356,6 +541,14 @@ def train_model(
     logger.info(f"  Test Paper Acc (<=10pt): {test_metrics['paper_tolerance_acc_10pt']*100:.1f}%")
     logger.info(f"  Test NDCG@5 (Ranking):   {test_metrics['mean_ndcg_5']:.4f}")
     logger.info(f"  Test NDCG@10 (Ranking):  {test_metrics['mean_ndcg_10']:.4f}")
+    logger.info(
+        f"  Zero-Shot Asym Eval:     Acc={asym_eval_metrics['accuracy']*100:.1f}% "
+        f"(mean_gap={asym_eval_metrics['mean_gap']:+.4f}, min_gap={asym_eval_metrics['min_gap']:+.4f})"
+    )
+    logger.info(
+        f"  Depth Sensitivity Eval:  Acc={depth_eval_metrics['accuracy']*100:.1f}% "
+        f"(mean_gap={depth_eval_metrics['mean_gap']:+.4f}, min_gap={depth_eval_metrics['min_gap']:+.4f})"
+    )
     logger.info("-" * 70)
     logger.info("BASELINE COMPARISON (Test Set):")
     if "sbert_cosine_baseline" in baseline_metrics:
@@ -370,6 +563,16 @@ def train_model(
             f"  Bipartite GNN v1 Base:   MSE={bv1['mse']:.5f}, MAE={bv1['mae']:.4f}, "
             f"Spearman={bv1['spearman_rho']:.4f}, NDCG@5={bv1['mean_ndcg_5']:.4f}"
         )
+    if "dependency_gnn_v2_baseline" in baseline_metrics:
+        bv2 = baseline_metrics["dependency_gnn_v2_baseline"]
+        v2a = baseline_metrics["dependency_gnn_v2_asym_zero_shot"]
+        v2d = baseline_metrics["dependency_gnn_v2_depth_eval"]
+        logger.info(
+            f"  Dependency GNN v2 Base:  MSE={bv2['mse']:.5f}, MAE={bv2['mae']:.4f}, "
+            f"Spearman={bv2['spearman_rho']:.4f}, NDCG@5={bv2['mean_ndcg_5']:.4f} | "
+            f"AsymAcc={v2a['accuracy']*100:.1f}% (gap={v2a['mean_gap']:+.4f}), "
+            f"DepthAcc={v2d['accuracy']*100:.1f}% (gap={v2d['mean_gap']:+.4f})"
+        )
     logger.info("=" * 70)
 
     # Build Checkpoint Dictionary matching GNNInferenceService contract
@@ -380,9 +583,13 @@ def train_model(
         round(
             float(
                 (
-                    0.5 * torch.sigmoid(layer.dep_gate)
-                    if model_cfg.skill_dependency_mode == "light_sbert_diffusion"
-                    else torch.tanh(layer.dep_gate)
+                    0.20 * torch.sigmoid(layer.dep_gate)
+                    if model_cfg.skill_dependency_mode == "asymmetric_sbert_diffusion"
+                    else (
+                        0.5 * torch.sigmoid(layer.dep_gate)
+                        if model_cfg.skill_dependency_mode == "light_sbert_diffusion"
+                        else torch.tanh(layer.dep_gate)
+                    )
                 ).item()
             ),
             6,
@@ -390,14 +597,33 @@ def train_model(
         for layer in model.layers
         if getattr(layer, "dep_gate", None) is not None
     ]
+    learned_dep_rev_gates = [
+        round(
+            float(
+                (
+                    (0.65 if model_cfg.skill_dependency_mode == "asymmetric_sbert_diffusion" else 0.5)
+                    * torch.sigmoid(layer.dep_rev_gate)
+                ).item()
+            ),
+            6,
+        )
+        for layer in model.layers
+        if getattr(layer, "dep_rev_gate", None) is not None
+    ]
 
-    ckpt_payload = {
-        "architecture": "PaperAlignedHybridGNN",
-        "model_version": (
+    model_version_tag = (
+        "asymmetric-proficiency-hybrid-gnn-v3"
+        if (model_cfg.skill_dependency_mode == "asymmetric_sbert_diffusion" and model_cfg.use_value_weight_modulation)
+        else (
             "dependency-aware-hybrid-gnn-v2"
             if model_cfg.use_skill_dependency_edges
             else "paper-aligned-2025-v1"
-        ),
+        )
+    )
+
+    ckpt_payload = {
+        "architecture": "PaperAlignedHybridGNN",
+        "model_version": model_version_tag,
         "is_trained": True,
         "supervision_target": "skill_score",
         "dataset_repository": "synthetic_cv_jd_dataset_v2",
@@ -420,6 +646,7 @@ def train_model(
             "missing_job_weight_for_graphconv": model_cfg.missing_job_weight_for_graphconv,
             "use_resume_edge_weights": model_cfg.use_resume_edge_weights,
             "missing_resume_weight_for_gat": model_cfg.missing_resume_weight_for_gat,
+            "use_value_weight_modulation": model_cfg.use_value_weight_modulation,
             "add_self_loops_in_gat": model_cfg.add_self_loops_in_gat,
             "score_scale": model_cfg.score_scale,
             "use_skill_dependency_edges": model_cfg.use_skill_dependency_edges,
@@ -434,14 +661,19 @@ def train_model(
             "weight_decay": weight_decay,
             "patience": patience,
             "optimizer": "AdamW",
-            "loss_function": "MSELoss",
-            "learned_dependency_gates_tanh": learned_dep_gates,
+            "loss_function": "MSELoss + AsymmetricPairwiseMarginLoss + DepthPairwiseMarginLoss",
+            "asym_loss_weight": asym_loss_weight,
+            "depth_loss_weight": depth_loss_weight,
+            "learned_dependency_fwd_gates": learned_dep_gates,
+            "learned_dependency_rev_gates": learned_dep_rev_gates,
         },
         "best_epoch": best_epoch,
         "stopped_early": no_improve_epochs >= patience,
         "best_validation_metrics": val_best_metrics,
         "best_train_metrics": train_best_metrics,
         "test_metrics": test_metrics,
+        "asymmetric_zero_shot_eval": asym_eval_metrics,
+        "depth_sensitivity_eval": depth_eval_metrics,
         "baseline_comparison": baseline_metrics,
         "training_timestamp_utc": datetime.now(timezone.utc).isoformat(),
         "model_state_dict": best_state_dict,
@@ -459,7 +691,8 @@ def train_model(
     )
     logger.info(
         f"Checkpoint successfully validated! Scale={validated_config.score_scale}, "
-        f"use_skill_dependency_edges={validated_config.use_skill_dependency_edges}"
+        f"use_skill_dependency_edges={validated_config.use_skill_dependency_edges}, "
+        f"use_value_weight_modulation={validated_config.use_value_weight_modulation}"
     )
 
     summary_report = {k: v for k, v in ckpt_payload.items() if k != "model_state_dict"}
@@ -477,19 +710,19 @@ if __name__ == "__main__":
     parser.add_argument(
         "--processed-dir",
         type=str,
-        default=r"ai-service\matching_cv\data\processed\paper_aligned_gnn",
+        default=r"ai-service\matching_cv\data\processed\paper_aligned_gnn_v3",
         help="Directory containing train_graphs.pt, val_graphs.pt, test_graphs.pt",
     )
     parser.add_argument(
         "--checkpoint-out",
         type=str,
-        default=r"ai-service\matching_cv\data\checkpoints\paper_aligned_gnn\paper_aligned_hybrid_gnn_v2_dep.pt",
+        default=r"ai-service\matching_cv\data\checkpoints\paper_aligned_gnn\paper_aligned_hybrid_gnn_v3_asym_prof.pt",
         help="Target file path for trained PyTorch checkpoint",
     )
-    parser.add_argument("--epochs", type=int, default=45, help="Maximum number of training epochs")
+    parser.add_argument("--epochs", type=int, default=55, help="Maximum number of training epochs")
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
     parser.add_argument("--weight-decay", type=float, default=1e-5, help="Weight decay")
-    parser.add_argument("--patience", type=int, default=25, help="Early stopping patience")
+    parser.add_argument("--patience", type=int, default=30, help="Early stopping patience")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument(
         "--enable-skill-dependencies",
@@ -518,20 +751,34 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dep-mode",
         type=str,
-        choices=["light_sbert_diffusion", "modified_gat"],
-        default="light_sbert_diffusion",
+        choices=["asymmetric_sbert_diffusion", "light_sbert_diffusion", "modified_gat"],
+        default="asymmetric_sbert_diffusion",
         help="Intra-skill prerequisite propagation operator",
     )
+    parser.add_argument(
+        "--no-value-weight-modulation",
+        action="store_true",
+        help="Disable proficiency value modulation in Modified GAT",
+    )
+    parser.add_argument("--missing-resume-weight", type=float, default=0.45)
+    parser.add_argument("--asym-loss-weight", type=float, default=0.35)
+    parser.add_argument("--depth-loss-weight", type=float, default=0.35)
     parser.add_argument(
         "--baseline-checkpoint",
         type=str,
         default=r"ai-service\matching_cv\data\checkpoints\paper_aligned_gnn\paper_aligned_hybrid_gnn_v1.pt",
-        help="Optional baseline checkpoint to evaluate on the same test split for direct comparison",
+        help="Optional v1 baseline checkpoint to evaluate on the same test split",
+    )
+    parser.add_argument(
+        "--v2-checkpoint",
+        type=str,
+        default=r"ai-service\matching_cv\data\checkpoints\paper_aligned_gnn\paper_aligned_hybrid_gnn_v2_dep.pt",
+        help="Optional v2 dependency checkpoint to evaluate on the same test split",
     )
     parser.add_argument(
         "--report-out",
         type=str,
-        default=None,
+        default=r"ai-service\matching_cv\data\checkpoints\paper_aligned_gnn\evaluation_report_v3_asym_prof.json",
         help="Optional path to save JSON evaluation report",
     )
     args = parser.parse_args()
@@ -548,6 +795,11 @@ if __name__ == "__main__":
         use_reverse_skill_dependency_edges=not args.no_reverse_skill_dependencies,
         skill_dependency_gate_init=args.dep_gate_init,
         skill_dependency_mode=args.dep_mode,
+        use_value_weight_modulation=not args.no_value_weight_modulation,
+        missing_resume_weight_for_gat=args.missing_resume_weight,
+        asym_loss_weight=args.asym_loss_weight,
+        depth_loss_weight=args.depth_loss_weight,
         baseline_checkpoint=args.baseline_checkpoint,
+        v2_checkpoint=args.v2_checkpoint,
         report_out=args.report_out,
     )

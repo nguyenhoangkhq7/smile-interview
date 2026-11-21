@@ -54,6 +54,7 @@ class PaperAlignedGNNConfig:
     missing_job_weight_for_graphconv: float = 1.0  # Prevents zeroing out JD skills with '-' proficiency
     use_resume_edge_weights: bool = True
     missing_resume_weight_for_gat: float = 0.0
+    use_value_weight_modulation: bool = False  # True in v3: modulates GAT value message by w_ij so depth survives 1-neighbor/shift-invariant softmax
     add_self_loops_in_gat: bool = False  # Strictly bipartite neighborhood N(i) by default
 
     # Score scale support ('0_1' matches Table 5 MSE=0.0020; '0_100' matches HR 0-100 scale)
@@ -64,7 +65,11 @@ class PaperAlignedGNNConfig:
     use_skill_dependency_edges: bool = False
     use_reverse_skill_dependency_edges: bool = True
     skill_dependency_gate_init: float = 0.15
-    skill_dependency_mode: Literal["light_sbert_diffusion", "modified_gat"] = "light_sbert_diffusion"
+    skill_dependency_mode: Literal[
+        "light_sbert_diffusion",
+        "modified_gat",
+        "asymmetric_sbert_diffusion",
+    ] = "light_sbert_diffusion"
 
     def get_decision_audit(self) -> Dict[str, DecisionClassification]:
         audit: Dict[str, DecisionClassification] = {
@@ -107,6 +112,7 @@ class PaperModifiedGATConv(nn.Module):
         negative_slope: float = 0.2,
         dropout: float = 0.0,
         bias: bool = True,
+        use_value_weight_modulation: bool = False,
     ) -> None:
         super().__init__()
         if isinstance(in_channels, int):
@@ -119,6 +125,7 @@ class PaperModifiedGATConv(nn.Module):
         self.heads = heads
         self.negative_slope = negative_slope
         self.dropout = dropout
+        self.use_value_weight_modulation = use_value_weight_modulation
 
         # Linear projection W: shared when src and dst dimensions match (exact Eq. 2),
         # or bipartite-aligned when dimensions differ.
@@ -135,6 +142,15 @@ class PaperModifiedGATConv(nn.Module):
         # Partitioned explicitly into [a_dst (out_channels) || a_src (out_channels) || a_edge (1)]
         self.att = nn.Parameter(torch.empty(heads, 2 * out_channels + 1))
 
+        # Optional proficiency-modulated value pathway (PROJECT_ADAPTATION v3):
+        # Prevents scalar proficiency w_ij from cancelling out under 1-neighbor or shift-invariant softmax.
+        if use_value_weight_modulation:
+            self.val_weight_scale: Optional[nn.Parameter] = nn.Parameter(torch.tensor(0.5, dtype=torch.float32))
+            self.val_weight_vec: Optional[nn.Parameter] = nn.Parameter(torch.empty(heads, out_channels))
+        else:
+            self.register_parameter("val_weight_scale", None)
+            self.register_parameter("val_weight_vec", None)
+
         if bias:
             self.bias = nn.Parameter(torch.zeros(out_channels))
         else:
@@ -149,6 +165,10 @@ class PaperModifiedGATConv(nn.Module):
             nn.init.xavier_uniform_(self.lin_src.weight)
             nn.init.xavier_uniform_(self.lin_dst.weight)
         nn.init.xavier_uniform_(self.att)
+        if self.val_weight_scale is not None:
+            nn.init.constant_(self.val_weight_scale, 0.5)
+        if self.val_weight_vec is not None:
+            nn.init.normal_(self.val_weight_vec, mean=0.0, std=0.05)
         if self.bias is not None:
             nn.init.zeros_(self.bias)
 
@@ -233,8 +253,22 @@ class PaperModifiedGATConv(nn.Module):
         else:
             alpha_dropped = alpha
 
-        # Weighted message m_{ij} = alpha_{ij} * W h_j -> shape [E, heads, out_channels]
-        messages = alpha_dropped.unsqueeze(-1) * wh_j
+        # Weighted message m_{ij} = alpha_{ij} * value_msg -> shape [E, heads, out_channels]
+        if (
+            self.use_value_weight_modulation
+            and self.val_weight_scale is not None
+            and self.val_weight_vec is not None
+        ):
+            # Center around 0.55 (average real-CV weight) and smoothly bound both multiplicative
+            # and additive modulation so proficiency shifts scores realistically (~0.15-0.25 span)
+            # without distorting global regression calibration on average-proficiency CVs.
+            centered_w = w_ij - 0.55  # [E, heads, 1]
+            prof_scale = 1.0 + 0.30 * torch.tanh(self.val_weight_scale) * centered_w
+            bounded_vec = 0.20 * torch.tanh(self.val_weight_vec).unsqueeze(0)
+            val_msg = prof_scale * wh_j + centered_w * bounded_vec
+            messages = alpha_dropped.unsqueeze(-1) * val_msg
+        else:
+            messages = alpha_dropped.unsqueeze(-1) * wh_j
 
         # Aggregate over j in N(i) into target node i
         out = torch.zeros((num_dst, self.heads, self.out_channels), dtype=dtype, device=device)
@@ -278,6 +312,7 @@ class PaperBipartiteHybridLayer(nn.Module):
             heads=config.num_heads,
             negative_slope=config.leaky_relu_slope,
             dropout=config.dropout,
+            use_value_weight_modulation=config.use_value_weight_modulation,
         )
         # Step 2 (Updated Skill -> Document): (out_dim, in_dim) -> out_dim
         self.skill_to_resume_gat = PaperModifiedGATConv(
@@ -286,6 +321,7 @@ class PaperBipartiteHybridLayer(nn.Module):
             heads=config.num_heads,
             negative_slope=config.leaky_relu_slope,
             dropout=config.dropout,
+            use_value_weight_modulation=config.use_value_weight_modulation,
         )
 
         # Residual self-projections when in_dim != out_dim
@@ -300,10 +336,14 @@ class PaperBipartiteHybridLayer(nn.Module):
         self.drop = nn.Dropout(config.dropout)
 
         # 3. Optional Intra-Skill Prerequisite Dependency Message Passing (PROJECT_ADAPTATION)
-        # Supports two modes:
-        # - 'light_sbert_diffusion' (default): Parameter-efficient SBERT-cosine weighted DAG diffusion
-        #   (inspired by LightGCN/APPNP) with learnable scalar gates (2-4 params total, prevents small-sample overfitting).
+        # Supports three modes:
+        # - 'light_sbert_diffusion': Parameter-efficient SBERT-cosine weighted DAG diffusion (v2).
+        # - 'asymmetric_sbert_diffusion' (v3): Dedicated forward (prerequisite_to: foundation -> advanced)
+        #   and reverse (prerequisite_of: advanced -> foundation) gates + directional relation bias
+        #   vectors so the GNN cleanly distinguishes CV=Kubernetes/JD=Docker from CV=Docker/JD=Kubernetes.
         # - 'modified_gat': Full Equation (2) Modified GAT on skill prerequisite edges.
+        self.dep_fwd_bias: Optional[nn.Parameter] = None
+        self.dep_rev_bias: Optional[nn.Parameter] = None
         if config.use_skill_dependency_edges:
             if config.skill_dependency_mode == "modified_gat":
                 self.skill_prereq_gat: Optional[PaperModifiedGATConv] = PaperModifiedGATConv(
@@ -327,6 +367,19 @@ class PaperBipartiteHybridLayer(nn.Module):
                     self.skill_prereq_rev_gat = None
                 self.norm_skill_dep: Optional[nn.LayerNorm] = nn.LayerNorm(out_dim)
                 self.dep_rev_gate: Optional[nn.Parameter] = None
+            elif config.skill_dependency_mode == "asymmetric_sbert_diffusion":
+                self.skill_prereq_gat = None
+                self.skill_prereq_rev_gat = None
+                self.norm_skill_dep = None
+                self.dep_rev_gate = (
+                    nn.Parameter(torch.tensor(float(config.skill_dependency_gate_init) + 0.6, dtype=torch.float32))
+                    if config.use_reverse_skill_dependency_edges
+                    else None
+                )
+                # Forward prerequisite_to uses gentle non-penalizing convex diffusion only;
+                # Reverse prerequisite_of adds a bounded superseding credit vector.
+                if config.use_reverse_skill_dependency_edges:
+                    self.dep_rev_bias = nn.Parameter(torch.zeros(out_dim, dtype=torch.float32))
             else:
                 self.skill_prereq_gat = None
                 self.skill_prereq_rev_gat = None
@@ -418,6 +471,8 @@ class PaperBipartiteHybridLayer(nn.Module):
         res_to_skill_ei = torch.empty((2, 0), dtype=torch.long, device=device)
         prereq_alpha = torch.empty((0, self.config.num_heads), dtype=dtype, device=device)
         prereq_ei = torch.empty((2, 0), dtype=torch.long, device=device)
+        prereq_rev_alpha = torch.empty((0, self.config.num_heads), dtype=dtype, device=device)
+        prereq_rev_ei = torch.empty((2, 0), dtype=torch.long, device=device)
 
         if num_skills > 0:
             if et_job_to_skill in graph.edge_types and graph[et_job_to_skill].edge_index.numel() > 0:
@@ -485,6 +540,90 @@ class PaperBipartiteHybridLayer(nn.Module):
                         )
                     else:
                         h_skill_next = self.drop(h_skill_pre)
+                elif self.config.skill_dependency_mode == "asymmetric_sbert_diffusion":
+                    # Asymmetric Directional Cross-Bridge SBERT-Weighted DAG Diffusion (v3):
+                    # Activates strictly on CV-to-unmet-JD bridge edges (src in CV [mem != 1],
+                    # dst is unmet JD [mem == 1]) when `membership_code` is available so dense
+                    # intra-JD edges on GOOD_FIT candidates never leak penalty bias!
+                    # - Forward bridge `prerequisite_to` (CV foundation u -> unmet JD advanced v,
+                    #     e.g., CV=docker -> JD=kubernetes): gate lam_pf in (0, 0.5) + dep_fwd_bias.
+                    # - Reverse bridge `prerequisite_of` (CV advanced v -> unmet JD foundation u,
+                    #     e.g., CV=kubernetes -> JD=docker): gate lam_pr in (0, 0.65) + dep_rev_bias.
+                    h_updated = h_skill_pre
+                    mem_code = getattr(graph["skill"], "membership_code", None)
+                    if mem_code is not None and mem_code.numel() == num_skills:
+                        mem_code = mem_code.to(device=device)
+                    else:
+                        mem_code = None
+
+                    if et_prereq_fwd in graph.edge_types and graph[et_prereq_fwd].edge_index.numel() > 0:
+                        ei_pf_all = graph[et_prereq_fwd].edge_index.to(device=device)
+                        ea_pf_all = getattr(graph[et_prereq_fwd], "edge_attr", None)
+                        w_pf_all = (
+                            ea_pf_all.view(-1).to(dtype=dtype, device=device).clamp(min=1e-4)
+                            if ea_pf_all is not None and ea_pf_all.numel() == ei_pf_all.size(1)
+                            else torch.ones((ei_pf_all.size(1),), dtype=dtype, device=device)
+                        )
+                        if mem_code is not None:
+                            bridge_pf = (mem_code[ei_pf_all[0]] != 1) & (mem_code[ei_pf_all[1]] == 1)
+                            ei_pf = ei_pf_all[:, bridge_pf]
+                            w_pf = w_pf_all[bridge_pf]
+                        else:
+                            ei_pf = ei_pf_all
+                            w_pf = w_pf_all
+
+                        if ei_pf.numel() > 0:
+                            dst_pf = ei_pf[1]
+                            denom_pf = torch.zeros((num_skills,), dtype=dtype, device=device)
+                            denom_pf.index_add_(0, dst_pf, w_pf)
+                            has_in_pf = (denom_pf > 0).unsqueeze(-1)
+                            alpha_pf = w_pf / denom_pf[dst_pf].clamp(min=1e-8)
+                            prereq_ei = ei_pf
+                            prereq_alpha = alpha_pf.unsqueeze(-1)
+                            msg_pf = torch.zeros_like(h_skill_pre)
+                            msg_pf.index_add_(0, dst_pf, alpha_pf.unsqueeze(-1) * h_skill_pre[ei_pf[0]])
+                            # Gentle non-penalizing partial-credit diffusion in (0, 0.20)
+                            lam_pf = 0.20 * torch.sigmoid(self.dep_gate)
+                            blended_pf = (1.0 - lam_pf) * h_updated + lam_pf * msg_pf
+                            h_updated = torch.where(has_in_pf, blended_pf, h_updated)
+
+                    if (
+                        self.dep_rev_gate is not None
+                        and et_prereq_rev in graph.edge_types
+                        and graph[et_prereq_rev].edge_index.numel() > 0
+                    ):
+                        ei_pr_all = graph[et_prereq_rev].edge_index.to(device=device)
+                        ea_pr_all = getattr(graph[et_prereq_rev], "edge_attr", None)
+                        w_pr_all = (
+                            ea_pr_all.view(-1).to(dtype=dtype, device=device).clamp(min=1e-4)
+                            if ea_pr_all is not None and ea_pr_all.numel() == ei_pr_all.size(1)
+                            else torch.ones((ei_pr_all.size(1),), dtype=dtype, device=device)
+                        )
+                        if mem_code is not None:
+                            bridge_pr = (mem_code[ei_pr_all[0]] != 1) & (mem_code[ei_pr_all[1]] == 1)
+                            ei_pr = ei_pr_all[:, bridge_pr]
+                            w_pr = w_pr_all[bridge_pr]
+                        else:
+                            ei_pr = ei_pr_all
+                            w_pr = w_pr_all
+
+                        if ei_pr.numel() > 0:
+                            dst_pr = ei_pr[1]
+                            denom_pr = torch.zeros((num_skills,), dtype=dtype, device=device)
+                            denom_pr.index_add_(0, dst_pr, w_pr)
+                            has_in_pr = (denom_pr > 0).unsqueeze(-1)
+                            alpha_pr = w_pr / denom_pr[dst_pr].clamp(min=1e-8)
+                            prereq_rev_ei = ei_pr
+                            prereq_rev_alpha = alpha_pr.unsqueeze(-1)
+                            msg_pr = torch.zeros_like(h_skill_pre)
+                            msg_pr.index_add_(0, dst_pr, alpha_pr.unsqueeze(-1) * h_skill_pre[ei_pr[0]])
+                            if self.dep_rev_bias is not None:
+                                msg_pr = msg_pr + (0.50 * torch.tanh(self.dep_rev_bias)).unsqueeze(0)
+                            lam_pr = 0.65 * torch.sigmoid(self.dep_rev_gate)
+                            blended_pr = (1.0 - lam_pr) * h_updated + lam_pr * msg_pr
+                            h_updated = torch.where(has_in_pr, blended_pr, h_updated)
+
+                    h_skill_next = self.drop(h_updated)
                 else:
                     # Norm-preserving Convex SBERT-Weighted DAG Diffusion (APPNP-style):
                     # For nodes with incoming prerequisite edges:
@@ -577,6 +716,8 @@ class PaperBipartiteHybridLayer(nn.Module):
             "resume_to_skill_alpha": res_to_skill_alpha,
             "skill_prerequisite_edge_index": prereq_ei,
             "skill_prerequisite_alpha": prereq_alpha,
+            "skill_prerequisite_rev_edge_index": prereq_rev_ei,
+            "skill_prerequisite_rev_alpha": prereq_rev_alpha,
         }
         return h_resume_next, h_job_next, h_skill_next, layer_attn
 

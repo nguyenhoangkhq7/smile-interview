@@ -515,6 +515,7 @@ class PipelineOrchestrator:
             matching_status=matching_status,
             run_id=run_id,
             skill_importance_output=skill_importance_payload,
+            reasoning_results=raw_reasoning_results,
         )
         return response
 

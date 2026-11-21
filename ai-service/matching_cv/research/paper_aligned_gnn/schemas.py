@@ -39,6 +39,9 @@ ProficiencyMappingSource = Literal[
     "paper_table3_explicit",
     "paper_table6_7_assumption",
     "years_heuristic_mapping",
+    "vietnamese_descriptor_mapping",
+    "evidence_context_fallback",
+    "module2_proficiency_estimator",
     "missing",
 ]
 
@@ -294,13 +297,15 @@ class PaperAlignedGraphConfig:
     embedding_dim: int = 768
     allow_paper_table6_7_descriptors: bool = True
     allow_years_heuristic: bool = True
+    allow_vietnamese_descriptors: bool = True
+    enable_evidence_proficiency_fallback: bool = False
     edge_weight_normalization: EdgeWeightNormalization = "scaled_0_1"
     missing_proficiency_tensor_weight: float = 0.0
     include_reverse_edges: bool = True
     filter_context_non_competencies: bool = True
     filter_unsupported_implicit: bool = True
     enable_skill_dependencies: bool = True
-    dependency_scope: Literal["jd_anchored", "jd_only", "all_skills"] = "jd_anchored"
+    dependency_scope: Literal["jd_bidirectional", "jd_anchored", "jd_only", "all_skills"] = "jd_bidirectional"
     use_curated_dependency_dag: bool = True
     use_stage4_dependency_reasoning: bool = True
 
