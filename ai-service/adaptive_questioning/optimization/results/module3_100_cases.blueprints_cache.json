@@ -1,0 +1,1740 @@
+{
+  "jd_002__aws": {
+    "objectives": [
+      {
+        "requirement_id": "aws:req_007",
+        "skill_id": "aws",
+        "target_depth": 2,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Áp dụng kiến thức nền tảng về dịch vụ đám mây để cấu hình tài nguyên cơ bản thuộc L2.",
+        "depth_evidence_spans": [
+          "familiarity with **cloud platforms such as AWS, Azure, or Google Cloud"
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Lựa chọn và mô tả dịch vụ lưu trữ đối tượng phù hợp cho dữ liệu không cấu trúc",
+            "expected_evidence": "Chỉ ra tên dịch vụ (ví dụ: S3) và giải thích ngắn gọn lý do chọn thay vì lưu trữ khối truyền thống.",
+            "below_target": "Không xác định được dịch vụ lưu trữ hoặc nhầm lẫn với cơ sở dữ liệu quan hệ.",
+            "at_target": "Xác định đúng dịch vụ lưu trữ đối tượng và nêu đặc điểm chính của nó.",
+            "above_target": "So sánh chi phí và độ trễ giữa các lớp lưu trữ khác nhau trong cùng dịch vụ.",
+            "essential": true,
+            "criterion_id": "e8b93ad7-7fdb-569f-ba38-2249cf861d7e:c1"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "TECHNICAL_EXPLANATION",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 120,
+        "objective_id": "e8b93ad7-7fdb-569f-ba38-2249cf861d7e",
+        "claim": "familiarity with **cloud platforms such as AWS, Azure, or Google Cloud",
+        "requirement_kind": "OPTIONAL",
+        "jd_evidence_spans": [
+          "familiarity with **cloud platforms such as AWS, Azure, or Google Cloud"
+        ]
+      }
+    ]
+  },
+  "jd_001__microservices": {
+    "objectives": [
+      {
+        "requirement_id": "microservices:req_002",
+        "skill_id": "microservices",
+        "target_depth": 4,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Thiết kế hệ thống phân tán chịu lỗi và khả dụng cao thuộc L4.",
+        "depth_evidence_spans": [
+          "A deep understanding of microservices architecture and experience designing and implementing highly available, fault-tolerant distributed systems is essential."
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Đề xuất kiến trúc xử lý sự cố khi một dịch vụ con bị sập",
+            "expected_evidence": "Sử dụng Circuit Breaker hoặc Retry với Backoff để ngăn chặn sự cố lan rộng.",
+            "below_target": "Cho rằng mạng luôn ổn định hoặc không có cơ chế bảo vệ.",
+            "at_target": "Áp dụng mô hình Circuit Breaker để cách ly dịch vụ lỗi.",
+            "above_target": "Đánh giá trade-off giữa độ trễ thêm vào và tỷ lệ thành công của giao dịch.",
+            "essential": true,
+            "criterion_id": "d59434af-407e-5404-aa98-93ebf86fb795:c1"
+          },
+          {
+            "description": "Lựa chọn chiến lược đồng bộ hóa dữ liệu giữa các dịch vụ",
+            "expected_evidence": "Giải thích lý do chọn Eventual Consistency hoặc Synchronous API dựa trên yêu cầu nghiệp vụ.",
+            "below_target": "Yêu cầu Strong Consistency cho mọi thao tác mà không cần thiết.",
+            "at_target": "Chọn Eventual Consistency cho các trường hợp không cần chính xác tức thì.",
+            "above_target": "Phân tích rủi ro mất mát dữ liệu tạm thời trong quá trình chuyển đổi trạng thái.",
+            "essential": true,
+            "criterion_id": "d59434af-407e-5404-aa98-93ebf86fb795:c2"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "DESIGN",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 300,
+        "objective_id": "d59434af-407e-5404-aa98-93ebf86fb795",
+        "claim": "A deep understanding of microservices architecture and experience designing and implementing highly available, fault-tolerant distributed systems is essential.",
+        "requirement_kind": "REQUIRED",
+        "jd_evidence_spans": [
+          "A deep understanding of microservices architecture and experience designing and implementing highly available, fault-tolerant distributed systems is essential."
+        ]
+      }
+    ]
+  },
+  "jd_001__java": {
+    "objectives": [
+      {
+        "requirement_id": "java:req_001",
+        "skill_id": "java",
+        "target_depth": 4,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Yêu cầu kinh nghiệm sâu và trọng tâm Spring Boot ở mức độ thiết kế hệ thống và đánh đổi kỹ thuật thuộc L4.",
+        "depth_evidence_spans": [
+          "at least 8 years of professional experience in backend software development, specifically with a strong emphasis on Java and the Spring Boot framework."
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Thiết kế kiến trúc module Spring Boot có khả năng mở rộng và bảo trì cao",
+            "expected_evidence": "Đưa ra quyết định về cấu trúc package, phân tách layer (Controller, Service, Repository) và giải thích lý do lựa chọn dựa trên yêu cầu nghiệp vụ.",
+            "below_target": "Viết code monolithic không rõ ràng hoặc trộn lẫn logic nghiệp vụ với controller.",
+            "at_target": "Áp dụng đúng các nguyên tắc SOLID trong thiết kế lớp dịch vụ và controller.",
+            "above_target": "Đánh giá trade-off giữa việc sử dụng Microservices so với Modular Monolith cho quy mô dự án cụ thể.",
+            "essential": true,
+            "criterion_id": "cf06dc41-6ab1-51cc-aad3-0c038fd3d024:c1"
+          },
+          {
+            "description": "Xử lý các vấn đề hiệu năng và đồng bộ hóa trong môi trường đa luồng của Spring Boot",
+            "expected_evidence": "Phân tích các điểm nghẽn tiềm ẩn trong xử lý bất đồng bộ hoặc truy cập cơ sở dữ liệu và đề xuất giải pháp tối ưu.",
+            "below_target": "Bỏ qua vấn đề race condition hoặc xử lý blocking thread trong request handler.",
+            "at_target": "Sử dụng đúng các annotation như @Async hoặc CompletableFuture để xử lý bất đồng bộ.",
+            "above_target": "Thiết kế cơ chế retry và circuit breaker để đảm bảo tính sẵn sàng khi phụ thuộc bên ngoài gặp sự cố.",
+            "essential": true,
+            "criterion_id": "cf06dc41-6ab1-51cc-aad3-0c038fd3d024:c2"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "DESIGN",
+            "criterion_indices": []
+          },
+          {
+            "mode": "TECHNICAL_EXPLANATION",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 300,
+        "objective_id": "cf06dc41-6ab1-51cc-aad3-0c038fd3d024",
+        "claim": "at least 8 years of professional experience in backend software development, specifically with a strong emphasis on Java and the Spring Boot framework.",
+        "requirement_kind": "REQUIRED",
+        "jd_evidence_spans": [
+          "at least 8 years of professional experience in backend software development, specifically with a strong emphasis on Java and the Spring Boot framework."
+        ]
+      }
+    ]
+  },
+  "jd_002__html": {
+    "objectives": [
+      {
+        "requirement_id": "html:req_003",
+        "skill_id": "html",
+        "target_depth": 2,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Xây dựng giao diện React tĩnh kết nối API REST thuộc L2.",
+        "depth_evidence_spans": [
+          "To thrive in this role, you must possess at least **3 years of professional experience** in frontend development, primarily with **React.js and its ecosystem**. A strong command of **JavaScript (ES6+) and TypeScript** is essential, as is a deep understanding of **HTML5 and CSS3**, including responsive design principles. You should also have demonstrated experience consuming **RESTful APIs** and integrating them seamlessly into frontend applications. Finally, a solid grasp of **version control systems, particularly Git**, is non-negotiable for our collaborative development environment."
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Xây dựng component React hiển thị danh sách dữ liệu từ API REST",
+            "expected_evidence": "Viết code React sử dụng fetch/axios để lấy dữ liệu và render vào DOM.",
+            "below_target": "Hardcode dữ liệu hoặc không sử dụng React component.",
+            "at_target": "Gọi API, xử lý state loading/error và hiển thị danh sách.",
+            "above_target": "Áp dụng TypeScript types cho props và response data.",
+            "essential": true,
+            "criterion_id": "88b149e3-670d-5172-9c75-45bcdf443788:c1"
+          },
+          {
+            "description": "Thiết kế giao diện đáp ứng (responsive) với HTML5/CSS3",
+            "expected_evidence": "Sử dụng media queries hoặc flexbox/grid để điều chỉnh layout theo thiết bị.",
+            "below_target": "Layout cố định không thích ứng với màn hình nhỏ.",
+            "at_target": "Giao diện thay đổi hợp lý trên mobile và desktop.",
+            "above_target": "Tối ưu hóa hiệu năng render khi resize cửa sổ.",
+            "essential": true,
+            "criterion_id": "88b149e3-670d-5172-9c75-45bcdf443788:c2"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "CODING",
+            "criterion_indices": []
+          },
+          {
+            "mode": "DESIGN",
+            "criterion_indices": [
+              1
+            ]
+          }
+        ],
+        "estimated_seconds": 180,
+        "objective_id": "88b149e3-670d-5172-9c75-45bcdf443788",
+        "claim": "To thrive in this role, you must possess at least **3 years of professional experience** in frontend development, primarily with **React.js and its ecosystem**. A strong command of **JavaScript (ES6+) and TypeScript** is essential, as is a deep understanding of **HTML5 and CSS3**, including responsive design principles. You should also have demonstrated experience consuming **RESTful APIs** and integrating them seamlessly into frontend applications. Finally, a solid grasp of **version control systems, particularly Git**, is non-negotiable for our collaborative development environment.",
+        "requirement_kind": "REQUIRED",
+        "jd_evidence_spans": [
+          "To thrive in this role, you must possess at least **3 years of professional experience** in frontend development, primarily with **React.js and its ecosystem**. A strong command of **JavaScript (ES6+) and TypeScript** is essential, as is a deep understanding of **HTML5 and CSS3**, including responsive design principles. You should also have demonstrated experience consuming **RESTful APIs** and integrating them seamlessly into frontend applications. Finally, a solid grasp of **version control systems, particularly Git**, is non-negotiable for our collaborative development environment."
+        ]
+      }
+    ]
+  },
+  "jd_003__full-stack-development": {
+    "objectives": [
+      {
+        "requirement_id": "full-stack-development:req_001",
+        "skill_id": "full-stack-development",
+        "target_depth": 2,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Yêu cầu kinh nghiệm thực tế được đánh giá qua khả năng hoàn thành một tác vụ phát triển đầy đủ (frontend + backend) độc lập thuộc L2.",
+        "depth_evidence_spans": [
+          "To hit the ground running, you absolutely need at least 1-2 years of professional experience in full-stack development."
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Xây dựng endpoint API nhận dữ liệu và lưu vào cơ sở dữ liệu",
+            "expected_evidence": "Viết code xử lý HTTP request, validate input và tương tác với database.",
+            "below_target": "Chỉ viết giao diện người dùng mà không có logic xử lý phía máy chủ.",
+            "at_target": "Hoàn thiện luồng nhận dữ liệu từ frontend đến lưu trữ backend.",
+            "above_target": "Thêm xử lý lỗi transaction và phản hồi mã trạng thái HTTP chính xác.",
+            "essential": true,
+            "criterion_id": "97b8c1cb-0993-5292-90b7-80dc9d1547ec:c1"
+          },
+          {
+            "description": "Hiển thị danh sách dữ liệu đã lưu trên giao diện người dùng",
+            "expected_evidence": "Gọi API lấy dữ liệu và render lên UI.",
+            "below_target": "Dữ liệu được hardcode trực tiếp trong file HTML/JS.",
+            "at_target": "Lấy dữ liệu động từ API và hiển thị đúng cấu trúc.",
+            "above_target": "Xử lý trạng thái loading và empty state khi gọi API.",
+            "essential": true,
+            "criterion_id": "97b8c1cb-0993-5292-90b7-80dc9d1547ec:c2"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "CODING",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 300,
+        "objective_id": "97b8c1cb-0993-5292-90b7-80dc9d1547ec",
+        "claim": "To hit the ground running, you absolutely need at least 1-2 years of professional experience in full-stack development.",
+        "requirement_kind": "REQUIRED",
+        "jd_evidence_spans": [
+          "To hit the ground running, you absolutely need at least 1-2 years of professional experience in full-stack development."
+        ]
+      }
+    ]
+  },
+  "jd_002__javascript-es6+": {
+    "objectives": [
+      {
+        "requirement_id": "javascript-es6+:req_002",
+        "skill_id": "javascript-es6+",
+        "target_depth": 3,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Sử dụng thành thạo ES6+ và TypeScript để giải quyết vấn đề thực tế thuộc L3.",
+        "depth_evidence_spans": [
+          "A strong command of **JavaScript (ES6+) and TypeScript** is essential"
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Áp dụng cú pháp ES6+ hiện đại trong xử lý logic JavaScript thuần",
+            "expected_evidence": "Sử dụng đúng arrow functions, destructuring hoặc template literals thay thế cú pháp cũ khi phù hợp.",
+            "below_target": "Sử dụng `var` hoặc hàm khai báo truyền thống khi ngữ cảnh cho phép cú pháp hiện đại hơn.",
+            "at_target": "Viết đoạn mã JS sử dụng các tính năng ES6+ một cách chính xác và rõ ràng.",
+            "above_target": "Lựa chọn tối ưu hiệu năng hoặc khả năng đọc bằng cách kết hợp nhiều tính năng ES6+ cùng lúc.",
+            "essential": true,
+            "criterion_id": "8d5eb54d-47dc-52dc-8ead-de5caebd1c30:c1"
+          },
+          {
+            "description": "Áp dụng kiểu tĩnh TypeScript để tăng cường độ an toàn cho codebase",
+            "expected_evidence": "Định nghĩa interface/type cho dữ liệu đầu vào/ra và sử dụng chúng trong hàm.",
+            "below_target": "Không dùng type annotations hoặc dùng `any` bừa bãi.",
+            "at_target": "Thêm type definitions cơ bản cho các tham số và giá trị trả về của hàm.",
+            "above_target": "Sử dụng generic types hoặc utility types để tái sử dụng logic với nhiều kiểu dữ liệu khác nhau.",
+            "essential": true,
+            "criterion_id": "8d5eb54d-47dc-52dc-8ead-de5caebd1c30:c2"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "CODING",
+            "criterion_indices": [
+              0,
+              1
+            ]
+          },
+          {
+            "mode": "TECHNICAL_EXPLANATION",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 180,
+        "objective_id": "8d5eb54d-47dc-52dc-8ead-de5caebd1c30",
+        "claim": "A strong command of **JavaScript (ES6+) and TypeScript** is essential",
+        "requirement_kind": "REQUIRED",
+        "jd_evidence_spans": [
+          "A strong command of **JavaScript (ES6+) and TypeScript** is essential"
+        ]
+      }
+    ]
+  },
+  "jd_003__aws": {
+    "objectives": [
+      {
+        "requirement_id": "aws:req_006",
+        "skill_id": "aws",
+        "target_depth": 2,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Áp dụng kiến thức nền tảng về AWS để giải quyết một tác vụ cấu hình cơ bản thuộc L2.",
+        "depth_evidence_spans": [
+          "Ideally, you'll also have some exposure to cloud platforms like AWS or GCP, as we leverage these heavily."
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Cấu hình nhóm bảo mật (Security Group) cho phép truy cập HTTP vào EC2",
+            "expected_evidence": "Định nghĩa rule inbound cho port 80 từ nguồn 0.0.0.0/0 trong JSON hoặc CLI.",
+            "below_target": "Để mở tất cả các cổng (0.0.0.0/0 all traffic) hoặc không xác định được rule.",
+            "at_target": "Chỉ mở port 80 và giới hạn nguồn IP hợp lý.",
+            "above_target": "Giải thích lý do chọn CIDR cụ thể thay vì mở rộng.",
+            "essential": true,
+            "criterion_id": "963e5b5b-8593-551c-8a38-dd0dd0319bbd:c1"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "DESIGN",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 120,
+        "objective_id": "963e5b5b-8593-551c-8a38-dd0dd0319bbd",
+        "claim": "Ideally, you'll also have some exposure to cloud platforms like AWS or GCP, as we leverage these heavily.",
+        "requirement_kind": "OPTIONAL",
+        "jd_evidence_spans": [
+          "Ideally, you'll also have some exposure to cloud platforms like AWS or GCP, as we leverage these heavily."
+        ]
+      }
+    ]
+  },
+  "jd_002__react": {
+    "objectives": [
+      {
+        "requirement_id": "react:req_001",
+        "skill_id": "react",
+        "target_depth": 2,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Xây dựng giao diện người dùng tĩnh sử dụng React và TypeScript thuộc L2.",
+        "depth_evidence_spans": [
+          "primarily with **React.js and its ecosystem**",
+          "**JavaScript (ES6+) and TypeScript** is essential",
+          "**HTML5 and CSS3**, including responsive design principles"
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Cấu trúc component React với TypeScript để hiển thị dữ liệu",
+            "expected_evidence": "Định nghĩa interface props, sử dụng JSX và cú pháp ES6+.",
+            "below_target": "Sử dụng JavaScript thuần không có type checking hoặc cấu trúc component sai.",
+            "at_target": "Viết component React có typing chính xác và render đúng dữ liệu đầu vào.",
+            "above_target": "Áp dụng generic types cho props hoặc hooks để tăng tính tái sử dụng.",
+            "essential": true,
+            "criterion_id": "005c2bcd-0410-5b28-ae4f-4bfab8550c72:c1"
+          },
+          {
+            "description": "Áp dụng CSS3 responsive để bố cục giao diện thích ứng",
+            "expected_evidence": "Sử dụng Flexbox/Grid và media queries trong file CSS/SCSS.",
+            "below_target": "Sử dụng đơn vị cố định (px) cho mọi kích thước mà không có media query.",
+            "at_target": "Bố cục linh hoạt thay đổi theo kích thước màn hình thiết bị.",
+            "above_target": "Tối ưu hóa hiệu năng render khi thay đổi kích thước viewport.",
+            "essential": true,
+            "criterion_id": "005c2bcd-0410-5b28-ae4f-4bfab8550c72:c2"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "CODING",
+            "criterion_indices": []
+          },
+          {
+            "mode": "DESIGN",
+            "criterion_indices": [
+              1
+            ]
+          }
+        ],
+        "estimated_seconds": 180,
+        "objective_id": "005c2bcd-0410-5b28-ae4f-4bfab8550c72",
+        "claim": "To thrive in this role, you must possess at least **3 years of professional experience** in frontend development, primarily with **React.js and its ecosystem**. A strong command of **JavaScript (ES6+) and TypeScript** is essential, as is a deep understanding of **HTML5 and CSS3**, including responsive design principles. You should also have demonstrated experience consuming **RESTful APIs** and integrating them seamlessly into frontend applications. Finally, a solid grasp of **version control systems, particularly Git**, is non-negotiable for our collaborative development environment.",
+        "requirement_kind": "REQUIRED",
+        "jd_evidence_spans": [
+          "To thrive in this role, you must possess at least **3 years of professional experience** in frontend development, primarily with **React.js and its ecosystem**. A strong command of **JavaScript (ES6+) and TypeScript** is essential, as is a deep understanding of **HTML5 and CSS3**, including responsive design principles. You should also have demonstrated experience consuming **RESTful APIs** and integrating them seamlessly into frontend applications. Finally, a solid grasp of **version control systems, particularly Git**, is non-negotiable for our collaborative development environment."
+        ]
+      }
+    ]
+  },
+  "jd_003__git": {
+    "objectives": [
+      {
+        "requirement_id": "git:req_004",
+        "skill_id": "git",
+        "target_depth": 2,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Áp dụng Git để giải quyết xung đột hoặc tạo nhánh trong quy trình CI/CD thuộc L2.",
+        "depth_evidence_spans": [
+          "We expect you to be comfortable with Git-based version control and CI/CD pipelines."
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Giải quyết xung đột merge khi tích hợp mã vào nhánh chính",
+            "expected_evidence": "Sử dụng lệnh git merge hoặc rebase đúng cách và xác nhận trạng thái sạch.",
+            "below_target": "Xóa file xung đột hoặc commit mà không kiểm tra lịch sử.",
+            "at_target": "Nhận diện xung đột, chọn phiên bản đúng và hoàn tất merge thành công.",
+            "above_target": "Sử dụng interactive rebase để dọn dẹp lịch sử commit trước khi merge.",
+            "essential": true,
+            "criterion_id": "9735862f-a36d-58af-905d-c51f1de0d8b6:c1"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "CODING",
+            "criterion_indices": []
+          },
+          {
+            "mode": "DEBUGGING",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 150,
+        "objective_id": "9735862f-a36d-58af-905d-c51f1de0d8b6",
+        "claim": "We expect you to be comfortable with Git-based version control and CI/CD pipelines.",
+        "requirement_kind": "REQUIRED",
+        "jd_evidence_spans": [
+          "We expect you to be comfortable with Git-based version control and CI/CD pipelines."
+        ]
+      }
+    ]
+  },
+  "jd_003__fintech": {
+    "objectives": [
+      {
+        "requirement_id": "fintech:req_005",
+        "skill_id": "fintech",
+        "target_depth": 2,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Trình bày sự hiểu biết và đam mê với hệ thống dữ liệu phức tạp trong lĩnh vực tài chính thuộc L2.",
+        "depth_evidence_spans": [
+          "Crucially, a demonstrated passion for fintech or complex data systems will set you apart."
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Giải thích lý do lựa chọn hoặc quan tâm đến các hệ thống dữ liệu phức tạp trong ngành tài chính",
+            "expected_evidence": "Nêu rõ một khía cạnh kỹ thuật hoặc thách thức dữ liệu cụ thể trong fintech mà ứng viên thấy thú vị hoặc đã tìm hiểu.",
+            "below_target": "Chỉ nói chung chung về việc thích công nghệ mà không liên kết với đặc thù dữ liệu tài chính.",
+            "at_target": "Mô tả được một ví dụ cụ thể về độ phức tạp của dữ liệu (ví dụ: tính nhất quán, khối lượng lớn) và tại sao nó hấp dẫn.",
+            "above_target": "Phân tích sâu hơn về xu hướng hoặc giải pháp công nghệ đang thay đổi cách xử lý dữ liệu trong fintech.",
+            "essential": true,
+            "criterion_id": "18883c25-b692-5961-b551-1691c44fdfe5:c1"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "BEHAVIORAL",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 120,
+        "objective_id": "18883c25-b692-5961-b551-1691c44fdfe5",
+        "claim": "Crucially, a demonstrated passion for fintech or complex data systems will set you apart.",
+        "requirement_kind": "REQUIRED",
+        "jd_evidence_spans": [
+          "Crucially, a demonstrated passion for fintech or complex data systems will set you apart."
+        ]
+      }
+    ]
+  },
+  "jd_004__mvvm": {
+    "objectives": [
+      {
+        "requirement_id": "mvvm:req_002",
+        "skill_id": "mvvm",
+        "target_depth": 3,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Phân tích và giải thích sự khác biệt giữa các mẫu kiến trúc thuộc L3.",
+        "depth_evidence_spans": [
+          "A strong grasp of architectural patterns like MVVM or MVI is critical"
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "So sánh luồng dữ liệu giữa MVVM và MVI trong ứng dụng UI",
+            "expected_evidence": "Giải thích rõ cơ chế unidirectional data flow của MVI so với hai chiều của MVVM.",
+            "below_target": "Nhầm lẫn vai trò của ViewModel và Store/Reducer.",
+            "at_target": "Mô tả chính xác cách mỗi mẫu xử lý trạng thái và cập nhật giao diện.",
+            "above_target": "Đánh giá ưu nhược điểm về khả năng kiểm thử và độ phức tạp khi mở rộng.",
+            "essential": true,
+            "criterion_id": "a5b794a5-fc33-553a-b274-4464f39f794a:c1"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "TECHNICAL_EXPLANATION",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 150,
+        "objective_id": "a5b794a5-fc33-553a-b274-4464f39f794a",
+        "claim": "A strong grasp of architectural patterns like MVVM or MVI is critical",
+        "requirement_kind": "REQUIRED",
+        "jd_evidence_spans": [
+          "A strong grasp of architectural patterns like MVVM or MVI is critical"
+        ]
+      }
+    ]
+  },
+  "jd_004__ios-development": {
+    "objectives": [
+      {
+        "requirement_id": "ios-development:req_001",
+        "skill_id": "ios-development",
+        "target_depth": 2,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Xây dựng một thành phần giao diện cơ bản thuộc L2.",
+        "depth_evidence_spans": [
+          "You must have at least 1 year of professional experience developing native iOS applications using Swift/Objective-C or native Android applications with Kotlin/Java."
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Tạo màn hình hiển thị danh sách dữ liệu tĩnh",
+            "expected_evidence": "Sử dụng SwiftUI hoặc UIKit để tạo View và List/Table hiển thị dữ liệu.",
+            "below_target": "Không thể tạo cấu trúc View cơ bản hoặc thiếu dữ liệu hiển thị.",
+            "at_target": "Hiển thị đúng danh sách dữ liệu với định dạng văn bản đơn giản.",
+            "above_target": "Áp dụng kiểu dáng tùy chỉnh cho từng mục trong danh sách.",
+            "essential": true,
+            "criterion_id": "7538a0a7-76f5-5e00-947b-84362535691b:c1"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "CODING",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 180,
+        "objective_id": "7538a0a7-76f5-5e00-947b-84362535691b",
+        "claim": "You must have at least 1 year of professional experience developing native iOS applications using Swift/Objective-C or native Android applications with Kotlin/Java.",
+        "requirement_kind": "REQUIRED",
+        "jd_evidence_spans": [
+          "You must have at least 1 year of professional experience developing native iOS applications using Swift/Objective-C or native Android applications with Kotlin/Java."
+        ]
+      }
+    ]
+  },
+  "jd_003__python": {
+    "objectives": [
+      {
+        "requirement_id": "python:req_002",
+        "skill_id": "python",
+        "target_depth": 3,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Đánh giá khả năng tích hợp backend Python với frontend React thuộc L3.",
+        "depth_evidence_spans": [
+          "A strong grasp of Python for backend development, coupled with practical experience in a modern JavaScript framework like React, is mandatory."
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Thiết kế API RESTful trong Python để phục vụ dữ liệu cho React",
+            "expected_evidence": "Viết endpoint nhận JSON, xử lý logic và trả về định dạng phù hợp cho client.",
+            "below_target": "Sử dụng HTML template thay vì API JSON hoặc lỗi cú pháp Python cơ bản.",
+            "at_target": "Xây dựng endpoint chuẩn REST, xử lý lỗi HTTP đúng mã trạng thái.",
+            "above_target": "Tối ưu hiệu năng query database và xử lý đồng thời nhiều yêu cầu.",
+            "essential": true,
+            "criterion_id": "b992381b-e4b6-53a4-b2c1-07b2346b259b:c1"
+          },
+          {
+            "description": "Trích xuất và hiển thị dữ liệu từ API Python trong thành phần React",
+            "expected_evidence": "Sử dụng fetch/axios để gọi API và cập nhật state UI khi có dữ liệu mới.",
+            "below_target": "Hardcode dữ liệu trong component hoặc không xử lý trạng thái loading/error.",
+            "at_target": "Gọi API thành công, hiển thị dữ liệu và xử lý trường hợp rỗng.",
+            "above_target": "Tối ưu hóa re-render bằng memoization hoặc phân tách logic data fetching.",
+            "essential": true,
+            "criterion_id": "b992381b-e4b6-53a4-b2c1-07b2346b259b:c2"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "CODING",
+            "criterion_indices": [
+              0,
+              1
+            ]
+          },
+          {
+            "mode": "DESIGN",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 240,
+        "objective_id": "b992381b-e4b6-53a4-b2c1-07b2346b259b",
+        "claim": "A strong grasp of Python for backend development, coupled with practical experience in a modern JavaScript framework like React, is mandatory.",
+        "requirement_kind": "REQUIRED",
+        "jd_evidence_spans": [
+          "A strong grasp of Python for backend development, coupled with practical experience in a modern JavaScript framework like React, is mandatory."
+        ]
+      }
+    ]
+  },
+  "jd_004__ci-cd": {
+    "objectives": [
+      {
+        "requirement_id": "ci-cd:req_006",
+        "skill_id": "ci-cd",
+        "target_depth": 2,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Áp dụng kiến thức cơ bản về CI/CD và GraphQL để cấu hình hoặc giải thích luồng dữ liệu thuộc L2.",
+        "depth_evidence_spans": [
+          "experience with CI/CD pipelines (e.g., Fastlane, Bitrise) and a basic understanding of GraphQL would be highly valued."
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Giải thích vai trò của pipeline CI/CD trong việc tích hợp thay đổi GraphQL",
+            "expected_evidence": "Mô tả các bước chạy kiểm thử tự động khi có thay đổi schema hoặc query GraphQL.",
+            "below_target": "Không phân biệt được giữa công cụ CI/CD và ngôn ngữ GraphQL.",
+            "at_target": "Xác định đúng nơi GraphQL tương tác với quy trình build/deploy.",
+            "above_target": "Đề xuất cách tối ưu hóa cache trong pipeline dựa trên tần suất truy vấn GraphQL.",
+            "essential": true,
+            "criterion_id": "c9eae646-1f18-5ee4-912f-7ac644f8d767:c1"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "TECHNICAL_EXPLANATION",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 120,
+        "objective_id": "c9eae646-1f18-5ee4-912f-7ac644f8d767",
+        "claim": "experience with CI/CD pipelines (e.g., Fastlane, Bitrise) and a basic understanding of GraphQL would be highly valued.",
+        "requirement_kind": "OPTIONAL",
+        "jd_evidence_spans": [
+          "experience with CI/CD pipelines (e.g., Fastlane, Bitrise) and a basic understanding of GraphQL would be highly valued."
+        ]
+      }
+    ]
+  },
+  "jd_004__git": {
+    "objectives": [
+      {
+        "requirement_id": "git:req_004",
+        "skill_id": "git",
+        "target_depth": 2,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Sử dụng Git để thực hiện các thao tác cơ bản như tạo commit và xem lịch sử thuộc L2.",
+        "depth_evidence_spans": [
+          "You should be comfortable with version control systems, specifically Git."
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Thực hiện quy trình làm việc cơ bản với Git bao gồm thêm file và commit thay đổi",
+            "expected_evidence": "Chạy lệnh `git add` và `git commit` với thông điệp rõ ràng cho một thay đổi cụ thể.",
+            "below_target": "Không biết cách khởi tạo kho lưu trữ hoặc không hiểu ý nghĩa của trạng thái staging.",
+            "at_target": "Thêm các tệp đã sửa đổi vào staging area và tạo commit với mô tả chính xác.",
+            "above_target": "Giải thích được sự khác biệt giữa `git reset --soft` và `git reset --hard`.",
+            "essential": true,
+            "criterion_id": "9735862f-a36d-58af-905d-c51f1de0d8b6:c1"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "CODING",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 120,
+        "objective_id": "9735862f-a36d-58af-905d-c51f1de0d8b6",
+        "claim": "You should be comfortable with version control systems, specifically Git.",
+        "requirement_kind": "REQUIRED",
+        "jd_evidence_spans": [
+          "You should be comfortable with version control systems, specifically Git."
+        ]
+      }
+    ]
+  },
+  "jd_005__terraform": {
+    "objectives": [
+      {
+        "requirement_id": "terraform:req_002",
+        "skill_id": "terraform",
+        "target_depth": 2,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Áp dụng công cụ IaC để định nghĩa tài nguyên cơ bản thuộc L2.",
+        "depth_evidence_spans": [
+          "prior exposure to Terraform or a similar IaC tool is essential"
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Định nghĩa cấu trúc tài nguyên cloud cơ bản bằng Terraform",
+            "expected_evidence": "Viết file .tf khai báo tài nguyên với các tham số bắt buộc và giá trị hợp lệ.",
+            "below_target": "Sử dụng cú pháp sai hoặc thiếu khối tài nguyên cần thiết.",
+            "at_target": "Khai báo đúng tài nguyên với biến đầu vào và giá trị mặc định phù hợp.",
+            "above_target": "Sử dụng module để đóng gói và tái sử dụng cấu hình tài nguyên.",
+            "essential": true,
+            "criterion_id": "e95671c8-8e12-5c19-87b1-f71088905a12:c1"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "CODING",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 150,
+        "objective_id": "e95671c8-8e12-5c19-87b1-f71088905a12",
+        "claim": "prior exposure to Terraform or a similar IaC tool is essential",
+        "requirement_kind": "REQUIRED",
+        "jd_evidence_spans": [
+          "prior exposure to Terraform or a similar IaC tool is essential"
+        ]
+      }
+    ]
+  },
+  "jd_005__docker": {
+    "objectives": [
+      {
+        "requirement_id": "docker:req_003",
+        "skill_id": "docker",
+        "target_depth": 2,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Xây dựng cấu hình Docker cơ bản cho ứng dụng thuộc L2.",
+        "depth_evidence_spans": [
+          "Experience with containerization technologies, particularly Docker"
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Viết Dockerfile đa giai đoạn để xây dựng image nhỏ gọn",
+            "expected_evidence": "Sử dụng builder stage để compile và runtime stage để chạy, giảm kích thước image.",
+            "below_target": "Dùng base image lớn chứa đầy đủ công cụ phát triển.",
+            "at_target": "Tách biệt quá trình build và run, chỉ copy artifact cần thiết.",
+            "above_target": "Áp dụng multi-stage build với tối ưu layer cache.",
+            "essential": true,
+            "criterion_id": "c03a9110-4ec3-5e4e-a956-6fbf9fab8c6b:c1"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "CODING",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 180,
+        "objective_id": "c03a9110-4ec3-5e4e-a956-6fbf9fab8c6b",
+        "claim": "Experience with containerization technologies, particularly Docker, and orchestrators like Kubernetes, is a must-have for this role",
+        "requirement_kind": "REQUIRED",
+        "jd_evidence_spans": [
+          "Experience with containerization technologies, particularly Docker, and orchestrators like Kubernetes, is a must-have for this role"
+        ]
+      }
+    ]
+  },
+  "jd_005__aws": {
+    "objectives": [
+      {
+        "requirement_id": "aws:req_001",
+        "skill_id": "aws",
+        "target_depth": 2,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Áp dụng kiến thức cơ bản về các dịch vụ AWS vào việc cấu hình hoặc giải thích vai trò của chúng trong một ngữ cảnh cụ thể thuộc L2.",
+        "depth_evidence_spans": [
+          "foundational understanding of cloud platforms, specifically AWS, including services like EC2, S3, RDS, and VPC"
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Xác định đúng dịch vụ AWS phù hợp cho lưu trữ đối tượng bất biến",
+            "expected_evidence": "Chỉ ra Amazon S3 là lựa chọn chính xác và giải thích ngắn gọn lý do (ví dụ: độ bền cao, chi phí thấp).",
+            "below_target": "Gợi ý EC2 hoặc RDS cho mục đích lưu trữ file tĩnh.",
+            "at_target": "Chọn S3 và mô tả đúng chức năng lưu trữ đối tượng.",
+            "above_target": "So sánh S3 với EBS/EFS về tính phù hợp cho dữ liệu không thay đổi.",
+            "essential": true,
+            "criterion_id": "d04d00ed-1acb-59f5-869c-b42d8ce9c041:c1"
+          },
+          {
+            "description": "Giải thích vai trò của VPC trong việc cô lập tài nguyên mạng",
+            "expected_evidence": "Mô tả VPC như một vùng mạng ảo logic tách biệt khỏi mạng công cộng mặc định.",
+            "below_target": "Nhầm lẫn VPC với bảo mật ứng dụng (WAF) hoặc IAM.",
+            "at_target": "Định nghĩa VPC là nền tảng mạng ảo cho phép kiểm soát truy cập mạng.",
+            "above_target": "Liệt kê các thành phần con của VPC như Subnet, Route Table, Security Group.",
+            "essential": true,
+            "criterion_id": "d04d00ed-1acb-59f5-869c-b42d8ce9c041:c2"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "TECHNICAL_EXPLANATION",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 120,
+        "objective_id": "d04d00ed-1acb-59f5-869c-b42d8ce9c041",
+        "claim": "foundational understanding of cloud platforms, specifically AWS, including services like EC2, S3, RDS, and VPC",
+        "requirement_kind": "REQUIRED",
+        "jd_evidence_spans": [
+          "foundational understanding of cloud platforms, specifically AWS, including services like EC2, S3, RDS, and VPC"
+        ]
+      }
+    ]
+  },
+  "jd_005__ci-cd": {
+    "objectives": [
+      {
+        "requirement_id": "ci-cd:req_006",
+        "skill_id": "ci-cd",
+        "target_depth": 2,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Thiết lập pipeline CI/CD cơ bản để tự động hóa kiểm tra và xây dựng thuộc L2.",
+        "depth_evidence_spans": [
+          "A solid grasp of CI/CD principles and experience with tools like GitLab CI/CD or Jenkins is highly valued"
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Cấu hình pipeline CI/CD để chạy kiểm thử tự động khi có thay đổi mã nguồn",
+            "expected_evidence": "Viết cấu hình pipeline (YAML hoặc Groovy) định nghĩa các bước build và test.",
+            "below_target": "Chỉ mô tả khái niệm CI/CD mà không viết cấu hình cụ thể.",
+            "at_target": "Định nghĩa rõ ràng các stage (build, test) và công cụ thực thi trong pipeline.",
+            "above_target": "Thêm điều kiện kích hoạt pipeline chỉ cho nhánh phát triển chính.",
+            "essential": true,
+            "criterion_id": "c9eae646-1f18-5ee4-912f-7ac644f8d767:c1"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "DESIGN",
+            "criterion_indices": []
+          },
+          {
+            "mode": "CODING",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 180,
+        "objective_id": "c9eae646-1f18-5ee4-912f-7ac644f8d767",
+        "claim": "A solid grasp of CI/CD principles and experience with tools like GitLab CI/CD or Jenkins is highly valued",
+        "requirement_kind": "REQUIRED",
+        "jd_evidence_spans": [
+          "A solid grasp of CI/CD principles and experience with tools like GitLab CI/CD or Jenkins is highly valued"
+        ]
+      }
+    ]
+  },
+  "jd_006__python": {
+    "objectives": [
+      {
+        "requirement_id": "python:req_002",
+        "skill_id": "python",
+        "target_depth": 3,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Xử lý dữ liệu và tự động hóa thuộc L3 vì cần phân tích cấu trúc dữ liệu và lựa chọn công cụ phù hợp.",
+        "depth_evidence_spans": [
+          "Expertise in Python for data manipulation and automation is essential"
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Lọc và chuyển đổi tập dữ liệu lớn bằng pandas hoặc generator hiệu quả",
+            "expected_evidence": "Viết code xử lý chuỗi sự kiện hoặc DataFrame với bộ nhớ tối ưu.",
+            "below_target": "Dùng vòng lặp Python thuần để duyệt từng dòng thay vì vector hóa.",
+            "at_target": "Sử dụng phương thức tích hợp sẵn của thư viện để lọc và biến đổi dữ liệu.",
+            "above_target": "Tối ưu hóa bộ nhớ bằng cách dùng kiểu dữ liệu nhẹ hơn hoặc chunking.",
+            "essential": true,
+            "criterion_id": "b992381b-e4b6-53a4-b2c1-07b2346b259b:c1"
+          },
+          {
+            "description": "Tự động hóa quy trình xử lý file đầu vào",
+            "expected_evidence": "Viết script đọc, xác thực và ghi kết quả ra file định dạng yêu cầu.",
+            "below_target": "Hardcode đường dẫn file hoặc bỏ qua bước kiểm tra lỗi IO.",
+            "at_target": "Sử dụng pathlib hoặc os để quản lý đường dẫn và xử lý ngoại lệ khi mở file.",
+            "above_target": "Thiết kế hàm tái sử dụng có thể nhận nhiều định dạng đầu vào khác nhau.",
+            "essential": true,
+            "criterion_id": "b992381b-e4b6-53a4-b2c1-07b2346b259b:c2"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "CODING",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 180,
+        "objective_id": "b992381b-e4b6-53a4-b2c1-07b2346b259b",
+        "claim": "Expertise in Python for data manipulation and automation is essential",
+        "requirement_kind": "REQUIRED",
+        "jd_evidence_spans": [
+          "Expertise in Python for data manipulation and automation is essential"
+        ]
+      }
+    ]
+  },
+  "jd_006__aws": {
+    "objectives": [
+      {
+        "requirement_id": "aws:req_005",
+        "skill_id": "aws",
+        "target_depth": 2,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Sử dụng dịch vụ lưu trữ đối tượng cơ bản thuộc L2.",
+        "depth_evidence_spans": [
+          "Practical experience with cloud data platforms (AWS, GCP, or Azure) is also a must-have, specifically with services like S3, Redshift, BigQuery, or Snowflake"
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Tạo bucket và tải lên tệp dữ liệu vào AWS S3",
+            "expected_evidence": "Viết lệnh CLI hoặc SDK để tạo bucket với tên duy nhất và upload file mẫu.",
+            "below_target": "Mô tả lý thuyết về S3 mà không thực hiện thao tác tạo/tải lên.",
+            "at_target": "Thực hiện thành công việc tạo bucket và upload file vào vùng cụ thể.",
+            "above_target": "Thiết lập quyền truy cập riêng tư cho bucket sau khi tạo.",
+            "essential": true,
+            "criterion_id": "2b96b3a8-7247-5c99-a7e7-445d429c4dd8:c1"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "CODING",
+            "criterion_indices": []
+          },
+          {
+            "mode": "TECHNICAL_EXPLANATION",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 120,
+        "objective_id": "2b96b3a8-7247-5c99-a7e7-445d429c4dd8",
+        "claim": "Practical experience with cloud data platforms (AWS, GCP, or Azure) is also a must-have, specifically with services like S3, Redshift, BigQuery, or Snowflake",
+        "requirement_kind": "REQUIRED",
+        "jd_evidence_spans": [
+          "Practical experience with cloud data platforms (AWS, GCP, or Azure) is also a must-have, specifically with services like S3, Redshift, BigQuery, or Snowflake"
+        ]
+      }
+    ]
+  },
+  "jd_006__data-engineering": {
+    "objectives": [
+      {
+        "requirement_id": "data-engineering:req_001",
+        "skill_id": "data-engineering",
+        "target_depth": 4,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Thiết kế hệ thống đường ống dữ liệu phức tạp với các ràng buộc về hiệu năng và độ tin cậy thuộc L4.",
+        "depth_evidence_spans": [
+          "minimum of 5 years of professional experience in data engineering, with a strong focus on building data pipelines"
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Đánh giá sự đánh đổi giữa xử lý theo lô (batch) và thời gian thực (streaming) cho yêu cầu kinh doanh",
+            "expected_evidence": "Giải thích rõ ràng khi nào dùng batch để tối ưu chi phí tính toán và khi nào dùng streaming để giảm độ trễ nghiệp vụ.",
+            "below_target": "Khuyến nghị một công nghệ duy nhất mà không xem xét ngữ cảnh hoặc chi phí.",
+            "at_target": "Phân tích được điểm mạnh/yếu của từng mô hình đối với yêu cầu cụ thể.",
+            "above_target": "Đề xuất kiến trúc lai (hybrid) kết hợp cả hai để cân bằng tải và độ tươi mới của dữ liệu.",
+            "essential": true,
+            "criterion_id": "e5cdc307-6073-5443-ac4f-033e3158e8ef:c1"
+          },
+          {
+            "description": "Thiết kế cơ chế đảm bảo tính toàn vẹn dữ liệu (idempotency) và xử lý lỗi trong đường ống",
+            "expected_evidence": "Mô tả cách sử dụng khóa chính hoặc ID sự kiện để tránh ghi trùng lặp và chiến lược retry/backoff khi nguồn dữ liệu không ổn định.",
+            "below_target": "Bỏ qua khả năng xảy ra lỗi mạng hoặc dữ liệu trùng lặp.",
+            "at_target": "Áp dụng cơ chế idempotency cơ bản để xử lý các trường hợp gửi lại.",
+            "above_target": "Thiết kế cơ chế kiểm tra tính nhất quán cuối cùng (eventual consistency) và báo cáo lỗi chi tiết để giám sát.",
+            "essential": true,
+            "criterion_id": "e5cdc307-6073-5443-ac4f-033e3158e8ef:c2"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "DESIGN",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 300,
+        "objective_id": "e5cdc307-6073-5443-ac4f-033e3158e8ef",
+        "claim": "minimum of 5 years of professional experience in data engineering, with a strong focus on building data pipelines",
+        "requirement_kind": "REQUIRED",
+        "jd_evidence_spans": [
+          "minimum of 5 years of professional experience in data engineering, with a strong focus on building data pipelines"
+        ]
+      }
+    ]
+  },
+  "jd_007__machine-learning": {
+    "objectives": [
+      {
+        "requirement_id": "machine-learning:req_001",
+        "skill_id": "machine-learning",
+        "target_depth": 3,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Đánh giá nền tảng vững chắc về nguyên lý ML và mô hình thống kê đòi hỏi khả năng phân tích và giải thích các trade-off trong lựa chọn mô hình thuộc L3.",
+        "depth_evidence_spans": [
+          "robust foundation in machine learning principles and statistical modeling"
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Giải thích cơ chế hoạt động và giả định thống kê của mô hình được chọn",
+            "expected_evidence": "Mô tả rõ ràng cách mô hình học từ dữ liệu và các điều kiện tiên quyết (assumptions) cần thỏa mãn.",
+            "below_target": "Chỉ nêu tên mô hình hoặc mô tả chung chung không đi vào chi tiết kỹ thuật.",
+            "at_target": "Liệt kê đúng các giả định chính và giải thích ngắn gọn cách mô hình xử lý chúng.",
+            "above_target": "Phân tích sâu hơn về hậu quả khi vi phạm giả định và cách mô hình nhạy cảm với nhiễu.",
+            "essential": true,
+            "criterion_id": "f410b1c5-670f-5f7f-8630-8c854716128c:c1"
+          },
+          {
+            "description": "Lựa chọn và biện minh cho chỉ số đánh giá phù hợp với đặc thù dữ liệu",
+            "expected_evidence": "Chọn metric (ví dụ: Precision/Recall, RMSE, AUC) và giải thích tại sao nó phản ánh tốt nhất mục tiêu kinh doanh hoặc thống kê.",
+            "below_target": "Chọn metric phổ biến nhất mà không giải thích lý do liên quan đến dữ liệu.",
+            "at_target": "Chọn metric phù hợp và giải thích ngắn gọn mối tương quan với lỗi dự đoán.",
+            "above_target": "So sánh nhiều metric và lập luận vì sao metric được chọn tối ưu hơn trong bối cảnh mất cân bằng lớp hoặc chi phí sai sót khác nhau.",
+            "essential": true,
+            "criterion_id": "f410b1c5-670f-5f7f-8630-8c854716128c:c2"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "TECHNICAL_EXPLANATION",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 240,
+        "objective_id": "f410b1c5-670f-5f7f-8630-8c854716128c",
+        "claim": "robust foundation in machine learning principles and statistical modeling",
+        "requirement_kind": "REQUIRED",
+        "jd_evidence_spans": [
+          "robust foundation in machine learning principles and statistical modeling"
+        ]
+      }
+    ]
+  },
+  "jd_007__python": {
+    "objectives": [
+      {
+        "requirement_id": "python:req_002",
+        "skill_id": "python",
+        "target_depth": 3,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Lựa chọn và áp dụng thư viện ML phù hợp cho một bài toán cụ thể thuộc L3.",
+        "depth_evidence_spans": [
+          "extensive hands-on experience in Python and its data science ecosystem (e.g., scikit-learn, TensorFlow, PyTorch)"
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Lựa chọn công cụ Python phù hợp cho tác vụ học máy",
+            "expected_evidence": "Giải thích lý do chọn scikit-learn hoặc TensorFlow dựa trên đặc điểm dữ liệu.",
+            "below_target": "Sử dụng thư viện không phù hợp với loại dữ liệu đầu vào.",
+            "at_target": "Chọn đúng thư viện và giải thích ngắn gọn về sự phù hợp.",
+            "above_target": "Đánh giá chi tiết các trade-off giữa hiệu năng và độ phức tạp của mô hình.",
+            "essential": true,
+            "criterion_id": "b992381b-e4b6-53a4-b2c1-07b2346b259b:c1"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "DESIGN",
+            "criterion_indices": []
+          },
+          {
+            "mode": "TECHNICAL_EXPLANATION",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 150,
+        "objective_id": "b992381b-e4b6-53a4-b2c1-07b2346b259b",
+        "claim": "extensive hands-on experience in Python and its data science ecosystem (e.g., scikit-learn, TensorFlow, PyTorch)",
+        "requirement_kind": "REQUIRED",
+        "jd_evidence_spans": [
+          "extensive hands-on experience in Python and its data science ecosystem (e.g., scikit-learn, TensorFlow, PyTorch)"
+        ]
+      }
+    ]
+  },
+  "jd_007__data-science": {
+    "objectives": [
+      {
+        "requirement_id": "data-science:req_003",
+        "skill_id": "data-science",
+        "target_depth": 4,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Yêu cầu kinh nghiệm 7 năm đòi hỏi khả năng thiết kế giải pháp và đánh đổi kỹ thuật ở mức cao nhất (L4).",
+        "depth_evidence_spans": [
+          "minimum of 7 years in a data science or machine learning engineering role"
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Thiết kế hệ thống ML chịu lỗi và có thể mở rộng cho dữ liệu lớn",
+            "expected_evidence": "Đưa ra kiến trúc xử lý pipeline dữ liệu, chọn mô hình phù hợp với ràng buộc tài nguyên và đề xuất chiến lược giám sát.",
+            "below_target": "Chỉ liệt kê các công cụ phổ biến mà không giải thích lý do lựa chọn trong ngữ cảnh cụ thể.",
+            "at_target": "Thiết kế được pipeline cơ bản, giải thích được sự cân nhắc giữa độ chính xác và chi phí tính toán.",
+            "above_target": "Đánh giá được rủi ro suy giảm chất lượng mô hình theo thời gian và đề xuất cơ chế tự động tái huấn luyện hoặc can thiệp.",
+            "essential": true,
+            "criterion_id": "356f0072-d93e-5825-871c-b4b2b779f6f1:c1"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "DESIGN",
+            "criterion_indices": []
+          },
+          {
+            "mode": "TECHNICAL_EXPLANATION",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 180,
+        "objective_id": "356f0072-d93e-5825-871c-b4b2b779f6f1",
+        "claim": "minimum of 7 years in a data science or machine learning engineering role",
+        "requirement_kind": "REQUIRED",
+        "jd_evidence_spans": [
+          "minimum of 7 years in a data science or machine learning engineering role"
+        ]
+      }
+    ]
+  },
+  "jd_007__aws": {
+    "objectives": [
+      {
+        "requirement_id": "aws:req_006",
+        "skill_id": "aws",
+        "target_depth": 2,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Áp dụng kiến thức nền tảng về các dịch vụ AWS cơ bản vào một tác vụ cấu hình cụ thể thuộc L2.",
+        "depth_evidence_spans": [
+          "Experience with cloud platforms like AWS, Azure, or GCP is also a critical requirement"
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Cấu hình tài nguyên lưu trữ đối tượng (S3) với quyền truy cập hạn chế",
+            "expected_evidence": "Viết chính sách IAM hoặc bucket policy giới hạn quyền truy cập S3 theo yêu cầu bảo mật tối thiểu.",
+            "below_target": "Để bucket mở công khai toàn cầu hoặc không xác định được dịch vụ lưu trữ phù hợp.",
+            "at_target": "Chọn đúng dịch vụ S3 và áp dụng chính sách quyền truy cập cơ bản.",
+            "above_target": "Giải thích lý do chọn S3 thay vì EBS cho dữ liệu tĩnh và phân tích chi phí lưu trữ.",
+            "essential": true,
+            "criterion_id": "963e5b5b-8593-551c-8a38-dd0dd0319bbd:c1"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "DESIGN",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 150,
+        "objective_id": "963e5b5b-8593-551c-8a38-dd0dd0319bbd",
+        "claim": "Experience with cloud platforms like AWS, Azure, or GCP is also a critical requirement",
+        "requirement_kind": "REQUIRED",
+        "jd_evidence_spans": [
+          "Experience with cloud platforms like AWS, Azure, or GCP is also a critical requirement"
+        ]
+      }
+    ]
+  },
+  "jd_008__kafka": {
+    "objectives": [
+      {
+        "requirement_id": "kafka:req_010",
+        "skill_id": "kafka",
+        "target_depth": 2,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Áp dụng kiến thức cơ bản về Kafka để giải thích luồng sự kiện thuộc L2.",
+        "depth_evidence_spans": [
+          "Any prior experience working with Kafka-based event streaming architectures"
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Giải thích vai trò của topic và partition trong kiến trúc Kafka",
+            "expected_evidence": "Mô tả cách dữ liệu được phân tán qua các partition và đọc tuần tự từ offset.",
+            "below_target": "Nhầm lẫn giữa queue truyền thống và stream sự kiện.",
+            "at_target": "Giải thích rõ ràng cấu trúc topic-partition-offset và tính chất append-only.",
+            "above_target": "Phân tích tác động của số lượng partition đến throughput và parallelism.",
+            "essential": true,
+            "criterion_id": "980508ea-cb54-5310-a5bf-0b02d688b268:c1"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "TECHNICAL_EXPLANATION",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 120,
+        "objective_id": "980508ea-cb54-5310-a5bf-0b02d688b268",
+        "claim": "Any prior experience working with Kafka-based event streaming architectures",
+        "requirement_kind": "OPTIONAL",
+        "jd_evidence_spans": [
+          "Any prior experience working with Kafka-based event streaming architectures"
+        ]
+      }
+    ]
+  },
+  "jd_008__e2e-testing": {
+    "objectives": [
+      {
+        "requirement_id": "e2e-testing:req_002",
+        "skill_id": "e2e-testing",
+        "target_depth": 4,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Thiết kế và duy trì khung thử nghiệm E2E thuộc L4.",
+        "depth_evidence_spans": [
+          "and a proven track record of implementing and maintaining E2E test frameworks (Cypress preferred)"
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Thiết kế cấu trúc thư mục và lớp trừu tượng cho framework Cypress",
+            "expected_evidence": "Đề xuất sơ đồ tổ chức file hỗ trợ tái sử dụng và dễ bảo trì.",
+            "below_target": "Viết tất cả kịch bản trong một file lớn không có cấu trúc.",
+            "at_target": "Phân tách logic trang và hành động thành các module riêng biệt.",
+            "above_target": "Áp dụng Page Object Model hoặc Custom Commands để giảm trùng lặp mã nguồn.",
+            "essential": true,
+            "criterion_id": "a4f82f0e-7256-589e-bd80-84ed4559988d:c1"
+          },
+          {
+            "description": "Xác định chiến lược xử lý lỗi mạng và timeout trong môi trường CI/CD",
+            "expected_evidence": "Giải thích cách framework tự động retry hoặc báo cáo nguyên nhân thất bại cụ thể.",
+            "below_target": "Bỏ qua vấn đề ổn định hoặc chỉ dựa vào sleep tĩnh.",
+            "at_target": "Sử dụng explicit waits thay vì implicit waits hoặc sleep.",
+            "above_target": "Triển khai cơ chế chụp ảnh màn hình tự động khi fail để debug nhanh.",
+            "essential": true,
+            "criterion_id": "a4f82f0e-7256-589e-bd80-84ed4559988d:c2"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "DESIGN",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 180,
+        "objective_id": "a4f82f0e-7256-589e-bd80-84ed4559988d",
+        "claim": "and a proven track record of implementing and maintaining E2E test frameworks (Cypress preferred)",
+        "requirement_kind": "REQUIRED",
+        "jd_evidence_spans": [
+          "and a proven track record of implementing and maintaining E2E test frameworks (Cypress preferred)"
+        ]
+      }
+    ]
+  },
+  "jd_008__api-testing": {
+    "objectives": [
+      {
+        "requirement_id": "api-testing:req_003",
+        "skill_id": "api-testing",
+        "target_depth": 2,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Sử dụng công cụ API để thực thi yêu cầu và xác minh phản hồi thuộc L2.",
+        "depth_evidence_spans": [
+          "You should also possess solid experience with API testing tools (e.g., Postman, RestAssured)"
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Thực thi yêu cầu API và xác minh mã trạng thái HTTP",
+            "expected_evidence": "Gửi request qua công cụ (Postman/RestAssured) và kiểm tra response code là 200 hoặc giá trị mong đợi.",
+            "below_target": "Chỉ mô tả lý thuyết về API mà không thực thi request.",
+            "at_target": "Thực thi thành công request và xác nhận mã trạng thái đúng.",
+            "above_target": "Xác minh thêm cấu trúc JSON trong body phản hồi khớp schema.",
+            "essential": true,
+            "criterion_id": "b68c446f-66e4-5b6e-9292-d11bb2972524:c1"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "CODING",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 120,
+        "objective_id": "b68c446f-66e4-5b6e-9292-d11bb2972524",
+        "claim": "You should also possess solid experience with API testing tools (e.g., Postman, RestAssured)",
+        "requirement_kind": "REQUIRED",
+        "jd_evidence_spans": [
+          "You should also possess solid experience with API testing tools (e.g., Postman, RestAssured)"
+        ]
+      }
+    ]
+  },
+  "jd_008__test-automation": {
+    "objectives": [
+      {
+        "requirement_id": "test-automation:req_001",
+        "skill_id": "test-automation",
+        "target_depth": 2,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Xây dựng kịch bản kiểm thử tự động cơ bản trong môi trường JavaScript/TypeScript thuộc L2.",
+        "depth_evidence_spans": [
+          "We require a minimum of 3 years of experience in test automation, specifically with JavaScript/TypeScript"
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Viết kịch bản kiểm thử tự động cho luồng đăng nhập người dùng",
+            "expected_evidence": "Sử dụng framework phổ biến (như Jest hoặc Playwright) để mô phỏng tương tác và xác nhận trạng thái thành công.",
+            "below_target": "Chỉ liệt kê các bước thủ công hoặc thiếu mã nguồn thực thi.",
+            "at_target": "Triển khai mã TypeScript chạy được, bao gồm thiết lập fixture và assertion rõ ràng.",
+            "above_target": "Tích hợp xử lý lỗi mạng và retry logic vào kịch bản kiểm thử.",
+            "essential": true,
+            "criterion_id": "cf4c951e-75aa-5ca5-82b7-ec14a701dd7a:c1"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "CODING",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 180,
+        "objective_id": "cf4c951e-75aa-5ca5-82b7-ec14a701dd7a",
+        "claim": "We require a minimum of 3 years of experience in test automation, specifically with JavaScript/TypeScript",
+        "requirement_kind": "REQUIRED",
+        "jd_evidence_spans": [
+          "We require a minimum of 3 years of experience in test automation, specifically with JavaScript/TypeScript"
+        ]
+      }
+    ]
+  },
+  "jd_009__linux": {
+    "objectives": [
+      {
+        "requirement_id": "linux:req_002",
+        "skill_id": "linux",
+        "target_depth": 3,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Phân tích và giải thích các giao thức mạng cùng kỹ năng dòng lệnh cơ bản thuộc L3.",
+        "depth_evidence_spans": [
+          "A strong understanding of network protocols (TCP/IP, DNS) and foundational Linux command-line skills are essential."
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Sử dụng công cụ dòng lệnh để xác minh trạng thái kết nối TCP",
+            "expected_evidence": "Chạy lệnh kiểm tra cổng hoặc hiển thị bảng kết nối và diễn giải trạng thái.",
+            "below_target": "Không sử dụng được lệnh dòng lệnh hoặc không biết cách đọc đầu ra.",
+            "at_target": "Xác định chính xác trạng thái kết nối (ví dụ: ESTABLISHED, LISTEN) từ đầu ra lệnh.",
+            "above_target": "Giải thích ý nghĩa của các cờ TCP trong trạng thái kết nối.",
+            "essential": true,
+            "criterion_id": "10279259-da5e-59b8-bfdd-0dd94a64c704:c1"
+          },
+          {
+            "description": "Kiểm tra cấu hình và độ tin cậy của phân giải tên miền DNS",
+            "expected_evidence": "Thực hiện truy vấn DNS và phân tích phản hồi nhận được.",
+            "below_target": "Không biết lệnh truy vấn DNS hoặc không hiểu kết quả trả về.",
+            "at_target": "Xác định địa chỉ IP tương ứng với tên miền và kiểm tra thời gian phản hồi.",
+            "above_target": "Phân biệt giữa các loại bản ghi DNS khác nhau (A, AAAA, CNAME) trong kết quả.",
+            "essential": true,
+            "criterion_id": "10279259-da5e-59b8-bfdd-0dd94a64c704:c2"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "TECHNICAL_EXPLANATION",
+            "criterion_indices": []
+          },
+          {
+            "mode": "DEBUGGING",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 180,
+        "objective_id": "10279259-da5e-59b8-bfdd-0dd94a64c704",
+        "claim": "A strong understanding of network protocols (TCP/IP, DNS) and foundational Linux command-line skills are essential.",
+        "requirement_kind": "REQUIRED",
+        "jd_evidence_spans": [
+          "A strong understanding of network protocols (TCP/IP, DNS) and foundational Linux command-line skills are essential."
+        ]
+      }
+    ]
+  },
+  "jd_009__adaptability": {
+    "objectives": [
+      {
+        "requirement_id": "adaptability:req_008",
+        "skill_id": "adaptability",
+        "target_depth": 2,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Thích nghi với công nghệ mới trong môi trường nhanh thuộc L2.",
+        "depth_evidence_spans": [
+          "We're a fast-paced environment, so adaptability and a drive to learn new technologies are key."
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Thể hiện khả năng tiếp cận và áp dụng công nghệ chưa quen thuộc để hoàn thành nhiệm vụ",
+            "expected_evidence": "Mô tả quy trình tự học hoặc tìm hiểu tài liệu kỹ thuật để giải quyết vấn đề cụ thể bằng công cụ mới.",
+            "below_target": "Phàn nàn về độ khó của công nghệ mới hoặc từ chối thay đổi.",
+            "at_target": "Chứng minh đã sử dụng thành thạo công nghệ mới cho một tác vụ nhỏ sau thời gian ngắn tìm hiểu.",
+            "above_target": "Đề xuất cải tiến quy trình dựa trên việc khám phá tính năng mới của công nghệ đó.",
+            "essential": true,
+            "criterion_id": "7647cbd1-b14e-5dda-8a9b-7f37b5b614f1:c1"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "BEHAVIORAL",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 120,
+        "objective_id": "7647cbd1-b14e-5dda-8a9b-7f37b5b614f1",
+        "claim": "We're a fast-paced environment, so adaptability and a drive to learn new technologies are key.",
+        "requirement_kind": "REQUIRED",
+        "jd_evidence_spans": [
+          "We're a fast-paced environment, so adaptability and a drive to learn new technologies are key."
+        ]
+      }
+    ]
+  },
+  "jd_009__tcp-ip": {
+    "objectives": [
+      {
+        "requirement_id": "tcp-ip:req_001",
+        "skill_id": "tcp-ip",
+        "target_depth": 2,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Áp dụng kiến thức nền tảng về giao thức mạng và lệnh Linux để thực hiện tác vụ cụ thể thuộc L2.",
+        "depth_evidence_spans": [
+          "A strong understanding of network protocols (TCP/IP, DNS) and foundational Linux command-line skills are essential."
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Sử dụng công cụ dòng lệnh để xác minh trạng thái kết nối TCP và phân giải DNS",
+            "expected_evidence": "Chạy lệnh như `curl`, `dig` hoặc `ss` để thu thập dữ liệu kết nối và trả về kết quả phân tích ngắn gọn.",
+            "below_target": "Không sử dụng được công cụ dòng lệnh hoặc đưa ra kết luận mà không có bằng chứng từ đầu ra lệnh.",
+            "at_target": "Thực hiện đúng lệnh để kiểm tra kết nối và diễn giải chính xác kết quả đầu ra.",
+            "above_target": "So sánh sự khác biệt giữa các mã trạng thái TCP hoặc lỗi DNS để đưa ra nhận định sâu hơn.",
+            "essential": true,
+            "criterion_id": "5dc12a33-8af7-5063-886e-a257eaab52d9:c1"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "TECHNICAL_EXPLANATION",
+            "criterion_indices": []
+          },
+          {
+            "mode": "DEBUGGING",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 150,
+        "objective_id": "5dc12a33-8af7-5063-886e-a257eaab52d9",
+        "claim": "A strong understanding of network protocols (TCP/IP, DNS) and foundational Linux command-line skills are essential.",
+        "requirement_kind": "REQUIRED",
+        "jd_evidence_spans": [
+          "A strong understanding of network protocols (TCP/IP, DNS) and foundational Linux command-line skills are essential."
+        ]
+      }
+    ]
+  },
+  "jd_009__alert-triage": {
+    "objectives": [
+      {
+        "requirement_id": "alert-triage:req_004",
+        "skill_id": "alert-triage",
+        "target_depth": 3,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Phân tích sự kiện bảo mật để xác định hoạt động đáng ngờ thuộc L3.",
+        "depth_evidence_spans": [
+          "identifying suspicious activity"
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Xác định hành vi bất thường từ nhật ký AWS CloudTrail hoặc endpoint",
+            "expected_evidence": "Chỉ ra các dấu hiệu như đăng nhập từ vị trí lạ, thay đổi cấu hình trái phép hoặc tải dữ liệu bất thường.",
+            "below_target": "Bỏ qua cảnh báo hoặc không giải thích được lý do đánh giá là an toàn/nguy hiểm.",
+            "at_target": "Liên kết sự kiện nhật ký với quy tắc phát hiện và phân loại mức độ nghiêm trọng.",
+            "above_target": "Đề xuất bước điều tra tiếp theo để loại trừ giả thiết sai (false positive).",
+            "essential": true,
+            "criterion_id": "c7e54850-56fc-52ab-a027-d2e482f2253f:c1"
+          },
+          {
+            "description": "Quyết định mức độ ưu tiên và nội dung báo cáo cho đội phản ứng sự cố",
+            "expected_evidence": "Trích xuất thông tin then chốt (nguồn, đích, thời gian, tác nhân) và đề xuất mức độ khẩn cấp.",
+            "below_target": "Gửi báo cáo chung chung thiếu thông tin kỹ thuật cần thiết.",
+            "at_target": "Soạn thảo ticket escalations với đầy đủ ngữ cảnh sự kiện và bằng chứng sơ bộ.",
+            "above_target": "Đề xuất biện pháp cô lập tạm thời nếu có nguy cơ lây lan cao.",
+            "essential": true,
+            "criterion_id": "c7e54850-56fc-52ab-a027-d2e482f2253f:c2"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "BEHAVIORAL",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 180,
+        "objective_id": "c7e54850-56fc-52ab-a027-d2e482f2253f",
+        "claim": "You will be responsible for monitoring security events across our AWS environment (EC2, S3, RDS) and corporate endpoints (macOS, Linux), identifying suspicious activity, and escalating critical alerts.",
+        "requirement_kind": "REQUIRED",
+        "jd_evidence_spans": [
+          "You will be responsible for monitoring security events across our AWS environment (EC2, S3, RDS) and corporate endpoints (macOS, Linux), identifying suspicious activity, and escalating critical alerts."
+        ]
+      }
+    ]
+  },
+  "jd_010__edtech": {
+    "objectives": [
+      {
+        "requirement_id": "edtech:req_010_007",
+        "skill_id": "edtech",
+        "target_depth": 2,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Áp dụng kiến thức nền về hệ thống LMS vào việc thiết kế tính năng cơ bản thuộc L2.",
+        "depth_evidence_spans": [
+          "prior experience within the EdTech industry, working on learning management systems (LMS), online course platforms, or educational content delivery systems, would be a significant advantage."
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Thiết kế luồng phân quyền truy cập nội dung khóa học",
+            "expected_evidence": "Đề xuất mô hình dữ liệu hoặc logic kiểm tra vai trò người dùng (học viên/giảng viên) khi xem bài giảng.",
+            "below_target": "Bỏ qua yếu tố bảo mật hoặc gộp chung tất cả người dùng.",
+            "at_target": "Xác định rõ các vai trò và quyền hạn cơ bản trong hệ thống LMS.",
+            "above_target": "Xem xét hiệu năng cache cho nội dung phổ biến và cơ chế revoke quyền thời gian thực.",
+            "essential": true,
+            "criterion_id": "098c34a7-a312-5abf-a76c-5014c625834d:c1"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "DESIGN",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 150,
+        "objective_id": "098c34a7-a312-5abf-a76c-5014c625834d",
+        "claim": "prior experience within the EdTech industry, working on learning management systems (LMS), online course platforms, or educational content delivery systems, would be a significant advantage.",
+        "requirement_kind": "OPTIONAL",
+        "jd_evidence_spans": [
+          "prior experience within the EdTech industry, working on learning management systems (LMS), online course platforms, or educational content delivery systems, would be a significant advantage."
+        ]
+      }
+    ]
+  },
+  "jd_010__product-owner": {
+    "objectives": [
+      {
+        "requirement_id": "product-owner:req_010_001",
+        "skill_id": "product-owner",
+        "target_depth": 3,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Phân tích và giải quyết các tình huống ưu tiên sản phẩm phức tạp thuộc L3.",
+        "depth_evidence_spans": [
+          "at least 3 years of demonstrable experience as a Product Owner, Business Analyst, or Technical Product Manager, specifically within a software development environment."
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Ưu tiên backlog dựa trên giá trị kinh doanh và ràng buộc kỹ thuật",
+            "expected_evidence": "Trình bày lý do sắp xếp thứ tự công việc khi có xung đột giữa yêu cầu khách hàng và chi phí phát triển.",
+            "below_target": "Liệt kê tất cả tính năng cần làm mà không phân biệt mức độ quan trọng.",
+            "at_target": "Xác định tính năng cốt lõi (MVP) và giải thích tác động nếu trì hoãn tính năng phụ.",
+            "above_target": "Đề xuất lộ trình giảm phạm vi để đáp ứng hạn chót mà vẫn giữ được giá trị cốt lõi.",
+            "essential": true,
+            "criterion_id": "00e817e6-fcf7-5190-9b34-a3ef2c8172f2:c1"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "BEHAVIORAL",
+            "criterion_indices": []
+          },
+          {
+            "mode": "DESIGN",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 180,
+        "objective_id": "00e817e6-fcf7-5190-9b34-a3ef2c8172f2",
+        "claim": "at least 3 years of demonstrable experience as a Product Owner, Business Analyst, or Technical Product Manager, specifically within a software development environment.",
+        "requirement_kind": "REQUIRED",
+        "jd_evidence_spans": [
+          "at least 3 years of demonstrable experience as a Product Owner, Business Analyst, or Technical Product Manager, specifically within a software development environment."
+        ]
+      }
+    ]
+  },
+  "jd_010__sdlc": {
+    "objectives": [
+      {
+        "requirement_id": "sdlc:req_010_002",
+        "skill_id": "sdlc",
+        "target_depth": 3,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Áp dụng và phân tích quy trình phát triển phần mềm trong bối cảnh cụ thể thuộc L3.",
+        "depth_evidence_spans": [
+          "A strong understanding of the software development lifecycle (SDLC) and Agile methodologies (Scrum, Kanban) is essential."
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Lựa chọn phương pháp luận phù hợp cho dự án dựa trên đặc điểm yêu cầu",
+            "expected_evidence": "Giải thích lý do chọn Scrum hoặc Kanban dựa trên tính ổn định của yêu cầu và tần suất thay đổi.",
+            "below_target": "Khẳng định chỉ có một phương pháp duy nhất phù hợp cho mọi dự án.",
+            "at_target": "Phân biệt rõ ràng khi nào dùng Scrum (nhóm cố định, sprint) và Kanban (dòng chảy liên tục, WIP limit).",
+            "above_target": "Đề xuất mô hình lai (Hybrid) kết hợp cả hai để tối ưu hóa quy trình.",
+            "essential": true,
+            "criterion_id": "1ed7471a-071c-53d2-831d-7828c89064c4:c1"
+          },
+          {
+            "description": "Xác định các hoạt động then chốt trong vòng đời phát triển phần mềm",
+            "expected_evidence": "Liệt kê và sắp xếp đúng thứ tự các giai đoạn: thu thập yêu cầu, thiết kế, phát triển, kiểm thử, triển khai.",
+            "below_target": "Nhầm lẫn giữa giai đoạn kiểm thử và bảo trì.",
+            "at_target": "Mô tả chính xác đầu ra và đầu vào của từng giai đoạn trong SDLC truyền thống hoặc Agile.",
+            "above_target": "Phân tích tác động của việc bỏ qua một giai đoạn cụ thể đến chất lượng sản phẩm cuối cùng.",
+            "essential": true,
+            "criterion_id": "1ed7471a-071c-53d2-831d-7828c89064c4:c2"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "TECHNICAL_EXPLANATION",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 180,
+        "objective_id": "1ed7471a-071c-53d2-831d-7828c89064c4",
+        "claim": "A strong understanding of the software development lifecycle (SDLC) and Agile methodologies (Scrum, Kanban) is essential.",
+        "requirement_kind": "REQUIRED",
+        "jd_evidence_spans": [
+          "A strong understanding of the software development lifecycle (SDLC) and Agile methodologies (Scrum, Kanban) is essential."
+        ]
+      }
+    ]
+  },
+  "jd_010__requirements-gathering": {
+    "objectives": [
+      {
+        "requirement_id": "requirements-gathering:req_010_006",
+        "skill_id": "requirements-gathering",
+        "target_depth": 3,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Chuyển đổi yêu cầu kinh doanh thành đặc tả kỹ thuật chi tiết bao gồm user stories và acceptance criteria thuộc L3.",
+        "depth_evidence_spans": [
+          "candidates must have prior experience translating business requirements into detailed technical specifications, including user stories, use cases, and acceptance criteria."
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Viết user story với acceptance criteria rõ ràng từ yêu cầu kinh doanh mơ hồ",
+            "expected_evidence": "Định dạng đúng cấu trúc As a... I want... So that... kèm các điều kiện chấp nhận (Given/When/Then).",
+            "below_target": "Chỉ liệt kê tính năng chung chung không có người dùng mục tiêu hoặc điều kiện kiểm thử.",
+            "at_target": "Xác định đúng vai trò người dùng, hành động mong muốn và lợi ích kinh doanh; acceptance criteria đủ để xác minh.",
+            "above_target": "Phân tích được các trường hợp biên (edge cases) và ghi nhận chúng trong acceptance criteria.",
+            "essential": true,
+            "criterion_id": "861186a9-ec2b-58d0-8d2a-2563e15bf482:c1"
+          },
+          {
+            "description": "Xây dựng use case mô tả luồng tương tác chính giữa người dùng và hệ thống",
+            "expected_evidence": "Liệt kê các bước thực hiện tuần tự cho luồng chính (main flow) của use case.",
+            "below_target": "Bỏ qua các bước tương tác hoặc trộn lẫn logic nghiệp vụ với giao diện.",
+            "at_target": "Mô tả chính xác chuỗi sự kiện kích hoạt và phản hồi của hệ thống.",
+            "above_target": "Ghi chú rõ các luồng thay thế (alt flows) hoặc ngoại lệ thường gặp.",
+            "essential": true,
+            "criterion_id": "861186a9-ec2b-58d0-8d2a-2563e15bf482:c2"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "DESIGN",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 240,
+        "objective_id": "861186a9-ec2b-58d0-8d2a-2563e15bf482",
+        "claim": "candidates must have prior experience translating business requirements into detailed technical specifications, including user stories, use cases, and acceptance criteria.",
+        "requirement_kind": "REQUIRED",
+        "jd_evidence_spans": [
+          "candidates must have prior experience translating business requirements into detailed technical specifications, including user stories, use cases, and acceptance criteria."
+        ]
+      }
+    ]
+  },
+  "jd_010__jira": {
+    "objectives": [
+      {
+        "requirement_id": "jira:req_010_003",
+        "skill_id": "jira",
+        "target_depth": 2,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Sử dụng công cụ quản lý dự án để tổ chức backlog và theo dõi tiến độ thuộc L2.",
+        "depth_evidence_spans": [
+          "We require proven experience working with JIRA or similar project management tools to manage backlogs and track progress effectively."
+        ],
+        "extension_depth": null,
+        "criteria": [
+          {
+            "description": "Tạo và cấu hình ticket trong backlog với thông tin đầy đủ",
+            "expected_evidence": "Mô tả yêu cầu rõ ràng, đặt ưu tiên và gắn nhãn phù hợp cho ticket mới.",
+            "below_target": "Tạo ticket thiếu mô tả hoặc không có tiêu đề cụ thể.",
+            "at_target": "Tạo ticket có tiêu đề, mô tả, ưu tiên và trạng thái ban đầu chính xác.",
+            "above_target": "Gắn thêm các trường tùy chỉnh như ước lượng thời gian hoặc thành viên liên quan.",
+            "essential": true,
+            "criterion_id": "29aff38c-cce3-504b-a21a-1c89e77bf0f9:c1"
+          },
+          {
+            "description": "Cập nhật trạng thái và ghi chú tiến độ thực hiện",
+            "expected_evidence": "Chuyển trạng thái ticket sang 'In Progress' hoặc 'Done' kèm ghi chú ngắn gọn về kết quả.",
+            "below_target": "Chỉ thay đổi trạng thái mà không giải thích lý do hoặc kết quả.",
+            "at_target": "Cập nhật trạng thái đúng quy trình và thêm ghi chú tóm tắt công việc đã làm.",
+            "above_target": "Liên kết ticket với commit code hoặc pull request tương ứng.",
+            "essential": true,
+            "criterion_id": "29aff38c-cce3-504b-a21a-1c89e77bf0f9:c2"
+          }
+        ],
+        "suitable_modes": [
+          {
+            "mode": "BEHAVIORAL",
+            "criterion_indices": []
+          }
+        ],
+        "estimated_seconds": 120,
+        "objective_id": "29aff38c-cce3-504b-a21a-1c89e77bf0f9",
+        "claim": "We require proven experience working with JIRA or similar project management tools to manage backlogs and track progress effectively.",
+        "requirement_kind": "REQUIRED",
+        "jd_evidence_spans": [
+          "We require proven experience working with JIRA or similar project management tools to manage backlogs and track progress effectively."
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "student_model": "openrouter/qwen/qwen3.7-flash",
+  "judge_model": "openrouter/google/gemini-2.5-flash",
+  "independent_judge": true,
+  "compiled": {
+    "split": "test",
+    "question_count": 9,
+    "question_avg_score": 1.0,
+    "judge_count": 9,
+    "judge_avg_score": 0.6666666666666666,
+    "alignment_count": 8,
+    "alignment_accuracy": 1.0,
+    "alignment_macro_f1": 1.0,
+    "blueprint_count": 4,
+    "blueprint_avg_score": 1.0,
+    "dialogue_count": 3,
+    "dialogue_avg_score": 0.3333333333333333,
+    "evaluation_errors": 0
+  },
+  "uncompiled": {
+    "split": "test",
+    "question_count": 9,
+    "question_avg_score": 0.5555555555555556,
+    "judge_count": 9,
+    "judge_avg_score": 0.5555555555555556,
+    "alignment_count": 8,
+    "alignment_accuracy": 1.0,
+    "alignment_macro_f1": 1.0,
+    "blueprint_count": 4,
+    "blueprint_avg_score": 1.0,
+    "dialogue_count": 3,
+    "dialogue_avg_score": 0.3333333333333333,
+    "evaluation_errors": 4
+  }
+}

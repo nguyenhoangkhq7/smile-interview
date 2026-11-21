@@ -818,6 +818,11 @@ def main() -> None:
     parser.add_argument("--mipro", action="store_true", help="Online MIPROv2 instruction + demo optimization")
     parser.add_argument("--all", action="store_true", help="Compile all 4 modules (Question, Judge, Alignment, Blueprint)")
     parser.add_argument("--evaluate", action="store_true", help="Online evaluation on held-out dev/test splits")
+    parser.add_argument("--eval-only", action="store_true", help="Evaluate existing compiled artifacts without recompiling")
+    parser.add_argument("--compare-uncompiled", action="store_true", help="With --eval-only, also evaluate uncompiled baseline")
+    parser.add_argument("--judge-model", type=str, default=None, help="Independent judge LM model id (e.g. openrouter/google/gemini-2.5-flash)")
+    parser.add_argument("--eval-split", type=str, default="test", choices=["dev", "val", "test"])
+    parser.add_argument("--eval-out", type=Path, default=None, help="Optional JSON path to save evaluation report")
     parser.add_argument("--extended", action="store_true", help="Include extended domain-disjoint train split")
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_COMPILED_DIR)
     parser.add_argument("--metric-threshold", type=float, default=0.8)
@@ -825,32 +830,66 @@ def main() -> None:
     parser.add_argument("--max-labeled", type=int, default=2)
     args = parser.parse_args()
     lm = None
-    if args.bootstrap or args.random_search or args.mipro or args.evaluate:
+    judge_lm = None
+    if args.bootstrap or args.random_search or args.mipro or args.evaluate or args.eval_only:
+        import os
         from dotenv import load_dotenv
         from adaptive_questioning.evidence.provider import configured_lm
         root = Path(__file__).resolve().parents[2]
         load_dotenv(root.parent / ".env")
         load_dotenv(root / ".env", override=True)
         lm = configured_lm().copy(num_retries=3)
+        if args.judge_model:
+            j_model = args.judge_model if args.judge_model.startswith("openrouter/") else f"openrouter/{args.judge_model}"
+            judge_lm = dspy.LM(
+                j_model,
+                api_key=os.environ.get("OPENROUTER_API_KEY"),
+                api_base="https://openrouter.ai/api/v1",
+                temperature=0.0,
+                max_tokens=512,
+                cache=False,
+                num_retries=3,
+            )
+        else:
+            judge_lm = lm
+
+    if args.eval_only:
+        compiled = load_all_compiled_modules(args.out_dir)
+        compiled_res = evaluate_all_modules(*compiled, lm=lm, split=args.eval_split, judge_lm=judge_lm)
+        payload = {
+            "student_model": getattr(lm, "model", None),
+            "judge_model": getattr(judge_lm, "model", None),
+            "independent_judge": getattr(lm, "model", None) != getattr(judge_lm, "model", None),
+            "compiled": compiled_res,
+        }
+        if args.compare_uncompiled:
+            uncompiled = (*_new_modules(), *_new_aux_modules())
+            payload["uncompiled"] = evaluate_all_modules(*uncompiled, lm=lm, split=args.eval_split, judge_lm=judge_lm)
+        text = json.dumps(payload, ensure_ascii=False, indent=2)
+        if args.eval_out:
+            args.eval_out.parent.mkdir(parents=True, exist_ok=True)
+            args.eval_out.write_text(text + "\n", encoding="utf-8")
+        print(text)
+        return
 
     strategy: CompileStrategy = (
         "mipro" if args.mipro else ("random_search" if args.random_search else ("bootstrap" if args.bootstrap else "labeled"))
     )
     if args.all:
         modules = compile_all_modules(
-            lm, strategy=strategy, use_extended=args.extended or strategy != "labeled",
+            lm, strategy=strategy, judge_lm=judge_lm, use_extended=args.extended or strategy != "labeled",
             metric_threshold=args.metric_threshold, max_bootstrapped_demos=args.max_bootstrapped,
             max_labeled_demos=args.max_labeled,
         )
         paths = save_all_compiled_modules(*modules, target_dir=args.out_dir)
         print("Saved:", *paths)
         if args.evaluate:
-            print(json.dumps(evaluate_all_modules(*modules, lm=lm, split="test", judge_lm=lm), indent=2))
+            print(json.dumps(evaluate_all_modules(*modules, lm=lm, split=args.eval_split, judge_lm=judge_lm), indent=2))
         return
 
     modules = (
         compile_with_bootstrap_few_shot(
-            lm, metric_threshold=args.metric_threshold,
+            lm, judge_lm=judge_lm, metric_threshold=args.metric_threshold,
             max_bootstrapped_demos=args.max_bootstrapped,
             max_labeled_demos=args.max_labeled,
             use_extended=args.extended,
@@ -861,7 +900,7 @@ def main() -> None:
     paths = save_compiled_modules(*modules, target_dir=args.out_dir)
     print("Saved:", *paths)
     if args.evaluate:
-        print(json.dumps(evaluate_modules_on_dev(*modules, lm=lm, judge_lm=lm), indent=2))
+        print(json.dumps(evaluate_modules_on_dev(*modules, lm=lm, judge_lm=judge_lm), indent=2))
 
 
 if __name__ == "__main__":

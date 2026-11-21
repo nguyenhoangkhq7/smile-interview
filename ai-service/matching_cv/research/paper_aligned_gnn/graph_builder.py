@@ -27,6 +27,7 @@ from matching_cv.research.data.canonical_skill_normalizer import normalize_canon
 from matching_cv.research.paper_aligned_gnn.proficiency_extractor import (
     PAPER_TABLE3_EXPLICIT_MAPPING,
     PAPER_TABLE6_7_SUPPLEMENTAL_MAPPING,
+    build_module2_proficiency_record,
     compute_tensor_edge_weight,
     extract_skill_proficiency,
 )
@@ -307,6 +308,9 @@ class PaperAlignedGraphBuilder:
                 emb_rec = cv_emb_by_occ.get(s.occurrence_id) or cv_emb_by_skill.get(s.skill_id)
                 vec = emb_rec.vector if (emb_rec and emb_rec.vector) else None
                 vec_ref = emb_rec.vector_id if emb_rec else None
+                cv_item_meta = dict(s.metadata or {})
+                if getattr(s, "sections", None):
+                    cv_item_meta.setdefault("sections", list(s.sections))
 
                 cv_items.append(
                     SkillInputItem(
@@ -322,7 +326,7 @@ class PaperAlignedGraphBuilder:
                         modifier_text=mod_text,
                         embedding_ref=vec_ref,
                         embedding_vector=vec,
-                        metadata=dict(s.metadata or {}),
+                        metadata=cv_item_meta,
                     )
                 )
 
@@ -426,6 +430,9 @@ class PaperAlignedGraphBuilder:
                 emb_rec = jd_emb_by_occ.get(s.occurrence_id) or jd_emb_by_skill.get(s.skill_id)
                 vec = emb_rec.vector if (emb_rec and emb_rec.vector) else None
                 vec_ref = emb_rec.vector_id if emb_rec else None
+                jd_item_meta = dict(s.metadata or {})
+                if getattr(s, "sections", None):
+                    jd_item_meta.setdefault("sections", list(s.sections))
 
                 jd_items.append(
                     SkillInputItem(
@@ -441,7 +448,7 @@ class PaperAlignedGraphBuilder:
                         modifier_text=mod_text,
                         embedding_ref=vec_ref,
                         embedding_vector=vec,
-                        metadata=dict(s.metadata or {}),
+                        metadata=jd_item_meta,
                     )
                 )
 
@@ -722,11 +729,15 @@ class PaperAlignedGraphBuilder:
                 cv_sk,
                 allow_paper_table6_7_descriptors=self.config.allow_paper_table6_7_descriptors,
                 allow_years_heuristic=self.config.allow_years_heuristic,
+                allow_vietnamese_descriptors=self.config.allow_vietnamese_descriptors,
+                enable_evidence_fallback=self.config.enable_evidence_proficiency_fallback,
             )
             jd_prof = extract_skill_proficiency(
                 jd_sk,
                 allow_paper_table6_7_descriptors=self.config.allow_paper_table6_7_descriptors,
                 allow_years_heuristic=self.config.allow_years_heuristic,
+                allow_vietnamese_descriptors=self.config.allow_vietnamese_descriptors,
+                enable_evidence_fallback=self.config.enable_evidence_proficiency_fallback,
             )
 
             w_cv = compute_tensor_edge_weight(
@@ -835,6 +846,8 @@ class PaperAlignedGraphBuilder:
                 cv_sk,
                 allow_paper_table6_7_descriptors=self.config.allow_paper_table6_7_descriptors,
                 allow_years_heuristic=self.config.allow_years_heuristic,
+                allow_vietnamese_descriptors=self.config.allow_vietnamese_descriptors,
+                enable_evidence_fallback=self.config.enable_evidence_proficiency_fallback,
             )
             w_cv = compute_tensor_edge_weight(
                 cv_prof,
@@ -907,6 +920,8 @@ class PaperAlignedGraphBuilder:
                 jd_sk,
                 allow_paper_table6_7_descriptors=self.config.allow_paper_table6_7_descriptors,
                 allow_years_heuristic=self.config.allow_years_heuristic,
+                allow_vietnamese_descriptors=self.config.allow_vietnamese_descriptors,
+                enable_evidence_fallback=self.config.enable_evidence_proficiency_fallback,
             )
             w_jd = compute_tensor_edge_weight(
                 jd_prof,
@@ -1523,6 +1538,96 @@ class PaperAlignedGraphBuilder:
             warnings=warnings,
         )
 
+    def apply_module2_proficiencies(
+        self,
+        graph_data: PaperAlignedGraphData,
+        cv_proficiencies: Optional[Dict[str, float]] = None,
+        jd_proficiencies: Optional[Dict[str, float]] = None,
+    ) -> PaperAlignedGraphData:
+        """
+        Return a deep copy of `graph_data` with edge weights updated from Module 2's
+        continuous ProficiencyEstimator (P_CV in [1.0, 5.0]) and JDRequirementParser
+        (P_JD in [1.0, 5.0]) via w = P / 5.0 in [0.2, 1.0] (Approach 1).
+
+        Edges for skills not covered by Module 2 retain their existing Approach 2
+        continuous evidence-based fallback weights. Forward and reverse edges are
+        updated symmetrically to preserve all graph integrity invariants.
+        """
+        updated = graph_data.model_copy(deep=True)
+        cv_map: Dict[str, float] = {}
+        for k, v in (cv_proficiencies or {}).items():
+            if v is not None and math.isfinite(float(v)):
+                norm_k = normalize_canonical_skill(k) or k.strip().lower()
+                cv_map[norm_k] = max(cv_map.get(norm_k, 0.0), float(v))
+
+        jd_map: Dict[str, float] = {}
+        for k, v in (jd_proficiencies or {}).items():
+            if v is not None and math.isfinite(float(v)):
+                norm_k = normalize_canonical_skill(k) or k.strip().lower()
+                jd_map[norm_k] = max(jd_map.get(norm_k, 0.0), float(v))
+
+        cv_updated_edges = 0
+        jd_updated_edges = 0
+
+        for edge in updated.edges:
+            if edge.edge_type in ("has_skill", "in_resume"):
+                skill_node_id = edge.target_id if edge.edge_type == "has_skill" else edge.source_id
+                snode = updated.skill_nodes.get(skill_node_id)
+                if snode is None:
+                    continue
+                lookup_keys = [
+                    normalize_canonical_skill(snode.cv_canonical_id or ""),
+                    normalize_canonical_skill(snode.canonical_skill_id or ""),
+                ]
+                p_cv = next((cv_map[k] for k in lookup_keys if k and k in cv_map), None)
+                if p_cv is not None:
+                    rec = build_module2_proficiency_record(
+                        p_cv,
+                        side="CV_DEMONSTRATED",
+                        provenance_sentence=edge.proficiency.provenance_sentence,
+                    )
+                    edge.proficiency = rec
+                    edge.tensor_weight = (
+                        float(rec.numeric_level)
+                        if updated.edge_weight_normalization == "raw_table3" and rec.numeric_level is not None
+                        else float(rec.normalized_weight or 0.2)
+                    )
+                    if not edge.is_reverse_edge:
+                        cv_updated_edges += 1
+            elif edge.edge_type in ("requires_skill", "required_by_job"):
+                skill_node_id = edge.target_id if edge.edge_type == "requires_skill" else edge.source_id
+                snode = updated.skill_nodes.get(skill_node_id)
+                if snode is None:
+                    continue
+                lookup_keys = [
+                    normalize_canonical_skill(snode.jd_canonical_id or ""),
+                    normalize_canonical_skill(snode.canonical_skill_id or ""),
+                ]
+                p_jd = next((jd_map[k] for k in lookup_keys if k and k in jd_map), None)
+                if p_jd is not None:
+                    rec = build_module2_proficiency_record(
+                        p_jd,
+                        side="JD_REQUIRED",
+                        provenance_sentence=edge.proficiency.provenance_sentence,
+                    )
+                    edge.proficiency = rec
+                    edge.tensor_weight = (
+                        float(rec.numeric_level)
+                        if updated.edge_weight_normalization == "raw_table3" and rec.numeric_level is not None
+                        else float(rec.normalized_weight or 0.2)
+                    )
+                    if not edge.is_reverse_edge:
+                        jd_updated_edges += 1
+
+        updated.diagnostics = dict(updated.diagnostics or {})
+        updated.diagnostics["module2_proficiency_injection"] = {
+            "applied": True,
+            "cv_edges_updated": cv_updated_edges,
+            "jd_edges_updated": jd_updated_edges,
+        }
+        updated.integrity_report = self.validate_graph_integrity(updated)
+        return updated
+
     def export_to_pyg(
         self, graph_data: PaperAlignedGraphData
     ) -> Tuple[HeteroData, Dict[str, Dict[str, int]], Dict[str, Any]]:
@@ -1793,4 +1898,10 @@ def verify_paper_aligned_subgraphs(
     }
 
 
-paper_aligned_graph_builder = PaperAlignedGraphBuilder()
+paper_aligned_graph_builder = PaperAlignedGraphBuilder(
+    PaperAlignedGraphConfig(
+        embedding_dim=settings.STAGE3_EMBEDDING_DIM,
+        enable_evidence_proficiency_fallback=True,
+        dependency_scope="jd_bidirectional",
+    )
+)

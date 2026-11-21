@@ -41,10 +41,12 @@ PINNED_SBERT_MODEL_ID = "sentence-transformers/paraphrase-multilingual-mpnet-bas
 PINNED_SBERT_REVISION = "4328cf26390c98c5e3c738b4460a05b95f4911f5"
 EXPECTED_EMBEDDING_DIM = 768
 
-# Default checkpoint path for trained Dependency-Aware PaperAlignedHybridGNN (v2)
-# Baseline bipartite checkpoint remains preserved at paper_aligned_hybrid_gnn_v1.pt for ablation comparison.
+# Default checkpoint path for trained Asymmetric & Proficiency-Aware PaperAlignedHybridGNN (v3).
+# Earlier baselines remain preserved at paper_aligned_hybrid_gnn_v1.pt (bipartite)
+# and paper_aligned_hybrid_gnn_v2_dep.pt (dependency diffusion) for ablation comparison.
 PAPER_ALIGNED_CKPT_PATH = str(
-    Path(__file__).resolve().parents[2] / "data/checkpoints/paper_aligned_gnn/paper_aligned_hybrid_gnn_v2_dep.pt"
+    Path(__file__).resolve().parents[2]
+    / "data/checkpoints/paper_aligned_gnn/paper_aligned_hybrid_gnn_v3_asym_prof.pt"
 )
 
 ALLOWED_PAPER_NODE_TYPES = {"resume", "job", "skill"}
@@ -260,6 +262,7 @@ class GNNInferenceService:
             "missing_job_weight_for_graphconv",
             "use_resume_edge_weights",
             "missing_resume_weight_for_gat",
+            "use_value_weight_modulation",
             "add_self_loops_in_gat",
             "score_scale",
             "use_skill_dependency_edges",

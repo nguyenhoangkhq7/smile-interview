@@ -55,6 +55,81 @@ PAPER_TABLE6_7_SUPPLEMENTAL_MAPPING: Dict[str, Tuple[float, str]] = {
     "moderate": (4.0, "Moderate"),
 }
 
+# ---------------------------------------------------------------------------
+# PROJECT_ADAPTATION: Vietnamese Proficiency Descriptor Mapping
+# Covers common Vietnamese CV/JD proficiency qualifiers so Vietnamese CVs
+# (e.g., "Python (cơ bản, 3 tháng)" vs "Python (chuyên sâu, 6 năm)") are
+# distinguished accurately even before or without Module 2.
+# ---------------------------------------------------------------------------
+VIETNAMESE_PROFICIENCY_MAPPING: Dict[str, Tuple[float, str]] = {
+    "chuyên sâu": (9.0, "Expert"),
+    "thành thục": (9.0, "Expert"),
+    "chuyên gia": (9.0, "Expert"),
+    "xuất sắc": (9.0, "Expert"),
+    "nhiều kinh nghiệm": (8.0, "Experienced"),
+    "dày dặn kinh nghiệm": (8.0, "Experienced"),
+    "kinh nghiệm sâu": (8.0, "Experienced"),
+    "sử dụng thành thạo": (7.0, "Accomplished"),
+    "thành thạo": (7.0, "Accomplished"),
+    "vững vàng": (7.0, "Accomplished"),
+    "nắm vững": (6.0, "Skilled"),
+    "sử dụng tốt": (6.0, "Skilled"),
+    "có kinh nghiệm thực tế": (5.0, "Proficient"),
+    "trung bình": (4.0, "Intermediate"),
+    "biết sử dụng": (3.0, "Beginner"),
+    "có kiến thức": (3.0, "Beginner"),
+    "quen thuộc": (2.0, "Familiar"),
+    "làm quen": (2.0, "Familiar"),
+    "cơ bản": (1.0, "Basic"),
+    "nhập môn": (1.0, "Basic"),
+    "mới tìm hiểu": (1.0, "Basic"),
+}
+
+_EXPERIENCE_SECTIONS = frozenset({
+    "experience",
+    "work_experience",
+    "work experience",
+    "employment",
+    "projects",
+    "project",
+    "professional_experience",
+    "kinh_nghiem",
+    "du_an",
+})
+
+_SKILLS_LIST_SECTIONS = frozenset({
+    "skills",
+    "technical_skills",
+    "technical skills",
+    "core_competencies",
+    "summary",
+    "ky_nang",
+})
+
+_JD_CORE_SECTIONS = frozenset({
+    "requirements",
+    "mandatory",
+    "must_have",
+    "qualifications",
+    "responsibilities",
+    "yeu_cau",
+})
+
+_JD_OPTIONAL_SECTIONS = frozenset({
+    "bonus",
+    "preferred",
+    "nice_to_have",
+    "plus",
+    "uu_tien",
+})
+
+_RICH_ACTION_VERB_REGEX = re.compile(
+    r"\b(?:built|designed|architected|deployed|implemented|optimized|developed|maintained|led|"
+    r"spearheaded|migrated|engineered|scaled|managed|operated|automated|orchestrated|"
+    r"xây dựng|thiết kế|triển khai|tối ưu|phát triển|vận hành|dẫn dắt|quản trị)\b",
+    re.IGNORECASE,
+)
+
 CLAUSE_SPLIT_REGEX = re.compile(r"[.;,\n]|\b(?:and|but|while|whereas)\b", re.IGNORECASE)
 
 # ---------------------------------------------------------------------------
@@ -145,6 +220,7 @@ def map_descriptor_to_proficiency(
     side: ProficiencySide,
     allow_paper_table6_7_descriptors: bool = True,
     allow_years_heuristic: bool = True,
+    allow_vietnamese_descriptors: bool = True,
     extraction_method: str = "explicit_modifier_field",
     provenance_sentence: Optional[str] = None,
 ) -> ProficiencyRecord:
@@ -251,6 +327,26 @@ def map_descriptor_to_proficiency(
             decision_class=dec_cls,  # type: ignore[arg-type]
         )
 
+    # 3B. Vietnamese proficiency descriptors (longest-phrase first)
+    if allow_vietnamese_descriptors:
+        for vn_key, (val, canonical_desc) in sorted(
+            VIETNAMESE_PROFICIENCY_MAPPING.items(),
+            key=lambda x: (len(x[0]), x[1][0]),
+            reverse=True,
+        ):
+            if re.search(rf"(?<!\w){re.escape(vn_key)}(?!\w)", lower):
+                return ProficiencyRecord(
+                    side=side,
+                    raw_descriptor=canonical_desc,
+                    numeric_level=val,
+                    normalized_weight=round(val / 10.0, 4),
+                    is_missing=False,
+                    mapping_source="vietnamese_descriptor_mapping",
+                    extraction_method=extraction_method,
+                    provenance_sentence=provenance_sentence,
+                    decision_class="PROJECT_ADAPTATION",
+                )
+
     # 4. Years of experience heuristic mapping (if enabled)
     if allow_years_heuristic:
         years_rec = map_years_to_proficiency(
@@ -315,17 +411,102 @@ def _extract_clause_around_skill(sentence: str, skill_surface: str, window_chars
     return sentence[w_start:w_end]
 
 
+def estimate_evidence_fallback_proficiency(
+    skill_item: SkillInputItem,
+    side: ProficiencySide,
+) -> ProficiencyRecord:
+    """
+    Continuous, evidence-based proficiency fallback (Approach 2) for real CVs/JDs that omit
+    explicit Table 3 modifiers ('Strong', 'Basic') or explicit years next to a skill mention.
+
+    Maps structural signals already produced by Stage 2 (section placement, rich action context,
+    evidence count, explicit vs. implicit) to a continuous level in [2.5, 7.5] (weight [0.25, 0.75])
+    so edges never collapse to 0.0 while remaining strictly bounded below explicit Expert/Strong (8-10).
+    """
+    sents = [s.strip() for s in (skill_item.evidence_sentences or []) if s and s.strip()]
+    first_sent = sents[0] if sents else None
+    raw_sections = skill_item.metadata.get("sections", []) if isinstance(skill_item.metadata, dict) else []
+    sections = {str(sec).strip().lower() for sec in raw_sections if sec}
+
+    has_rich_sentence = any(
+        len(sent) >= 35 and bool(_RICH_ACTION_VERB_REGEX.search(sent))
+        for sent in sents
+    )
+    extra_evidence_count = max(0, len(sents) - 1)
+
+    if side == "CV_DEMONSTRATED":
+        if skill_item.extraction_type == "implicit":
+            base_level = 3.5
+        elif sections.intersection(_EXPERIENCE_SECTIONS) or has_rich_sentence:
+            base_level = 5.5
+        elif sections.intersection(_SKILLS_LIST_SECTIONS):
+            base_level = 4.0
+        else:
+            base_level = 4.5
+        level = min(7.5, base_level + 0.5 * min(4, extra_evidence_count))
+    else:
+        if sections.intersection(_JD_OPTIONAL_SECTIONS):
+            base_level = 4.0
+        elif sections.intersection(_JD_CORE_SECTIONS) or has_rich_sentence:
+            base_level = 6.0
+        else:
+            base_level = 5.5
+        level = min(7.5, base_level + 0.3 * min(3, extra_evidence_count))
+
+    level = round(float(max(2.5, min(7.5, level))), 2)
+    return ProficiencyRecord(
+        side=side,
+        raw_descriptor="EvidenceFallback",
+        numeric_level=level,
+        normalized_weight=round(level / 10.0, 4),
+        is_missing=False,
+        mapping_source="evidence_context_fallback",
+        extraction_method="evidence_context_fallback",
+        provenance_sentence=first_sent,
+        decision_class="PROJECT_ADAPTATION",
+    )
+
+
+def build_module2_proficiency_record(
+    proficiency_1_to_5: float,
+    side: ProficiencySide,
+    provenance_sentence: Optional[str] = None,
+) -> ProficiencyRecord:
+    """
+    Convert a continuous Module 2 (skill_gap) proficiency score P in [1.0, 5.0]
+    into a normalized GNN edge ProficiencyRecord on [0.2, 1.0] (numeric_level in [2.0, 10.0]).
+    """
+    clamped = max(1.0, min(5.0, float(proficiency_1_to_5)))
+    weight = round(clamped / 5.0, 4)
+    level = round(clamped * 2.0, 2)
+    label_prefix = "Module2_P_CV" if side == "CV_DEMONSTRATED" else "Module2_P_JD"
+    return ProficiencyRecord(
+        side=side,
+        raw_descriptor=f"{label_prefix}={clamped:.2f}",
+        numeric_level=level,
+        normalized_weight=weight,
+        is_missing=False,
+        mapping_source="module2_proficiency_estimator",
+        extraction_method="module2_proficiency_estimator",
+        provenance_sentence=provenance_sentence,
+        decision_class="PROJECT_ADAPTATION",
+    )
+
+
 def extract_skill_proficiency(
     skill_item: SkillInputItem,
     allow_paper_table6_7_descriptors: bool = True,
     allow_years_heuristic: bool = True,
+    allow_vietnamese_descriptors: bool = True,
+    enable_evidence_fallback: bool = False,
 ) -> ProficiencyRecord:
     """
     Extract proficiency for a CV or JD skill item without fabricating values:
     1. Explicit `proficiency_override` if set on the item.
     2. Explicit `modifier_text` if extracted upstream.
-    3. Local clause/window search inside `evidence_sentences`.
-    4. Otherwise returns missing ProficiencyRecord (`is_missing=True`, `numeric_level=None`).
+    3. Local clause/window search inside `evidence_sentences` (Table 3, Table 6/7, Vietnamese, Years).
+    4. Optional continuous evidence-based fallback (Approach 2) when `enable_evidence_fallback=True`.
+    5. Otherwise returns missing ProficiencyRecord (`is_missing=True`, `numeric_level=None`).
     """
     side: ProficiencySide = (
         "CV_DEMONSTRATED" if skill_item.source_document == "CV" else "JD_REQUIRED"
@@ -339,6 +520,7 @@ def extract_skill_proficiency(
             side=side,
             allow_paper_table6_7_descriptors=allow_paper_table6_7_descriptors,
             allow_years_heuristic=allow_years_heuristic,
+            allow_vietnamese_descriptors=allow_vietnamese_descriptors,
             extraction_method="provided_override",
             provenance_sentence=first_sent,
         )
@@ -350,6 +532,7 @@ def extract_skill_proficiency(
             side=side,
             allow_paper_table6_7_descriptors=allow_paper_table6_7_descriptors,
             allow_years_heuristic=allow_years_heuristic,
+            allow_vietnamese_descriptors=allow_vietnamese_descriptors,
             extraction_method="explicit_modifier_field",
             provenance_sentence=first_sent,
         )
@@ -367,6 +550,7 @@ def extract_skill_proficiency(
             side=side,
             allow_paper_table6_7_descriptors=allow_paper_table6_7_descriptors,
             allow_years_heuristic=allow_years_heuristic,
+            allow_vietnamese_descriptors=allow_vietnamese_descriptors,
             extraction_method="context_window_regex",
             provenance_sentence=sent,
         )
@@ -377,7 +561,11 @@ def extract_skill_proficiency(
     if best_record is not None:
         return best_record
 
-    # 4. Missing proficiency (do NOT invent or substitute cosine similarity)
+    # 4. Continuous evidence-based fallback (Approach 2) when enabled for production inference
+    if enable_evidence_fallback:
+        return estimate_evidence_fallback_proficiency(skill_item, side=side)
+
+    # 5. Missing proficiency (do NOT invent or substitute cosine similarity)
     return ProficiencyRecord(
         side=side,
         raw_descriptor=None,

@@ -28,6 +28,9 @@ from matching_cv.app.schemas.standardized_output import (
 )
 from matching_cv.app.services.extraction_adapter import ExtractionDataAdapter
 from matching_cv.research.data.canonical_skill_normalizer import normalize_canonical_skill
+from matching_cv.research.paper_aligned_gnn.skill_dependency_resolver import (
+    resolve_directed_skill_relation,
+)
 from matching_cv.app.schemas.module1 import Module1Output
 from skill_gap.domain.enums import SkillType
 from skill_gap.domain.models import ExtractedCVSkill, ExtractedJDSkill, MatchResult
@@ -66,6 +69,7 @@ class PublicOutputContext:
     matching_status: Optional[str] = None
     run_id: Optional[str] = None
     skill_importance_output: Optional[Any] = None
+    reasoning_results: Optional[Any] = None
 
 
 @dataclass
@@ -446,6 +450,47 @@ def _classify_semantic_relation_category(jd_cid: str, cv_cid: Optional[str], is_
     return "related_skill"
 
 
+def _compute_directed_soft_match(
+    jd_cid: str,
+    cv_cid: str,
+    raw_cos: float,
+    reasoning_results: Optional[Any] = None,
+) -> Tuple[float, str, int]:
+    """
+    Compute asymmetric directed transferability score s(CV -> JD) from raw SBERT cosine
+    and verified skill prerequisite/hierarchy relations (CURATED_SKILL_PREREQUISITE_DAG + Stage 4 LLM).
+
+    Fixes symmetric cosine failure (e.g., JD=Kubernetes/CV=Docker vs JD=Docker/CV=Kubernetes):
+    - cv_supersedes_jd (e.g., JD=Docker, CV=Kubernetes; JD=Java, CV=Spring Boot):
+        1-hop -> [0.72, 0.84] (strong partial credit, capped below 0.85 identity threshold)
+        2-hop -> [0.56, 0.70] (moderate partial credit)
+    - cv_is_prerequisite_only (e.g., JD=Kubernetes, CV=Docker; JD=Spring Boot, CV=Java):
+        1-hop -> [0.36, 0.52] (discounted weak partial credit, clearly separated from reverse direction)
+        2-hop -> [0.22, 0.35] (below Module 2 floor_threshold=0.40 -> treated as missing)
+    - none -> preserves authentic raw SBERT cosine untouched.
+    """
+    rel_kind, hops = resolve_directed_skill_relation(
+        jd_skill_id=jd_cid,
+        cv_skill_id=cv_cid,
+        reasoning_results=reasoning_results,
+        max_hops=2,
+    )
+    pos_cos = max(0.0, float(raw_cos))
+    if rel_kind == "cv_supersedes_jd":
+        if hops == 1:
+            directed = min(0.84, max(float(raw_cos), 0.72 + 0.14 * pos_cos))
+        else:
+            directed = min(0.70, max(float(raw_cos), 0.56 + 0.14 * pos_cos))
+        return round(directed, 6), rel_kind, hops
+    if rel_kind == "cv_is_prerequisite_only":
+        if hops == 1:
+            directed = min(0.52, 0.36 + 0.20 * pos_cos)
+        else:
+            directed = min(0.35, 0.22 + 0.15 * pos_cos)
+        return round(directed, 6), rel_kind, hops
+    return float(raw_cos), "none", 0
+
+
 def build_skill_gap(
     graph_data: Any,
     stage3_response: Any,
@@ -454,6 +499,8 @@ def build_skill_gap(
     skill_importance_output: Optional[Any] = None,
     suppress_cross_category_soft_match: bool = False,
     eligible_cv_ids: Optional[set[str]] = None,
+    enable_directed_hierarchy_soft_match: bool = True,
+    reasoning_results: Optional[Any] = None,
 ) -> Tuple[List[SkillGapRow], List[Dict[str, Any]]]:
     nodes = list(graph_data.skill_nodes.values())
     jd_nodes = [n for n in nodes if n.jd_canonical_id]
@@ -505,6 +552,8 @@ def build_skill_gap(
 
     rows: List[SkillGapRow] = []
     details: List[Dict[str, Any]] = []
+    prereq_floor = min(float(min_soft_match), 0.40)
+
     for jn in jd_nodes:
         detail: Dict[str, Any] = {"jd_skill_id": jn.jd_canonical_id, "jd_node_id": jn.node_id}
         matched: Optional[str] = None
@@ -526,32 +575,70 @@ def build_skill_gap(
             detail.update(
                 match_type="verified_identity" if reason in IDENTITY_MERGE_REASONS else "graph_merge_other",
                 merge_reason=reason,
+                directed_relation="exact_shared",
+                directed_hops=0,
+                raw_cosine=soft,
                 similarity_source=(
                     "stage3_matrix" if (jn.node_id, jn.node_id) in pair_cos else
                     ("graph_node.cosine_similarity_if_shared" if soft is not None else "unavailable")
                 ),
             )
-        else:  # Priority B: best semantic candidate via reverse retrieval argmax
-            best: Optional[Tuple[float, Any]] = None
+        else:  # Priority B: best directed semantic candidate via reverse retrieval argmax
+            best: Optional[Tuple[float, Any, float, str, int, float]] = None
+            # Tuple: (eff_score, cv_node, raw_cos, dir_rel, dir_hops, required_threshold)
             for cn in cv_nodes_sorted:
-                val = pair_cos.get((jn.node_id, cn.node_id))
-                if val is None or not math.isfinite(val):
+                raw_val = pair_cos.get((jn.node_id, cn.node_id))
+                if raw_val is None or not math.isfinite(raw_val):
                     continue
                 if suppress_cross_category_soft_match:
                     rel_cat = _classify_semantic_relation_category(jn.jd_canonical_id, cn.cv_canonical_id, False)
                     if rel_cat == "confusable_distinct_or_unrelated_guard":
                         continue
-                if best is None or val > best[0]:  # strict '>' + sorted iteration -> deterministic tie-break
-                    best = (val, cn)
-            if best is not None and best[0] >= min_soft_match:
-                matched, soft = best[1].cv_canonical_id, best[0]
-                detail.update(match_type="semantic_related", similarity_source="stage3_matrix")
+                if enable_directed_hierarchy_soft_match:
+                    eff_val, dir_rel, dir_hops = _compute_directed_soft_match(
+                        jn.jd_canonical_id,
+                        cn.cv_canonical_id,
+                        raw_val,
+                        reasoning_results=reasoning_results,
+                    )
+                else:
+                    eff_val, dir_rel, dir_hops = raw_val, "none", 0
+
+                cand_thresh = (
+                    prereq_floor
+                    if (dir_rel == "cv_is_prerequisite_only" and dir_hops == 1)
+                    else float(min_soft_match)
+                )
+                if best is None or eff_val > best[0]:  # strict '>' + sorted iteration -> deterministic tie-break
+                    best = (eff_val, cn, raw_val, dir_rel, dir_hops, cand_thresh)
+
+            if best is not None and best[0] >= best[5]:
+                eff_val, best_cn, raw_val, dir_rel, dir_hops, _ = best
+                matched, soft = best_cn.cv_canonical_id, eff_val
+                sim_src = "stage3_matrix_directed_dag" if dir_rel != "none" else "stage3_matrix"
+                detail.update(
+                    match_type="semantic_related",
+                    similarity_source=sim_src,
+                    raw_cosine=round(raw_val, 6),
+                    directed_relation=dir_rel,
+                    directed_hops=dir_hops,
+                )
             else:  # Priority C: unmatched
                 detail.update(
                     match_type="no_match",
                     similarity_source="stage3_matrix" if matrix_available else "unavailable",
+                    raw_cosine=round(best[2], 6) if best is not None else None,
+                    directed_relation=best[3] if best is not None else "none",
+                    directed_hops=best[4] if best is not None else 0,
                     best_below_threshold=(
-                        {"cv_skill_id": best[1].cv_canonical_id, "cosine": best[0]} if best is not None else None
+                        {
+                            "cv_skill_id": best[1].cv_canonical_id,
+                            "cosine": best[2],
+                            "directed_soft_match": best[0],
+                            "directed_relation": best[3],
+                        }
+                        if best is not None
+                        else None
                     ),
                 )
 
@@ -625,7 +712,14 @@ def build_standardized_output(
     cv_skills, jd_skills, cv_dbg, jd_dbg = _extract_output_skills(ctx)
     jd_order = list(dict.fromkeys(skill.skill_id for skill in jd_skills))
     graph = ctx.graph_data
-    rows, gap_details = build_skill_gap(graph, ctx.stage3_response, jd_order, threshold, ctx.skill_importance_output)
+    rows, gap_details = build_skill_gap(
+        graph,
+        ctx.stage3_response,
+        jd_order,
+        threshold,
+        ctx.skill_importance_output,
+        reasoning_results=ctx.reasoning_results,
+    )
 
     has_score = ctx.matching_score is not None
     public = StandardizedPipelineOutput(
@@ -719,6 +813,7 @@ def build_module1_output(ctx: PublicOutputContext) -> Module1Output:
         ctx.graph_data, ctx.stage3_response, list(jd_by_id),
         settings.SKILL_GAP_MIN_SOFT_MATCH, ctx.skill_importance_output,
         eligible_cv_ids=set(cv_by_id),
+        reasoning_results=ctx.reasoning_results,
     )
     by_jd_id = {row.jd_skill_id: row for row in rows}
     return Module1Output(
