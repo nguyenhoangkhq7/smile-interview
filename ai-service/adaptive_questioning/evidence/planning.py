@@ -278,34 +278,43 @@ def plan(
         blueprint.objectives,
         key=lambda obj: _rank(obj, by_skill[obj.skill_id], prior_map),
     )
-    # First pass across skills before additional objectives of the same skill.
     first, additional, seen = [], [], set()
     for objective in ranked:
-        (additional if objective.skill_id in seen else first).append(objective)
-        seen.add(objective.skill_id)
-    return _allocate(first + additional, by_skill, config, policy, mastered)
+        if objective.skill_id in seen or not _fits_session(objective, config):
+            additional.append(objective)
+        else:
+            first.append(objective)
+            seen.add(objective.skill_id)
+    core_skills = {
+        skill_id for skill_id in seen - mastered
+        if by_skill[skill_id].importance_weight >= policy.core_importance
+    }
+    # Stable grouping preserves the first pass across skills within each group.
+    ordered = sorted(first + additional, key=lambda obj: obj.skill_id not in core_skills)
+    return _allocate(ordered, core_skills, config, policy, mastered)
+
+
+def _fits_session(objective: Objective, config: InterviewConfig) -> bool:
+    focused_mode = config.focused_question_mode
+    compatible = focused_mode is None or any(item.mode == focused_mode for item in objective.suitable_modes)
+    return compatible and objective.estimated_seconds <= config.duration_seconds
 
 
 def _allocate(
     objectives: list[Objective],
-    by_skill: dict[str, InterviewSkill],
+    core_skills: set[str],
     config: InterviewConfig,
     policy: InterviewPolicy,
     mastered: set[str],
 ) -> tuple[dict[str, ObjectiveState], list[str]]:
     states, queue, remaining = {}, [], config.duration_seconds
     mode_usage: Counter[Mode] = Counter()
-    core_skills = {
-        obj.skill_id for obj in objectives
-        if obj.skill_id not in mastered
-        and by_skill[obj.skill_id].importance_weight >= policy.core_importance
-        and obj.requirement_kind != "OPTIONAL"
-    }
     initial_limit = min(
         config.max_questions,
         max(len(core_skills), 1, config.max_questions - ceil(config.max_questions * policy.reserve_followup_fraction)),
     )
     compatible = 0
+    queued_core_objectives = 0
     mastered_in_mode = False
     for obj in objectives:
         modes = [item.mode for item in obj.suitable_modes]
@@ -319,18 +328,20 @@ def _allocate(
         mode = select_mode(obj, config, mode_usage)
         state = ObjectiveState(objective=obj)
         compatible += int(mode in modes)
-        optional_reserve = (
-            bool(core_skills)
-            and obj.requirement_kind == "OPTIONAL"
-            and by_skill[obj.skill_id].importance_weight < policy.core_importance
-            and len(queue) * config.max_questions_per_objective >= config.max_questions
+        is_core = obj.skill_id in core_skills
+        reserve_for_core = (
+            not is_core
+            and queued_core_objectives * config.max_questions_per_objective >= config.max_questions
         )
-        reason = _check_plan_exclusion(mode, modes, len(queue), initial_limit, obj.estimated_seconds, remaining, optional_reserve)
+        reason = _check_plan_exclusion(
+            mode, modes, len(queue), initial_limit, obj.estimated_seconds, remaining, reserve_for_core,
+        )
         if reason:
             state.lifecycle, state.excluded_reason = "EXCLUDED", reason
         else:
             state.selected_mode = mode
             queue.append(obj.objective_id)
+            queued_core_objectives += int(is_core)
             mode_usage[mode] += 1
             remaining -= obj.estimated_seconds
         states[obj.objective_id] = state
@@ -350,11 +361,11 @@ def _check_plan_exclusion(
     initial_limit: int,
     estimated_seconds: int,
     remaining_seconds: int,
-    optional_reserve: bool,
+    reserve_for_core: bool,
 ) -> str | None:
     if mode not in modes:
         return "MODE_FILTER"
-    if queue_len >= initial_limit or estimated_seconds > remaining_seconds or optional_reserve:
+    if queue_len >= initial_limit or estimated_seconds > remaining_seconds or reserve_for_core:
         return "PLAN_BUDGET"
     return None
 
@@ -377,12 +388,12 @@ def _rank(
     objective: Objective,
     skill: InterviewSkill,
     prior_assessments: dict[str, str],
-) -> tuple[float, int, int, int, str]:
+) -> tuple[float, float, int, int, str]:
     prior_status = prior_assessments.get(objective.objective_id)
     return (
+        -skill.priority,
         -skill.importance_weight,
         int(prior_status in MASTERED_PRIOR_ASSESSMENTS),
-        int(objective.requirement_kind == "OPTIONAL"),
         objective.estimated_seconds,
         objective.objective_id,
     )

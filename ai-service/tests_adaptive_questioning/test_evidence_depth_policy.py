@@ -310,27 +310,32 @@ def test_mixed_prefers_essential_coverage_then_diversity(audit):
     assert {s.selected_mode for s in diverse.snapshot.objectives.values()} == {Mode.DESIGN, Mode.DEBUGGING}
 
 
-def test_core_skills_fill_the_plan_before_low_importance_optional_skill(audit):
+def test_core_skills_fill_the_plan_in_gap_order_even_with_zero_priority(audit):
     _, engine, _ = audit
-    skills = [task_skill(name="java", importance_weight=0.95, priority=0.3),
-              task_skill(name="spring", importance_weight=0.9, priority=0),
-              task_skill(name="sql", importance_weight=0.8, priority=0.2),
-              task_skill(name="aws", importance_weight=0.2, priority=0.8)]
-    skills[-1].job_tasks[0].requirement_kind = "OPTIONAL"
+    skills = [task_skill(name="java", importance_weight=0.8, priority=0.3),
+              task_skill(name="spring", importance_weight=0.95, priority=0),
+              task_skill(name="sql", importance_weight=0.7, priority=0.2),
+              task_skill(name="aws", importance_weight=0.65, priority=0.5)]
+    skills[2].job_tasks[0].requirement_kind = "OPTIONAL"
+    skills[3].job_tasks[0].requirement_kind = "REQUIRED"
     result = start(engine, skills, max_questions=3)
     planned = [result.snapshot.objectives[key].objective.skill_id for key in result.snapshot.queue]
-    assert planned == ["java", "spring", "sql"]
+    assert planned == ["java", "sql", "spring"]
     aws = next(s for s in result.snapshot.objectives.values() if s.objective.skill_id == "aws")
     assert aws.assessment == Assessment.NOT_ASSESSED
     assert aws.excluded_reason == "PLAN_BUDGET"
     assert not [item for obj in result.public.report.objectives for item in obj.study_recommendations]
+    for _ in planned:
+        result = answer(engine, result.snapshot)
+    assert [turn.skill_id for turn in result.snapshot.turns] == planned
 
 
-def test_jd_importance_selects_matched_skill_with_only_one_question(audit):
+def test_configured_core_threshold_protects_matched_skill_with_only_one_question(audit):
     _, engine, _ = audit
-    matched = task_skill(name="spring", importance_weight=0.95, priority=0.0,
+    engine.policy = InterviewPolicy(core_importance=0.8)
+    matched = task_skill(name="spring", importance_weight=0.8, priority=0.0,
                          semantic_alignment="MATCH", cv_evidence_spans=["Built Spring REST APIs"])
-    missing = task_skill(name="sql", importance_weight=0.80, priority=0.60,
+    missing = task_skill(name="sql", importance_weight=0.79, priority=0.632,
                          semantic_alignment="MISSING")
     matched.job_tasks[0].requirement_kind = "OPTIONAL"
     missing.job_tasks[0].requirement_kind = "REQUIRED"
@@ -341,15 +346,54 @@ def test_jd_importance_selects_matched_skill_with_only_one_question(audit):
     assert len(result.snapshot.queue) == 1
 
 
-def test_gap_priority_does_not_break_importance_ties(audit):
+@pytest.mark.parametrize("importance_weight", [0.9, 0.6])
+def test_gap_priority_orders_equal_importance_skills_within_each_group(audit, importance_weight):
     _, engine, _ = audit
-    skills = [skill("spring", priority=0.0), skill("sql", priority=0.6)]
+    skills = [skill("spring", importance_weight=importance_weight, priority=0.0),
+              skill("sql", importance_weight=importance_weight, priority=0.4)]
     original = start(engine, skills, max_questions=1)
+    assert original.snapshot.pending_turn.skill_id == "sql"
 
     skills[0].priority, skills[1].priority = skills[1].priority, skills[0].priority
     replanned = start(engine, skills, max_questions=1)
+    assert replanned.snapshot.pending_turn.skill_id == "spring"
 
-    assert original.snapshot.queue == replanned.snapshot.queue
+
+def test_focused_plan_covers_each_core_skill_with_a_compatible_task(audit, monkeypatch):
+    provider, engine, _ = audit
+    spring = task_skill("Diagnose Spring login failures", "spring", priority=0.6)
+    spring.job_tasks += task_skill("Diagnose Spring request latency", "spring").job_tasks
+    sql = task_skill("Explain SQL indexes", "sql", importance_weight=0.8, priority=0.4)
+    sql.job_tasks += task_skill("Diagnose SQL query timeouts", "sql").job_tasks
+    draft_blueprint = provider.blueprint
+
+    def prefer_short_explanations(context):
+        draft = draft_blueprint(context)
+        for objective in draft.objectives:
+            if objective.suitable_modes[0].mode == Mode.TECHNICAL_EXPLANATION:
+                objective.estimated_seconds = 30
+        return draft
+
+    monkeypatch.setattr(provider, "blueprint", prefer_short_explanations)
+    result = start(engine, [spring, sql], max_questions=2, focused_question_mode=Mode.DEBUGGING)
+    planned = [result.snapshot.objectives[key].objective for key in result.snapshot.queue]
+    assert [objective.skill_id for objective in planned] == ["spring", "sql"]
+    assert planned[1].claim == "Diagnose SQL query timeouts"
+
+
+def test_reallocates_supplementary_skills_in_gap_order_after_core_coverage(audit):
+    _, engine, _ = audit
+    skills = [skill("core", importance_weight=0.9, priority=0),
+              skill("smaller-gap", importance_weight=0.6, priority=0.1),
+              skill("larger-gap", importance_weight=0.5, priority=0.4)]
+    result = start(engine, skills, max_questions=3)
+    assert [result.snapshot.objectives[key].objective.skill_id for key in result.snapshot.queue] == ["core"]
+
+    restored = Snapshot.model_validate_json(result.snapshot.model_dump_json())
+    result = answer(engine, restored)
+    assert result.snapshot.pending_turn.skill_id == "larger-gap"
+    result = answer(engine, result.snapshot)
+    assert result.snapshot.pending_turn.skill_id == "smaller-gap"
 
 
 def test_retake_skips_mastered_skill_even_if_it_has_the_highest_weight(audit):
@@ -633,7 +677,7 @@ def test_minh_java_backend_intern_full_walkthrough(audit):
     java = task_skill("Use Java Collections to store unique user IDs and check membership", "java",
                       importance_weight=0.95, priority=0.38)
     spring = task_skill("Develop Spring Boot REST API request validation and error handling", "spring",
-                        importance_weight=0.90, priority=0.0)
+                        importance_weight=0.90, priority=0.36)
     sql = task_skill("Write SQL queries and apply indexing for order history", "sql",
                      importance_weight=0.80, priority=0.32)
     aws = task_skill("Explain basic AWS cloud concepts", "aws",
