@@ -2,8 +2,6 @@
 
 from dataclasses import dataclass
 from io import BytesIO
-import logging
-from typing import Any, Dict, Optional
 
 from fastapi import UploadFile
 
@@ -64,24 +62,18 @@ def build_pipeline_orchestrator() -> PipelineOrchestrator:
 pipeline_orchestrator = build_pipeline_orchestrator()
 
 
-logger = logging.getLogger(__name__)
-
-
 @dataclass(frozen=True)
 class MatchedDocuments:
     cv_text: str
     jd_text: str
     output: Module1Output
     matching_score: float | None = None
-    graph_data: Optional[Any] = None
-    graph_mode: str = "similarity_enriched"
-    pair_id: Optional[str] = None
 
 
 async def match_documents(
     cv_text: str, jd_text: str, *, include_compatibility_score: bool = False,
 ) -> MatchedDocuments:
-    """Run the same matching pipeline for text already extracted by Smile Interview."""
+    """Run the self-contained Module 1 pipeline (Stages 0-6) for CV and JD text."""
     with BytesIO(cv_text.encode("utf-8")) as cv_data, BytesIO(jd_text.encode("utf-8")) as jd_data:
         result = await pipeline_orchestrator.execute_pipeline(
             cv_file=UploadFile(cv_data, filename="candidate.txt"),
@@ -102,42 +94,4 @@ async def match_documents(
         jd_text=context.jd_text,
         output=build_module1_output(context),
         matching_score=score,
-        graph_data=context.graph_data,
-        graph_mode=result.graph_mode,
-        pair_id=getattr(context.graph_data, "pair_id", None) or result.run_id,
     )
-
-
-def score_matched_documents_with_module2(
-    documents: MatchedDocuments,
-    cv_proficiencies: Optional[Dict[str, float]] = None,
-    jd_proficiencies: Optional[Dict[str, float]] = None,
-) -> Optional[float]:
-    """
-    Approach 1 (Unified Proficiency -> GNN Scoring):
-    Injects continuous Module 2 (skill_gap) proficiencies P_CV, P_JD in [1.0, 5.0]
-    as w = P / 5.0 into the Stage 5 heterogeneous graph, then executes Stage 6 GNN
-    compatibility inference. Unmatched CV skills retain Approach 2 continuous evidence
-    fallback weights so no edge collapses to 0.0.
-    """
-    if documents.graph_data is None:
-        return documents.matching_score
-    try:
-        enriched_graph = paper_aligned_graph_builder.apply_module2_proficiencies(
-            documents.graph_data,
-            cv_proficiencies=cv_proficiencies,
-            jd_proficiencies=jd_proficiencies,
-        )
-        pyg_data, _, _ = paper_aligned_graph_builder.export_to_pyg(enriched_graph)
-        pred = gnn_inference_service.predict_graph(
-            graph=pyg_data,
-            mode=documents.graph_mode,
-            pair_id=documents.pair_id,
-        )
-        return pred.matching_score / 100.0 if pred.score_scale == "0_100" else pred.matching_score
-    except Exception as exc:
-        logger.warning(
-            "Stage 6 GNN rescoring with Module 2 proficiencies skipped non-fatally: %s",
-            exc,
-        )
-        return documents.matching_score

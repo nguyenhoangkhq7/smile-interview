@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import math
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Literal, Optional, Set, Tuple, Union
 
 import numpy as np
 import torch
@@ -99,6 +99,97 @@ def generate_deterministic_fallback_skill_embedding(
     if norm > 1e-12:
         vec = vec / norm
     return [float(x) for x in vec.tolist()]
+
+
+def _extract_jd_importance_map(
+    jd_importance_weights: Optional[Dict[str, float]] = None,
+    skill_importance_output: Optional[Any] = None,
+) -> Dict[str, float]:
+    """Normalize JD skill importance weights w_j in [0.0, 1.0] by canonical skill ID."""
+    weights: Dict[str, float] = {}
+
+    def _register(raw_key: Optional[str], raw_val: Any) -> None:
+        if not raw_key or raw_val is None or isinstance(raw_val, bool):
+            return
+        try:
+            val = float(raw_val)
+        except (TypeError, ValueError):
+            return
+        if not math.isfinite(val):
+            return
+        clamped = min(1.0, max(0.0, val))
+        clean = str(raw_key).strip()
+        norm = normalize_canonical_skill(clean)
+        for key in (clean, clean.lower(), norm, norm.lower() if norm else None):
+            if key:
+                weights[key] = clamped
+
+    if skill_importance_output is not None:
+        recs = (
+            skill_importance_output.get("records", [])
+            if isinstance(skill_importance_output, dict)
+            else getattr(skill_importance_output, "records", [])
+        )
+        for rec in recs or []:
+            sk_id = rec.get("skill_id") if isinstance(rec, dict) else getattr(rec, "skill_id", None)
+            canon_id = (
+                rec.get("canonical_skill_id")
+                if isinstance(rec, dict)
+                else getattr(rec, "canonical_skill_id", None)
+            )
+            wt = rec.get("weight") if isinstance(rec, dict) else getattr(rec, "weight", None)
+            if wt is None:
+                wt = (
+                    rec.get("importance_weight")
+                    if isinstance(rec, dict)
+                    else getattr(rec, "importance_weight", None)
+                )
+            _register(sk_id, wt)
+            _register(canon_id, wt)
+
+    for raw_key, raw_val in (jd_importance_weights or {}).items():
+        _register(raw_key, raw_val)
+
+    return weights
+
+
+def _build_uniform_cv_edge_weight(
+    provenance_sentence: Optional[str] = None,
+) -> Tuple[ProficiencyRecord, float]:
+    """Return uniform semantic topology weight (1.0) for CV-Skill edges without proficiency."""
+    rec = ProficiencyRecord(
+        side="CV_DEMONSTRATED",
+        raw_descriptor="UniformSemanticWeight",
+        numeric_level=10.0,
+        normalized_weight=1.0,
+        is_missing=False,
+        mapping_source="uniform_semantic_topology",
+        extraction_method="uniform_semantic_topology",
+        provenance_sentence=provenance_sentence,
+        decision_class="PROJECT_ADAPTATION",
+    )
+    return rec, 1.0
+
+
+def _build_jd_importance_edge_weight(
+    importance_weight: Optional[float],
+    provenance_sentence: Optional[str] = None,
+) -> Tuple[ProficiencyRecord, float]:
+    """Return JD-Skill edge weight sourced from JSI-v1 importance w_j (fallback 1.0)."""
+    has_weight = importance_weight is not None and math.isfinite(float(importance_weight))
+    weight = round(min(1.0, max(0.0, float(importance_weight))), 4) if has_weight else 1.0
+    rec = ProficiencyRecord(
+        side="JD_REQUIRED",
+        raw_descriptor=f"JSI_w_j={weight:.4f}" if has_weight else "JSI_fallback=1.0",
+        numeric_level=round(weight * 10.0, 2),
+        normalized_weight=weight,
+        is_missing=False,
+        mapping_source="jd_skill_importance",
+        extraction_method="jsi_skill_importance" if has_weight else "jsi_importance_fallback",
+        provenance_sentence=provenance_sentence,
+        decision_class="PROJECT_ADAPTATION",
+    )
+    return rec, weight
 
 
 class PaperAlignedGraphBuilder:
@@ -557,6 +648,46 @@ class PaperAlignedGraphBuilder:
 
         return cv_items, jd_items, cv_doc_id, jd_doc_id, cv_hash, jd_hash, lineage_records
 
+    def _resolve_doc_skill_edge_weight(
+        self,
+        skill_item: SkillInputItem,
+        side: Literal["CV", "JD"],
+        jd_importance_map: Dict[str, float],
+    ) -> Tuple[ProficiencyRecord, float]:
+        """Resolve document-to-skill edge metadata and scalar weight per active edge_weight_mode."""
+        first_sent = skill_item.evidence_sentences[0] if skill_item.evidence_sentences else None
+        if self.config.edge_weight_mode == "semantic_importance":
+            if side == "CV":
+                return _build_uniform_cv_edge_weight(first_sent)
+            raw_meta_w = (
+                skill_item.metadata.get("importance_weight")
+                if isinstance(skill_item.metadata, dict)
+                else None
+            )
+            lookup_keys = (
+                skill_item.canonical_skill_id,
+                skill_item.canonical_skill_id.lower() if skill_item.canonical_skill_id else "",
+                normalize_canonical_skill(skill_item.surface_name or ""),
+            )
+            matched_w = next((jd_importance_map[k] for k in lookup_keys if k and k in jd_importance_map), None)
+            if matched_w is None and raw_meta_w is not None:
+                matched_w = float(raw_meta_w)
+            return _build_jd_importance_edge_weight(matched_w, first_sent)
+
+        prof = extract_skill_proficiency(
+            skill_item,
+            allow_paper_table6_7_descriptors=self.config.allow_paper_table6_7_descriptors,
+            allow_years_heuristic=self.config.allow_years_heuristic,
+            allow_vietnamese_descriptors=self.config.allow_vietnamese_descriptors,
+            enable_evidence_fallback=self.config.enable_evidence_proficiency_fallback,
+        )
+        weight = compute_tensor_edge_weight(
+            prof,
+            normalization=self.config.edge_weight_normalization,
+            missing_tensor_weight=self.config.missing_proficiency_tensor_weight,
+        )
+        return prof, weight
+
     def build_graph_from_items(
         self,
         cv_items: List[SkillInputItem],
@@ -569,11 +700,17 @@ class PaperAlignedGraphBuilder:
         cv_hash: Optional[str] = None,
         jd_hash: Optional[str] = None,
         lineage_records: Optional[List[CompetencyLineageRecord]] = None,
+        jd_importance_weights: Optional[Dict[str, float]] = None,
+        skill_importance_output: Optional[Any] = None,
     ) -> Tuple[PaperAlignedGraphData, PaperAlignedGraphIntegrityReport]:
         """
         Construct a validated paper-aligned bipartite graph from CV and JD SkillInputItems.
         """
         dim = self.config.embedding_dim
+        jd_importance_map = _extract_jd_importance_map(
+            jd_importance_weights=jd_importance_weights,
+            skill_importance_output=skill_importance_output,
+        )
 
         # 1. Initialize Document Nodes ('resume_0' and 'job_0') with reproducible distinct seeds
         resume_seed = int(self.config.random_seed) * 2 + 1
@@ -724,32 +861,9 @@ class PaperAlignedGraphBuilder:
                 merge_decision=audit_rec,
             )
 
-            # Extract separate CV demonstrated proficiency and JD required proficiency
-            cv_prof = extract_skill_proficiency(
-                cv_sk,
-                allow_paper_table6_7_descriptors=self.config.allow_paper_table6_7_descriptors,
-                allow_years_heuristic=self.config.allow_years_heuristic,
-                allow_vietnamese_descriptors=self.config.allow_vietnamese_descriptors,
-                enable_evidence_fallback=self.config.enable_evidence_proficiency_fallback,
-            )
-            jd_prof = extract_skill_proficiency(
-                jd_sk,
-                allow_paper_table6_7_descriptors=self.config.allow_paper_table6_7_descriptors,
-                allow_years_heuristic=self.config.allow_years_heuristic,
-                allow_vietnamese_descriptors=self.config.allow_vietnamese_descriptors,
-                enable_evidence_fallback=self.config.enable_evidence_proficiency_fallback,
-            )
-
-            w_cv = compute_tensor_edge_weight(
-                cv_prof,
-                normalization=self.config.edge_weight_normalization,
-                missing_tensor_weight=self.config.missing_proficiency_tensor_weight,
-            )
-            w_jd = compute_tensor_edge_weight(
-                jd_prof,
-                normalization=self.config.edge_weight_normalization,
-                missing_tensor_weight=self.config.missing_proficiency_tensor_weight,
-            )
+            # Resolve CV and JD edge weights per active edge_weight_mode
+            cv_prof, w_cv = self._resolve_doc_skill_edge_weight(cv_sk, "CV", jd_importance_map)
+            jd_prof, w_jd = self._resolve_doc_skill_edge_weight(jd_sk, "JD", jd_importance_map)
 
             # Resume -> Shared Skill ('has_skill') and reverse ('in_resume')
             edges.append(
@@ -842,18 +956,7 @@ class PaperAlignedGraphBuilder:
                 merge_decision=audit_rec,
             )
 
-            cv_prof = extract_skill_proficiency(
-                cv_sk,
-                allow_paper_table6_7_descriptors=self.config.allow_paper_table6_7_descriptors,
-                allow_years_heuristic=self.config.allow_years_heuristic,
-                allow_vietnamese_descriptors=self.config.allow_vietnamese_descriptors,
-                enable_evidence_fallback=self.config.enable_evidence_proficiency_fallback,
-            )
-            w_cv = compute_tensor_edge_weight(
-                cv_prof,
-                normalization=self.config.edge_weight_normalization,
-                missing_tensor_weight=self.config.missing_proficiency_tensor_weight,
-            )
+            cv_prof, w_cv = self._resolve_doc_skill_edge_weight(cv_sk, "CV", jd_importance_map)
 
             edges.append(
                 PaperAlignedBipartiteEdge(
@@ -916,18 +1019,7 @@ class PaperAlignedGraphBuilder:
                 merge_decision=audit_rec,
             )
 
-            jd_prof = extract_skill_proficiency(
-                jd_sk,
-                allow_paper_table6_7_descriptors=self.config.allow_paper_table6_7_descriptors,
-                allow_years_heuristic=self.config.allow_years_heuristic,
-                allow_vietnamese_descriptors=self.config.allow_vietnamese_descriptors,
-                enable_evidence_fallback=self.config.enable_evidence_proficiency_fallback,
-            )
-            w_jd = compute_tensor_edge_weight(
-                jd_prof,
-                normalization=self.config.edge_weight_normalization,
-                missing_tensor_weight=self.config.missing_proficiency_tensor_weight,
-            )
+            jd_prof, w_jd = self._resolve_doc_skill_edge_weight(jd_sk, "JD", jd_importance_map)
 
             edges.append(
                 PaperAlignedBipartiteEdge(
@@ -1100,6 +1192,7 @@ class PaperAlignedGraphBuilder:
             run_id=run_id,
             merge_policy=self.config.merge_policy,
             graph_policy=getattr(self.config, "graph_policy", "policy_a_legacy"),
+            edge_weight_mode=self.config.edge_weight_mode,
             edge_weight_normalization=self.config.edge_weight_normalization,
             missing_proficiency_tensor_weight=self.config.missing_proficiency_tensor_weight,
             embedding_dim=dim,
@@ -1124,6 +1217,7 @@ class PaperAlignedGraphBuilder:
                 "random_seed": self.config.random_seed,
                 "merge_policy": self.config.merge_policy,
                 "graph_policy": getattr(self.config, "graph_policy", "policy_a_legacy"),
+                "edge_weight_mode": self.config.edge_weight_mode,
                 "semantic_transform_audit": semantic_transform_audit,
                 "paper_cosine_threshold": self.config.paper_cosine_threshold,
                 "edge_weight_normalization": self.config.edge_weight_normalization,
@@ -1180,6 +1274,8 @@ class PaperAlignedGraphBuilder:
         stage3_response: Optional[Union[SemanticRepresentationResponse, Dict[str, Any]]] = None,
         reasoning_results: Optional[List[SkillPairReasoningResult]] = None,
         pair_id: Optional[str] = None,
+        jd_importance_weights: Optional[Dict[str, float]] = None,
+        skill_importance_output: Optional[Any] = None,
     ) -> Tuple[PaperAlignedGraphData, PaperAlignedGraphIntegrityReport]:
         """
         Build paper-aligned graph directly from Stage 2 / Stage 3 / Stage 4 pipeline outputs
@@ -1238,6 +1334,8 @@ class PaperAlignedGraphBuilder:
             cv_hash=cv_hash,
             jd_hash=jd_hash,
             lineage_records=lineage_records,
+            jd_importance_weights=jd_importance_weights,
+            skill_importance_output=skill_importance_output,
         )
         if req_mode:
             graph_data.diagnostics["requested_graph_mode"] = req_mode
@@ -1901,7 +1999,8 @@ def verify_paper_aligned_subgraphs(
 paper_aligned_graph_builder = PaperAlignedGraphBuilder(
     PaperAlignedGraphConfig(
         embedding_dim=settings.STAGE3_EMBEDDING_DIM,
-        enable_evidence_proficiency_fallback=True,
+        edge_weight_mode="semantic_importance",
+        enable_evidence_proficiency_fallback=False,
         dependency_scope="jd_bidirectional",
     )
 )

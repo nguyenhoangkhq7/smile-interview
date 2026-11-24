@@ -16,11 +16,10 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import logging
-import math
 from pathlib import Path
 import random
 import sys
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 
 import numpy as np
 import scipy.stats
@@ -280,10 +279,11 @@ def train_model(
     use_reverse_skill_dependency_edges: bool = True,
     skill_dependency_gate_init: float = 0.15,
     skill_dependency_mode: str = "asymmetric_sbert_diffusion",
-    use_value_weight_modulation: bool = True,
-    missing_resume_weight_for_gat: float = 0.45,
-    asym_loss_weight: float = 0.35,
-    depth_loss_weight: float = 0.35,
+    use_resume_edge_weights: bool = False,
+    use_value_weight_modulation: bool = False,
+    missing_resume_weight_for_gat: float = 0.0,
+    asym_loss_weight: float = 0.15,
+    depth_loss_weight: float = 0.0,
     baseline_checkpoint: str | None = None,
     v2_checkpoint: str | None = None,
     report_out: str | None = None,
@@ -345,7 +345,7 @@ def train_model(
         mlp_dropout=0.05,
         use_job_edge_weights=True,
         missing_job_weight_for_graphconv=1.0,
-        use_resume_edge_weights=True,
+        use_resume_edge_weights=use_resume_edge_weights,
         missing_resume_weight_for_gat=missing_resume_weight_for_gat,
         use_value_weight_modulation=use_value_weight_modulation,
         add_self_loops_in_gat=False,
@@ -395,7 +395,11 @@ def train_model(
             real_losses = []
             for idx in batch_idxs:
                 g_raw = train_graphs[idx]
-                g = _jitter_cv_edge_weights_for_robustness(g_raw, prob=0.06).to(device)
+                g = (
+                    _jitter_cv_edge_weights_for_robustness(g_raw, prob=0.06).to(device)
+                    if model_cfg.use_resume_edge_weights
+                    else g_raw.to(device)
+                )
                 out = model(g)
                 real_losses.append(criterion(out["raw_score"].view(-1), g.y.view(-1).to(device)))
             real_mse = torch.stack(real_losses).mean()
@@ -611,15 +615,25 @@ def train_model(
         if getattr(layer, "dep_rev_gate", None) is not None
     ]
 
-    model_version_tag = (
-        "asymmetric-proficiency-hybrid-gnn-v3"
-        if (model_cfg.skill_dependency_mode == "asymmetric_sbert_diffusion" and model_cfg.use_value_weight_modulation)
-        else (
-            "dependency-aware-hybrid-gnn-v2"
-            if model_cfg.use_skill_dependency_edges
-            else "paper-aligned-2025-v1"
-        )
-    )
+    if (
+        model_cfg.skill_dependency_mode == "asymmetric_sbert_diffusion"
+        and not model_cfg.use_resume_edge_weights
+        and not model_cfg.use_value_weight_modulation
+    ):
+        model_version_tag = "semantic-importance-dependency-gnn-v4"
+    elif model_cfg.skill_dependency_mode == "asymmetric_sbert_diffusion" and model_cfg.use_value_weight_modulation:
+        model_version_tag = "asymmetric-proficiency-hybrid-gnn-v3"
+    elif model_cfg.use_skill_dependency_edges:
+        model_version_tag = "dependency-aware-hybrid-gnn-v2"
+    else:
+        model_version_tag = "paper-aligned-2025-v1"
+
+    loss_parts = ["MSELoss"]
+    if asym_loss_weight > 0.0 and asym_train_pairs:
+        loss_parts.append("AsymmetricPairwiseMarginLoss")
+    if depth_loss_weight > 0.0 and depth_train_pairs:
+        loss_parts.append("DepthPairwiseMarginLoss")
+    loss_description = " + ".join(loss_parts)
 
     ckpt_payload = {
         "architecture": "PaperAlignedHybridGNN",
@@ -661,7 +675,7 @@ def train_model(
             "weight_decay": weight_decay,
             "patience": patience,
             "optimizer": "AdamW",
-            "loss_function": "MSELoss + AsymmetricPairwiseMarginLoss + DepthPairwiseMarginLoss",
+            "loss_function": loss_description,
             "asym_loss_weight": asym_loss_weight,
             "depth_loss_weight": depth_loss_weight,
             "learned_dependency_fwd_gates": learned_dep_gates,
@@ -710,19 +724,19 @@ if __name__ == "__main__":
     parser.add_argument(
         "--processed-dir",
         type=str,
-        default=r"ai-service\matching_cv\data\processed\paper_aligned_gnn_v3",
+        default=r"ai-service\matching_cv\data\processed\paper_aligned_gnn_v4_semantic_importance",
         help="Directory containing train_graphs.pt, val_graphs.pt, test_graphs.pt",
     )
     parser.add_argument(
         "--checkpoint-out",
         type=str,
-        default=r"ai-service\matching_cv\data\checkpoints\paper_aligned_gnn\paper_aligned_hybrid_gnn_v3_asym_prof.pt",
+        default=r"ai-service\matching_cv\data\checkpoints\paper_aligned_gnn\paper_aligned_hybrid_gnn_v4_semantic_importance.pt",
         help="Target file path for trained PyTorch checkpoint",
     )
-    parser.add_argument("--epochs", type=int, default=55, help="Maximum number of training epochs")
+    parser.add_argument("--epochs", type=int, default=65, help="Maximum number of training epochs")
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
     parser.add_argument("--weight-decay", type=float, default=1e-5, help="Weight decay")
-    parser.add_argument("--patience", type=int, default=30, help="Early stopping patience")
+    parser.add_argument("--patience", type=int, default=35, help="Early stopping patience")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument(
         "--enable-skill-dependencies",
@@ -756,13 +770,18 @@ if __name__ == "__main__":
         help="Intra-skill prerequisite propagation operator",
     )
     parser.add_argument(
-        "--no-value-weight-modulation",
+        "--use-resume-edge-weights",
         action="store_true",
-        help="Disable proficiency value modulation in Modified GAT",
+        help="Enable scalar proficiency weights on Resume-Skill GAT edges (disabled in v4 semantic mode)",
     )
-    parser.add_argument("--missing-resume-weight", type=float, default=0.45)
-    parser.add_argument("--asym-loss-weight", type=float, default=0.35)
-    parser.add_argument("--depth-loss-weight", type=float, default=0.35)
+    parser.add_argument(
+        "--use-value-weight-modulation",
+        action="store_true",
+        help="Enable proficiency value modulation in Modified GAT (disabled in v4 semantic mode)",
+    )
+    parser.add_argument("--missing-resume-weight", type=float, default=0.0)
+    parser.add_argument("--asym-loss-weight", type=float, default=0.15)
+    parser.add_argument("--depth-loss-weight", type=float, default=0.0)
     parser.add_argument(
         "--baseline-checkpoint",
         type=str,
@@ -778,7 +797,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--report-out",
         type=str,
-        default=r"ai-service\matching_cv\data\checkpoints\paper_aligned_gnn\evaluation_report_v3_asym_prof.json",
+        default=r"ai-service\matching_cv\data\checkpoints\paper_aligned_gnn\evaluation_report_v4_semantic_importance.json",
         help="Optional path to save JSON evaluation report",
     )
     args = parser.parse_args()
@@ -795,7 +814,8 @@ if __name__ == "__main__":
         use_reverse_skill_dependency_edges=not args.no_reverse_skill_dependencies,
         skill_dependency_gate_init=args.dep_gate_init,
         skill_dependency_mode=args.dep_mode,
-        use_value_weight_modulation=not args.no_value_weight_modulation,
+        use_resume_edge_weights=args.use_resume_edge_weights,
+        use_value_weight_modulation=args.use_value_weight_modulation,
         missing_resume_weight_for_gat=args.missing_resume_weight,
         asym_loss_weight=args.asym_loss_weight,
         depth_loss_weight=args.depth_loss_weight,

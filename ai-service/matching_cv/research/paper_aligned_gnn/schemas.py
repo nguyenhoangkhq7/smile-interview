@@ -33,6 +33,11 @@ EdgeWeightNormalization = Literal[
     "scaled_0_1",   # Scaled by / 10.0 into [0.0, 1.0] for numerical stability
 ]
 
+EdgeWeightMode = Literal[
+    "semantic_importance",  # Production decoupled M1: JD-Skill = JSI w_j (fallback 1.0), CV-Skill = uniform 1.0
+    "paper_proficiency",    # ICIT 2025 ablation baseline: Table 3 / descriptor proficiency edge weights
+]
+
 ProficiencySide = Literal["CV_DEMONSTRATED", "JD_REQUIRED"]
 
 ProficiencyMappingSource = Literal[
@@ -42,6 +47,8 @@ ProficiencyMappingSource = Literal[
     "vietnamese_descriptor_mapping",
     "evidence_context_fallback",
     "module2_proficiency_estimator",
+    "jd_skill_importance",
+    "uniform_semantic_topology",
     "missing",
 ]
 
@@ -299,6 +306,7 @@ class PaperAlignedGraphConfig:
     allow_years_heuristic: bool = True
     allow_vietnamese_descriptors: bool = True
     enable_evidence_proficiency_fallback: bool = False
+    edge_weight_mode: EdgeWeightMode = "paper_proficiency"
     edge_weight_normalization: EdgeWeightNormalization = "scaled_0_1"
     missing_proficiency_tensor_weight: float = 0.0
     include_reverse_edges: bool = True
@@ -318,6 +326,7 @@ class PaperAlignedGraphData(BaseModel):
     run_id: str = Field(default="paper_aligned_run")
     merge_policy: MergePolicyType = Field(...)
     graph_policy: Literal["policy_a_legacy", "policy_b_semantic"] = Field(default="policy_a_legacy")
+    edge_weight_mode: EdgeWeightMode = Field(default="paper_proficiency")
     edge_weight_normalization: EdgeWeightNormalization = Field(...)
     missing_proficiency_tensor_weight: float = Field(default=0.0)
     embedding_dim: int = Field(default=768)

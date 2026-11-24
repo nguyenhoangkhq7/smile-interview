@@ -7,7 +7,7 @@ from typing import Optional
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile, status
 from starlette.concurrency import run_in_threadpool
 
-from matching_cv.app.container import match_documents, score_matched_documents_with_module2
+from matching_cv.app.container import match_documents
 from matching_cv.app.schemas.module1 import Module1Output
 from matching_cv.app.schemas.unified_skill_extraction import UnifiedExtractFileResponse
 from matching_cv.app.services.document_parser import document_parser_service
@@ -15,7 +15,6 @@ from matching_cv.app.services.standardized_output_builder import Module1OutputEr
 from matching_cv.app.services.unified_skill_service import unified_skill_service
 from skill_gap.api.routes import _get_orchestrator
 from skill_gap.api.schemas import AnalyzeWithReportResponse
-from skill_gap.domain.enums import SemanticAlignment
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1", tags=["Matching CV"])
@@ -63,8 +62,8 @@ async def analyze(request: Request) -> AnalyzeWithReportResponse:
     cv_text, jd_text, analysis_id = await read_inputs(request)
     if not cv_text or not jd_text:
         raise HTTPException(status_code=400, detail="Both CV content and JD content (file or text) are required.")
-    # Run Module 1 Stages 1-5 first (skip early regex-based GNN pass when Module 2 runs next)
-    documents = await run_matching(cv_text, jd_text, include_compatibility_score=False)
+    # Strictly one-way pipeline: Module 1 (complete, including Stage 6 GNN S_semantic) -> Module 2 -> Module 3
+    documents = await run_matching(cv_text, jd_text, include_compatibility_score=True)
     match_result = documents.output
     resolved_analysis_id = analysis_id or str(uuid.uuid4())
     skills, report = await run_in_threadpool(
@@ -76,33 +75,7 @@ async def analyze(request: Request) -> AnalyzeWithReportResponse:
         match_results=match_result.match_results,
         analysis_id=resolved_analysis_id,
     )
-    # Approach 1: Inject Module 2's continuous P_CV / P_JD proficiencies into the graph before Stage 6 GNN
-    if documents.graph_data is not None:
-        jd_proficiencies = {
-            s.jd_skill_id: float(s.required_proficiency)
-            for s in skills
-            if getattr(s, "required_proficiency", None) is not None
-        }
-        cv_proficiencies: dict[str, float] = {}
-        for s in skills:
-            if (
-                s.semantic_alignment != SemanticAlignment.MISSING
-                and s.matched_cv_skill_id
-                and s.matched_cv_skill_id.lower() != "none"
-                and getattr(s, "candidate_proficiency", None) is not None
-            ):
-                cv_proficiencies[s.matched_cv_skill_id] = max(
-                    cv_proficiencies.get(s.matched_cv_skill_id, 0.0),
-                    float(s.candidate_proficiency),
-                )
-        report.matching_score = await run_in_threadpool(
-            score_matched_documents_with_module2,
-            documents,
-            cv_proficiencies,
-            jd_proficiencies,
-        )
-    else:
-        report.matching_score = documents.matching_score
+    report.matching_score = documents.matching_score
     return AnalyzeWithReportResponse(analysis_id=resolved_analysis_id, skills=skills, report=report)
 
 

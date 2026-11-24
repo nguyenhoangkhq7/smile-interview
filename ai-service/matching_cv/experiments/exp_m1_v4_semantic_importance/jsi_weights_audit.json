@@ -1,0 +1,360 @@
+{
+  "synthetic_jds": {
+    "jd_001": {
+      "status": "SUCCESS",
+      "mapped_count": 25,
+      "total_skills": 25,
+      "fallback_count": 0,
+      "min_w": 0.5696,
+      "max_w": 0.9071,
+      "mean_w": 0.7338,
+      "std_w": 0.1231
+    },
+    "jd_002": {
+      "status": "SUCCESS",
+      "mapped_count": 21,
+      "total_skills": 21,
+      "fallback_count": 0,
+      "min_w": 0.7772,
+      "max_w": 0.9068,
+      "mean_w": 0.8236,
+      "std_w": 0.0363
+    },
+    "jd_003": {
+      "status": "SUCCESS",
+      "mapped_count": 25,
+      "total_skills": 25,
+      "fallback_count": 0,
+      "min_w": 0.6858,
+      "max_w": 0.8248,
+      "mean_w": 0.763,
+      "std_w": 0.0316
+    },
+    "jd_004": {
+      "status": "SUCCESS",
+      "mapped_count": 24,
+      "total_skills": 24,
+      "fallback_count": 0,
+      "min_w": 0.6331,
+      "max_w": 0.8902,
+      "mean_w": 0.7252,
+      "std_w": 0.0538
+    },
+    "jd_005": {
+      "status": "SUCCESS",
+      "mapped_count": 25,
+      "total_skills": 25,
+      "fallback_count": 0,
+      "min_w": 0.5532,
+      "max_w": 0.8226,
+      "mean_w": 0.7047,
+      "std_w": 0.0806
+    },
+    "jd_006": {
+      "status": "SUCCESS",
+      "mapped_count": 25,
+      "total_skills": 25,
+      "fallback_count": 0,
+      "min_w": 0.5713,
+      "max_w": 0.9093,
+      "mean_w": 0.7672,
+      "std_w": 0.1014
+    },
+    "jd_007": {
+      "status": "SUCCESS",
+      "mapped_count": 25,
+      "total_skills": 25,
+      "fallback_count": 0,
+      "min_w": 0.629,
+      "max_w": 0.8362,
+      "mean_w": 0.734,
+      "std_w": 0.0566
+    },
+    "jd_008": {
+      "status": "SUCCESS",
+      "mapped_count": 25,
+      "total_skills": 25,
+      "fallback_count": 0,
+      "min_w": 0.579,
+      "max_w": 0.8794,
+      "mean_w": 0.6611,
+      "std_w": 0.078
+    },
+    "jd_009": {
+      "status": "SUCCESS",
+      "mapped_count": 25,
+      "total_skills": 25,
+      "fallback_count": 0,
+      "min_w": 0.6291,
+      "max_w": 0.8473,
+      "mean_w": 0.7503,
+      "std_w": 0.0495
+    },
+    "jd_010": {
+      "status": "SUCCESS",
+      "mapped_count": 22,
+      "total_skills": 25,
+      "fallback_count": 3,
+      "min_w": 0.5704,
+      "max_w": 1.0,
+      "mean_w": 0.78,
+      "std_w": 0.1186
+    }
+  },
+  "real_test_jds": {
+    "real_jd_001": {
+      "status": "SUCCESS",
+      "mapped_count": 24,
+      "total_skills": 25,
+      "fallback_count": 1,
+      "min_w": 0.5692,
+      "max_w": 1.0,
+      "mean_w": 0.6312,
+      "std_w": 0.0788
+    },
+    "real_jd_002": {
+      "status": "SUCCESS",
+      "mapped_count": 25,
+      "total_skills": 25,
+      "fallback_count": 0,
+      "min_w": 0.7035,
+      "max_w": 0.9013,
+      "mean_w": 0.7532,
+      "std_w": 0.0459
+    },
+    "real_jd_003": {
+      "status": "SUCCESS",
+      "mapped_count": 25,
+      "total_skills": 25,
+      "fallback_count": 0,
+      "min_w": 0.6622,
+      "max_w": 0.8165,
+      "mean_w": 0.7492,
+      "std_w": 0.0328
+    },
+    "real_jd_004": {
+      "status": "SUCCESS",
+      "mapped_count": 24,
+      "total_skills": 25,
+      "fallback_count": 1,
+      "min_w": 0.7868,
+      "max_w": 1.0,
+      "mean_w": 0.8632,
+      "std_w": 0.0406
+    },
+    "real_jd_005": {
+      "status": "SUCCESS",
+      "mapped_count": 22,
+      "total_skills": 24,
+      "fallback_count": 2,
+      "min_w": 0.5511,
+      "max_w": 1.0,
+      "mean_w": 0.6678,
+      "std_w": 0.1082
+    },
+    "real_jd_006": {
+      "status": "SUCCESS",
+      "mapped_count": 25,
+      "total_skills": 25,
+      "fallback_count": 0,
+      "min_w": 0.6932,
+      "max_w": 0.9372,
+      "mean_w": 0.8052,
+      "std_w": 0.0631
+    },
+    "real_jd_007": {
+      "status": "SUCCESS",
+      "mapped_count": 24,
+      "total_skills": 24,
+      "fallback_count": 0,
+      "min_w": 0.6361,
+      "max_w": 0.8342,
+      "mean_w": 0.7676,
+      "std_w": 0.0547
+    },
+    "real_jd_008": {
+      "status": "SUCCESS",
+      "mapped_count": 13,
+      "total_skills": 13,
+      "fallback_count": 0,
+      "min_w": 0.6166,
+      "max_w": 0.717,
+      "mean_w": 0.6791,
+      "std_w": 0.0273
+    },
+    "real_jd_009": {
+      "status": "SUCCESS",
+      "mapped_count": 24,
+      "total_skills": 24,
+      "fallback_count": 0,
+      "min_w": 0.5403,
+      "max_w": 0.7036,
+      "mean_w": 0.6177,
+      "std_w": 0.0429
+    },
+    "real_jd_010": {
+      "status": "SUCCESS",
+      "mapped_count": 15,
+      "total_skills": 15,
+      "fallback_count": 0,
+      "min_w": 0.6319,
+      "max_w": 0.9178,
+      "mean_w": 0.7744,
+      "std_w": 0.0714
+    },
+    "real_jd_011": {
+      "status": "SUCCESS",
+      "mapped_count": 25,
+      "total_skills": 25,
+      "fallback_count": 0,
+      "min_w": 0.5467,
+      "max_w": 0.7028,
+      "mean_w": 0.6131,
+      "std_w": 0.0454
+    },
+    "real_jd_012": {
+      "status": "SUCCESS",
+      "mapped_count": 19,
+      "total_skills": 20,
+      "fallback_count": 1,
+      "min_w": 0.4909,
+      "max_w": 1.0,
+      "mean_w": 0.5793,
+      "std_w": 0.1193
+    },
+    "real_jd_013": {
+      "status": "SUCCESS",
+      "mapped_count": 24,
+      "total_skills": 25,
+      "fallback_count": 1,
+      "min_w": 0.7494,
+      "max_w": 1.0,
+      "mean_w": 0.8201,
+      "std_w": 0.0747
+    },
+    "real_jd_014": {
+      "status": "SUCCESS",
+      "mapped_count": 22,
+      "total_skills": 25,
+      "fallback_count": 3,
+      "min_w": 0.8263,
+      "max_w": 1.0,
+      "mean_w": 0.9053,
+      "std_w": 0.0531
+    }
+  },
+  "real_jd_text_recovery": {
+    "real_jd_001": {
+      "skill_match_hits": 24,
+      "total_skills": 25,
+      "skill_match_ratio": 0.96,
+      "csv_occurrences": 27,
+      "jd_char_len": 2213,
+      "jd_preview": "Role Details We are seeking a Senior Software Engineer who will help drive our clients systems evolution to join our tea"
+    },
+    "real_jd_002": {
+      "skill_match_hits": 24,
+      "total_skills": 25,
+      "skill_match_ratio": 0.96,
+      "csv_occurrences": 30,
+      "jd_char_len": 4603,
+      "jd_preview": "Company Description NBC Sports Next is where sports and technology intersect. Were a subdivision of NBC Sports and home "
+    },
+    "real_jd_003": {
+      "skill_match_hits": 24,
+      "total_skills": 25,
+      "skill_match_ratio": 0.96,
+      "csv_occurrences": 29,
+      "jd_char_len": 2895,
+      "jd_preview": "As a Solution Architect - Data Engineering, you will work for an American multinational technology company focusing on v"
+    },
+    "real_jd_004": {
+      "skill_match_hits": 25,
+      "total_skills": 25,
+      "skill_match_ratio": 1.0,
+      "csv_occurrences": 74,
+      "jd_char_len": 4189,
+      "jd_preview": "Purpose StatementThe Software Engineering Manager will be responsible for hiring and leading technical teams within our "
+    },
+    "real_jd_005": {
+      "skill_match_hits": 23,
+      "total_skills": 24,
+      "skill_match_ratio": 0.9583,
+      "csv_occurrences": 67,
+      "jd_char_len": 3913,
+      "jd_preview": "Centurion Consulting Group is looking for a Software Development Manager This is a DIRECT HIRE and requires a local cand"
+    },
+    "real_jd_006": {
+      "skill_match_hits": 24,
+      "total_skills": 25,
+      "skill_match_ratio": 0.96,
+      "csv_occurrences": 66,
+      "jd_char_len": 3256,
+      "jd_preview": "ROR Partners is a rapidly growing, client-driven digital marketing and data company. We offer proven marketing solutions"
+    },
+    "real_jd_007": {
+      "skill_match_hits": 22,
+      "total_skills": 24,
+      "skill_match_ratio": 0.9167,
+      "csv_occurrences": 112,
+      "jd_char_len": 5343,
+      "jd_preview": "Calling all innovators find your future at Fiserv. Were Fiserv, a global leader in Fintech and payments, and we move mon"
+    },
+    "real_jd_008": {
+      "skill_match_hits": 9,
+      "total_skills": 13,
+      "skill_match_ratio": 0.6923,
+      "csv_occurrences": 30,
+      "jd_char_len": 914,
+      "jd_preview": "Senior Software EngineerSelby Jennings is partnered with a Proprietary Trading firm based in the San Francisco Bay area "
+    },
+    "real_jd_009": {
+      "skill_match_hits": 23,
+      "total_skills": 24,
+      "skill_match_ratio": 0.9583,
+      "csv_occurrences": 31,
+      "jd_char_len": 1138,
+      "jd_preview": "Hi, Hope you are doing great today. Please find the job description below. Let me know your job interest as soon as poss"
+    },
+    "real_jd_010": {
+      "skill_match_hits": 14,
+      "total_skills": 15,
+      "skill_match_ratio": 0.9333,
+      "csv_occurrences": 67,
+      "jd_char_len": 1297,
+      "jd_preview": "Job Description I am actively seeking an experienced Data Engineer to join an innovative SaaS company within the AI AdTe"
+    },
+    "real_jd_011": {
+      "skill_match_hits": 19,
+      "total_skills": 25,
+      "skill_match_ratio": 0.76,
+      "csv_occurrences": 36,
+      "jd_char_len": 3089,
+      "jd_preview": "Who we are Multi Media LLC is a technology company that builds digital products for the content creator economy. We are "
+    },
+    "real_jd_012": {
+      "skill_match_hits": 20,
+      "total_skills": 20,
+      "skill_match_ratio": 1.0,
+      "csv_occurrences": 12,
+      "jd_char_len": 1971,
+      "jd_preview": "Flexton is Founded and incorporated in 2007, Flexton Inc. is headquartered in San Jose, CA with development centers in I"
+    },
+    "real_jd_013": {
+      "skill_match_hits": 23,
+      "total_skills": 25,
+      "skill_match_ratio": 0.92,
+      "csv_occurrences": 73,
+      "jd_char_len": 7350,
+      "jd_preview": "The position is described below. If you want to apply, click the Apply Now button at the top or bottom of this page. Aft"
+    },
+    "real_jd_014": {
+      "skill_match_hits": 24,
+      "total_skills": 25,
+      "skill_match_ratio": 0.96,
+      "csv_occurrences": 34,
+      "jd_char_len": 3503,
+      "jd_preview": "Business Analyst Location Remote.Duration 12 months.MOI Skype About the RoleThe Business Analyst will support a cross-fu"
+    }
+  }
+}
