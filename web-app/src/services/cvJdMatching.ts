@@ -3,7 +3,7 @@ import { useAuthStore } from '@/store/authStore';
 
 export type SemanticAlignment = 'MATCH' | 'PARTIAL' | 'MISSING';
 
-interface JobTask {
+export interface JobTask {
   task_id: string;
   description: string;
   evidence_spans: string[];

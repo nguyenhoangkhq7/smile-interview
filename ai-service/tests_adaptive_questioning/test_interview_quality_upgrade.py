@@ -5,7 +5,8 @@ import json
 import dspy
 import pytest
 
-from adaptive_questioning.evidence.models import Assessment
+from adaptive_questioning.evidence.models import Action, Assessment, BlueprintDraft, CriterionDraft, Mode, ObjectiveDraft, SuitableMode
+from adaptive_questioning.evidence.policy_config import InterviewPolicy
 from adaptive_questioning.evidence.provider import DSPyAssessmentProvider
 from skill_gap.domain.models import JobTask
 from test_evidence_workflow import answer, setup, skill, start
@@ -126,3 +127,50 @@ def test_structured_judge_uses_json_adapter_on_first_invocation():
     provider.judge_module = judge
     assert provider.judge("{}").feedback == ""
     assert len(lm.history) == 1
+
+
+def test_coding_deeper_probe_omits_initial_dedup_guidance_and_guides_adaptation(setup, monkeypatch):
+    provider, engine, _ = setup
+    engine.policy = InterviewPolicy(allow_extension_probes=True)
+    generate = provider.question
+    question_contexts = []
+
+    def blueprint(context):
+        req_id, req = next(iter(json.loads(context)["requirements"].items()))
+        return BlueprintDraft(objectives=[ObjectiveDraft(
+            requirement_id=req_id,
+            skill_id=req["skill_id"],
+            target_depth=2,
+            extension_depth=3,
+            criteria=[CriterionDraft(
+                description="Viết hàm khử trùng lặp event_id giữ thứ tự đầu tiên",
+                expected_evidence="Cài đặt hàm giữ bản ghi đầu tiên theo event_id",
+                below_target="Ghi đè bản ghi sau",
+                at_target="Giữ bản ghi đầu tiên theo thứ tự đầu vào",
+                above_target="Điều chỉnh cấu trúc dữ liệu khi dữ liệu lớn vượt RAM và nêu đánh đổi",
+            )],
+            suitable_modes=[SuitableMode(mode=Mode.CODING)],
+        )])
+
+    def capture_question(context):
+        data = json.loads(context)
+        question_contexts.append(data)
+        question = generate(context)
+        if data["action"] == "INITIAL":
+            question.text = EVENT_TASK
+        return question
+
+    monkeypatch.setattr(provider, "blueprint", blueprint)
+    monkeypatch.setattr(provider, "question", capture_question)
+
+    task = JobTask(description=EVENT_TASK, evidence_spans=[EVENT_TASK], required_level=2)
+    initial = start(engine, [skill("python", job_tasks=[task])])
+    deeper = answer(engine, initial.snapshot, FIRST_RECORD)
+
+    assert len(question_contexts) == 2
+    assert "deduplicate_events(events)" in question_contexts[0]["question_guidance"]
+    assert deeper.snapshot.pending_turn.action == Action.DEEPER
+    assert deeper.snapshot.pending_turn.mode == Mode.CODING
+    deeper_guidance = question_contexts[1]["question_guidance"]
+    assert "deduplicate_events(events)" not in deeper_guidance
+    assert "Build on the prior coding problem/solution in history" in deeper_guidance

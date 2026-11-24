@@ -9,7 +9,7 @@ export interface CompetencyEvidence {
   rationale: string; performance: string;
 }
 export interface CompetencyCriterion {
-  id: string; description: string; essential: boolean; assessment: CompetencyStatus;
+  id: string; description: string; essential: boolean; atTarget?: string; assessment: CompetencyStatus;
   lastAssessment: CompetencySource | null; evidence: CompetencyEvidence[];
 }
 export interface CompetencyObjective {
@@ -83,7 +83,9 @@ export const attemptLabels: Record<AttemptStatus, string> = {
 };
 const base = '/api/v1/application-profiles';
 export const applicationProfiles = {
-  async competency(id: string): Promise<CurrentCompetency> { return (await axiosClient.get(`${base}/${id}/competency`)).data; },
+  async competency(id: string, signal?: AbortSignal): Promise<CurrentCompetency> {
+    return (await axiosClient.get(`${base}/${id}/competency`, { signal })).data;
+  },
   async list(signal?: AbortSignal): Promise<ApplicationProfile[]> { return (await axiosClient.get(base, { signal })).data; },
   async get(id: string, signal?: AbortSignal): Promise<ApplicationProfile> {
     return (await axiosClient.get(`${base}/${encodeURIComponent(id)}`, { signal })).data;

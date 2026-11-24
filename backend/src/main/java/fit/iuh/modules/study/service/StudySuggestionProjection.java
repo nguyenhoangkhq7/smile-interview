@@ -55,8 +55,7 @@ public class StudySuggestionProjection {
         }
         var suggestions = new ArrayList<ObjectiveSuggestion>();
         for (var skill : competency.skills()) for (var objective : skill.objectives()) {
-            var definition = definitions.get(objective.id());
-            if (definition == null || objective.lastChecked() == null) continue;
+            if (!definitions.containsKey(objective.id()) || objective.lastChecked() == null) continue;
             var criteria = new ArrayList<CriterionSuggestion>();
             for (var criterion : objective.criteria()) {
                 var activity = activities.get(criterion.id());
@@ -76,13 +75,10 @@ public class StudySuggestionProjection {
                     case "DEMONSTRATED_AT_TARGET", "DEMONSTRATED_ABOVE_TARGET" -> struggled ? "REINFORCE" : "MET";
                     default -> activity == null ? "UNASSESSED" : "VERIFY";
                 };
-                String goal = "";
-                for (var item : definition.path("criteria"))
-                    if (criterion.id().equals(item.path("criterion_id").asText())) goal = item.path("at_target").asText();
                 var source = ("REVIEW".equals(kind) || "VERIFY".equals(kind)) && criterion.lastAssessment() != null
                         ? criterion.lastAssessment() : activity == null ? null : activity.source();
                 criteria.add(new CriterionSuggestion(criterion.id(), criterion.description(),
-                        criterion.assessment(), kind, goal, source, criterion.lastAssessment()));
+                        criterion.assessment(), kind, criterion.atTarget(), source, criterion.lastAssessment()));
             }
             suggestions.add(new ObjectiveSuggestion(skill.skillId(), objective.id(), objective.claim(),
                     objective.lastChecked(), criteria));

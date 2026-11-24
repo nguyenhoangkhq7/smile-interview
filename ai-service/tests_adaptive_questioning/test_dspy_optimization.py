@@ -230,6 +230,11 @@ def test_default_interview_workflow_loads_checked_in_training_demos(monkeypatch)
             assert demo["question_contract"] in train_q_contracts
             assert demo["question_contract"] not in dev_q_contracts
             assert "reasoning" in demo
+    assert any(
+        json.loads(d["question_contract"]).get("action") == "PROBE_DEEPER"
+        and json.loads(d["question_contract"]).get("required_question_contract", {}).get("mode") == "CODING"
+        for d in provider.question_module.followup.predict.demos
+    )
 
     train_j_answers = {
         build_judge_stage1_inputs(ex.context)["candidate_answer"]

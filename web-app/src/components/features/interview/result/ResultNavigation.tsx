@@ -14,30 +14,59 @@ const sections = [
 
 const control = 'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1.5 text-xs font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 xl:px-3';
 
-export function ResultNavigation({ studyHref }: { studyHref: string }) {
+export function ResultNavigation({ studyHref, hasNavbar = false }: { studyHref: string; hasNavbar?: boolean }) {
   const nav = useRef<HTMLElement>(null);
   const [active, setActive] = useState<(typeof sections)[number]['id']>('overview');
+  const [stickyTop, setStickyTop] = useState(hasNavbar ? 69 : 0);
 
   useEffect(() => {
+    const navbar = document.querySelector<HTMLElement>('[data-site-navbar]');
+
+    const syncStickyOffsets = () => {
+      const top = navbar ? Math.ceil(navbar.getBoundingClientRect().height) : 0;
+      setStickyTop(top);
+      const navHeight = nav.current ? Math.ceil(nav.current.getBoundingClientRect().height) : 45;
+      nav.current?.parentElement?.style.setProperty('--result-scroll-mt', `${top + navHeight + 16}px`);
+    };
+
     const update = () => {
-      const threshold = Math.max(148, (nav.current?.getBoundingClientRect().bottom ?? 0) + 8);
+      const threshold = Math.max(48, (nav.current?.getBoundingClientRect().bottom ?? 0) + 12);
       const current = sections.findLast(({ id }) => {
         const section = document.getElementById(id);
         return section && section.getBoundingClientRect().top <= threshold;
       });
       setActive(current?.id ?? 'overview');
     };
-    update();
+
+    const onLayoutChange = () => {
+      syncStickyOffsets();
+      update();
+    };
+
+    onLayoutChange();
+
+    const observer = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(onLayoutChange)
+      : null;
+    if (navbar) observer?.observe(navbar);
+    if (nav.current) observer?.observe(nav.current);
+
     window.addEventListener('scroll', update, { passive: true });
-    window.addEventListener('resize', update);
+    window.addEventListener('resize', onLayoutChange);
     return () => {
+      observer?.disconnect();
       window.removeEventListener('scroll', update);
-      window.removeEventListener('resize', update);
+      window.removeEventListener('resize', onLayoutChange);
     };
   }, []);
 
   return (
-    <nav ref={nav} aria-label="Các phần của báo cáo" className="sticky top-16 z-20 border-b border-slate-200 bg-[#f9f8f6]/95 backdrop-blur print:hidden">
+    <nav
+      ref={nav}
+      aria-label="Các phần của báo cáo"
+      style={{ top: stickyTop }}
+      className="sticky z-20 border-b border-slate-200 bg-[#f9f8f6]/95 backdrop-blur print:hidden"
+    >
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-2 px-3 py-2 sm:px-6">
         <div className="flex min-w-0 items-center gap-1 overflow-x-auto px-0.5 py-0.5">
           {sections.map(({ id, label, Icon }) => (

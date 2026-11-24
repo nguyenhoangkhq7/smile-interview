@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { applicationProfiles } from '@/services/applicationProfiles';
 import { interviewError, type EvidenceSession } from '@/services/evidenceInterview';
 import type { SessionHistoryItem } from '@/services/historyService';
-import { ResultFeedback, ResultQuestions, ResultSkills, ResultStudy, resultPanel } from './ResultBreakdown';
+import { ResultCoachingSummary, ResultFeedback, ResultQuestions, ResultSkills, ResultStudy, resultPanel } from './ResultBreakdown';
 import { buildResult, percent, resultReasons } from './resultData';
 import { ResultNavigation } from './ResultNavigation';
 
@@ -63,7 +63,15 @@ function SkillSummaryCard({ data, reason }: { data: ReturnType<typeof buildResul
   );
 }
 
-export function InterviewResultDashboard({ session, metadata }: { session: EvidenceSession; metadata: SessionHistoryItem | null }) {
+export function InterviewResultDashboard({
+  session,
+  metadata,
+  hasNavbar = false,
+}: {
+  session: EvidenceSession;
+  metadata: SessionHistoryItem | null;
+  hasNavbar?: boolean;
+}) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -89,7 +97,7 @@ export function InterviewResultDashboard({ session, metadata }: { session: Evide
 
   return (
     <div className="min-w-0 bg-[#f4f7fc] text-slate-900">
-      <ResultNavigation studyHref={studyHref} />
+      <ResultNavigation studyHref={studyHref} hasNavbar={hasNavbar} />
       <div className="mx-auto max-w-5xl space-y-6 px-4 pt-5 pb-12 sm:px-6">
         <div className="space-y-1.5">
           <Link href={backHref} className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#a02707] hover:underline">
@@ -110,11 +118,12 @@ export function InterviewResultDashboard({ session, metadata }: { session: Evide
           </div>
         </div>
 
-        <section id="overview" className={cn(resultPanel, 'scroll-mt-32')}>
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.25fr)]">
+        <section id="overview" className={cn(resultPanel, 'scroll-mt-(--result-scroll-mt,5rem) space-y-4')}>
+          <div className={cn('grid gap-4', data.coaching?.overall_summary && 'lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.35fr)]')}>
             <SkillSummaryCard data={data} reason={session.report.termination_reason} />
-            <ResultFeedback data={data} />
+            {data.coaching?.overall_summary && <ResultCoachingSummary summary={data.coaching.overall_summary} />}
           </div>
+          <ResultFeedback data={data} />
         </section>
 
         <ResultSkills skills={data.skills} />

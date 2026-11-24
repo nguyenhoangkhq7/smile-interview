@@ -25,11 +25,14 @@ export function searchText(value: string) {
 export { skillLabel } from '@/lib/skillLabels';
 
 export function AttemptBadge({ attempt }: { attempt: InterviewAttempt }) {
-  const color = attempt.status === 'In progress' ? 'bg-orange-50 text-orange-800 ring-orange-200/70'
-    : attempt.status === 'Completed' ? 'bg-emerald-50 text-emerald-800 ring-emerald-200/70'
-      : attempt.status === 'Stopped early' ? 'bg-amber-50 text-amber-800 ring-amber-200/70'
-        : 'bg-muted/70 text-muted-foreground ring-border';
+  const endedWithoutAnswer = finishedAttempt(attempt) && attempt.answeredCount === 0;
+  const neutral = 'bg-muted/70 text-muted-foreground ring-border';
+  const color = endedWithoutAnswer ? neutral
+    : attempt.status === 'In progress' ? 'bg-orange-50 text-orange-800 ring-orange-200/70'
+      : attempt.status === 'Completed' ? 'bg-emerald-50 text-emerald-800 ring-emerald-200/70'
+        : attempt.status === 'Stopped early' ? 'bg-amber-50 text-amber-800 ring-amber-200/70' : neutral;
   return <span className={`inline-flex max-w-full items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${color}`}>
-    <span className="size-1.5 shrink-0 rounded-full bg-current" aria-hidden="true" />{attemptLabels[attempt.status]}
+    <span className="size-1.5 shrink-0 rounded-full bg-current" aria-hidden="true" />
+    {endedWithoutAnswer ? 'Kết thúc trước khi trả lời' : attemptLabels[attempt.status]}
   </span>;
 }

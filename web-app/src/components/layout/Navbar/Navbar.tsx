@@ -56,7 +56,7 @@ export default function Navbar() {
   };
 
   return (
-    <header className={styles.header}>
+    <header className={styles.header} data-site-navbar>
       <div className={styles.inner}>
 
         {/* Logo */}

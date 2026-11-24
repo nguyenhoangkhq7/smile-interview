@@ -26,7 +26,7 @@ QuestionSignature = InitialQuestionSignature
 JudgeSignature = EvidenceAssessmentSignature
 
 CONVERSATION_TEMPERATURE = 0.5
-QUESTION_RETRY_TEMPERATURE = 0.25
+QUESTION_RETRY_TEMPERATURE = 0.45
 
 MAX_TOKENS_ALIGNMENT = 160
 MAX_TOKENS_DIALOGUE = 256
@@ -137,9 +137,10 @@ class QuestionAlignmentSignature(dspy.Signature):
     clarification may elicit the one missing piece in the same chain. A lower-depth
     diagnostic should test a concrete prerequisite of this criterion. Asking only for a
     basic L1 term/concept definition when question_depth >= 2 is WRONG_DEPTH (even if on
-    the same skill). Conversely, an extension (PROBE_DEEPER at extension_depth) asking
-    how to solve a harder constraint and evaluate trade-offs per above_target is ALIGNED,
-    not WRONG_DEPTH. Return WRONG_DEPTH for any depth mismatch.
+    the same skill). Conversely, an extension (PROBE_DEEPER at extension_depth, including in CODING mode)
+    asking how to adapt an algorithm or data structure for a harder constraint and evaluate
+    trade-offs per above_target is ALIGNED, not WRONG_DEPTH or WRONG_SKILL. Return WRONG_DEPTH
+    for any depth mismatch.
     Return UNANSWERABLE when key data or rules are missing, an external tool is required,
     or the deliverable is impossible in this interaction mode. Check whether two reasonable
     readings of the candidate-facing task would change the correct answer. For debugging,

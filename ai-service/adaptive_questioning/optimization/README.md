@@ -100,7 +100,7 @@ lacks `CODING`/`BEHAVIORAL`/`L1`/`PROBE_DEEPER`/`VERIFY_CONTRADICTION`/multiline
 and shares skills across train/dev), `extended_dataset.py` exposes domain-disjoint
 `train` / `dev` / `test` splits built from `optimization/corpora/`:
 
-- `questions.json` (36 cases: 18 train / 9 dev / 9 test)
+- `questions.json` (37 cases: 19 train / 9 dev / 9 test)
 - `judgments.json` (37 cases: 19 train / 9 dev / 9 test)
 - `alignments.json` (35 cases across all 7 `AlignmentVerdict` labels: 18 train / 9 dev / 8 test)
 - `blueprints.json` (18 cases validated via `BlueprintBuilder.validate`: 9 train / 5 dev / 4 test)

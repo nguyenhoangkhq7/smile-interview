@@ -38,14 +38,14 @@ def clear_teacher():
 def test_extended_corpus_counts_and_splits():
     summary = corpus_summary()
     assert summary == {
-        "questions": {"train": 18, "dev": 9, "test": 9},
+        "questions": {"train": 19, "dev": 9, "test": 9},
         "judgments": {"train": 19, "dev": 9, "test": 9},
         "alignments": {"train": 18, "dev": 9, "test": 8},
         "blueprints": {"train": 9, "dev": 5, "test": 4},
         "dialogues": {"train": 6, "dev": 3, "test": 3},
     }
-    assert len(get_extended_question_examples("all")) == 36
-    assert len(get_extended_question_examples("all", include_base=True)) == 60
+    assert len(get_extended_question_examples("all")) == 37
+    assert len(get_extended_question_examples("all", include_base=True)) == 61
     assert len(get_extended_question_examples("test", include_base=True)) == 9
     assert len(get_extended_judge_examples("all")) == 37
     assert len(get_extended_judge_examples("all", include_base=True)) == 61

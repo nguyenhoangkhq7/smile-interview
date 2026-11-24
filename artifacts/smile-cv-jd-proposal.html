@@ -1,0 +1,291 @@
+<div class="viz-dotted-background" id="smile-documents-proposal" lang="vi">
+  <style>
+    #smile-documents-proposal {
+      --smile-surface: light-dark(#ffffff, #1c1d20);
+      --smile-subtle: light-dark(#f8f8f9, #242529);
+      --smile-ink: light-dark(#202025, #f4f3f4);
+      --smile-muted: light-dark(#555760, #b4b4bd);
+      --smile-line: light-dark(#e5e5ea, #383941);
+      --smile-accent: light-dark(#a0441c, #ffb086);
+      --smile-accent-soft: light-dark(#fff1e9, #3c2b25);
+      --smile-missing: light-dark(#794008, #ffd096);
+      --smile-missing-soft: light-dark(#fff3e2, #392d22);
+      --smile-found: light-dark(#23634c, #a6e2c7);
+      --smile-found-soft: light-dark(#eaf5ef, #223831);
+      box-sizing: border-box;
+      padding: clamp(10px, 2.75vw, 20px);
+      color: var(--smile-ink);
+      font: 400 14px/1.5 Geist, Inter, "Segoe UI", system-ui, sans-serif;
+    }
+
+    #smile-documents-proposal *, #smile-documents-proposal *::before, #smile-documents-proposal *::after {
+      box-sizing: border-box;
+    }
+
+    #smile-documents-proposal .smile-panel {
+      margin-inline: auto;
+      max-width: 720px;
+      padding: clamp(16px, 3.5vw, 28px);
+      border: 1px solid var(--smile-line);
+      border-radius: 18px;
+      background: var(--smile-surface);
+    }
+
+    #smile-documents-proposal :is(h2, h3, p, blockquote) { margin: 0; }
+    #smile-documents-proposal h2 { font-size: 24px; font-weight: 650; line-height: 1.25; }
+    #smile-documents-proposal h3 { font-size: 16px; font-weight: 650; }
+    #smile-documents-proposal .smile-support { margin-top: 5px; color: var(--smile-muted); }
+    #smile-documents-proposal .smile-small { font-size: 12px; color: var(--smile-muted); }
+
+    #smile-documents-proposal summary {
+      list-style: none;
+      overflow-wrap: anywhere;
+    }
+
+    #smile-documents-proposal summary::-webkit-details-marker { display: none; }
+    #smile-documents-proposal summary:focus-visible { outline: 2px solid var(--smile-accent); outline-offset: 2px; }
+
+    #smile-documents-proposal .smile-sources {
+      margin-top: 18px;
+      border: 1px solid var(--smile-line);
+      border-radius: 12px;
+      background: var(--smile-subtle);
+    }
+
+    #smile-documents-proposal .smile-sources > summary {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 10px 16px;
+      padding: 13px 14px;
+      border-radius: inherit;
+    }
+
+    #smile-documents-proposal .smile-file-list,
+    #smile-documents-proposal .smile-pair {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px 18px;
+    }
+
+    #smile-documents-proposal .smile-file {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      gap: 9px;
+    }
+
+    #smile-documents-proposal .smile-file-icon {
+      display: grid;
+      place-items: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: var(--smile-accent-soft);
+      color: var(--smile-accent);
+    }
+
+    #smile-documents-proposal .smile-file strong { display: block; font-size: 13px; font-weight: 600; }
+
+    #smile-documents-proposal .smile-source-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--smile-accent);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    #smile-documents-proposal .smile-chevron {
+      display: block;
+      width: 7px;
+      height: 7px;
+      margin-inline: 3px;
+      border-right: 1.5px solid currentColor;
+      border-bottom: 1.5px solid currentColor;
+      transform: translateY(-2px) rotate(45deg);
+    }
+
+    #smile-documents-proposal details[open] > summary .smile-chevron { transform: translateY(2px) rotate(225deg); }
+    #smile-documents-proposal .smile-on-open,
+    #smile-documents-proposal details[open] > summary .smile-on-closed { display: none; }
+    #smile-documents-proposal details[open] > summary .smile-on-open { display: inline; }
+
+    #smile-documents-proposal .smile-source-content {
+      padding: 13px 14px 15px;
+      border-top: 1px solid var(--smile-line);
+    }
+
+    #smile-documents-proposal .smile-source-content p + p { margin-top: 5px; }
+    #smile-documents-proposal .smile-alignment { margin-top: 23px; }
+    #smile-documents-proposal .smile-alignment > header { margin-bottom: 11px; }
+    #smile-documents-proposal .smile-result { border-top: 1px solid var(--smile-line); }
+    #smile-documents-proposal .smile-result:last-of-type { border-bottom: 1px solid var(--smile-line); }
+
+    #smile-documents-proposal .smile-result > summary {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      align-items: center;
+      gap: 10px;
+      min-height: 60px;
+      padding: 10px 8px;
+    }
+
+    #smile-documents-proposal .smile-result > summary:hover { background: var(--smile-subtle); }
+    #smile-documents-proposal .smile-skill-name { display: block; font-weight: 650; }
+    #smile-documents-proposal .smile-result > summary .smile-chevron { color: var(--smile-muted); }
+
+    #smile-documents-proposal .smile-status {
+      justify-self: start;
+      padding: 3px 8px;
+      border-radius: 6px;
+      color: var(--smile-muted);
+      background: var(--smile-subtle);
+      font-size: 12px;
+      font-weight: 550;
+    }
+
+    #smile-documents-proposal .smile-status-missing { color: var(--smile-missing); background: var(--smile-missing-soft); }
+    #smile-documents-proposal .smile-status-found { color: var(--smile-found); background: var(--smile-found-soft); }
+
+    #smile-documents-proposal .smile-evidence {
+      margin: 0 8px 12px;
+      padding: 13px 14px;
+      border-radius: 10px;
+      background: var(--smile-subtle);
+    }
+
+    #smile-documents-proposal .smile-evidence .smile-small { margin-bottom: 4px; font-weight: 600; }
+    #smile-documents-proposal .smile-tip { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--smile-line); }
+    #smile-documents-proposal .smile-tip strong { font-weight: 650; }
+
+    @media (max-width: 550px) {
+      #smile-documents-proposal .smile-sources > summary { grid-template-columns: minmax(0, 1fr); }
+    }
+
+    @media (max-width: 410px) {
+      #smile-documents-proposal .smile-file-list, #smile-documents-proposal .smile-pair { grid-template-columns: 1fr; }
+      #smile-documents-proposal .smile-result > summary { grid-template-columns: minmax(0, 1fr) auto; gap: 5px 8px; }
+      #smile-documents-proposal .smile-result > summary .smile-chevron { grid-column: 2; grid-row: 1 / span 2; }
+    }
+  </style>
+
+  <section class="smile-panel" aria-labelledby="smile-documents-heading">
+    <header>
+      <h2 id="smile-documents-heading">CV &amp; JD</h2>
+      <p class="smile-support">Tài liệu dùng để phân tích hồ sơ này.</p>
+    </header>
+
+    <details class="smile-sources" data-disclosure="documents">
+      <summary>
+        <span class="smile-file-list">
+          <span class="smile-file">
+            <span class="smile-file-icon" aria-hidden="true"><i data-lucide="file-text"></i></span>
+            <span><span class="smile-small">CV</span><strong>CV_Backend.pdf</strong></span>
+          </span>
+          <span class="smile-file">
+            <span class="smile-file-icon" aria-hidden="true"><i data-lucide="clipboard-list"></i></span>
+            <span><span class="smile-small">Mô tả công việc</span><strong>Backend Developer</strong></span>
+          </span>
+        </span>
+        <span class="smile-source-action">
+          <span class="smile-on-closed">Xem tài liệu</span><span class="smile-on-open">Thu gọn</span>
+          <span class="smile-chevron" aria-hidden="true"></span>
+        </span>
+      </summary>
+      <div class="smile-source-content smile-pair">
+        <section aria-label="Nội dung CV">
+          <p class="smile-small">CV</p>
+          <p>Xây dựng API quản lý đơn hàng bằng Spring Boot.</p>
+          <p>Tối ưu truy vấn PostgreSQL cho bảng đơn hàng bằng chỉ mục ghép.</p>
+        </section>
+        <section aria-label="Nội dung mô tả công việc">
+          <p class="smile-small">Mô tả công việc</p>
+          <p>Bắt buộc viết kiểm thử tích hợp cho API và kiểm tra các trường hợp lỗi.</p>
+          <p>Bắt buộc thiết kế REST API với quy ước nhất quán cho mã lỗi.</p>
+          <p>Sử dụng PostgreSQL và tối ưu truy vấn dữ liệu.</p>
+        </section>
+      </div>
+    </details>
+
+    <section class="smile-alignment" aria-labelledby="smile-alignment-heading">
+      <header>
+        <h3 id="smile-alignment-heading">Đối chiếu theo kỹ năng</h3>
+      </header>
+
+      <details class="smile-result" name="smile-skill-evidence" data-disclosure="api-testing">
+        <summary>
+          <span><span class="smile-skill-name">Kiểm thử API</span><span class="smile-small">Có yêu cầu bắt buộc</span></span>
+          <span class="smile-status smile-status-missing">CV chưa thể hiện</span>
+          <span class="smile-chevron" aria-hidden="true"></span>
+        </summary>
+        <div class="smile-evidence">
+          <div class="smile-pair">
+            <div><p class="smile-small">Yêu cầu trong JD</p><blockquote>“Bắt buộc viết kiểm thử tích hợp cho API và kiểm tra các trường hợp lỗi.”</blockquote></div>
+            <div><p class="smile-small">Căn cứ trong CV</p><p>Chưa tìm thấy đoạn đề cập đến kiểm thử API.</p></div>
+          </div>
+          <p class="smile-tip"><strong>Gợi ý chuẩn bị</strong><br>Nếu từng kiểm thử API, chọn một trường hợp lỗi và tập giải thích cách bạn kiểm chứng kết quả.</p>
+        </div>
+      </details>
+
+      <details class="smile-result" name="smile-skill-evidence" data-disclosure="rest-design">
+        <summary>
+          <span><span class="smile-skill-name">Thiết kế REST API</span><span class="smile-small">Có yêu cầu bắt buộc</span></span>
+          <span class="smile-status">CV có nội dung liên quan</span>
+          <span class="smile-chevron" aria-hidden="true"></span>
+        </summary>
+        <div class="smile-evidence">
+          <div class="smile-pair">
+            <div><p class="smile-small">Yêu cầu trong JD</p><blockquote>“Bắt buộc thiết kế REST API với quy ước nhất quán cho mã lỗi.”</blockquote></div>
+            <div><p class="smile-small">Căn cứ trong CV</p><blockquote>“Xây dựng API quản lý đơn hàng bằng Spring Boot.”</blockquote></div>
+          </div>
+          <p class="smile-tip"><strong>Gợi ý chuẩn bị</strong><br>Nếu từng thiết kế mã lỗi cho API, chuẩn bị một ví dụ về quy ước bạn đã chọn và lý do.</p>
+        </div>
+      </details>
+
+      <details class="smile-result" name="smile-skill-evidence" data-disclosure="postgresql">
+        <summary>
+          <span class="smile-skill-name">PostgreSQL</span>
+          <span class="smile-status smile-status-found">CV có nội dung phù hợp</span>
+          <span class="smile-chevron" aria-hidden="true"></span>
+        </summary>
+        <div class="smile-evidence">
+          <div class="smile-pair">
+            <div><p class="smile-small">Yêu cầu trong JD</p><blockquote>“Sử dụng PostgreSQL và tối ưu truy vấn dữ liệu.”</blockquote></div>
+            <div><p class="smile-small">Căn cứ trong CV</p><blockquote>“Tối ưu truy vấn PostgreSQL cho bảng đơn hàng bằng chỉ mục ghép.”</blockquote></div>
+          </div>
+        </div>
+      </details>
+    </section>
+  </section>
+
+  <script>
+    (() => {
+      const root = document.getElementById("smile-documents-proposal");
+      const disclosures = Array.from(root.querySelectorAll("details[data-disclosure]"));
+      const readOpenKeys = () => disclosures.filter(item => item.open).map(item => item.dataset.disclosure);
+      let savedKeys = "";
+
+      function restore(state) {
+        const keys = state?.privateContent?.openDisclosures;
+        if (!Array.isArray(keys)) return;
+        for (const item of disclosures) item.open = keys.includes(item.dataset.disclosure);
+        savedKeys = JSON.stringify(readOpenKeys());
+      }
+
+      restore(window.openai?.widgetState);
+      savedKeys = JSON.stringify(readOpenKeys());
+      window.addEventListener("openai:set_globals", event => restore(event.detail?.globals?.widgetState));
+
+      for (const item of disclosures) {
+        item.addEventListener("toggle", () => {
+          const openDisclosures = readOpenKeys();
+          const nextKeys = JSON.stringify(openDisclosures);
+          if (savedKeys === nextKeys) return;
+          savedKeys = nextKeys;
+          window.openai?.setWidgetState?.({ privateContent: { openDisclosures } }).catch(() => {});
+        });
+      }
+    })();
+  </script>
+</div>

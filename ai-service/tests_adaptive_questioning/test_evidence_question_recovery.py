@@ -390,3 +390,35 @@ def test_clarification_retry_receives_the_exact_persisted_scope(setup, monkeypat
     assert calls[1]["required_question_contract"]["evidence_scope"] == expected
     assert "CLARIFY must preserve" in calls[1]["validation_error"]
     assert result.snapshot.pending_turn.question.evidence_scope == expected
+
+
+def test_retry_distinguishes_rejected_draft_repeat_and_preserves_prior_review_reason(setup, monkeypatch):
+    provider, engine, _ = setup
+    original = provider.question
+    calls = []
+    reviews = []
+    wrong_depth = "Trong Python, từ khóa yield dùng để làm gì?"
+    repaired = "Khi luồng dữ liệu vượt RAM, bạn điều chỉnh hàm vừa viết thế nào và đánh đổi chi phí gì?"
+
+    def draft(context):
+        data = json.loads(context)
+        calls.append(data)
+        question = original(context)
+        question.text = repaired if len(calls) == 3 else wrong_depth
+        return question
+
+    def review(context):
+        q_text = json.loads(context)["question"]
+        reviews.append(q_text)
+        return {"verdict": "WRONG_DEPTH", "reason": "Độ sâu chưa đạt L3"} if q_text == wrong_depth else "ALIGNED"
+
+    monkeypatch.setattr(provider, "question", draft)
+    monkeypatch.setattr(provider, "review_question", review)
+
+    result = start(engine)
+    assert result.public.pending_turn.question == repaired
+    assert reviews == [wrong_depth, repaired]
+    assert "Match the requested depth" in calls[1]["validation_error"]
+    assert "repeats a previously rejected question" in calls[2]["validation_error"]
+    assert "Previous rejection to fix:" in calls[2]["validation_error"]
+    assert "Độ sâu chưa đạt L3" in calls[2]["validation_error"]

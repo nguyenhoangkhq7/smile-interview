@@ -20,7 +20,7 @@ public class CompetencyProjection {
     public record Source(String sessionId, int attemptNumber, String assessedAt) {}
     public record Evidence(Source source, String turnId, String question, String responseExcerpt,
                            String rationale, String performance) {}
-    public record Criterion(String id, String description, boolean essential, String assessment,
+    public record Criterion(String id, String description, boolean essential, String atTarget, String assessment,
                             Source lastAssessment, List<Evidence> evidence) {}
     public record Objective(String id, String claim, String assessment, Source lastChecked,
                             Source lastAssessment, String explanation, List<Criterion> criteria) {}
@@ -34,10 +34,11 @@ public class CompetencyProjection {
         final List<Signal> signals = new ArrayList<>();
         final Map<String, Evidence> evidence = new LinkedHashMap<>();
         CriterionState(JsonNode definition) { this.definition = definition; }
-        Criterion view() {
+        Criterion view(boolean checked) {
             Resolution current = resolve(signals);
             return new Criterion(definition.path("criterion_id").asText(), definition.path("description").asText(),
-                    definition.path("essential").asBoolean(true), current.assessment(), current.source(), List.copyOf(evidence.values()));
+                    definition.path("essential").asBoolean(true), checked ? definition.path("at_target").asText("") : "",
+                    current.assessment(), current.source(), List.copyOf(evidence.values()));
         }
     }
     private static class ObjectiveState {
@@ -51,7 +52,7 @@ public class CompetencyProjection {
                 criteria.put(criterion.path("criterion_id").asText(), new CriterionState(criterion));
         }
         Objective view() {
-            List<Criterion> items = criteria.values().stream().map(CriterionState::view).toList();
+            List<Criterion> items = criteria.values().stream().map(criterion -> criterion.view(lastChecked != null)).toList();
             Resolution current = resolve(signals);
             String status = current.assessment();
             Source basis = current.source();
@@ -97,13 +98,13 @@ public class CompetencyProjection {
             InterviewRun run = runs.get(attempt.getId());
             if (run == null) continue;
             JsonNode snapshot = json.read(run.getSnapshotJson()), visible = json.read(run.getPublicJson());
-            if (!snapshot.path("is_finished").asBoolean() || !visible.path("is_finished").asBoolean()
-                    || snapshot.path("turns").isEmpty()) continue;
+            if (!snapshot.path("is_finished").asBoolean() || !visible.path("is_finished").asBoolean()) continue;
+            Map<String, JsonNode> turns = new HashMap<>();
+            for (JsonNode turn : snapshot.path("turns")) turns.put(turn.path("turn_id").asText(), turn);
+            if (turns.values().stream().noneMatch(turn -> !turn.path("answer").asText("").isBlank())) continue;
             completed++;
             Source source = new Source(attempt.getId(), attempt.getAttemptNumber(),
                     attempt.getEndedAt() == null ? null : attempt.getEndedAt().toString());
-            Map<String, JsonNode> turns = new HashMap<>();
-            for (JsonNode turn : snapshot.path("turns")) turns.put(turn.path("turn_id").asText(), turn);
             for (var entry : objectives.entrySet()) {
                 ObjectiveState objective = entry.getValue();
                 JsonNode state = snapshot.path("objectives").path(entry.getKey());

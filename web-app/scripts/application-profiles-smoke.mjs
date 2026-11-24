@@ -172,8 +172,9 @@ try {
   await text('EXPLAIN ANALYZE');
   await click('Đóng lịch sử');
   await click('Kết thúc phiên'); await click('Kết thúc lượt');
-  await text('Bạn đã kết thúc phiên sớm');
-  await click('Về hồ sơ ứng tuyển'); await text('Năng lực hiện tại theo JD'); await historyTab(); await text('Kết thúc sớm'); await text('Đã hủy — chưa trả lời');
+  await click('Về hồ sơ ứng tuyển');
+  assert.equal(profile.attempts.find(item => item.number === 2)?.status, 'Stopped early');
+  await text('Năng lực hiện tại theo JD'); await historyTab(); await text('Kết thúc sớm'); await text('Kết thúc trước khi trả lời');
   await page.screenshot({ path: '.next/application-profile-desktop.png', fullPage: true });
   await click('Phỏng vấn lượt mới'); await text('Chuẩn bị phỏng vấn');
   await click('Bắt đầu phỏng vấn'); await page.waitForSelector('textarea');

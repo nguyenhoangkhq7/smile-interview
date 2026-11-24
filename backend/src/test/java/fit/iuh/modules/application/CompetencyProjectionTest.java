@@ -26,7 +26,8 @@ class CompetencyProjectionTest {
     private ObjectNode definition(String skill) {
         return (ObjectNode) json.read("{\"objective_id\":\"" + skill + "-task\",\"skill_id\":\"" + skill
                 + "\",\"claim\":\"Check " + skill + "\",\"target_depth\":3,\"rubric_fingerprint\":\"" + skill
-                + "-rubric\",\"criteria\":[{\"criterion_id\":\"" + skill + "-c1\",\"description\":\"Explain the execution\",\"essential\":true}]}");
+                + "-rubric\",\"criteria\":[{\"criterion_id\":\"" + skill + "-c1\",\"description\":\"Explain the execution\","
+                + "\"at_target\":\"Identify which operation uses the most time\",\"essential\":true}]}");
     }
 
     private Attempt attempt(int number, Map<String, String> assessments, String context) {
@@ -74,6 +75,7 @@ class CompetencyProjectionTest {
         View result = view();
         assertThat(result.skills()).hasSize(2).allSatisfy(skill -> assertThat(skill.assessment()).isEqualTo(NONE));
         assertThat(result.skills().getFirst().objectives().getFirst().lastAssessment()).isNull();
+        assertThat(result.skills().getFirst().objectives().getFirst().criteria().getFirst().atTarget()).isEmpty();
         profile.setBlueprintJson(null);
         assertThat(view().skills()).allSatisfy(skill -> assertThat(skill.assessment()).isEqualTo(NONE));
     }
@@ -83,7 +85,9 @@ class CompetencyProjectionTest {
         View result = view(attempt(1, Map.of("sql", AT), "query A"));
         assertThat(sql(result).assessment()).isEqualTo(AT);
         assertThat(result.skills().getLast().assessment()).isEqualTo(NONE);
-        var evidence = sql(result).objectives().getFirst().criteria().getFirst().evidence().getFirst();
+        var criterion = sql(result).objectives().getFirst().criteria().getFirst();
+        assertThat(criterion.atTarget()).isEqualTo("Identify which operation uses the most time");
+        var evidence = criterion.evidence().getFirst();
         assertThat(evidence.source().sessionId()).isEqualTo("s1");
         assertThat(evidence.responseExcerpt()).isEqualTo("EXPLAIN ANALYZE");
         assertThat(profile.getSkillGapJson()).isEqualTo(baseline);
@@ -105,7 +109,9 @@ class CompetencyProjectionTest {
         var first = attempt(1, Map.of("sql", AT), "A");
         var running = attempt(2, Map.of("sql", BELOW), "B"); running.snapshot().put("is_finished", false);
         var cancelled = attempt(3, Map.of("sql", BELOW), "C"); cancelled.snapshot().putArray("turns");
-        View result = view(first, running, cancelled);
+        var blank = attempt(4, Map.of("sql", BELOW), "D");
+        ((ObjectNode) blank.snapshot().path("turns").get(0)).put("answer", " ");
+        View result = view(first, running, cancelled, blank);
         assertThat(result.completedAttempts()).isEqualTo(1);
         assertThat(sql(result).assessment()).isEqualTo(AT);
         assertThat(sql(result).objectives().getFirst().lastAssessment().attemptNumber()).isEqualTo(1);
