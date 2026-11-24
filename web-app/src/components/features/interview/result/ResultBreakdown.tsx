@@ -14,7 +14,7 @@ import {
 } from './resultData';
 
 export const resultPanel = 'min-w-0 rounded-2xl border border-slate-200/80 bg-card p-4 shadow-xs sm:p-5';
-export const resultSection = 'scroll-mt-32 space-y-3';
+export const resultSection = 'scroll-mt-(--result-scroll-mt,5rem) space-y-3';
 
 export function AnswerContent({ content, mode, compact = false }: { content: string; mode?: string; compact?: boolean }) {
   if (looksLikeRawCode(content, mode)) {
@@ -51,6 +51,17 @@ export function FindingList({ items, empty, preview = 3 }: { items: readonly str
   );
 }
 
+export function ResultCoachingSummary({ summary }: { summary: string }) {
+  return (
+    <div className="space-y-2 rounded-xl border border-indigo-200/70 bg-indigo-50/70 p-4 text-indigo-950">
+      <h2 className="flex items-center gap-1.5 text-sm font-bold">
+        <MessageSquare size={16} className="text-indigo-700" /> Nhận xét & Coaching tổng hợp
+      </h2>
+      <p className="text-sm leading-relaxed text-slate-800">{summary}</p>
+    </div>
+  );
+}
+
 export function ResultFeedback({ data }: { data: ResultData }) {
   const partialSkills = data.skills
     .filter(skill => skill.status === 'partial')
@@ -60,34 +71,24 @@ export function ResultFeedback({ data }: { data: ResultData }) {
   const attentionItems = mergedWeaknesses.length ? mergedWeaknesses : partialSkills;
 
   return (
-    <div id="feedback" className="space-y-3">
-      {data.coaching?.overall_summary && (
-        <div className="space-y-1.5 rounded-xl border border-indigo-200/70 bg-indigo-50/70 p-3.5 text-indigo-950">
-          <h2 className="flex items-center gap-1.5 text-sm font-bold">
-            <MessageSquare size={16} className="text-indigo-700" /> Nhận xét & Coaching tổng hợp
-          </h2>
-          <p className="text-sm leading-relaxed text-slate-800">{data.coaching.overall_summary}</p>
-        </div>
-      )}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-        <div className="space-y-2 rounded-xl border border-emerald-200/60 bg-emerald-50/70 p-3.5 text-emerald-950">
-          <h2 className="flex items-center gap-1.5 text-sm font-bold"><CircleCheck size={16} className="text-emerald-700" /> Điểm làm tốt</h2>
-          <FindingList items={mergedStrengths} preview={3} empty="Chưa có đủ dữ kiện để ghi nhận điểm mạnh nổi bật." />
-        </div>
-        <div className={cn(
-          'space-y-2 rounded-xl border p-3.5',
-          mergedWeaknesses.length ? 'border-orange-200/70 bg-orange-50/70 text-orange-950'
-            : attentionItems.length ? 'border-amber-200/70 bg-amber-50/60 text-amber-950'
-              : 'border-slate-200/80 bg-slate-50/80 text-slate-700',
-        )}>
-          <h2 className="flex items-center gap-1.5 text-sm font-bold">
-            {mergedWeaknesses.length ? <TriangleAlert size={16} className="text-orange-700" />
-              : attentionItems.length ? <Clock3 size={16} className="text-amber-700" />
-                : <MessageSquare size={16} className="text-slate-600" />}
-            {mergedWeaknesses.length ? 'Cần cải thiện' : 'Lưu ý đánh giá'}
-          </h2>
-          <FindingList items={attentionItems} preview={2} empty="Không ghi nhận thiếu sót trong các nội dung đã đánh giá." />
-        </div>
+    <div id="feedback" className="grid items-start gap-3 md:grid-cols-2">
+      <div className="space-y-2 rounded-xl border border-emerald-200/60 bg-emerald-50/70 p-4 text-emerald-950">
+        <h2 className="flex items-center gap-1.5 text-sm font-bold"><CircleCheck size={16} className="text-emerald-700" /> Điểm làm tốt</h2>
+        <FindingList items={mergedStrengths} preview={3} empty="Chưa có đủ dữ kiện để ghi nhận điểm mạnh nổi bật." />
+      </div>
+      <div className={cn(
+        'space-y-2 rounded-xl border p-4',
+        mergedWeaknesses.length ? 'border-orange-200/70 bg-orange-50/70 text-orange-950'
+          : attentionItems.length ? 'border-amber-200/70 bg-amber-50/60 text-amber-950'
+            : 'border-slate-200/80 bg-slate-50/80 text-slate-700',
+      )}>
+        <h2 className="flex items-center gap-1.5 text-sm font-bold">
+          {mergedWeaknesses.length ? <TriangleAlert size={16} className="text-orange-700" />
+            : attentionItems.length ? <Clock3 size={16} className="text-amber-700" />
+              : <MessageSquare size={16} className="text-slate-600" />}
+          {mergedWeaknesses.length ? 'Cần cải thiện' : 'Lưu ý đánh giá'}
+        </h2>
+        <FindingList items={attentionItems} preview={2} empty="Không ghi nhận thiếu sót trong các nội dung đã đánh giá." />
       </div>
     </div>
   );

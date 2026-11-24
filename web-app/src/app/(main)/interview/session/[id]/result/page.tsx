@@ -29,5 +29,5 @@ function InterviewResult({ sessionId }: { sessionId: string }) {
   if (!session.is_finished || !session.turns.length) return (
     <div className="mx-auto max-w-6xl p-6"><InterviewOutcome session={session} metadata={metadata} /></div>
   );
-  return <InterviewResultDashboard session={session} metadata={metadata} />;
+  return <InterviewResultDashboard session={session} metadata={metadata} hasNavbar />;
 }

@@ -16,7 +16,7 @@ from .coding_verification import check_coding_answer
 from .errors import JudgmentUnavailableError, QuestionUnavailableError
 from .models import (
     Action, Blueprint, BlueprintRequest, ConversationRequest, InterviewConfig, InterviewSkillContext,
-    InterviewVerification, Judgment,
+    InterviewVerification, Judgment, Mode,
     NextQuestionRequest, ObjectiveState, Question, SessionCoaching, Snapshot, StartRequest,
     StoredQuestion, TransitionRequest, TransitionResult, Turn,
 )
@@ -533,9 +533,18 @@ class EvidenceWorkflow:
             guidance_parts.append(
                 "Ask about one prerequisite using a small concrete example. Do not ask why the candidate could not answer."
             )
+        if action == Action.DEEPER and state.selected_mode == Mode.CODING:
+            guidance_parts.append(
+                "Build on the prior coding problem/solution in history by changing one harder technical constraint "
+                "(e.g. large or streaming input, bounded memory, concurrency, or time/space limit) and ask ONE "
+                "focused question about adapting the algorithm/data structure or evaluating trade-offs for above_target. "
+                "Do not ask the candidate to rewrite the basic function from scratch or split into separate deliverables."
+            )
         criterion_blob = f"{objective.get('claim', '')} {objective['criteria'][0].get('description', '')}".casefold()
-        if (snapshot.config.interaction_mode == "TEXT"
-                and state.selected_mode.value == "CODING"
+        if (not history_turns
+                and action in {Action.INITIAL, Action.FOLLOW_UP}
+                and snapshot.config.interaction_mode == "TEXT"
+                and state.selected_mode == Mode.CODING
                 and ("deduplicate" in criterion_blob or "khử trùng" in criterion_blob)
                 and "event" in criterion_blob):
             guidance_parts.append(
@@ -563,15 +572,23 @@ class EvidenceWorkflow:
                 sources["detail_to_verify"] = focus.detail_to_verify
                 context["cv_evidence"] = [focus.cv_excerpt]
 
+    @staticmethod
+    def _normalize_question_text(text: str) -> str:
+        return " ".join(text.casefold().split())
+
     def _generate_valid_question(self, context: dict[str, object], snapshot: Snapshot) -> Question | None:
-        seen = {" ".join(turn.question.text.casefold().split()) for turn in snapshot.turns}
-        seen.update(" ".join(stem.casefold().split()) for stem in snapshot.prior_question_stems if stem.strip())
+        prior_seen = {self._normalize_question_text(turn.question.text) for turn in snapshot.turns}
+        prior_seen.update(
+            self._normalize_question_text(stem) for stem in snapshot.prior_question_stems if stem.strip()
+        )
+        rejected_seen: set[str] = set()
+        last_review_error: str | None = None
         for attempt in range(GENERATION_ATTEMPTS):
             if self.clock() >= snapshot.deadline_at:
                 return None
-            if attempt == GENERATION_ATTEMPTS - 1:
-                self._fall_back_to_jd(context)
-            question, errors = self._question_attempt(context, seen)
+            if attempt == GENERATION_ATTEMPTS - 1 and self._fall_back_to_jd(context):
+                last_review_error = None
+            question, errors, repeated = self._question_attempt(context, prior_seen, rejected_seen)
             failure = None
             if not errors:
                 if self.clock() >= snapshot.deadline_at:
@@ -589,25 +606,34 @@ class EvidenceWorkflow:
                     return question
                 failure = verdict
                 context["rejected_draft"] = question.text
-                seen.add(" ".join(question.text.casefold().split()))
+                rejected_seen.add(self._normalize_question_text(question.text))
                 base_repair = ALIGNMENT_REPAIRS.get(
                     verdict,
                     "Revise the question to match the criterion, depth, mode, and single-task scope.",
                 )
-                errors = [f"{base_repair} Chi tiết lỗi: {reason}" if reason else base_repair]
+                last_review_error = f"{base_repair} Chi tiết lỗi: {reason}" if reason else base_repair
+                errors = [last_review_error]
+            else:
+                if question is not None:
+                    rejected_seen.add(self._normalize_question_text(question.text))
+                    context["rejected_draft"] = question.text
+                if repeated and last_review_error:
+                    errors.append(f"Previous rejection to fix: {last_review_error}")
             context["validation_error"] = "; ".join(errors)
             logger.warning("Invalid question for session %s (attempt %s/%s): %s", snapshot.session_id,
                            attempt + 1, GENERATION_ATTEMPTS, failure or context["validation_error"])
         raise QuestionUnavailableError("AI chưa tạo được câu hỏi phù hợp. Dữ liệu đã lưu được giữ nguyên; vui lòng thử lại.")
 
     @staticmethod
-    def _fall_back_to_jd(context: dict[str, object]) -> None:
+    def _fall_back_to_jd(context: dict[str, object]) -> bool:
         sources = context.get("verification_context")
         if isinstance(sources, dict) and sources.pop("detail_to_verify", None) is not None:
             context["cv_evidence"] = []
             context.pop("rejected_draft", None)
             context["validation_error"] = "Use a hypothetical case from the JD for the same criterion."
             event("verification.jd_context", reason="cv_drafts_rejected")
+            return True
+        return False
 
     def _review_question(self, context: dict[str, object], question: Question) -> tuple[str, str]:
         raw = self.provider.review_question(self._review_context(context, question))
@@ -649,19 +675,30 @@ class EvidenceWorkflow:
             payload["verification_context"] = context["verification_context"]
         return encode_context(payload)
 
-    def _question_attempt(self, context: dict[str, object], seen: set[str]) -> tuple[Question | None, list[str]]:
+    def _question_attempt(
+        self,
+        context: dict[str, object],
+        prior_seen: set[str],
+        rejected_seen: set[str] | None = None,
+    ) -> tuple[Question | None, list[str], bool]:
         try:
             question = self.provider.question(encode_context(context))
         except ValidationError as exc:
             errors = [f"Invalid Question schema at {item['loc']}: {item['type']}"
                       for item in exc.errors(include_input=False, include_url=False)]
-            return None, errors
+            return None, errors, False
         except ValueError as exc:
-            return None, [str(exc)]
+            return None, [str(exc)], False
         errors = question_errors(question, context)
-        if " ".join(question.text.casefold().split()) in seen:
+        normalized = self._normalize_question_text(question.text)
+        repeated = False
+        if normalized in prior_seen:
             errors.append("The question repeats a prior turn; use a new focused question instead")
-        return question, errors
+            repeated = True
+        elif rejected_seen and normalized in rejected_seen:
+            errors.append("The draft repeats a previously rejected question; write a substantially revised question instead")
+            repeated = True
+        return question, errors, repeated
 
     @staticmethod
     def _prompt_objective(state: ObjectiveState, target_ids: list[str]) -> dict[str, object]:

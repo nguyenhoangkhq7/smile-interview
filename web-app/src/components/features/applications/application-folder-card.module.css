@@ -128,9 +128,7 @@
 .fileChip span { overflow: hidden; text-overflow: ellipsis; }
 .date { gap: 0.4rem; color: #718096; font-size: 0.72rem; }
 .date svg { flex: 0 0 auto; }
-.footer { justify-content: space-between; gap: 0.75rem; margin-top: auto; padding-top: 0.9rem; border-top: 1px solid #eee9e1; }
-.resultCount { overflow: hidden; color: #67778a; font-size: 0.76rem; text-overflow: ellipsis; white-space: nowrap; }
-.footerActions { display: flex; flex: 0 0 auto; align-items: center; gap: 0.55rem; }
+.footer { justify-content: flex-end; margin-top: auto; padding-top: 0.9rem; border-top: 1px solid #eee9e1; }
 .openAction { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 0.35rem; color: #bd350d; font-size: 0.78rem; font-weight: 650; text-decoration: none; transition: gap 200ms ease; }
 .openAction:focus-visible { border-radius: 0.2rem; outline: 2px solid #c2410c; outline-offset: 3px; }
 .folder:hover .openAction,

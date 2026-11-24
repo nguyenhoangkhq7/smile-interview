@@ -29,7 +29,6 @@ function ProfileStatus({ profile, active }: { profile: ApplicationProfile; activ
 
 export function ApplicationFolderCard({ profile, index }: { profile: ApplicationProfile; index: number }) {
   const active = activeAttempt(profile.attempts);
-  const completed = profile.attempts.filter((attempt) => finishedAttempt(attempt) && attempt.answeredCount > 0).length;
 
   return (
     <article
@@ -58,10 +57,7 @@ export function ApplicationFolderCard({ profile, index }: { profile: Application
         <span className={styles.date}><CalendarDays size={14} aria-hidden="true" />Tạo {formatProfileDate(profile.createdAt)}</span>
 
         <span className={styles.footer}>
-          <span className={styles.resultCount}>{completed ? `${completed} lượt có kết quả` : 'Chưa có lượt hoàn thành'}</span>
-          <span className={styles.footerActions}>
-            <Link className={styles.openAction} href={`/applications/${profile.id}/documents`}>Xem CV &amp; JD<ArrowRight size={16} aria-hidden="true" /></Link>
-          </span>
+          <Link className={styles.openAction} href={`/applications/${profile.id}/documents`}>Xem CV &amp; JD<ArrowRight size={16} aria-hidden="true" /></Link>
         </span>
       </span>
     </article>

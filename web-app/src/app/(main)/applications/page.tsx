@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, BriefcaseBusiness, FileText, Plus, Search, SlidersHorizontal, Trash2 } from 'lucide-react';
+import { ArrowRight, BriefcaseBusiness, Plus, Search, SlidersHorizontal, Trash2 } from 'lucide-react';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { ApplicationProfile, applicationProfiles } from '@/services/applicationProfiles';

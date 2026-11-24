@@ -64,7 +64,8 @@ try {
   await page.screenshot({ path: '.next/applications-list-desktop.png', fullPage: true });
   await page.type('[aria-label="Tìm hồ sơ ứng tuyển"]', 'cong ty b');
   await text('1 hồ sơ');
-  assert.equal(await page.$$eval('a[href^="/applications/"]', elements => elements.length), 1);
+  assert.equal(await page.$$eval('article:has(a[href^="/applications/"])', elements => elements.length), 1);
+  assert.ok(await page.$('article a[href="/applications/frontend"]'));
   await page.type('[aria-label="Tìm hồ sơ ứng tuyển"]', ' impossible'); await text('Không tìm thấy hồ sơ phù hợp');
   await click('Xóa bộ lọc'); await click('Đang phỏng vấn'); await text('1 hồ sơ');
   await click('Tất cả');
@@ -73,13 +74,13 @@ try {
 
   await page.setViewport({ width: 1440, height: 1050 }); await visit('/applications/design');
   await text('Năng lực hiện tại theo JD'); await page.waitForSelector('[data-skill]');
-  assert.equal(await page.$$eval('[data-skill]', elements => elements.length), 6);
+  assert.equal(await page.$$eval('[data-skill]', elements => elements.length), 1);
   assert.equal(await page.$$eval('[data-skill]', elements => elements[0].dataset.skill), 'sql');
   assert.equal(await page.$$eval('[role="tabpanel"]', elements => elements.filter(e => !e.hidden && getComputedStyle(e).display !== 'none').length), 1);
   await page.screenshot({ path: '.next/application-overview-desktop.png', fullPage: true });
-  await click('Cần tập trung3');
-  assert.equal(await page.$$eval('[data-skill]', elements => elements.length), 3);
-  await click('Tất cả12'); await click('Xem thêm kỹ năng (6)');
+  await click('Dưới yêu cầu 2');
+  assert.equal(await page.$$eval('[data-skill]', elements => elements.length), 2);
+  await click('Tất cả'); await click('Xem thêm kỹ năng (6)');
   assert.equal(await page.$$eval('[data-skill]', elements => elements.length), 12);
   await page.$eval('[data-skill="sql"] > summary', e => e.click());
   await page.focus('[data-skill="sql"] button'); await page.keyboard.press('Enter');
@@ -94,9 +95,9 @@ try {
   assert.equal(new URL(page.url()).hash, '#history');
   await page.reload({ waitUntil: 'networkidle0' }); await text('Các lượt phỏng vấn');
   await page.screenshot({ path: '.next/application-history-desktop.png', fullPage: true });
-  await tab('CV & JD'); await text('Tài liệu của hồ sơ');
-  await page.evaluate(() => [...document.querySelectorAll('summary')].find(e => e.textContent === 'Xem bản phân tích đầy đủ').click());
-  await page.waitForSelector('.katex');
+  await tab('CV & JD'); await text('Tài liệu đã dùng');
+  await text('Đối chiếu theo kỹ năng');
+  await page.waitForSelector('[data-cv-skill]');
   await page.screenshot({ path: '.next/application-documents-desktop.png', fullPage: true });
   await page.setViewport({ width: 390, height: 844 }); await noOverflow();
   await tab('Năng lực hiện tại'); await text('Năng lực hiện tại theo JD'); await page.waitForSelector('[data-skill]');
@@ -104,7 +105,7 @@ try {
     const rect = e.getBoundingClientRect(); return rect.left >= 0 && rect.right <= innerWidth;
   })), true, 'All profile tabs must be visible on mobile');
   await noOverflow(); await page.screenshot({ path: '.next/application-overview-mobile.png', fullPage: true });
-  await visit('/applications/long#documents'); await text('Tài liệu của hồ sơ'); await noOverflow();
+  await visit('/applications/long#documents'); await text('Tài liệu đã dùng'); await noOverflow();
   assert.deepEqual(errors, []);
-  console.log('PASS: profile search/filters, long names, focused overview, pagination, evidence dialog, persistent tabs, Markdown and mobile layouts.');
+  console.log('PASS: profile search/filters, long names, focused overview, pagination, evidence dialog, persistent tabs, CV & JD and mobile layouts.');
 } finally { await browser.close(); }

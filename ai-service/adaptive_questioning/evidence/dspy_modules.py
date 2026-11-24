@@ -83,8 +83,10 @@ class FollowUpQuestionSignature(dspy.Signature):
     - FOLLOW_UP: use probe_reason and history to probe one unresolved detail (referencing the
       candidate's words when helpful), or introduce a newly selected criterion cleanly. If a
       prior question was already answered, ask a genuinely new task instead of rephrasing.
-    - PROBE_DEEPER: modify one meaningful constraint and ask ONE integrated design/trade-off
-      question targeting the above_target anchor (e.g. "bạn xử lý ... thế nào và đánh đổi chi phí gì?").
+    - PROBE_DEEPER: build on history by modifying one meaningful constraint and asking ONE
+      integrated adaptation/trade-off question targeting the above_target anchor (e.g. "bạn xử lý
+      ... thế nào và đánh đổi chi phí gì?"). In CODING mode, adapt the existing problem/solution
+      to the harder constraint rather than asking to rewrite the basic function from scratch.
       Never split it into two sentences/imperatives ("Hãy mô tả giải pháp và phân tích chi phí...").
     - VERIFY_CONTRADICTION: present one concrete discriminating case that separates the two
       conflicting observed claims in history/prior_observations.
