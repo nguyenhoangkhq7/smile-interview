@@ -343,3 +343,10 @@ def test_checkpoints_v1_bipartite_and_v2_dependency_both_load_and_predict():
         res_v3 = svc_v3.predict_graph(pyg)
         assert 0.0 <= res_v3.matching_score <= 1.0
         assert res_v3.model_version == "asymmetric-proficiency-hybrid-gnn-v3"
+
+    v4_path = ckpt_dir / "paper_aligned_hybrid_gnn_v4_semantic_importance.pt"
+    if v4_path.is_file():
+        svc_v4 = GNNInferenceService(checkpoint_path=str(v4_path))
+        res_v4 = svc_v4.predict_graph(pyg)
+        assert 0.0 <= res_v4.matching_score <= 1.0
+        assert res_v4.model_version == "semantic-importance-dependency-gnn-v4"

@@ -28,6 +28,7 @@ class GraphBuilder(Protocol):
         stage3_response: Optional[SemanticRepresentationResponse] = None,
         reasoning_results: Optional[list[SkillPairReasoningResult]] = None,
         pair_id: Optional[str] = None,
+        skill_importance_output: Optional[Any] = None,
     ) -> Any: ...
 
     def export_to_pyg(self, graph_data: PaperAlignedGraphData) -> Any: ...
@@ -72,16 +73,20 @@ class PipelineGraphService:
         graph_mode: str,
         pair_id: str,
         include_graph: bool,
+        skill_importance_output: Optional[Any] = None,
     ) -> PipelineGraphOutcome:
         started_at = time.perf_counter()
         try:
             active_builder = self._builder_for_mode(graph_mode)
-            graph_data, integrity_report = active_builder.build_graph(
-                unified_response=unified_response,
-                stage3_response=stage3_response if graph_mode != "evidence_only" else None,
-                reasoning_results=reasoning_results if graph_mode == "llm_enriched" else None,
-                pair_id=pair_id,
-            )
+            build_kwargs: dict[str, Any] = {
+                "unified_response": unified_response,
+                "stage3_response": stage3_response if graph_mode != "evidence_only" else None,
+                "reasoning_results": reasoning_results if graph_mode == "llm_enriched" else None,
+                "pair_id": pair_id,
+            }
+            if skill_importance_output is not None:
+                build_kwargs["skill_importance_output"] = skill_importance_output
+            graph_data, integrity_report = active_builder.build_graph(**build_kwargs)
             if not integrity_report.is_valid:
                 raise GraphIntegrityError(
                     "; ".join(integrity_report.errors),
@@ -129,10 +134,13 @@ class PipelineGraphService:
 
     def _builder_for_mode(self, graph_mode: str) -> GraphBuilder:
         if graph_mode in ("paper_cosine_08", "canonical_only"):
+            base_cfg = getattr(self._base_builder, "config", None)
+            edge_weight_mode = getattr(base_cfg, "edge_weight_mode", "semantic_importance")
             return PaperAlignedGraphBuilder(
                 PaperAlignedGraphConfig(
                     embedding_dim=self._embedding_dim,
                     merge_policy=graph_mode,
+                    edge_weight_mode=edge_weight_mode,
                 )
             )
         return self._base_builder

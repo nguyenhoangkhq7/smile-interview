@@ -41,12 +41,12 @@ PINNED_SBERT_MODEL_ID = "sentence-transformers/paraphrase-multilingual-mpnet-bas
 PINNED_SBERT_REVISION = "4328cf26390c98c5e3c738b4460a05b95f4911f5"
 EXPECTED_EMBEDDING_DIM = 768
 
-# Default checkpoint path for trained Asymmetric & Proficiency-Aware PaperAlignedHybridGNN (v3).
-# Earlier baselines remain preserved at paper_aligned_hybrid_gnn_v1.pt (bipartite)
-# and paper_aligned_hybrid_gnn_v2_dep.pt (dependency diffusion) for ablation comparison.
+# Default checkpoint path for trained Semantic-Importance Dependency-Aware GNN (v4).
+# Decoupled Module 1: Job-Skill = JSI w_j, Resume-Skill = uniform 1.0 (no proficiency), Skill-Skill = SBERT DAG.
+# Earlier baselines remain preserved at v1 (bipartite), v2 (dependency), and v3 (asym_prof) for ablation comparison.
 PAPER_ALIGNED_CKPT_PATH = str(
     Path(__file__).resolve().parents[2]
-    / "data/checkpoints/paper_aligned_gnn/paper_aligned_hybrid_gnn_v3_asym_prof.pt"
+    / "data/checkpoints/paper_aligned_gnn/paper_aligned_hybrid_gnn_v4_semantic_importance.pt"
 )
 
 ALLOWED_PAPER_NODE_TYPES = {"resume", "job", "skill"}

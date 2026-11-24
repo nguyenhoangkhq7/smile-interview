@@ -11,13 +11,12 @@ HeteroData graphs with exact Baghbanzadeh & Wu (ICIT 2025) bipartite graph topol
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import logging
 from pathlib import Path
 import re
 import sys
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import torch
 from torch_geometric.data import HeteroData
@@ -29,12 +28,15 @@ if str(ai_service_dir) not in sys.path:
 
 from matching_cv.app.core.config import settings
 from matching_cv.app.core.model_loader import ModelLoader
+from matching_cv.app.services.production_skill_importance_service import (
+    production_skill_importance_service,
+)
 from matching_cv.research.data.canonical_skill_normalizer import normalize_canonical_skill
 from matching_cv.research.paper_aligned_gnn.graph_builder import (
     PaperAlignedGraphBuilder,
     PaperAlignedGraphConfig,
 )
-from matching_cv.research.paper_aligned_gnn.schemas import SkillInputItem
+from matching_cv.research.paper_aligned_gnn.schemas import EdgeWeightMode, SkillInputItem
 from matching_cv.research.paper_aligned_gnn.skill_dependency_resolver import (
     CURATED_SKILL_PREREQUISITE_DAG,
 )
@@ -119,12 +121,57 @@ class EmbeddingCache:
         return self.cache[key]
 
 
+def compute_jd_importance_weights(job: Dict[str, Any]) -> Dict[str, float]:
+    """Compute JSI-v1 importance weights w_j for all skills in a synthetic JD."""
+    jd_id = job["jd_id"]
+    jd_text = job.get("jd_text", "")
+    explicit_skills: List[Dict[str, Any]] = []
+    fallback_weights: Dict[str, float] = {}
+
+    for req in job.get("requirements", []):
+        is_crit = bool(req.get("is_critical", False))
+        req_type = str(req.get("type", "mandatory")).lower()
+        prior_w = 0.92 if is_crit else (0.75 if req_type == "mandatory" else 0.45)
+        sentence = req.get("jd_quote") or req.get("text", "")
+        for term in req.get("skill_terms", []):
+            canon = normalize_canonical_skill(term)
+            if not canon:
+                continue
+            fallback_weights[canon] = max(fallback_weights.get(canon, 0.0), prior_w)
+            explicit_skills.append(
+                {
+                    "skill_id": canon,
+                    "surface_forms": [term],
+                    "evidences": [{"surface_form": term, "sentence": sentence}],
+                }
+            )
+
+    weights = dict(fallback_weights)
+    try:
+        jsi_out = production_skill_importance_service.evaluate_jd_importance(
+            jd_text=jd_text,
+            explicit_skills=explicit_skills,
+            implicit_skills=[],
+            job_title=job.get("title"),
+            jd_id=jd_id,
+            force_enable=True,
+        )
+        for rec in jsi_out.records:
+            cid = normalize_canonical_skill(rec.skill_id) or rec.skill_id
+            if cid:
+                weights[cid] = float(rec.weight)
+    except Exception as exc:
+        logger.warning(f"JSI importance fallback used for {jd_id}: {exc}")
+    return weights
+
+
 def build_pair_graph(
     pair: Dict[str, Any],
     job: Dict[str, Any],
     resume: Dict[str, Any],
     builder: PaperAlignedGraphBuilder,
     emb_cache: EmbeddingCache,
+    jd_importance_weights: Optional[Dict[str, float]] = None,
 ) -> Tuple[HeteroData, Dict[str, Any]]:
     """Build a single bipartite HeteroData graph for a CV-JD pair."""
     jd_id = job["jd_id"]
@@ -224,6 +271,7 @@ def build_pair_graph(
         pair_id=pair["pair_id"],
         cv_doc_id=cv_id,
         jd_doc_id=jd_id,
+        jd_importance_weights=jd_importance_weights,
     )
     pyg, _, summary = builder.export_to_pyg(graph_data)
 
@@ -537,6 +585,7 @@ def run_dataset_preparation(
     enable_skill_dependencies: bool = True,
     dependency_scope: str = "jd_bidirectional",
     include_counterfactuals: bool = True,
+    edge_weight_mode: EdgeWeightMode = "semantic_importance",
 ) -> None:
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
@@ -548,10 +597,11 @@ def run_dataset_preparation(
 
     cfg = PaperAlignedGraphConfig(
         embedding_dim=settings.STAGE3_EMBEDDING_DIM,
+        edge_weight_mode=edge_weight_mode,
         edge_weight_normalization="scaled_0_1",
         enable_skill_dependencies=enable_skill_dependencies,
         dependency_scope=dependency_scope,
-        enable_evidence_proficiency_fallback=True,
+        enable_evidence_proficiency_fallback=(edge_weight_mode == "paper_proficiency"),
     )
     builder = PaperAlignedGraphBuilder(cfg)
 
@@ -562,25 +612,28 @@ def run_dataset_preparation(
 
     logger.info(f"Loading jobs from {jobs_file}")
     with open(jobs_file, "r", encoding="utf-8") as f:
-        jobs = {j["jd_id"]: j for j in [json.loads(l) for l in f]}
+        jobs = {j["jd_id"]: j for j in [json.loads(line) for line in f]}
 
     logger.info(f"Loading resumes from {resumes_file}")
     with open(resumes_file, "r", encoding="utf-8") as f:
-        resumes = {r["cv_id"]: r for r in [json.loads(l) for l in f]}
+        resumes = {r["cv_id"]: r for r in [json.loads(line) for line in f]}
 
     logger.info(f"Loading accepted pairs from {processed_file}")
     with open(processed_file, "r", encoding="utf-8") as f:
-        pairs = [json.loads(l) for l in f]
+        pairs = [json.loads(line) for line in f]
 
-    logger.info(f"Total jobs: {len(jobs)}, resumes: {len(resumes)}, pairs: {len(pairs)}")
+    logger.info(
+        f"Total jobs: {len(jobs)}, resumes: {len(resumes)}, pairs: {len(pairs)}, "
+        f"edge_weight_mode={edge_weight_mode}"
+    )
 
-    # Group split by jd_id strictly
+    jd_importance_by_id: Dict[str, Dict[str, float]] = {}
+    if edge_weight_mode == "semantic_importance":
+        for jid, job in jobs.items():
+            jd_importance_by_id[jid] = compute_jd_importance_weights(job)
+
+    # Group split by jd_id strictly (7 train, 1 val, 2 test for 10 JDs)
     all_jds = sorted(list(jobs.keys()))
-    n_jds = len(all_jds)
-    n_train_jds = max(1, int(round(n_jds * train_ratio)))
-    n_val_jds = max(1, int(round(n_jds * val_ratio)))
-    
-    # 7 train, 1 val, 2 test for 10 JDs
     train_jds = set(all_jds[:7])
     val_jds = set(all_jds[7:8])
     test_jds = set(all_jds[8:])
@@ -598,7 +651,14 @@ def run_dataset_preparation(
         job = jobs[jd_id]
         resume = resumes[cv_id]
 
-        pyg, meta = build_pair_graph(pair, job, resume, builder, emb_cache)
+        pyg, meta = build_pair_graph(
+            pair,
+            job,
+            resume,
+            builder,
+            emb_cache,
+            jd_importance_weights=jd_importance_by_id.get(jd_id),
+        )
         metadata_list.append(meta)
 
         if jd_id in train_jds:
@@ -643,16 +703,17 @@ def run_dataset_preparation(
         asym_eval_pairs = build_asymmetric_counterfactual_pairs(
             builder, emb_cache, eval_dag_pairs, prefix="eval", max_pairs=len(eval_dag_pairs)
         )
-        depth_train_pairs = build_depth_sensitivity_pairs(
-            builder, emb_cache, jobs, sorted(train_jds), prefix="train"
-        )
-        depth_eval_pairs = build_depth_sensitivity_pairs(
-            builder, emb_cache, jobs, sorted(test_jds), prefix="eval"
-        )
         torch.save(asym_train_pairs, output_path / "asymmetric_train_pairs.pt")
         torch.save(asym_eval_pairs, output_path / "asymmetric_eval_pairs.pt")
-        torch.save(depth_train_pairs, output_path / "depth_train_pairs.pt")
-        torch.save(depth_eval_pairs, output_path / "depth_eval_pairs.pt")
+        if edge_weight_mode == "paper_proficiency":
+            depth_train_pairs = build_depth_sensitivity_pairs(
+                builder, emb_cache, jobs, sorted(train_jds), prefix="train"
+            )
+            depth_eval_pairs = build_depth_sensitivity_pairs(
+                builder, emb_cache, jobs, sorted(test_jds), prefix="eval"
+            )
+            torch.save(depth_train_pairs, output_path / "depth_train_pairs.pt")
+            torch.save(depth_eval_pairs, output_path / "depth_eval_pairs.pt")
         logger.info(
             f"Saved counterfactual sets: asym_train={len(asym_train_pairs)} pairs, "
             f"asym_eval(zero-shot)={len(asym_eval_pairs)} pairs, "
@@ -662,9 +723,10 @@ def run_dataset_preparation(
     manifest = {
         "dataset_name": "synthetic_cv_jd_dataset_v2",
         "total_pairs": len(pairs),
+        "edge_weight_mode": edge_weight_mode,
         "enable_skill_dependencies": enable_skill_dependencies,
         "dependency_scope": dependency_scope,
-        "enable_evidence_proficiency_fallback": True,
+        "enable_evidence_proficiency_fallback": edge_weight_mode == "paper_proficiency",
         "total_skill_dependency_edges": total_dep_edges,
         "avg_skill_dependency_edges_per_pair": avg_dep_edges,
         "counterfactual_counts": {
@@ -713,8 +775,15 @@ if __name__ == "__main__":
     parser.add_argument(
         "--output-dir",
         type=str,
-        default=r"ai-service\matching_cv\data\processed\paper_aligned_gnn_v3",
+        default=r"ai-service\matching_cv\data\processed\paper_aligned_gnn_v4_semantic_importance",
         help="Directory to save serialized graphs and manifest",
+    )
+    parser.add_argument(
+        "--edge-weight-mode",
+        type=str,
+        choices=["semantic_importance", "paper_proficiency"],
+        default="semantic_importance",
+        help="Edge weighting policy: semantic_importance (v4 decoupled M1) or paper_proficiency (ICIT 2025 ablation)",
     )
     parser.add_argument(
         "--no-skill-dependencies",
@@ -731,7 +800,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--no-counterfactuals",
         action="store_true",
-        help="Skip building train-only asymmetric and depth counterfactual pairs",
+        help="Skip building train-only asymmetric counterfactual pairs",
     )
     args = parser.parse_args()
     run_dataset_preparation(
@@ -741,4 +810,5 @@ if __name__ == "__main__":
         enable_skill_dependencies=not args.no_skill_dependencies,
         dependency_scope=args.dependency_scope,
         include_counterfactuals=not args.no_counterfactuals,
+        edge_weight_mode=args.edge_weight_mode,
     )

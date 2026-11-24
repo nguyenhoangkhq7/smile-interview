@@ -372,6 +372,18 @@ class PipelineOrchestrator:
             granular_timings["stage4_semantic_reasoning_ms"] = reasoning_outcome.duration_ms
 
         # -------------------------------------------------------------
+        # STAGE 4.5: JD SKILL IMPORTANCE ESTIMATION (JSI-v1 -> w_j)
+        # Evaluated before Stage 5 so Job <-> Skill edges carry w_j cleanly inside Module 1.
+        # -------------------------------------------------------------
+        skill_importance_payload = self.skill_importance_stage.evaluate(
+            enabled=enable_skill_importance,
+            unified_response=unified_response,
+            jd_text=jd_text,
+            fallback_jd_text=stage1_jd_text,
+            run_id=run_id,
+        )
+
+        # -------------------------------------------------------------
         # STAGE 5: PAPER-ALIGNED GRAPH CONSTRUCTION & INTEGRITY VALIDATION
         # -------------------------------------------------------------
         try:
@@ -382,6 +394,7 @@ class PipelineOrchestrator:
                 graph_mode=graph_mode,
                 pair_id=matched_pid or f"pair_{run_id[:12]}",
                 include_graph=include_graph,
+                skill_importance_output=skill_importance_payload,
             )
         except GraphIntegrityError as graph_error:
             duration = graph_error.duration_ms
@@ -496,13 +509,6 @@ class PipelineOrchestrator:
                 errors=all_errors,
             ),
             failure=pipeline_failure,
-        )
-        skill_importance_payload = self.skill_importance_stage.evaluate(
-            enabled=enable_skill_importance,
-            unified_response=unified_response,
-            jd_text=jd_text,
-            fallback_jd_text=stage1_jd_text,
-            run_id=run_id,
         )
         # In-memory hand-off for the standardized public output (not serialized, no recomputation)
         response._public_context = PublicOutputContext(

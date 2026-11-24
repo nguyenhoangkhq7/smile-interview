@@ -22,9 +22,9 @@ class ExtractedJDSkill(BaseModel):
 
 class MatchResult(BaseModel):
     jd_skill_id: str
-    w_j: float = Field(ge=0.0, le=1.0, description="Trọng số tầm quan trọng của kỹ năng trong JD (từ GNN)")
+    w_j: float = Field(ge=0.0, le=1.0, description="Trọng số tầm quan trọng của kỹ năng trong JD (từ Module 1 JSI)")
     matched_cv_skill_id: str
-    soft_match: float = Field(ge=0.0, le=1.0, description="Độ tương đồng ngữ nghĩa (từ SBERT)")
+    soft_match: float = Field(ge=0.0, le=1.0, description="Độ tương đồng ngữ nghĩa định hướng (từ Module 1 SBERT + DAG)")
 
 # --- Step A Models (Resume Segmenter) ---
 
@@ -145,6 +145,9 @@ class SkillGapResult(SkillGapSummary):
 
 class SkillGapReportSummary(BaseModel):
     matching_score: Optional[float] = Field(
-        default=None, ge=0.0, le=1.0, description="Overall GNN CV–JD compatibility on a 0–1 scale"
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Module 1 semantic & dependency GNN CV-JD match score (S_semantic) on a 0-1 scale",
     )
     degraded: bool = False

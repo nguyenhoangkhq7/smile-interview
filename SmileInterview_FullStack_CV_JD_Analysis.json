@@ -1,0 +1,2665 @@
+{
+  "schema_note": "Actual end-to-end execution output from Smile Interview AI Service (Module 1 -> Module 2 -> Stage 6 Unified GNN -> Module 3). No synthetic or manually invented scores.",
+  "metadata": {
+    "system": "Smile Interview AI Service v2.2.0",
+    "executed_at_utc": "2026-11-22T09:28:21.360686+00:00",
+    "candidate_name": "Huy Nguyen",
+    "position": "Full-Stack Engineer (Node.js / React)",
+    "company": "Coral Booking",
+    "input_files": {
+      "cv": "03_FullStack_CV.pdf",
+      "jd": "03_FullStack_JD.pdf"
+    },
+    "runtime_models": {
+      "llm_model": "qwen/qwen3.7-flash",
+      "sbert_model": "sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
+      "sbert_revision": "4328cf26390c98c5e3c738b4460a05b95f4911f5",
+      "gnn_architecture": "PaperAlignedHybridGNN",
+      "gnn_model_version": "asymmetric-proficiency-hybrid-gnn-v3",
+      "gnn_checkpoint": "paper_aligned_hybrid_gnn_v3_asym_prof.pt",
+      "gnn_checkpoint_sha256": "8ee63a0a5fcadf9ec55038672c88ed8e84badd8b289fc2b15cc52aaf1807e223"
+    },
+    "execution_notes": {
+      "pdf_soft_wrap_preprocessing": "Visual PDF soft line-wraps inside paragraphs/bullets were refolded after pypdf extraction without altering any words, punctuation, or headings, so JDRequirementParser verbatim span validation receives intact sentences matching Module 1 spans.",
+      "initial_raw_pypdf_diagnostic": "An initial trial passing raw pypdf text with mid-sentence PDF line-wraps triggered JDRequirementParser's strict substring check (llm_jd_parser_failed:Task evidence must be grounded in the JD) on one wrapped paragraph in 03_FullStack_JD.pdf. Refolding visual PDF line-wraps without changing any wording allowed the unmodified pipeline to complete with degraded=False and 9 grounded JD tasks.",
+      "status_mapping_rule": "Smile Interview natively outputs semantic_alignment (MATCH / PARTIAL / MISSING) and deterministic gap_magnitude g. The 3-level report status maps deterministically as: Missing if semantic_alignment == MISSING; Meets Requirement if semantic_alignment == MATCH and g == 0; Partially Meets if semantic_alignment == PARTIAL or (semantic_alignment == MATCH and g > 0)."
+    }
+  },
+  "inputs": {
+    "cv_document": {
+      "filename": "03_FullStack_CV.pdf",
+      "total_pages": 1,
+      "character_count": 1631,
+      "word_count": 251,
+      "extracted_text": "Huy Nguyen\nFull-Stack Software Engineer\nhuy.nguyen.fs@email.com | +84 93 345 6789 | Ho Chi Minh City, Vietnam | github.com/huynguyen-fs\nSUMMARY\nFull-stack engineer with 5 years of experience across Node.js/Express backends and React frontends, plus hands-on work\nwith MongoDB and PostgreSQL. Enjoys owning features end to end — from database schema to shipped UI — at fast-moving startups.\nSKILLS\n• Languages: TypeScript, JavaScript, SQL, some Go for internal tools\n• Backend: Node.js, Express, NestJS, GraphQL (Apollo)\n• Frontend: React, Next.js, Redux, Tailwind CSS\n• Data: MongoDB, PostgreSQL, Redis\n• Infra: Docker, AWS (EC2, S3, Lambda), GitHub Actions\nEXPERIENCE\nFull-Stack Engineer — Marigold Logistics Jun 2022 – Present\nHo Chi Minh City, Vietnam\n• Built a real-time shipment-tracking feature end to end (NestJS + WebSocket backend, React frontend), adopted by 1,200+ active drivers.\n• Designed the PostgreSQL schema and GraphQL API for a route-planning module, cutting average dispatcher planning time by 25%.\n• Set up CI/CD with GitHub Actions and Docker, reducing deployment time from 40 minutes to under 8.\nSoftware Engineer — Bamboo Labs (early-stage startup) Jul 2020 – May 2022\nHo Chi Minh City, Vietnam\n• Sole engineer for the MVP of a B2B SaaS product (Node.js/Express + React), taken from prototype to first 50 paying customers.\n• Integrated Stripe billing and built an admin dashboard for subscription management.\nEDUCATION\nB.Eng. in Computer Science — Industrial University of Ho Chi Minh City 2016 – 2020\nGPA 3.3/4.0\nPROJECTS\n• Open-source Markdown-based note app (Next.js, MongoDB) — self-hosted by ~500 users"
+    },
+    "jd_document": {
+      "filename": "03_FullStack_JD.pdf",
+      "total_pages": 1,
+      "character_count": 1505,
+      "word_count": 226,
+      "extracted_text": "Full-Stack Engineer (Node.js / React)\nCoral Booking\nHo Chi Minh City (onsite) | Full-time | 3–6 years experience\nABOUT THE ROLE\nCoral Booking runs a travel-booking marketplace connecting independent hotels with travelers across Southeast Asia. We're a small, senior engineering team and need a Full-Stack Engineer who can move confidently between our Node.js backend and React frontend to ship features end to end.\nKEY RESPONSIBILITIES\n• Design and build features spanning our Node.js/NestJS backend and React/Next.js frontend.\n• Model and evolve our PostgreSQL schema as booking and pricing logic grows more complex.\n• Build and consume GraphQL APIs shared across web and internal admin tools.\n• Own features from technical design through deployment and post-launch monitoring.\n• Participate in architecture discussions as we scale beyond a monolith.\nREQUIREMENTS\n• 3+ years of professional experience with both Node.js (Express or NestJS) and React.\n• Strong SQL skills and experience designing relational schemas (PostgreSQL preferred).\n• Experience building or consuming GraphQL or REST APIs in production.\n• Working knowledge of Docker and basic AWS services (EC2, S3, Lambda).\n• Ability to work independently and communicate trade-offs clearly to a small team.\nNICE TO HAVE\n• Experience with payments or booking/inventory systems.\n• MongoDB experience alongside relational databases.\n• Startup experience owning a feature from 0 to 1.\nBENEFITS\n• Equity package\n• 13th-month salary\n• Annual team trip"
+    }
+  },
+  "module1_cv_jd_matching": {
+    "status": "completed",
+    "run_id": "796e5b98-a33e-4421-8726-e8ca933ffec2",
+    "graph_mode": "similarity_enriched",
+    "stage_diagnostics": [
+      {
+        "stage": "input_validation",
+        "status": "completed",
+        "duration_ms": 0.77,
+        "error": null
+      },
+      {
+        "stage": "unified_skill_extraction",
+        "status": "completed",
+        "duration_ms": 25808.73,
+        "error": null
+      },
+      {
+        "stage": "semantic_representation",
+        "status": "completed",
+        "duration_ms": 9306.7,
+        "error": null
+      },
+      {
+        "stage": "semantic_reasoning",
+        "status": "skipped",
+        "duration_ms": 0.0,
+        "error": "Skipped for similarity_enriched graph_mode"
+      },
+      {
+        "stage": "graph_construction",
+        "status": "completed",
+        "duration_ms": 43.86,
+        "error": null
+      },
+      {
+        "stage": "gnn_inference",
+        "status": "completed",
+        "duration_ms": 970.15,
+        "error": null
+      }
+    ],
+    "total_duration_ms": 36131.72,
+    "match_score_official_unified_gnn": 0.9066,
+    "match_score_standalone_m1_gnn": 0.9926,
+    "gnn_unified_inference": {
+      "pair_id": "pair_796e5b98-a33",
+      "model_name": "PaperAlignedHybridGNN",
+      "matching_score": 0.9066,
+      "raw_score": 0.9066,
+      "raw_model_score": 0.9066,
+      "predicted_target_name": "skill_score",
+      "score_version": "skill-target-regression-v1",
+      "calibrated_score": null,
+      "calibration_status": "UNCALIBRATED",
+      "bounded_display_score": 0.9066,
+      "fit_category": "Uncalibrated",
+      "score_scale": "0_1",
+      "score_range": {
+        "min": 0.0,
+        "max": 1.0
+      },
+      "score_type": "bounded_uncalibrated_regression",
+      "classification_thresholds": null,
+      "graph_mode": "similarity_enriched",
+      "model_version": "asymmetric-proficiency-hybrid-gnn-v3",
+      "checkpoint_name": "paper_aligned_hybrid_gnn_v3_asym_prof.pt",
+      "checkpoint_sha256": "8ee63a0a5fcadf9ec55038672c88ed8e84badd8b289fc2b15cc52aaf1807e223",
+      "input_validation": {
+        "validation_status": "VALID",
+        "architecture": "PaperAlignedHybridGNN",
+        "node_counts": {
+          "resume": 1,
+          "job": 1,
+          "skill": 27
+        },
+        "edge_counts": {
+          "job__requires_skill__skill": 13,
+          "skill__required_by_job__job": 13,
+          "resume__has_skill__skill": 26,
+          "skill__in_resume__resume": 26,
+          "skill__prerequisite_to__skill": 12,
+          "skill__prerequisite_of__skill": 12
+        },
+        "proficiency_summary": {
+          "resume__has_skill__skill": {
+            "total_edges": 26,
+            "with_proficiency": 26,
+            "missing_proficiency": 0,
+            "stored_tensor_missing_fallback": 0.0,
+            "effective_layer_missing_fallback": 0.0,
+            "stored_edge_attr_mean": 0.55021536,
+            "effective_edge_weight_mean": 0.55021536,
+            "numerical_consistency_verified": true
+          },
+          "job__requires_skill__skill": {
+            "total_edges": 13,
+            "with_proficiency": 13,
+            "missing_proficiency": 0,
+            "stored_tensor_missing_fallback": 0.0,
+            "effective_layer_missing_fallback": 1.0,
+            "stored_edge_attr_mean": 0.63076919,
+            "effective_edge_weight_mean": 0.63076919,
+            "numerical_consistency_verified": true
+          },
+          "skill__in_resume__resume": {
+            "total_edges": 26,
+            "with_proficiency": 26,
+            "missing_proficiency": 0,
+            "stored_tensor_missing_fallback": 0.0,
+            "effective_layer_missing_fallback": 0.0,
+            "stored_edge_attr_mean": 0.55021536,
+            "effective_edge_weight_mean": 0.55021536,
+            "numerical_consistency_verified": true
+          },
+          "skill__required_by_job__job": {
+            "total_edges": 13,
+            "with_proficiency": 13,
+            "missing_proficiency": 0,
+            "stored_tensor_missing_fallback": 0.0,
+            "effective_layer_missing_fallback": 1.0,
+            "stored_edge_attr_mean": 0.63076919,
+            "effective_edge_weight_mean": 0.63076919,
+            "numerical_consistency_verified": true
+          }
+        },
+        "forward_reverse_edge_consistency": true,
+        "mode_evaluated": "similarity_enriched",
+        "feature_dim": 768
+      },
+      "resume_skill_attention": {
+        "apollo-graphql": 0.057908,
+        "ci-cd": 0.061688,
+        "database-schema-design": 0.061527,
+        "express": 0.059035,
+        "github-actions": 0.060126,
+        "golang": 0.05873,
+        "javascript": 0.065848,
+        "redis": 0.058926,
+        "redux": 0.060237,
+        "sql": 0.057122,
+        "stripe": 0.060141,
+        "tailwind-css": 0.062686,
+        "typescript": 0.066637,
+        "websocket": 0.061974,
+        "aws": 0.012453,
+        "docker": 0.021547,
+        "ec2": 0.013999,
+        "graphql": 0.009814,
+        "lambda": 0.014973,
+        "mongodb": 0.023245,
+        "nestjs": 0.008309,
+        "next.js": 0.006907,
+        "nodejs": 0.007543,
+        "postgresql": 0.007779,
+        "react": 0.00791,
+        "s3": 0.012939
+      },
+      "inference_latency_ms": 5.406,
+      "probability_calibration_disclaimer": "Score represents GNN-predicted skill compatibility based on Baghbanzadeh & Wu (ICIT 2025) trained on skill_score (empirical View B dataset range [0.0, 0.5641], test 90th percentile = 0.2041). It is an uncalibrated regression output (calibration_status='UNCALIBRATED'), NOT a posterior probability of suitability. It does NOT evaluate holistic candidate suitability (e.g. experience, education, seniority, culture fit)."
+    },
+    "gnn_standalone_inference": {
+      "model_name": "PaperAlignedHybridGNN",
+      "model_version": "asymmetric-proficiency-hybrid-gnn-v3",
+      "graph_mode": "similarity_enriched",
+      "checkpoint_sha256": "8ee63a0a5fcadf9ec55038672c88ed8e84badd8b289fc2b15cc52aaf1807e223",
+      "matching_score": 0.9926,
+      "raw_score": 0.9926,
+      "raw_model_score": 0.9926,
+      "predicted_target_name": "skill_score",
+      "score_version": "skill-target-regression-v1",
+      "calibrated_score": null,
+      "calibration_status": "UNCALIBRATED",
+      "bounded_display_score": 0.9926,
+      "fit_category": "Uncalibrated",
+      "score_scale": "0_1",
+      "score_range": {
+        "min": 0.0,
+        "max": 1.0
+      },
+      "is_calibrated": false,
+      "score_type": "bounded_uncalibrated_regression",
+      "classification_thresholds": null,
+      "resume_skill_attention": {
+        "apollo-graphql": 0.052928,
+        "ci-cd": 0.056382,
+        "database-schema-design": 0.056236,
+        "express": 0.053959,
+        "github-actions": 0.054956,
+        "golang": 0.053679,
+        "javascript": 0.060186,
+        "redis": 0.053858,
+        "redux": 0.055056,
+        "sql": 0.052209,
+        "stripe": 0.054969,
+        "tailwind-css": 0.057294,
+        "typescript": 0.060907,
+        "websocket": 0.056645,
+        "aws": 0.044575,
+        "docker": 0.01084,
+        "ec2": 0.047621,
+        "graphql": 0.01005,
+        "lambda": 0.009446,
+        "mongodb": 0.02711,
+        "nestjs": 0.010377,
+        "next.js": 0.011252,
+        "nodejs": 0.022594,
+        "postgresql": 0.009513,
+        "react": 0.009,
+        "s3": 0.008358
+      },
+      "inference_latency_ms": 209.354,
+      "probability_calibration_disclaimer": "Score represents GNN-predicted skill compatibility based on Baghbanzadeh & Wu (ICIT 2025) trained on skill_score (empirical View B dataset range [0.0, 0.5641], test 90th percentile = 0.2041). It is an uncalibrated regression output (calibration_status='UNCALIBRATED'), NOT a posterior probability of suitability. It does NOT evaluate holistic candidate suitability (e.g. experience, education, seniority, culture fit)."
+    },
+    "heterogeneous_graph": {
+      "node_counts": {
+        "resume": 1,
+        "job": 1,
+        "skill": 27
+      },
+      "edge_counts": {
+        "job__requires_skill__skill": 13,
+        "skill__required_by_job__job": 13,
+        "resume__has_skill__skill": 26,
+        "skill__in_resume__resume": 26,
+        "skill__prerequisite_to__skill": 12,
+        "skill__prerequisite_of__skill": 12
+      },
+      "total_directed_edges": 102,
+      "skill_nodes": [
+        {
+          "node_id": "skill_cv_000_apollo-graphql",
+          "cv_canonical_id": "apollo-graphql",
+          "jd_canonical_id": null,
+          "is_shared": false,
+          "cosine_similarity_if_shared": null,
+          "merge_reason": "unique_to_cv"
+        },
+        {
+          "node_id": "skill_cv_001_ci-cd",
+          "cv_canonical_id": "ci-cd",
+          "jd_canonical_id": null,
+          "is_shared": false,
+          "cosine_similarity_if_shared": null,
+          "merge_reason": "unique_to_cv"
+        },
+        {
+          "node_id": "skill_cv_002_database-schema-design",
+          "cv_canonical_id": "database-schema-design",
+          "jd_canonical_id": null,
+          "is_shared": false,
+          "cosine_similarity_if_shared": null,
+          "merge_reason": "unique_to_cv"
+        },
+        {
+          "node_id": "skill_cv_003_express",
+          "cv_canonical_id": "express",
+          "jd_canonical_id": null,
+          "is_shared": false,
+          "cosine_similarity_if_shared": null,
+          "merge_reason": "unique_to_cv"
+        },
+        {
+          "node_id": "skill_cv_004_github-actions",
+          "cv_canonical_id": "github-actions",
+          "jd_canonical_id": null,
+          "is_shared": false,
+          "cosine_similarity_if_shared": null,
+          "merge_reason": "unique_to_cv"
+        },
+        {
+          "node_id": "skill_cv_005_golang",
+          "cv_canonical_id": "golang",
+          "jd_canonical_id": null,
+          "is_shared": false,
+          "cosine_similarity_if_shared": null,
+          "merge_reason": "unique_to_cv"
+        },
+        {
+          "node_id": "skill_cv_006_javascript",
+          "cv_canonical_id": "javascript",
+          "jd_canonical_id": null,
+          "is_shared": false,
+          "cosine_similarity_if_shared": null,
+          "merge_reason": "unique_to_cv"
+        },
+        {
+          "node_id": "skill_cv_007_redis",
+          "cv_canonical_id": "redis",
+          "jd_canonical_id": null,
+          "is_shared": false,
+          "cosine_similarity_if_shared": null,
+          "merge_reason": "unique_to_cv"
+        },
+        {
+          "node_id": "skill_cv_008_redux",
+          "cv_canonical_id": "redux",
+          "jd_canonical_id": null,
+          "is_shared": false,
+          "cosine_similarity_if_shared": null,
+          "merge_reason": "unique_to_cv"
+        },
+        {
+          "node_id": "skill_cv_009_sql",
+          "cv_canonical_id": "sql",
+          "jd_canonical_id": null,
+          "is_shared": false,
+          "cosine_similarity_if_shared": null,
+          "merge_reason": "unique_to_cv"
+        },
+        {
+          "node_id": "skill_cv_010_stripe",
+          "cv_canonical_id": "stripe",
+          "jd_canonical_id": null,
+          "is_shared": false,
+          "cosine_similarity_if_shared": null,
+          "merge_reason": "unique_to_cv"
+        },
+        {
+          "node_id": "skill_cv_011_tailwind-css",
+          "cv_canonical_id": "tailwind-css",
+          "jd_canonical_id": null,
+          "is_shared": false,
+          "cosine_similarity_if_shared": null,
+          "merge_reason": "unique_to_cv"
+        },
+        {
+          "node_id": "skill_cv_012_typescript",
+          "cv_canonical_id": "typescript",
+          "jd_canonical_id": null,
+          "is_shared": false,
+          "cosine_similarity_if_shared": null,
+          "merge_reason": "unique_to_cv"
+        },
+        {
+          "node_id": "skill_cv_013_websocket",
+          "cv_canonical_id": "websocket",
+          "jd_canonical_id": null,
+          "is_shared": false,
+          "cosine_similarity_if_shared": null,
+          "merge_reason": "unique_to_cv"
+        },
+        {
+          "node_id": "skill_jd_000_rest-api",
+          "cv_canonical_id": null,
+          "jd_canonical_id": "rest-api",
+          "is_shared": false,
+          "cosine_similarity_if_shared": null,
+          "merge_reason": "unique_to_jd"
+        },
+        {
+          "node_id": "skill_shared_000_aws",
+          "cv_canonical_id": "aws",
+          "jd_canonical_id": "aws",
+          "is_shared": true,
+          "cosine_similarity_if_shared": 1.0,
+          "merge_reason": "same_canonical_id"
+        },
+        {
+          "node_id": "skill_shared_001_docker",
+          "cv_canonical_id": "docker",
+          "jd_canonical_id": "docker",
+          "is_shared": true,
+          "cosine_similarity_if_shared": 1.0,
+          "merge_reason": "same_canonical_id"
+        },
+        {
+          "node_id": "skill_shared_002_ec2",
+          "cv_canonical_id": "ec2",
+          "jd_canonical_id": "ec2",
+          "is_shared": true,
+          "cosine_similarity_if_shared": 1.0,
+          "merge_reason": "same_canonical_id"
+        },
+        {
+          "node_id": "skill_shared_003_graphql",
+          "cv_canonical_id": "graphql",
+          "jd_canonical_id": "graphql",
+          "is_shared": true,
+          "cosine_similarity_if_shared": 0.923966,
+          "merge_reason": "verified_alias_same_canonical_id"
+        },
+        {
+          "node_id": "skill_shared_004_lambda",
+          "cv_canonical_id": "lambda",
+          "jd_canonical_id": "lambda",
+          "is_shared": true,
+          "cosine_similarity_if_shared": 1.0,
+          "merge_reason": "same_canonical_id"
+        },
+        {
+          "node_id": "skill_shared_005_mongodb",
+          "cv_canonical_id": "mongodb",
+          "jd_canonical_id": "mongodb",
+          "is_shared": true,
+          "cosine_similarity_if_shared": 1.0,
+          "merge_reason": "same_canonical_id"
+        },
+        {
+          "node_id": "skill_shared_006_nestjs",
+          "cv_canonical_id": "nestjs",
+          "jd_canonical_id": "nestjs",
+          "is_shared": true,
+          "cosine_similarity_if_shared": 1.0,
+          "merge_reason": "same_canonical_id"
+        },
+        {
+          "node_id": "skill_shared_007_next.js",
+          "cv_canonical_id": "next.js",
+          "jd_canonical_id": "next.js",
+          "is_shared": true,
+          "cosine_similarity_if_shared": 1.0,
+          "merge_reason": "same_canonical_id"
+        },
+        {
+          "node_id": "skill_shared_008_nodejs",
+          "cv_canonical_id": "nodejs",
+          "jd_canonical_id": "nodejs",
+          "is_shared": true,
+          "cosine_similarity_if_shared": 1.0,
+          "merge_reason": "same_canonical_id"
+        },
+        {
+          "node_id": "skill_shared_009_postgresql",
+          "cv_canonical_id": "postgresql",
+          "jd_canonical_id": "postgresql",
+          "is_shared": true,
+          "cosine_similarity_if_shared": 1.0,
+          "merge_reason": "same_canonical_id"
+        },
+        {
+          "node_id": "skill_shared_010_react",
+          "cv_canonical_id": "react",
+          "jd_canonical_id": "react",
+          "is_shared": true,
+          "cosine_similarity_if_shared": 1.0,
+          "merge_reason": "same_canonical_id"
+        },
+        {
+          "node_id": "skill_shared_011_s3",
+          "cv_canonical_id": "s3",
+          "jd_canonical_id": "s3",
+          "is_shared": true,
+          "cosine_similarity_if_shared": 1.0,
+          "merge_reason": "same_canonical_id"
+        }
+      ]
+    },
+    "cv_skills_retained": [
+      {
+        "skill_id": "nodejs",
+        "skill_name": "Node.js",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "Full-stack engineer with 5 years of experience across Node.js/Express backends and React frontends, plus hands-on work with MongoDB and PostgreSQL.",
+          "• Sole engineer for the MVP of a B2B SaaS product (Node.js/Express + React), taken from prototype to first 50 paying customers.",
+          "• Backend: Node.js, Express, NestJS, GraphQL (Apollo)"
+        ]
+      },
+      {
+        "skill_id": "express",
+        "skill_name": "Express",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "Full-stack engineer with 5 years of experience across Node.js/Express backends and React frontends, plus hands-on work with MongoDB and PostgreSQL.",
+          "• Sole engineer for the MVP of a B2B SaaS product (Node.js/Express + React), taken from prototype to first 50 paying customers.",
+          "• Backend: Node.js, Express, NestJS, GraphQL (Apollo)"
+        ]
+      },
+      {
+        "skill_id": "react",
+        "skill_name": "React",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "Full-stack engineer with 5 years of experience across Node.js/Express backends and React frontends, plus hands-on work with MongoDB and PostgreSQL.",
+          "• Sole engineer for the MVP of a B2B SaaS product (Node.js/Express + React), taken from prototype to first 50 paying customers.",
+          "• Frontend: React, Next.js, Redux, Tailwind CSS",
+          "• Built a real-time shipment-tracking feature end to end (NestJS + WebSocket backend, React frontend), adopted by 1,200+ active drivers."
+        ]
+      },
+      {
+        "skill_id": "mongodb",
+        "skill_name": "MongoDB",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "Full-stack engineer with 5 years of experience across Node.js/Express backends and React frontends, plus hands-on work with MongoDB and PostgreSQL.",
+          "• Open-source Markdown-based note app (Next.js, MongoDB) — self-hosted by ~500 users",
+          "• Data: MongoDB, PostgreSQL, Redis"
+        ]
+      },
+      {
+        "skill_id": "postgresql",
+        "skill_name": "PostgreSQL",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "Full-stack engineer with 5 years of experience across Node.js/Express backends and React frontends, plus hands-on work with MongoDB and PostgreSQL.",
+          "• Designed the PostgreSQL schema and GraphQL API for a route-planning module, cutting average dispatcher planning time by 25%.",
+          "• Data: MongoDB, PostgreSQL, Redis"
+        ]
+      },
+      {
+        "skill_id": "typescript",
+        "skill_name": "TypeScript",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "• Languages: TypeScript, JavaScript, SQL, some Go for internal tools"
+        ]
+      },
+      {
+        "skill_id": "javascript",
+        "skill_name": "JavaScript",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "• Languages: TypeScript, JavaScript, SQL, some Go for internal tools"
+        ]
+      },
+      {
+        "skill_id": "sql",
+        "skill_name": "SQL",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "• Languages: TypeScript, JavaScript, SQL, some Go for internal tools"
+        ]
+      },
+      {
+        "skill_id": "golang",
+        "skill_name": "Go",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "• Languages: TypeScript, JavaScript, SQL, some Go for internal tools"
+        ]
+      },
+      {
+        "skill_id": "nestjs",
+        "skill_name": "NestJS",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "• Backend: Node.js, Express, NestJS, GraphQL (Apollo)",
+          "• Built a real-time shipment-tracking feature end to end (NestJS + WebSocket backend, React frontend), adopted by 1,200+ active drivers."
+        ]
+      },
+      {
+        "skill_id": "graphql",
+        "skill_name": "GraphQL",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "• Backend: Node.js, Express, NestJS, GraphQL (Apollo)",
+          "• Designed the PostgreSQL schema and GraphQL API for a route-planning module, cutting average dispatcher planning time by 25%."
+        ]
+      },
+      {
+        "skill_id": "apollo-graphql",
+        "skill_name": "Apollo",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "• Backend: Node.js, Express, NestJS, GraphQL (Apollo)"
+        ]
+      },
+      {
+        "skill_id": "next.js",
+        "skill_name": "Next.js",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "• Frontend: React, Next.js, Redux, Tailwind CSS",
+          "• Open-source Markdown-based note app (Next.js, MongoDB) — self-hosted by ~500 users"
+        ]
+      },
+      {
+        "skill_id": "redux",
+        "skill_name": "Redux",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "• Frontend: React, Next.js, Redux, Tailwind CSS"
+        ]
+      },
+      {
+        "skill_id": "tailwind-css",
+        "skill_name": "Tailwind CSS",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "• Frontend: React, Next.js, Redux, Tailwind CSS"
+        ]
+      },
+      {
+        "skill_id": "redis",
+        "skill_name": "Redis",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "• Data: MongoDB, PostgreSQL, Redis"
+        ]
+      },
+      {
+        "skill_id": "docker",
+        "skill_name": "Docker",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "• Infra: Docker, AWS (EC2, S3, Lambda), GitHub Actions",
+          "• Set up CI/CD with GitHub Actions and Docker, reducing deployment time from 40 minutes to under 8."
+        ]
+      },
+      {
+        "skill_id": "aws",
+        "skill_name": "AWS",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "• Infra: Docker, AWS (EC2, S3, Lambda), GitHub Actions"
+        ]
+      },
+      {
+        "skill_id": "ec2",
+        "skill_name": "EC2",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "• Infra: Docker, AWS (EC2, S3, Lambda), GitHub Actions"
+        ]
+      },
+      {
+        "skill_id": "s3",
+        "skill_name": "S3",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "• Infra: Docker, AWS (EC2, S3, Lambda), GitHub Actions"
+        ]
+      },
+      {
+        "skill_id": "lambda",
+        "skill_name": "Lambda",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "• Infra: Docker, AWS (EC2, S3, Lambda), GitHub Actions"
+        ]
+      },
+      {
+        "skill_id": "github-actions",
+        "skill_name": "GitHub Actions",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "• Infra: Docker, AWS (EC2, S3, Lambda), GitHub Actions",
+          "• Set up CI/CD with GitHub Actions and Docker, reducing deployment time from 40 minutes to under 8."
+        ]
+      },
+      {
+        "skill_id": "websocket",
+        "skill_name": "WebSocket",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "• Built a real-time shipment-tracking feature end to end (NestJS + WebSocket backend, React frontend), adopted by 1,200+ active drivers."
+        ]
+      },
+      {
+        "skill_id": "ci-cd",
+        "skill_name": "CI/CD",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "• Set up CI/CD with GitHub Actions and Docker, reducing deployment time from 40 minutes to under 8."
+        ]
+      },
+      {
+        "skill_id": "stripe",
+        "skill_name": "Stripe",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "• Integrated Stripe billing and built an admin dashboard for subscription management."
+        ]
+      },
+      {
+        "skill_id": "database-schema-design",
+        "skill_name": "Database Schema Design",
+        "type": "implicit",
+        "confidence": 0.95,
+        "evidence_spans": [
+          "Designed the PostgreSQL schema and GraphQL API for a route-planning module, cutting average dispatcher planning time by 25%."
+        ]
+      }
+    ],
+    "cv_implicit_candidates_stage2_audit": [
+      {
+        "skill_id": "database-schema-design",
+        "label": "Database Schema Design",
+        "category": "Engineering Practice",
+        "retained_in_hetero_graph": true,
+        "evidences": [
+          {
+            "inferred_from_raw": "Designed the PostgreSQL schema and GraphQL API for a route-planning module, cutting average dispatcher planning time by 25%.",
+            "llm_confidence_raw": 0.95,
+            "reasoning": "Explicitly stating 'Designed the PostgreSQL schema' indicates the ability to model data structures, define relationships, and optimize storage for specific business logic (route-planning), which is distinct from general SQL usage or query writing.",
+            "snippets": [
+              {
+                "text": "Designed the PostgreSQL schema and GraphQL API for a route-planning module, cutting average dispatcher planning time by 25%.",
+                "start": 894,
+                "end": 1018,
+                "section": "experience",
+                "verbatim_ok": true,
+                "ellipsis_in_snippet": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "skill_id": "system-architecture-integration",
+        "label": "System Architecture & Integration",
+        "category": "Technical Concept",
+        "retained_in_hetero_graph": false,
+        "evidences": [
+          {
+            "inferred_from_raw": "Built a real-time shipment-tracking feature end to end (NestJS + WebSocket backend, React frontend)... Integrated Stripe billing and built an admin dashboard... taken from prototype to first 50 paying customers.",
+            "llm_confidence_raw": 0.85,
+            "reasoning": "Building features 'end to end' involving complex state synchronization (real-time via WebSockets) and integrating third-party financial APIs (Stripe) requires understanding system boundaries, data flow consistency, and architectural integration patterns beyond simple component coding.",
+            "snippets": [
+              {
+                "text": "Built a real-time shipment-tracking feature end to end (NestJS + WebSocket backend, React frontend)",
+                "start": 757,
+                "end": 856,
+                "section": "experience",
+                "verbatim_ok": true,
+                "ellipsis_in_snippet": false
+              },
+              {
+                "text": "Integrated Stripe billing and built an admin dashboard",
+                "start": 1349,
+                "end": 1403,
+                "section": "experience",
+                "verbatim_ok": true,
+                "ellipsis_in_snippet": false
+              },
+              {
+                "text": "taken from prototype to first 50 paying customers.",
+                "start": 1296,
+                "end": 1346,
+                "section": "experience",
+                "verbatim_ok": true,
+                "ellipsis_in_snippet": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "skill_id": "performance-optimization",
+        "label": "Performance Optimization",
+        "category": "Engineering Practice",
+        "retained_in_hetero_graph": false,
+        "evidences": [
+          {
+            "inferred_from_raw": "reducing deployment time from 40 minutes to under 8.",
+            "llm_confidence_raw": 0.8,
+            "reasoning": "Achieving a >75% reduction in CI/CD pipeline duration implies skills in optimizing build processes, parallelizing tasks, caching dependencies, or refining Docker layer strategies, which goes beyond basic setup.",
+            "snippets": [
+              {
+                "text": "reducing deployment time from 40 minutes to under 8.",
+                "start": 1066,
+                "end": 1118,
+                "section": "experience",
+                "verbatim_ok": true,
+                "ellipsis_in_snippet": false
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "jd_skills_retained": [
+      {
+        "skill_id": "nodejs",
+        "skill_name": "Node.js",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "We're a small, senior engineering team and need a Full-Stack Engineer who can move confidently between our Node.js backend and React frontend to ship features end to end.",
+          "• Design and build features spanning our Node.js/NestJS backend and React/Next.js frontend.",
+          "Full-Stack Engineer (Node.js / React)",
+          "• 3+ years of professional experience with both Node.js (Express or NestJS) and React."
+        ]
+      },
+      {
+        "skill_id": "react",
+        "skill_name": "React",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "We're a small, senior engineering team and need a Full-Stack Engineer who can move confidently between our Node.js backend and React frontend to ship features end to end.",
+          "• Design and build features spanning our Node.js/NestJS backend and React/Next.js frontend.",
+          "Full-Stack Engineer (Node.js / React)"
+        ]
+      },
+      {
+        "skill_id": "nestjs",
+        "skill_name": "NestJS",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "• Design and build features spanning our Node.js/NestJS backend and React/Next.js frontend.",
+          "• 3+ years of professional experience with both Node.js (Express or NestJS) and React."
+        ]
+      },
+      {
+        "skill_id": "next.js",
+        "skill_name": "Next.js",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "• Design and build features spanning our Node.js/NestJS backend and React/Next.js frontend."
+        ]
+      },
+      {
+        "skill_id": "postgresql",
+        "skill_name": "PostgreSQL",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "• Model and evolve our PostgreSQL schema as booking and pricing logic grows more complex.",
+          "• Strong SQL skills and experience designing relational schemas (PostgreSQL preferred)."
+        ]
+      },
+      {
+        "skill_id": "graphql",
+        "skill_name": "GraphQL APIs",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "• Build and consume GraphQL APIs shared across web and internal admin tools.",
+          "• Experience building or consuming GraphQL or REST APIs in production."
+        ]
+      },
+      {
+        "skill_id": "rest-api",
+        "skill_name": "REST APIs",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "• Experience building or consuming GraphQL or REST APIs in production."
+        ]
+      },
+      {
+        "skill_id": "docker",
+        "skill_name": "Docker",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "• Working knowledge of Docker and basic AWS services (EC2, S3, Lambda)."
+        ]
+      },
+      {
+        "skill_id": "aws",
+        "skill_name": "AWS",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "• Working knowledge of Docker and basic AWS services (EC2, S3, Lambda)."
+        ]
+      },
+      {
+        "skill_id": "ec2",
+        "skill_name": "EC2",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "• Working knowledge of Docker and basic AWS services (EC2, S3, Lambda)."
+        ]
+      },
+      {
+        "skill_id": "s3",
+        "skill_name": "S3",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "• Working knowledge of Docker and basic AWS services (EC2, S3, Lambda)."
+        ]
+      },
+      {
+        "skill_id": "lambda",
+        "skill_name": "Lambda",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "• Working knowledge of Docker and basic AWS services (EC2, S3, Lambda)."
+        ]
+      },
+      {
+        "skill_id": "mongodb",
+        "skill_name": "MongoDB",
+        "type": "explicit",
+        "confidence": 0.0,
+        "evidence_spans": [
+          "• MongoDB experience alongside relational databases."
+        ]
+      }
+    ],
+    "jd_implicit_enabled_config": false,
+    "skill_pairings": [
+      {
+        "jd_skill_id": "nodejs",
+        "jd_skill_name": "Node.js",
+        "matched_cv_skill_id": "nodejs",
+        "matched_cv_skill_name": "Node.js",
+        "match_category": "Exact Match",
+        "match_type": "verified_identity",
+        "merge_reason": "same_canonical_id",
+        "directed_relation": "exact_shared",
+        "raw_sbert_cosine": 1.0,
+        "soft_match": 1.0,
+        "jd_importance_weight_w_j": 0.8466,
+        "influences_gnn_graph": true
+      },
+      {
+        "jd_skill_id": "react",
+        "jd_skill_name": "React",
+        "matched_cv_skill_id": "react",
+        "matched_cv_skill_name": "React",
+        "match_category": "Exact Match",
+        "match_type": "verified_identity",
+        "merge_reason": "same_canonical_id",
+        "directed_relation": "exact_shared",
+        "raw_sbert_cosine": 1.0,
+        "soft_match": 1.0,
+        "jd_importance_weight_w_j": 0.784,
+        "influences_gnn_graph": true
+      },
+      {
+        "jd_skill_id": "nestjs",
+        "jd_skill_name": "NestJS",
+        "matched_cv_skill_id": "nestjs",
+        "matched_cv_skill_name": "NestJS",
+        "match_category": "Exact Match",
+        "match_type": "verified_identity",
+        "merge_reason": "same_canonical_id",
+        "directed_relation": "exact_shared",
+        "raw_sbert_cosine": 0.9999999403953552,
+        "soft_match": 1.0,
+        "jd_importance_weight_w_j": 0.8604,
+        "influences_gnn_graph": true
+      },
+      {
+        "jd_skill_id": "next.js",
+        "jd_skill_name": "Next.js",
+        "matched_cv_skill_id": "next.js",
+        "matched_cv_skill_name": "Next.js",
+        "match_category": "Exact Match",
+        "match_type": "verified_identity",
+        "merge_reason": "same_canonical_id",
+        "directed_relation": "exact_shared",
+        "raw_sbert_cosine": 1.0,
+        "soft_match": 1.0,
+        "jd_importance_weight_w_j": 0.7924,
+        "influences_gnn_graph": true
+      },
+      {
+        "jd_skill_id": "postgresql",
+        "jd_skill_name": "PostgreSQL",
+        "matched_cv_skill_id": "postgresql",
+        "matched_cv_skill_name": "PostgreSQL",
+        "match_category": "Exact Match",
+        "match_type": "verified_identity",
+        "merge_reason": "same_canonical_id",
+        "directed_relation": "exact_shared",
+        "raw_sbert_cosine": 1.0,
+        "soft_match": 1.0,
+        "jd_importance_weight_w_j": 0.8389,
+        "influences_gnn_graph": true
+      },
+      {
+        "jd_skill_id": "graphql",
+        "jd_skill_name": "GraphQL APIs",
+        "matched_cv_skill_id": "graphql",
+        "matched_cv_skill_name": "GraphQL",
+        "match_category": "Exact Match",
+        "match_type": "verified_identity",
+        "merge_reason": "verified_alias_same_canonical_id",
+        "directed_relation": "exact_shared",
+        "raw_sbert_cosine": 0.923965573310852,
+        "soft_match": 0.923966,
+        "jd_importance_weight_w_j": 0.8699,
+        "influences_gnn_graph": true
+      },
+      {
+        "jd_skill_id": "rest-api",
+        "jd_skill_name": "REST APIs",
+        "matched_cv_skill_id": "graphql",
+        "matched_cv_skill_name": "GraphQL",
+        "match_category": "Partial Match",
+        "match_type": "semantic_related",
+        "merge_reason": null,
+        "directed_relation": "cv_supersedes_jd",
+        "raw_sbert_cosine": 0.285303,
+        "soft_match": 0.759942,
+        "jd_importance_weight_w_j": 0.8288,
+        "influences_gnn_graph": false
+      },
+      {
+        "jd_skill_id": "docker",
+        "jd_skill_name": "Docker",
+        "matched_cv_skill_id": "docker",
+        "matched_cv_skill_name": "Docker",
+        "match_category": "Exact Match",
+        "match_type": "verified_identity",
+        "merge_reason": "same_canonical_id",
+        "directed_relation": "exact_shared",
+        "raw_sbert_cosine": 1.0,
+        "soft_match": 1.0,
+        "jd_importance_weight_w_j": 0.8709,
+        "influences_gnn_graph": true
+      },
+      {
+        "jd_skill_id": "aws",
+        "jd_skill_name": "AWS",
+        "matched_cv_skill_id": "aws",
+        "matched_cv_skill_name": "AWS",
+        "match_category": "Exact Match",
+        "match_type": "verified_identity",
+        "merge_reason": "same_canonical_id",
+        "directed_relation": "exact_shared",
+        "raw_sbert_cosine": 1.0,
+        "soft_match": 1.0,
+        "jd_importance_weight_w_j": 0.8762,
+        "influences_gnn_graph": true
+      },
+      {
+        "jd_skill_id": "ec2",
+        "jd_skill_name": "EC2",
+        "matched_cv_skill_id": "ec2",
+        "matched_cv_skill_name": "EC2",
+        "match_category": "Exact Match",
+        "match_type": "verified_identity",
+        "merge_reason": "same_canonical_id",
+        "directed_relation": "exact_shared",
+        "raw_sbert_cosine": 1.0,
+        "soft_match": 1.0,
+        "jd_importance_weight_w_j": 0.8643,
+        "influences_gnn_graph": true
+      },
+      {
+        "jd_skill_id": "s3",
+        "jd_skill_name": "S3",
+        "matched_cv_skill_id": "s3",
+        "matched_cv_skill_name": "S3",
+        "match_category": "Exact Match",
+        "match_type": "verified_identity",
+        "merge_reason": "same_canonical_id",
+        "directed_relation": "exact_shared",
+        "raw_sbert_cosine": 0.9999999403953552,
+        "soft_match": 1.0,
+        "jd_importance_weight_w_j": 0.874,
+        "influences_gnn_graph": true
+      },
+      {
+        "jd_skill_id": "lambda",
+        "jd_skill_name": "Lambda",
+        "matched_cv_skill_id": "lambda",
+        "matched_cv_skill_name": "Lambda",
+        "match_category": "Exact Match",
+        "match_type": "verified_identity",
+        "merge_reason": "same_canonical_id",
+        "directed_relation": "exact_shared",
+        "raw_sbert_cosine": 1.0,
+        "soft_match": 1.0,
+        "jd_importance_weight_w_j": 0.8498,
+        "influences_gnn_graph": true
+      },
+      {
+        "jd_skill_id": "mongodb",
+        "jd_skill_name": "MongoDB",
+        "matched_cv_skill_id": "mongodb",
+        "matched_cv_skill_name": "MongoDB",
+        "match_category": "Exact Match",
+        "match_type": "verified_identity",
+        "merge_reason": "same_canonical_id",
+        "directed_relation": "exact_shared",
+        "raw_sbert_cosine": 1.0,
+        "soft_match": 1.0,
+        "jd_importance_weight_w_j": 0.6208,
+        "influences_gnn_graph": true
+      }
+    ],
+    "pairing_counts": {
+      "exact_match": 12,
+      "partial_match": 1,
+      "missing": 0
+    }
+  },
+  "module2_skill_gap_analysis": {
+    "status": "completed",
+    "analysis_id": "b526c793-1171-4bef-947b-ca3c11778cfe",
+    "degraded": false,
+    "config": {
+      "llm_model": "qwen/qwen3.7-flash",
+      "identity_threshold": 0.85,
+      "floor_threshold": 0.4,
+      "recency_years_threshold": 3.0
+    },
+    "resume_job_blocks": [
+      {
+        "job_id": "job_1",
+        "title": "Full-Stack Engineer",
+        "seniority_level": "Mid",
+        "start_date": "2022-06",
+        "end_date": null,
+        "raw_text": "• Built a real-time shipment-tracking feature end to end (NestJS + WebSocket backend, React frontend), adopted by 1,200+ active drivers.\n• Designed the PostgreSQL schema and GraphQL API for a route-planning module, cutting average dispatcher planning time by 25%.\n• Set up CI/CD with GitHub Actions and Docker, reducing deployment time from 40 minutes to under 8.",
+        "raw_start_date": "Jun 2022",
+        "raw_end_date": "Present",
+        "raw_quote": "Full-Stack Engineer — Marigold Logistics Jun 2022 – Present"
+      },
+      {
+        "job_id": "job_2",
+        "title": "Software Engineer",
+        "seniority_level": "Mid",
+        "start_date": "2020-07",
+        "end_date": "2022-05",
+        "raw_text": "• Sole engineer for the MVP of a B2B SaaS product (Node.js/Express + React), taken from prototype to first 50 paying customers.\n• Integrated Stripe billing and built an admin dashboard for subscription management.",
+        "raw_start_date": "Jul 2020",
+        "raw_end_date": "May 2022",
+        "raw_quote": "Software Engineer — Bamboo Labs (early-stage startup) Jul 2020 – May 2022"
+      }
+    ],
+    "segmenter_degraded": false,
+    "jd_parser_degraded": false,
+    "total_jd_tasks_extracted": 9,
+    "status_counts": {
+      "meets_requirement": 6,
+      "partially_meets": 7,
+      "missing": 0,
+      "nonzero_gap_count": 6
+    },
+    "skill_gap_table_sorted": [
+      {
+        "priority_rank": 1,
+        "jd_skill_id": "next.js",
+        "jd_skill_name": "Next.js",
+        "matched_cv_skill_id": "next.js",
+        "matched_cv_skill_name": "Next.js",
+        "semantic_alignment": "MATCH",
+        "is_substituted": false,
+        "derived_status": "Partially Meets",
+        "jd_importance_weight_w_j": 0.7924,
+        "raw_sbert_cosine": 1.0,
+        "soft_match": 1.0,
+        "substitution_factor_gamma": 1.0,
+        "candidate_proficiency_p_cv": 2.0,
+        "required_proficiency_p_jd": 3.5,
+        "gap_magnitude_g": 0.375,
+        "priority_score_q": 0.208005,
+        "flags": [
+          "low_evidence_density"
+        ],
+        "degraded": false,
+        "context_job": "Kỹ năng khác (Không thuộc dự án cụ thể)",
+        "proficiency_details": {
+          "skill_id": "next.js",
+          "proficiency": 2.0,
+          "c_evidence": 0.0,
+          "effective_months": 6.0,
+          "recency_flag": false,
+          "degraded": false,
+          "flags": []
+        },
+        "jd_requirement_reasoning": "Mức 3.5 dựa trên nhiệm vụ/độ sâu: Design and build features spanning... React/Next.js frontend. Next.js is mentioned as part of the frontend stack. While \"strong\" skills are implied for core React, Next.js is often treated as an extension. Given the \"move confidently\" and \"end to end\" language, it's solid practical experience (3.5), slightly lower than core React if we assume React is the primary UI library, but effectively similar.",
+        "job_tasks": [
+          {
+            "task_id": "af8ece24-6b87-5fc7-a413-ebe6f9be60ad",
+            "description": "Implement frontend features using Next.js",
+            "evidence_spans": [
+              "• Design and build features spanning our Node.js/NestJS backend and React/Next.js frontend."
+            ],
+            "required_level": 3.5,
+            "requirement_kind": "REQUIRED",
+            "level_basis": "EXPLICIT"
+          }
+        ],
+        "cv_evidence_spans": [
+          "• Frontend: React, Next.js, Redux, Tailwind CSS",
+          "• Open-source Markdown-based note app (Next.js, MongoDB) — self-hosted by ~500 users"
+        ],
+        "jd_evidence_spans": []
+      },
+      {
+        "priority_rank": 2,
+        "jd_skill_id": "nodejs",
+        "jd_skill_name": "Node.js",
+        "matched_cv_skill_id": "nodejs",
+        "matched_cv_skill_name": "Node.js",
+        "semantic_alignment": "MATCH",
+        "is_substituted": false,
+        "derived_status": "Partially Meets",
+        "jd_importance_weight_w_j": 0.8466,
+        "raw_sbert_cosine": 1.0,
+        "soft_match": 1.0,
+        "substitution_factor_gamma": 1.0,
+        "candidate_proficiency_p_cv": 3.2777777777777777,
+        "required_proficiency_p_jd": 4.0,
+        "gap_magnitude_g": 0.18055555555555558,
+        "priority_score_q": 0.1222866666666667,
+        "flags": [
+          "recency_decay_warning"
+        ],
+        "degraded": false,
+        "context_job": "Kỹ năng khác (Không thuộc dự án cụ thể) | Software Engineer (2020-07 - 2022-05)",
+        "proficiency_details": {
+          "skill_id": "nodejs",
+          "proficiency": 3.2777777777777777,
+          "c_evidence": 0.3333333333333333,
+          "effective_months": 23.0,
+          "recency_flag": true,
+          "degraded": false,
+          "flags": []
+        },
+        "jd_requirement_reasoning": "Mức 4 dựa trên nhiệm vụ/độ sâu: Design and build features spanning our Node.js/NestJS backend... Own features from technical design through deployment... Experience with both Node.js... 3+ years. The role requires independent ownership, architectural discussion participation, and end-to-end feature delivery, indicating senior-level proficiency (4.0) rather than just mid-level execution.",
+        "job_tasks": [
+          {
+            "task_id": "1bb842a5-6928-5296-826a-2bff0fee1425",
+            "description": "Design and build full-stack features using Node.js/NestJS",
+            "evidence_spans": [
+              "• Design and build features spanning our Node.js/NestJS backend and React/Next.js frontend."
+            ],
+            "required_level": 4.0,
+            "requirement_kind": "REQUIRED",
+            "level_basis": "EXPLICIT"
+          },
+          {
+            "task_id": "d636d5d9-b3c5-5841-afb3-97d687a5788e",
+            "description": "Own features from technical design to deployment",
+            "evidence_spans": [
+              "• Own features from technical design through deployment and post-launch monitoring."
+            ],
+            "required_level": 4.0,
+            "requirement_kind": "REQUIRED",
+            "level_basis": "EXPLICIT"
+          }
+        ],
+        "cv_evidence_spans": [
+          "Full-stack engineer with 5 years of experience across Node.js/Express backends and React frontends, plus hands-on work with MongoDB and PostgreSQL.",
+          "• Sole engineer for the MVP of a B2B SaaS product (Node.js/Express + React), taken from prototype to first 50 paying customers.",
+          "• Backend: Node.js, Express, NestJS, GraphQL (Apollo)"
+        ],
+        "jd_evidence_spans": []
+      },
+      {
+        "priority_rank": 3,
+        "jd_skill_id": "aws",
+        "jd_skill_name": "AWS",
+        "matched_cv_skill_id": "aws",
+        "matched_cv_skill_name": "AWS",
+        "semantic_alignment": "MATCH",
+        "is_substituted": false,
+        "derived_status": "Partially Meets",
+        "jd_importance_weight_w_j": 0.8762,
+        "raw_sbert_cosine": 1.0,
+        "soft_match": 1.0,
+        "substitution_factor_gamma": 1.0,
+        "candidate_proficiency_p_cv": 2.0,
+        "required_proficiency_p_jd": 2.5,
+        "gap_magnitude_g": 0.125,
+        "priority_score_q": 0.0547625,
+        "flags": [
+          "low_evidence_density"
+        ],
+        "degraded": false,
+        "context_job": "Kỹ năng khác (Không thuộc dự án cụ thể)",
+        "proficiency_details": {
+          "skill_id": "aws",
+          "proficiency": 2.0,
+          "c_evidence": 0.0,
+          "effective_months": 6.0,
+          "recency_flag": false,
+          "degraded": false,
+          "flags": []
+        },
+        "jd_requirement_reasoning": "Mức 2.5 dựa trên nhiệm vụ/độ sâu: Working knowledge of Docker and basic AWS services (EC2, S3, Lambda). \"Basic\" and \"Working knowledge\" indicate limited depth, suitable for 2.5.",
+        "job_tasks": [],
+        "cv_evidence_spans": [
+          "• Infra: Docker, AWS (EC2, S3, Lambda), GitHub Actions"
+        ],
+        "jd_evidence_spans": [
+          "• Working knowledge of Docker and basic AWS services (EC2, S3, Lambda)."
+        ]
+      },
+      {
+        "priority_rank": 4,
+        "jd_skill_id": "s3",
+        "jd_skill_name": "S3",
+        "matched_cv_skill_id": "s3",
+        "matched_cv_skill_name": "S3",
+        "semantic_alignment": "MATCH",
+        "is_substituted": false,
+        "derived_status": "Partially Meets",
+        "jd_importance_weight_w_j": 0.874,
+        "raw_sbert_cosine": 0.9999999403953552,
+        "soft_match": 1.0,
+        "substitution_factor_gamma": 1.0,
+        "candidate_proficiency_p_cv": 2.0,
+        "required_proficiency_p_jd": 2.5,
+        "gap_magnitude_g": 0.125,
+        "priority_score_q": 0.054625,
+        "flags": [
+          "low_evidence_density"
+        ],
+        "degraded": false,
+        "context_job": "Kỹ năng khác (Không thuộc dự án cụ thể)",
+        "proficiency_details": {
+          "skill_id": "s3",
+          "proficiency": 2.0,
+          "c_evidence": 0.0,
+          "effective_months": 6.0,
+          "recency_flag": false,
+          "degraded": false,
+          "flags": []
+        },
+        "jd_requirement_reasoning": "Mức 2.5 dựa trên nhiệm vụ/độ sâu: Working knowledge of Docker and basic AWS services (EC2, S3, Lambda). Specific service under \"basic AWS\".",
+        "job_tasks": [],
+        "cv_evidence_spans": [
+          "• Infra: Docker, AWS (EC2, S3, Lambda), GitHub Actions"
+        ],
+        "jd_evidence_spans": [
+          "• Working knowledge of Docker and basic AWS services (EC2, S3, Lambda)."
+        ]
+      },
+      {
+        "priority_rank": 5,
+        "jd_skill_id": "ec2",
+        "jd_skill_name": "EC2",
+        "matched_cv_skill_id": "ec2",
+        "matched_cv_skill_name": "EC2",
+        "semantic_alignment": "MATCH",
+        "is_substituted": false,
+        "derived_status": "Partially Meets",
+        "jd_importance_weight_w_j": 0.8643,
+        "raw_sbert_cosine": 1.0,
+        "soft_match": 1.0,
+        "substitution_factor_gamma": 1.0,
+        "candidate_proficiency_p_cv": 2.0,
+        "required_proficiency_p_jd": 2.5,
+        "gap_magnitude_g": 0.125,
+        "priority_score_q": 0.05401875,
+        "flags": [
+          "low_evidence_density"
+        ],
+        "degraded": false,
+        "context_job": "Kỹ năng khác (Không thuộc dự án cụ thể)",
+        "proficiency_details": {
+          "skill_id": "ec2",
+          "proficiency": 2.0,
+          "c_evidence": 0.0,
+          "effective_months": 6.0,
+          "recency_flag": false,
+          "degraded": false,
+          "flags": []
+        },
+        "jd_requirement_reasoning": "Mức 2.5 dựa trên nhiệm vụ/độ sâu: Working knowledge of Docker and basic AWS services (EC2, S3, Lambda). Specific service under \"basic AWS\".",
+        "job_tasks": [],
+        "cv_evidence_spans": [
+          "• Infra: Docker, AWS (EC2, S3, Lambda), GitHub Actions"
+        ],
+        "jd_evidence_spans": [
+          "• Working knowledge of Docker and basic AWS services (EC2, S3, Lambda)."
+        ]
+      },
+      {
+        "priority_rank": 6,
+        "jd_skill_id": "lambda",
+        "jd_skill_name": "Lambda",
+        "matched_cv_skill_id": "lambda",
+        "matched_cv_skill_name": "Lambda",
+        "semantic_alignment": "MATCH",
+        "is_substituted": false,
+        "derived_status": "Partially Meets",
+        "jd_importance_weight_w_j": 0.8498,
+        "raw_sbert_cosine": 1.0,
+        "soft_match": 1.0,
+        "substitution_factor_gamma": 1.0,
+        "candidate_proficiency_p_cv": 2.0,
+        "required_proficiency_p_jd": 2.5,
+        "gap_magnitude_g": 0.125,
+        "priority_score_q": 0.0531125,
+        "flags": [
+          "low_evidence_density"
+        ],
+        "degraded": false,
+        "context_job": "Kỹ năng khác (Không thuộc dự án cụ thể)",
+        "proficiency_details": {
+          "skill_id": "lambda",
+          "proficiency": 2.0,
+          "c_evidence": 0.0,
+          "effective_months": 6.0,
+          "recency_flag": false,
+          "degraded": false,
+          "flags": []
+        },
+        "jd_requirement_reasoning": "Mức 2.5 dựa trên nhiệm vụ/độ sâu: Working knowledge of Docker and basic AWS services (EC2, S3, Lambda). Specific service under \"basic AWS\".",
+        "job_tasks": [],
+        "cv_evidence_spans": [
+          "• Infra: Docker, AWS (EC2, S3, Lambda), GitHub Actions"
+        ],
+        "jd_evidence_spans": [
+          "• Working knowledge of Docker and basic AWS services (EC2, S3, Lambda)."
+        ]
+      },
+      {
+        "priority_rank": 7,
+        "jd_skill_id": "docker",
+        "jd_skill_name": "Docker",
+        "matched_cv_skill_id": "docker",
+        "matched_cv_skill_name": "Docker",
+        "semantic_alignment": "MATCH",
+        "is_substituted": false,
+        "derived_status": "Meets Requirement",
+        "jd_importance_weight_w_j": 0.8709,
+        "raw_sbert_cosine": 1.0,
+        "soft_match": 1.0,
+        "substitution_factor_gamma": 1.0,
+        "candidate_proficiency_p_cv": 4.75,
+        "required_proficiency_p_jd": 2.5,
+        "gap_magnitude_g": 0.0,
+        "priority_score_q": 0.0,
+        "flags": [],
+        "degraded": false,
+        "context_job": "Kỹ năng khác (Không thuộc dự án cụ thể) | Full-Stack Engineer (2022-06 - Nay)",
+        "proficiency_details": {
+          "skill_id": "docker",
+          "proficiency": 4.75,
+          "c_evidence": 0.5,
+          "effective_months": 54.0,
+          "recency_flag": false,
+          "degraded": false,
+          "flags": []
+        },
+        "jd_requirement_reasoning": "Mức 2.5 dựa trên nhiệm vụ/độ sâu: Working knowledge of Docker and basic AWS services. \"Working knowledge\" explicitly limits the depth to junior/working knowledge level (2.5).",
+        "job_tasks": [],
+        "cv_evidence_spans": [
+          "• Infra: Docker, AWS (EC2, S3, Lambda), GitHub Actions",
+          "• Set up CI/CD with GitHub Actions and Docker, reducing deployment time from 40 minutes to under 8."
+        ],
+        "jd_evidence_spans": [
+          "• Working knowledge of Docker and basic AWS services (EC2, S3, Lambda)."
+        ]
+      },
+      {
+        "priority_rank": 8,
+        "jd_skill_id": "graphql",
+        "jd_skill_name": "GraphQL APIs",
+        "matched_cv_skill_id": "graphql",
+        "matched_cv_skill_name": "GraphQL",
+        "semantic_alignment": "MATCH",
+        "is_substituted": false,
+        "derived_status": "Meets Requirement",
+        "jd_importance_weight_w_j": 0.8699,
+        "raw_sbert_cosine": 0.923965573310852,
+        "soft_match": 0.923966,
+        "substitution_factor_gamma": 1.0,
+        "candidate_proficiency_p_cv": 4.75,
+        "required_proficiency_p_jd": 3.5,
+        "gap_magnitude_g": 0.0,
+        "priority_score_q": 0.0,
+        "flags": [],
+        "degraded": false,
+        "context_job": "Kỹ năng khác (Không thuộc dự án cụ thể) | Full-Stack Engineer (2022-06 - Nay)",
+        "proficiency_details": {
+          "skill_id": "graphql",
+          "proficiency": 4.75,
+          "c_evidence": 0.5,
+          "effective_months": 54.0,
+          "recency_flag": false,
+          "degraded": false,
+          "flags": []
+        },
+        "jd_requirement_reasoning": "Mức 3.5 dựa trên nhiệm vụ/độ sâu: Build and consume GraphQL APIs shared across web and internal admin tools. Experience building or consuming GraphQL... in production. Building shared APIs requires solid understanding of schema design and resolvers, fitting mid-to-senior level (3.5).",
+        "job_tasks": [
+          {
+            "task_id": "82f85734-682c-5f4d-bb6a-3d5115c48124",
+            "description": "Build and consume GraphQL APIs",
+            "evidence_spans": [
+              "• Build and consume GraphQL APIs shared across web and internal admin tools."
+            ],
+            "required_level": 3.5,
+            "requirement_kind": "REQUIRED",
+            "level_basis": "EXPLICIT"
+          }
+        ],
+        "cv_evidence_spans": [
+          "• Backend: Node.js, Express, NestJS, GraphQL (Apollo)",
+          "• Designed the PostgreSQL schema and GraphQL API for a route-planning module, cutting average dispatcher planning time by 25%."
+        ],
+        "jd_evidence_spans": []
+      },
+      {
+        "priority_rank": 9,
+        "jd_skill_id": "nestjs",
+        "jd_skill_name": "NestJS",
+        "matched_cv_skill_id": "nestjs",
+        "matched_cv_skill_name": "NestJS",
+        "semantic_alignment": "MATCH",
+        "is_substituted": false,
+        "derived_status": "Meets Requirement",
+        "jd_importance_weight_w_j": 0.8604,
+        "raw_sbert_cosine": 0.9999999403953552,
+        "soft_match": 1.0,
+        "substitution_factor_gamma": 1.0,
+        "candidate_proficiency_p_cv": 4.75,
+        "required_proficiency_p_jd": 4.0,
+        "gap_magnitude_g": 0.0,
+        "priority_score_q": 0.0,
+        "flags": [],
+        "degraded": false,
+        "context_job": "Kỹ năng khác (Không thuộc dự án cụ thể) | Full-Stack Engineer (2022-06 - Nay)",
+        "proficiency_details": {
+          "skill_id": "nestjs",
+          "proficiency": 4.75,
+          "c_evidence": 0.5,
+          "effective_months": 54.0,
+          "recency_flag": false,
+          "degraded": false,
+          "flags": []
+        },
+        "jd_requirement_reasoning": "Mức 4 dựa trên nhiệm vụ/độ sâu: Design and build features spanning our Node.js/NestJS backend... NestJS is a specific framework within Node.js ecosystem used here for complex backend logic. Proficiency aligns with the overall Node.js requirement.",
+        "job_tasks": [
+          {
+            "task_id": "871610fd-9f6e-5aa3-9d9f-87b078b85876",
+            "description": "Develop backend features using NestJS",
+            "evidence_spans": [
+              "• Design and build features spanning our Node.js/NestJS backend and React/Next.js frontend."
+            ],
+            "required_level": 4.0,
+            "requirement_kind": "REQUIRED",
+            "level_basis": "EXPLICIT"
+          }
+        ],
+        "cv_evidence_spans": [
+          "• Backend: Node.js, Express, NestJS, GraphQL (Apollo)",
+          "• Built a real-time shipment-tracking feature end to end (NestJS + WebSocket backend, React frontend), adopted by 1,200+ active drivers."
+        ],
+        "jd_evidence_spans": []
+      },
+      {
+        "priority_rank": 10,
+        "jd_skill_id": "postgresql",
+        "jd_skill_name": "PostgreSQL",
+        "matched_cv_skill_id": "postgresql",
+        "matched_cv_skill_name": "PostgreSQL",
+        "semantic_alignment": "MATCH",
+        "is_substituted": false,
+        "derived_status": "Meets Requirement",
+        "jd_importance_weight_w_j": 0.8389,
+        "raw_sbert_cosine": 1.0,
+        "soft_match": 1.0,
+        "substitution_factor_gamma": 1.0,
+        "candidate_proficiency_p_cv": 4.75,
+        "required_proficiency_p_jd": 4.0,
+        "gap_magnitude_g": 0.0,
+        "priority_score_q": 0.0,
+        "flags": [],
+        "degraded": false,
+        "context_job": "Kỹ năng khác (Không thuộc dự án cụ thể) | Full-Stack Engineer (2022-06 - Nay)",
+        "proficiency_details": {
+          "skill_id": "postgresql",
+          "proficiency": 4.75,
+          "c_evidence": 0.3333333333333333,
+          "effective_months": 54.0,
+          "recency_flag": false,
+          "degraded": false,
+          "flags": []
+        },
+        "jd_requirement_reasoning": "Mức 4 dựa trên nhiệm vụ/độ sâu: Model and evolve our PostgreSQL schema as booking and pricing logic grows more complex. Strong SQL skills and experience designing relational schemas. Evolving schemas for complex business logic (booking/pricing) and strong SQL design indicates advanced expertise (4.0).",
+        "job_tasks": [
+          {
+            "task_id": "22172dba-747c-5281-98b7-bc38043995ab",
+            "description": "Model and evolve PostgreSQL schemas for complex logic",
+            "evidence_spans": [
+              "• Model and evolve our PostgreSQL schema as booking and pricing logic grows more complex."
+            ],
+            "required_level": 4.0,
+            "requirement_kind": "REQUIRED",
+            "level_basis": "EXPLICIT"
+          },
+          {
+            "task_id": "2ef0b1d9-9abd-5be2-9004-3fa66e680025",
+            "description": "Design relational schemas with strong SQL skills",
+            "evidence_spans": [
+              "• Strong SQL skills and experience designing relational schemas (PostgreSQL preferred)."
+            ],
+            "required_level": 4.0,
+            "requirement_kind": "REQUIRED",
+            "level_basis": "EXPLICIT"
+          }
+        ],
+        "cv_evidence_spans": [
+          "Full-stack engineer with 5 years of experience across Node.js/Express backends and React frontends, plus hands-on work with MongoDB and PostgreSQL.",
+          "• Designed the PostgreSQL schema and GraphQL API for a route-planning module, cutting average dispatcher planning time by 25%.",
+          "• Data: MongoDB, PostgreSQL, Redis"
+        ],
+        "jd_evidence_spans": []
+      },
+      {
+        "priority_rank": 11,
+        "jd_skill_id": "rest-api",
+        "jd_skill_name": "REST APIs",
+        "matched_cv_skill_id": "graphql",
+        "matched_cv_skill_name": "GraphQL",
+        "semantic_alignment": "PARTIAL",
+        "is_substituted": true,
+        "derived_status": "Partially Meets",
+        "jd_importance_weight_w_j": 0.8288,
+        "raw_sbert_cosine": 0.285303,
+        "soft_match": 0.759942,
+        "substitution_factor_gamma": 0.759942,
+        "candidate_proficiency_p_cv": 4.75,
+        "required_proficiency_p_jd": 3.5,
+        "gap_magnitude_g": 0.0,
+        "priority_score_q": 0.0,
+        "flags": [],
+        "degraded": false,
+        "context_job": "Kỹ năng khác (Không thuộc dự án cụ thể) | Full-Stack Engineer (2022-06 - Nay)",
+        "proficiency_details": {
+          "skill_id": "graphql",
+          "proficiency": 4.75,
+          "c_evidence": 0.5,
+          "effective_months": 54.0,
+          "recency_flag": false,
+          "degraded": false,
+          "flags": []
+        },
+        "jd_requirement_reasoning": "Mức 3.5 dựa trên nhiệm vụ/độ sâu: Experience building or consuming GraphQL or REST APIs in production. Similar to GraphQL, building/consuming APIs in production is a standard mid-level skill.",
+        "job_tasks": [
+          {
+            "task_id": "60fa430c-dda0-5ec1-809c-9d978c8cc1e4",
+            "description": "Build or consume REST APIs in production",
+            "evidence_spans": [
+              "• Experience building or consuming GraphQL or REST APIs in production."
+            ],
+            "required_level": 3.5,
+            "requirement_kind": "REQUIRED",
+            "level_basis": "EXPLICIT"
+          }
+        ],
+        "cv_evidence_spans": [
+          "• Backend: Node.js, Express, NestJS, GraphQL (Apollo)",
+          "• Designed the PostgreSQL schema and GraphQL API for a route-planning module, cutting average dispatcher planning time by 25%."
+        ],
+        "jd_evidence_spans": []
+      },
+      {
+        "priority_rank": 12,
+        "jd_skill_id": "react",
+        "jd_skill_name": "React",
+        "matched_cv_skill_id": "react",
+        "matched_cv_skill_name": "React",
+        "semantic_alignment": "MATCH",
+        "is_substituted": false,
+        "derived_status": "Meets Requirement",
+        "jd_importance_weight_w_j": 0.784,
+        "raw_sbert_cosine": 1.0,
+        "soft_match": 1.0,
+        "substitution_factor_gamma": 1.0,
+        "candidate_proficiency_p_cv": 5.0,
+        "required_proficiency_p_jd": 4.0,
+        "gap_magnitude_g": 0.0,
+        "priority_score_q": 0.0,
+        "flags": [],
+        "degraded": false,
+        "context_job": "Kỹ năng khác (Không thuộc dự án cụ thể) | Software Engineer (2020-07 - 2022-05) | Full-Stack Engineer (2022-06 - Nay)",
+        "proficiency_details": {
+          "skill_id": "react",
+          "proficiency": 5.0,
+          "c_evidence": 0.5,
+          "effective_months": 77.0,
+          "recency_flag": false,
+          "degraded": false,
+          "flags": []
+        },
+        "jd_requirement_reasoning": "Mức 4 dựa trên nhiệm vụ/độ sâu: Design and build features spanning... React frontend... End to end. Same rationale as Node.js; full-stack ownership at this level implies high proficiency in the frontend framework to match backend complexity.",
+        "job_tasks": [
+          {
+            "task_id": "49fa6eab-905b-5d64-b96d-c20dc324481d",
+            "description": "Build React frontend features",
+            "evidence_spans": [
+              "• Design and build features spanning our Node.js/NestJS backend and React/Next.js frontend."
+            ],
+            "required_level": 4.0,
+            "requirement_kind": "REQUIRED",
+            "level_basis": "EXPLICIT"
+          }
+        ],
+        "cv_evidence_spans": [
+          "Full-stack engineer with 5 years of experience across Node.js/Express backends and React frontends, plus hands-on work with MongoDB and PostgreSQL.",
+          "• Sole engineer for the MVP of a B2B SaaS product (Node.js/Express + React), taken from prototype to first 50 paying customers.",
+          "• Frontend: React, Next.js, Redux, Tailwind CSS",
+          "• Built a real-time shipment-tracking feature end to end (NestJS + WebSocket backend, React frontend), adopted by 1,200+ active drivers."
+        ],
+        "jd_evidence_spans": []
+      },
+      {
+        "priority_rank": 13,
+        "jd_skill_id": "mongodb",
+        "jd_skill_name": "MongoDB",
+        "matched_cv_skill_id": "mongodb",
+        "matched_cv_skill_name": "MongoDB",
+        "semantic_alignment": "MATCH",
+        "is_substituted": false,
+        "derived_status": "Meets Requirement",
+        "jd_importance_weight_w_j": 0.6208,
+        "raw_sbert_cosine": 1.0,
+        "soft_match": 1.0,
+        "substitution_factor_gamma": 1.0,
+        "candidate_proficiency_p_cv": 2.0,
+        "required_proficiency_p_jd": 2.0,
+        "gap_magnitude_g": 0.0,
+        "priority_score_q": 0.0,
+        "flags": [
+          "low_evidence_density"
+        ],
+        "degraded": false,
+        "context_job": "Kỹ năng khác (Không thuộc dự án cụ thể)",
+        "proficiency_details": {
+          "skill_id": "mongodb",
+          "proficiency": 2.0,
+          "c_evidence": 0.0,
+          "effective_months": 6.0,
+          "recency_flag": false,
+          "degraded": false,
+          "flags": []
+        },
+        "jd_requirement_reasoning": "Mức 2.0 dựa trên nhiệm vụ/độ sâu: MongoDB experience alongside relational databases. Listed under \"NICE TO HAVE\", implying optional and likely lower priority/depth compared to core requirements. \"Experience\" suggests familiarity but not mastery.",
+        "job_tasks": [],
+        "cv_evidence_spans": [
+          "Full-stack engineer with 5 years of experience across Node.js/Express backends and React frontends, plus hands-on work with MongoDB and PostgreSQL.",
+          "• Open-source Markdown-based note app (Next.js, MongoDB) — self-hosted by ~500 users",
+          "• Data: MongoDB, PostgreSQL, Redis"
+        ],
+        "jd_evidence_spans": [
+          "• MongoDB experience alongside relational databases."
+        ]
+      }
+    ]
+  },
+  "module3_adaptive_interview": {
+    "status": "completed",
+    "meta": {
+      "executed_at": "2026-11-22T09:34:44.278170+00:00",
+      "session_id": "illustrative-fullstack-huy-nguyen-coral-booking",
+      "lm_model": "openrouter/qwen/qwen3.7-flash",
+      "fast_lm_model": "openrouter/qwen/qwen3.7-flash",
+      "compiled_dir": "/app/adaptive_questioning/compiled_modules",
+      "config": {
+        "interaction_mode": "TEXT",
+        "mode": "MIXED",
+        "focused_question_mode": null,
+        "max_questions": 10,
+        "duration_seconds": 1800,
+        "max_questions_per_objective": 2
+      },
+      "policy": {
+        "fallback_depth": 2,
+        "core_importance": 0.7,
+        "reserve_followup_fraction": 0.3,
+        "min_failure_contexts": 2,
+        "allow_extension_probes": true
+      }
+    },
+    "opening_greeting": "Chào Huy Nguyen, tôi là Minh, người phỏng vấn AI mô phỏng của bạn hôm nay. Rất vui được gặp bạn trong buổi thử sức này cho vị trí Full-Stack Engineer tại Coral Booking. Với nền tảng vững chắc về Node.js và React mà bạn đã thể hiện, tôi mong muốn nghe bạn chia sẻ ngắn gọn về hành trình chuyên môn và những dự án nổi bật nhất của mình để chúng ta bắt đầu.",
+    "verification_sources_counts": {
+      "cv_verified_spans": 10,
+      "jd_verified_spans": 8
+    },
+    "prepared_verification_focuses_count": 8,
+    "two_tier_planning": {
+      "tier1_blueprint_objectives_count": 15,
+      "tier2_planned_queue_count": 10,
+      "planned_objectives": [
+        {
+          "queue_rank": 1,
+          "objective_id": "f7e6246d-02ca-5101-a72c-8e9a6e3000b7",
+          "requirement_id": "next.js:af8ece24-6b87-5fc7-a413-ebe6f9be60ad",
+          "skill_id": "next.js",
+          "skill_name": "Next.js",
+          "priority_q": 0.208005,
+          "importance_weight_w_j": 0.7924,
+          "gap_magnitude_g": 0.375,
+          "selected_mode": "CODING",
+          "target_depth": "L2",
+          "extension_depth": null,
+          "depth_basis": "TASK_INTERPRETATION",
+          "estimated_seconds": 150,
+          "claim": "Implement frontend features using Next.js",
+          "criteria_count": 1
+        },
+        {
+          "queue_rank": 2,
+          "objective_id": "d613cb77-f219-5e40-a128-950b4300d0b9",
+          "requirement_id": "nodejs:d636d5d9-b3c5-5841-afb3-97d687a5788e",
+          "skill_id": "nodejs",
+          "skill_name": "Node.js",
+          "priority_q": 0.1222866666666667,
+          "importance_weight_w_j": 0.8466,
+          "gap_magnitude_g": 0.18055555555555558,
+          "selected_mode": "DESIGN",
+          "target_depth": "L3",
+          "extension_depth": null,
+          "depth_basis": "TASK_INTERPRETATION",
+          "estimated_seconds": 150,
+          "claim": "Own features from technical design to deployment",
+          "criteria_count": 1
+        },
+        {
+          "queue_rank": 3,
+          "objective_id": "15286c9c-313a-539d-aa56-c4853bfaefc2",
+          "requirement_id": "aws:inferred",
+          "skill_id": "aws",
+          "skill_name": "AWS",
+          "priority_q": 0.0547625,
+          "importance_weight_w_j": 0.8762,
+          "gap_magnitude_g": 0.125,
+          "selected_mode": "CODING",
+          "target_depth": "L2",
+          "extension_depth": null,
+          "depth_basis": "CONFIGURED_FALLBACK",
+          "estimated_seconds": 150,
+          "claim": "Đánh giá kiến thức thực hành AWS",
+          "criteria_count": 1
+        },
+        {
+          "queue_rank": 4,
+          "objective_id": "c780e684-94ff-59ad-b809-9a3701fd5d5a",
+          "requirement_id": "s3:inferred",
+          "skill_id": "s3",
+          "skill_name": "S3",
+          "priority_q": 0.054625,
+          "importance_weight_w_j": 0.874,
+          "gap_magnitude_g": 0.125,
+          "selected_mode": "TECHNICAL_EXPLANATION",
+          "target_depth": "L2",
+          "extension_depth": null,
+          "depth_basis": "CONFIGURED_FALLBACK",
+          "estimated_seconds": 120,
+          "claim": "Đánh giá kiến thức thực hành S3",
+          "criteria_count": 1
+        },
+        {
+          "queue_rank": 5,
+          "objective_id": "8586134c-4e29-56c2-967b-1bbf66dd378c",
+          "requirement_id": "ec2:inferred",
+          "skill_id": "ec2",
+          "skill_name": "EC2",
+          "priority_q": 0.05401875,
+          "importance_weight_w_j": 0.8643,
+          "gap_magnitude_g": 0.125,
+          "selected_mode": "DESIGN",
+          "target_depth": "L2",
+          "extension_depth": null,
+          "depth_basis": "CONFIGURED_FALLBACK",
+          "estimated_seconds": 120,
+          "claim": "Đánh giá kiến thức thực hành EC2",
+          "criteria_count": 1
+        },
+        {
+          "queue_rank": 6,
+          "objective_id": "65a96a66-ec72-54e9-90f2-847bd7712eba",
+          "requirement_id": "lambda:inferred",
+          "skill_id": "lambda",
+          "skill_name": "Lambda",
+          "priority_q": 0.0531125,
+          "importance_weight_w_j": 0.8498,
+          "gap_magnitude_g": 0.125,
+          "selected_mode": "DEBUGGING",
+          "target_depth": "L2",
+          "extension_depth": null,
+          "depth_basis": "CONFIGURED_FALLBACK",
+          "estimated_seconds": 180,
+          "claim": "Đánh giá kiến thức thực hành Lambda",
+          "criteria_count": 1
+        },
+        {
+          "queue_rank": 7,
+          "objective_id": "685f9ea4-3194-5450-b94b-64616abd38e9",
+          "requirement_id": "docker:inferred",
+          "skill_id": "docker",
+          "skill_name": "Docker",
+          "priority_q": 0.0,
+          "importance_weight_w_j": 0.8709,
+          "gap_magnitude_g": 0.0,
+          "selected_mode": "CODING",
+          "target_depth": "L2",
+          "extension_depth": null,
+          "depth_basis": "CONFIGURED_FALLBACK",
+          "estimated_seconds": 180,
+          "claim": "Đánh giá kiến thức thực hành Docker",
+          "criteria_count": 1
+        },
+        {
+          "queue_rank": 8,
+          "objective_id": "14f49626-2392-5aaf-950a-1c77217a4ac3",
+          "requirement_id": "graphql:82f85734-682c-5f4d-bb6a-3d5115c48124",
+          "skill_id": "graphql",
+          "skill_name": "GraphQL APIs",
+          "priority_q": 0.0,
+          "importance_weight_w_j": 0.8699,
+          "gap_magnitude_g": 0.0,
+          "selected_mode": "DESIGN",
+          "target_depth": "L3",
+          "extension_depth": null,
+          "depth_basis": "TASK_INTERPRETATION",
+          "estimated_seconds": 240,
+          "claim": "Build and consume GraphQL APIs",
+          "criteria_count": 2
+        },
+        {
+          "queue_rank": 9,
+          "objective_id": "05b58a41-d269-5f99-bf39-b0dfea50661b",
+          "requirement_id": "nestjs:871610fd-9f6e-5aa3-9d9f-87b078b85876",
+          "skill_id": "nestjs",
+          "skill_name": "NestJS",
+          "priority_q": 0.0,
+          "importance_weight_w_j": 0.8604,
+          "gap_magnitude_g": 0.0,
+          "selected_mode": "CODING",
+          "target_depth": "L3",
+          "extension_depth": "L4",
+          "depth_basis": "TASK_INTERPRETATION",
+          "estimated_seconds": 180,
+          "claim": "Develop backend features using NestJS",
+          "criteria_count": 1
+        },
+        {
+          "queue_rank": 10,
+          "objective_id": "840aa179-e7e8-5683-8446-d709e910ad93",
+          "requirement_id": "postgresql:22172dba-747c-5281-98b7-bc38043995ab",
+          "skill_id": "postgresql",
+          "skill_name": "PostgreSQL",
+          "priority_q": 0.0,
+          "importance_weight_w_j": 0.8389,
+          "gap_magnitude_g": 0.0,
+          "selected_mode": "TECHNICAL_EXPLANATION",
+          "target_depth": "L3",
+          "extension_depth": "L4",
+          "depth_basis": "TASK_INTERPRETATION",
+          "estimated_seconds": 180,
+          "claim": "Model and evolve PostgreSQL schemas for complex logic",
+          "criteria_count": 1
+        }
+      ],
+      "excluded_objectives": [
+        {
+          "objective_id": "9489cff2-7bec-5729-a176-3592e3f1418f",
+          "requirement_id": "rest-api:60fa430c-dda0-5ec1-809c-9d978c8cc1e4",
+          "skill_id": "rest-api",
+          "skill_name": "REST APIs",
+          "priority_q": 0.0,
+          "importance_weight_w_j": 0.8288,
+          "excluded_reason": "PLAN_BUDGET",
+          "target_depth": "L2",
+          "estimated_seconds": 120,
+          "claim": "Build or consume REST APIs in production"
+        },
+        {
+          "objective_id": "17b814fd-9f6d-5732-947e-853b0c21ba01",
+          "requirement_id": "react:49fa6eab-905b-5d64-b96d-c20dc324481d",
+          "skill_id": "react",
+          "skill_name": "React",
+          "priority_q": 0.0,
+          "importance_weight_w_j": 0.784,
+          "excluded_reason": "PLAN_BUDGET",
+          "target_depth": "L3",
+          "estimated_seconds": 180,
+          "claim": "Build React frontend features"
+        },
+        {
+          "objective_id": "a88f9299-3adb-5de3-b9e4-82b05bbc1d4f",
+          "requirement_id": "nodejs:1bb842a5-6928-5296-826a-2bff0fee1425",
+          "skill_id": "nodejs",
+          "skill_name": "Node.js",
+          "priority_q": 0.1222866666666667,
+          "importance_weight_w_j": 0.8466,
+          "excluded_reason": "PLAN_BUDGET",
+          "target_depth": "L3",
+          "estimated_seconds": 180,
+          "claim": "Design and build full-stack features using Node.js/NestJS"
+        },
+        {
+          "objective_id": "c9489d04-aede-58ef-b6a6-54732548606f",
+          "requirement_id": "postgresql:2ef0b1d9-9abd-5be2-9004-3fa66e680025",
+          "skill_id": "postgresql",
+          "skill_name": "PostgreSQL",
+          "priority_q": 0.0,
+          "importance_weight_w_j": 0.8389,
+          "excluded_reason": "PLAN_BUDGET",
+          "target_depth": "L3",
+          "estimated_seconds": 240,
+          "claim": "Design relational schemas with strong SQL skills"
+        },
+        {
+          "objective_id": "99e9f3af-acd5-5a9a-9a75-512450570171",
+          "requirement_id": "mongodb:inferred",
+          "skill_id": "mongodb",
+          "skill_name": "MongoDB",
+          "priority_q": 0.0,
+          "importance_weight_w_j": 0.6208,
+          "excluded_reason": "PLAN_BUDGET",
+          "target_depth": "L2",
+          "estimated_seconds": 150,
+          "claim": "Đánh giá kiến thức thực hành MongoDB"
+        }
+      ]
+    },
+    "generated_questions_count": 10,
+    "generated_questions": [
+      {
+        "question_id": "Q01",
+        "queue_rank": 1,
+        "generation_kind": "INITIAL_PLANNED",
+        "turn_id": "9767ff8c-c585-4a2f-b93d-ddc63bf4a07e",
+        "objective_id": "f7e6246d-02ca-5101-a72c-8e9a6e3000b7",
+        "requirement_id": "next.js:af8ece24-6b87-5fc7-a413-ebe6f9be60ad",
+        "skill_id": "next.js",
+        "skill_name": "Next.js",
+        "priority_score_q": 0.208005,
+        "importance_weight_w_j": 0.7924,
+        "gap_magnitude_g": 0.375,
+        "semantic_alignment": "MATCH",
+        "mode": "CODING",
+        "action": "INITIAL",
+        "question_depth": "L2",
+        "question_depth_int": 2,
+        "target_depth": "L2",
+        "extension_depth": null,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Triển khai giao diện người dùng tương tác với backend thuộc L2.",
+        "claim": "Implement frontend features using Next.js",
+        "criterion_id": "f7e6246d-02ca-5101-a72c-8e9a6e3000b7:c1",
+        "criterion_description": "Hiển thị danh sách khách sạn từ API backend lên trang tìm kiếm",
+        "expected_evidence": "Gọi API trong component Next.js và render danh sách kết quả.",
+        "at_target_anchor": "Fetch dữ liệu từ NestJS API và hiển thị chính xác thông tin khách sạn.",
+        "above_target_anchor": "Xử lý trạng thái loading và error khi API không phản hồi kịp.",
+        "evidence_scope": "nextjs-hotel-list",
+        "question_text": "JD yêu cầu tích hợp frontend Next.js với backend NestJS. Trong CV, bạn có ghi kinh nghiệm với Next.js. Hãy viết một component Next.js dùng `fetch` gọi API `/api/hotels` và render danh sách khách sạn vào giao diện.",
+        "introduction": "Mình bắt đầu phần trao đổi chuyên môn nhé.",
+        "supporting_evidence": {
+          "jd_evidence_spans": [
+            "• Design and build features spanning our Node.js/NestJS backend and React/Next.js frontend."
+          ],
+          "verified_jd_excerpt": "• Design and build features spanning our Node.js/NestJS backend and React/Next.js frontend.",
+          "cv_evidence_spans": [
+            "• Frontend: React, Next.js, Redux, Tailwind CSS",
+            "• Open-source Markdown-based note app (Next.js, MongoDB) — self-hosted by ~500 users"
+          ],
+          "verified_cv_excerpt": "• Frontend: React, Next.js, Redux, Tailwind CSS",
+          "detail_to_verify": "Mô tả cụ thể cách gọi API backend và xử lý việc render danh sách khách sạn trong component Next.js.",
+          "context_job": "Kỹ năng khác (Không thuộc dự án cụ thể)"
+        }
+      },
+      {
+        "question_id": "Q02",
+        "queue_rank": 2,
+        "generation_kind": "INITIAL_PLANNED",
+        "turn_id": "ab141930-4b36-4bf2-8ee7-796d9f17ef14",
+        "objective_id": "d613cb77-f219-5e40-a128-950b4300d0b9",
+        "requirement_id": "nodejs:d636d5d9-b3c5-5841-afb3-97d687a5788e",
+        "skill_id": "nodejs",
+        "skill_name": "Node.js",
+        "priority_score_q": 0.1222866666666667,
+        "importance_weight_w_j": 0.8466,
+        "gap_magnitude_g": 0.18055555555555558,
+        "semantic_alignment": "MATCH",
+        "mode": "DESIGN",
+        "action": "INITIAL",
+        "question_depth": "L3",
+        "question_depth_int": 3,
+        "target_depth": "L3",
+        "extension_depth": null,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Quản lý vòng đời tính năng từ thiết kế đến triển khai và giám sát thuộc L3.",
+        "claim": "Own features from technical design to deployment",
+        "criterion_id": "d613cb77-f219-5e40-a128-950b4300d0b9:c1",
+        "criterion_description": "Lập kế hoạch triển khai và cơ chế giám sát tính năng mới",
+        "expected_evidence": "Mô tả quy trình CI/CD cơ bản và các metric cần theo dõi sau khi ra mắt.",
+        "at_target_anchor": "Đề xuất pipeline deploy an toàn và các log/error tracking cần thiết.",
+        "above_target_anchor": "Đề xuất chiến lược feature flag để bật/tắt tính năng mà không cần redeploy.",
+        "evidence_scope": "d613cb77-f219-5e40-a128-950b4300d0b9:c1",
+        "question_text": "JD đề cập việc tự chủ từ thiết kế đến giám sát sau ra mắt. Bạn sẽ thiết kế quy trình CI/CD cơ bản cho tính năng mới thế nào để đảm bảo deploy an toàn và những metric nào bạn theo dõi ngay sau khi phát hành?",
+        "introduction": "",
+        "supporting_evidence": {
+          "jd_evidence_spans": [
+            "• Own features from technical design through deployment and post-launch monitoring."
+          ],
+          "verified_jd_excerpt": "• Own features from technical design through deployment and post-launch monitoring.",
+          "cv_evidence_spans": [
+            "Full-stack engineer with 5 years of experience across Node.js/Express backends and React frontends, plus hands-on work with MongoDB and PostgreSQL.",
+            "• Sole engineer for the MVP of a B2B SaaS product (Node.js/Express + React), taken from prototype to first 50 paying customers.",
+            "• Backend: Node.js, Express, NestJS, GraphQL (Apollo)"
+          ],
+          "verified_cv_excerpt": null,
+          "detail_to_verify": null,
+          "context_job": "Kỹ năng khác (Không thuộc dự án cụ thể) | Software Engineer (2020-07 - 2022-05)"
+        }
+      },
+      {
+        "question_id": "Q03",
+        "queue_rank": 3,
+        "generation_kind": "INITIAL_PLANNED",
+        "turn_id": "1e70bee5-369c-4151-97bf-052c49e19ad7",
+        "objective_id": "15286c9c-313a-539d-aa56-c4853bfaefc2",
+        "requirement_id": "aws:inferred",
+        "skill_id": "aws",
+        "skill_name": "AWS",
+        "priority_score_q": 0.0547625,
+        "importance_weight_w_j": 0.8762,
+        "gap_magnitude_g": 0.125,
+        "semantic_alignment": "MATCH",
+        "mode": "CODING",
+        "action": "INITIAL",
+        "question_depth": "L2",
+        "question_depth_int": 2,
+        "target_depth": "L2",
+        "extension_depth": null,
+        "depth_basis": "CONFIGURED_FALLBACK",
+        "depth_rationale": "No specific task depth; configured general fallback, not a proficiency conversion",
+        "claim": "Đánh giá kiến thức thực hành AWS",
+        "criterion_id": "15286c9c-313a-539d-aa56-c4853bfaefc2:c1",
+        "criterion_description": "Viết và cấu hình AWS Lambda xử lý sự kiện HTTP",
+        "expected_evidence": "Code handler nhận event, trả về JSON response theo chuẩn API Gateway.",
+        "at_target_anchor": "Xử lý lỗi cơ bản và trả về status code phù hợp.",
+        "above_target_anchor": "Cấu hình timeout và memory tối ưu cho workload nhỏ.",
+        "evidence_scope": "aws-lambda-http-handler",
+        "question_text": "JD yêu cầu sử dụng AWS Lambda. Hãy viết code Node.js cho một handler Lambda nhận sự kiện HTTP từ API Gateway và trả về JSON response với status code 200.",
+        "introduction": "",
+        "supporting_evidence": {
+          "jd_evidence_spans": [
+            "• Working knowledge of Docker and basic AWS services (EC2, S3, Lambda)."
+          ],
+          "verified_jd_excerpt": "• Working knowledge of Docker and basic AWS services (EC2, S3, Lambda).",
+          "cv_evidence_spans": [
+            "• Infra: Docker, AWS (EC2, S3, Lambda), GitHub Actions"
+          ],
+          "verified_cv_excerpt": null,
+          "detail_to_verify": null,
+          "context_job": "Kỹ năng khác (Không thuộc dự án cụ thể)"
+        }
+      },
+      {
+        "question_id": "Q04",
+        "queue_rank": 4,
+        "generation_kind": "INITIAL_PLANNED",
+        "turn_id": "a7bb4258-63e6-48cf-981c-ccbb7f949818",
+        "objective_id": "c780e684-94ff-59ad-b809-9a3701fd5d5a",
+        "requirement_id": "s3:inferred",
+        "skill_id": "s3",
+        "skill_name": "S3",
+        "priority_score_q": 0.054625,
+        "importance_weight_w_j": 0.874,
+        "gap_magnitude_g": 0.125,
+        "semantic_alignment": "MATCH",
+        "mode": "TECHNICAL_EXPLANATION",
+        "action": "INITIAL",
+        "question_depth": "L2",
+        "question_depth_int": 2,
+        "target_depth": "L2",
+        "extension_depth": null,
+        "depth_basis": "CONFIGURED_FALLBACK",
+        "depth_rationale": "No specific task depth; configured general fallback, not a proficiency conversion",
+        "claim": "Đánh giá kiến thức thực hành S3",
+        "criterion_id": "c780e684-94ff-59ad-b809-9a3701fd5d5a:c1",
+        "criterion_description": "Cấu hình bucket S3 để lưu trữ ảnh đại diện khách sạn",
+        "expected_evidence": "Xác định chính sách bảo mật và cách upload file từ backend Node.js.",
+        "at_target_anchor": "Mô tả quy trình upload an toàn và truy cập công khai/riêng tư.",
+        "above_target_anchor": "Đề xuất cơ chế làm sạch file tạm sau khi xử lý thành công.",
+        "evidence_scope": "s3-profile-pic-upload",
+        "question_text": "JD yêu cầu sử dụng S3 cho ảnh đại diện khách sạn. Trong CV, bạn có ghi kinh nghiệm với AWS S3. Bạn sẽ cấu hình bucket thế nào để lưu ảnh và upload từ backend Node.js?",
+        "introduction": "",
+        "supporting_evidence": {
+          "jd_evidence_spans": [
+            "• Working knowledge of Docker and basic AWS services (EC2, S3, Lambda)."
+          ],
+          "verified_jd_excerpt": "• Working knowledge of Docker and basic AWS services (EC2, S3, Lambda).",
+          "cv_evidence_spans": [
+            "• Infra: Docker, AWS (EC2, S3, Lambda), GitHub Actions"
+          ],
+          "verified_cv_excerpt": "• Infra: Docker, AWS (EC2, S3, Lambda), GitHub Actions",
+          "detail_to_verify": "Mô tả cụ thể cách cấu hình bucket S3 cho ảnh đại diện khách sạn và cách upload file từ backend Node.js.",
+          "context_job": "Kỹ năng khác (Không thuộc dự án cụ thể)"
+        }
+      },
+      {
+        "question_id": "Q05",
+        "queue_rank": 5,
+        "generation_kind": "INITIAL_PLANNED",
+        "turn_id": "49515b21-382a-4857-b57f-9aad9e9ad760",
+        "objective_id": "8586134c-4e29-56c2-967b-1bbf66dd378c",
+        "requirement_id": "ec2:inferred",
+        "skill_id": "ec2",
+        "skill_name": "EC2",
+        "priority_score_q": 0.05401875,
+        "importance_weight_w_j": 0.8643,
+        "gap_magnitude_g": 0.125,
+        "semantic_alignment": "MATCH",
+        "mode": "DESIGN",
+        "action": "INITIAL",
+        "question_depth": "L2",
+        "question_depth_int": 2,
+        "target_depth": "L2",
+        "extension_depth": null,
+        "depth_basis": "CONFIGURED_FALLBACK",
+        "depth_rationale": "No specific task depth; configured general fallback, not a proficiency conversion",
+        "claim": "Đánh giá kiến thức thực hành EC2",
+        "criterion_id": "8586134c-4e29-56c2-967b-1bbf66dd378c:c1",
+        "criterion_description": "Thiết lập Security Group cho instance web",
+        "expected_evidence": "Chỉ mở cổng 80/443 từ nguồn IP công cộng và SSH từ IP nội bộ quản trị.",
+        "at_target_anchor": "Áp dụng nguyên tắc least privilege cho inbound rules.",
+        "above_target_anchor": "Kết hợp với Network ACLs để tăng cường lớp bảo vệ mạng.",
+        "evidence_scope": "ec2-sg-config",
+        "question_text": "JD đề cập kiến thức cơ bản về AWS EC2. Trong CV, bạn có ghi kinh nghiệm với AWS. Bạn sẽ thiết lập Security Group cho instance web như thế nào để chỉ mở cổng 80/443 từ nguồn IP công cộng và SSH từ IP nội bộ quản trị?",
+        "introduction": "",
+        "supporting_evidence": {
+          "jd_evidence_spans": [
+            "• Working knowledge of Docker and basic AWS services (EC2, S3, Lambda)."
+          ],
+          "verified_jd_excerpt": "• Working knowledge of Docker and basic AWS services (EC2, S3, Lambda).",
+          "cv_evidence_spans": [
+            "• Infra: Docker, AWS (EC2, S3, Lambda), GitHub Actions"
+          ],
+          "verified_cv_excerpt": "• Infra: Docker, AWS (EC2, S3, Lambda), GitHub Actions",
+          "detail_to_verify": "Cách thiết lập Security Group cho instance web, bao gồm việc mở cổng 80/443 và SSH từ IP nội bộ.",
+          "context_job": "Kỹ năng khác (Không thuộc dự án cụ thể)"
+        }
+      },
+      {
+        "question_id": "Q06",
+        "queue_rank": 6,
+        "generation_kind": "INITIAL_PLANNED",
+        "turn_id": "f8150816-d3fe-45e4-910b-f68d7a2f0693",
+        "objective_id": "65a96a66-ec72-54e9-90f2-847bd7712eba",
+        "requirement_id": "lambda:inferred",
+        "skill_id": "lambda",
+        "skill_name": "Lambda",
+        "priority_score_q": 0.0531125,
+        "importance_weight_w_j": 0.8498,
+        "gap_magnitude_g": 0.125,
+        "semantic_alignment": "MATCH",
+        "mode": "DEBUGGING",
+        "action": "INITIAL",
+        "question_depth": "L2",
+        "question_depth_int": 2,
+        "target_depth": "L2",
+        "extension_depth": null,
+        "depth_basis": "CONFIGURED_FALLBACK",
+        "depth_rationale": "No specific task depth; configured general fallback, not a proficiency conversion",
+        "claim": "Đánh giá kiến thức thực hành Lambda",
+        "criterion_id": "65a96a66-ec72-54e9-90f2-847bd7712eba:c1",
+        "criterion_description": "Viết hàm Lambda xử lý webhook thanh toán",
+        "expected_evidence": "Code Node.js nhận payload, xác thực chữ ký và ghi nhận trạng thái.",
+        "at_target_anchor": "Xử lý ngoại lệ hợp lệ và trả về phản hồi HTTP chuẩn.",
+        "above_target_anchor": "Tối ưu thời gian khởi động lạnh bằng cách giữ kết nối DB mở.",
+        "evidence_scope": "lambda-webhook-auth",
+        "question_text": "JD yêu cầu xử lý webhook thanh toán trên AWS Lambda. Trong CV, bạn có ghi kinh nghiệm với AWS Lambda. Hãy viết code Node.js cho handler nhận sự kiện từ API Gateway, xác thực chữ ký từ header `X-Signature` so với secret key, và trả về JSON `{status: 'ok'}` với mã 200 khi thành công hoặc `{error: 'Invalid signature'}` với mã 401 khi thất bại.",
+        "introduction": "",
+        "supporting_evidence": {
+          "jd_evidence_spans": [
+            "• Working knowledge of Docker and basic AWS services (EC2, S3, Lambda)."
+          ],
+          "verified_jd_excerpt": "• Working knowledge of Docker and basic AWS services (EC2, S3, Lambda).",
+          "cv_evidence_spans": [
+            "• Infra: Docker, AWS (EC2, S3, Lambda), GitHub Actions"
+          ],
+          "verified_cv_excerpt": "• Infra: Docker, AWS (EC2, S3, Lambda), GitHub Actions",
+          "detail_to_verify": "Chi tiết code Node.js để xử lý webhook thanh toán, nhận payload, xác thực chữ ký và ghi nhận trạng thái.",
+          "context_job": "Kỹ năng khác (Không thuộc dự án cụ thể)"
+        }
+      },
+      {
+        "question_id": "Q07",
+        "queue_rank": 7,
+        "generation_kind": "INITIAL_PLANNED",
+        "turn_id": "ae862f3b-e3a5-463f-9021-2788eba637ea",
+        "objective_id": "685f9ea4-3194-5450-b94b-64616abd38e9",
+        "requirement_id": "docker:inferred",
+        "skill_id": "docker",
+        "skill_name": "Docker",
+        "priority_score_q": 0.0,
+        "importance_weight_w_j": 0.8709,
+        "gap_magnitude_g": 0.0,
+        "semantic_alignment": "MATCH",
+        "mode": "CODING",
+        "action": "INITIAL",
+        "question_depth": "L2",
+        "question_depth_int": 2,
+        "target_depth": "L2",
+        "extension_depth": null,
+        "depth_basis": "CONFIGURED_FALLBACK",
+        "depth_rationale": "No specific task depth; configured general fallback, not a proficiency conversion",
+        "claim": "Đánh giá kiến thức thực hành Docker",
+        "criterion_id": "685f9ea4-3194-5450-b94b-64616abd38e9:c1",
+        "criterion_description": "Xây dựng Dockerfile đa giai đoạn cho ứng dụng Node.js",
+        "expected_evidence": "Sử dụng builder để cài đặt dependencies và stage cuối cùng chỉ chứa runtime.",
+        "at_target_anchor": "Tách biệt build và run stage, sử dụng .dockerignore hợp lý.",
+        "above_target_anchor": "Chạy process với user không phải root và cấu hình healthcheck.",
+        "evidence_scope": "nodejs-multi-stage-dockerfile",
+        "question_text": "JD yêu cầu kiến thức thực hành Docker. Trong CV, bạn có ghi kinh nghiệm thiết lập CI/CD với Docker. Bạn hãy viết một Dockerfile đa giai đoạn cho ứng dụng Node.js, trong đó giai đoạn đầu tiên cài đặt dependencies và giai đoạn cuối cùng chỉ chứa runtime.",
+        "introduction": "",
+        "supporting_evidence": {
+          "jd_evidence_spans": [
+            "• Working knowledge of Docker and basic AWS services (EC2, S3, Lambda)."
+          ],
+          "verified_jd_excerpt": "• Working knowledge of Docker and basic AWS services (EC2, S3, Lambda).",
+          "cv_evidence_spans": [
+            "• Infra: Docker, AWS (EC2, S3, Lambda), GitHub Actions",
+            "• Set up CI/CD with GitHub Actions and Docker, reducing deployment time from 40 minutes to under 8."
+          ],
+          "verified_cv_excerpt": "• Set up CI/CD with GitHub Actions and Docker, reducing deployment time from 40 minutes to under 8.",
+          "detail_to_verify": "Mô tả cụ thể cấu trúc Dockerfile đa giai đoạn (multi-stage) đã sử dụng để tách biệt builder và runtime cho ứng dụng Node.js.",
+          "context_job": "Kỹ năng khác (Không thuộc dự án cụ thể) | Full-Stack Engineer (2022-06 - Nay)"
+        }
+      },
+      {
+        "question_id": "Q08",
+        "queue_rank": 8,
+        "generation_kind": "INITIAL_PLANNED",
+        "turn_id": "dd2583e0-be4e-4a3f-a59f-8d9c8a6d4025",
+        "objective_id": "14f49626-2392-5aaf-950a-1c77217a4ac3",
+        "requirement_id": "graphql:82f85734-682c-5f4d-bb6a-3d5115c48124",
+        "skill_id": "graphql",
+        "skill_name": "GraphQL APIs",
+        "priority_score_q": 0.0,
+        "importance_weight_w_j": 0.8699,
+        "gap_magnitude_g": 0.0,
+        "semantic_alignment": "MATCH",
+        "mode": "DESIGN",
+        "action": "INITIAL",
+        "question_depth": "L3",
+        "question_depth_int": 3,
+        "target_depth": "L3",
+        "extension_depth": null,
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Xây dựng API GraphQL xử lý quan hệ phức tạp thuộc L3.",
+        "claim": "Build and consume GraphQL APIs",
+        "criterion_id": "14f49626-2392-5aaf-950a-1c77217a4ac3:c1",
+        "criterion_description": "Định nghĩa Schema GraphQL cho đối tượng Booking",
+        "expected_evidence": "Khai báo type Booking với các field Hotel, Guest, DateRange.",
+        "at_target_anchor": "Xác định đúng các scalar types và relationships cơ bản.",
+        "above_target_anchor": "Sử dụng interface hoặc union types nếu cần mở rộng đa dạng booking.",
+        "evidence_scope": "14f49626-2392-5aaf-950a-1c77217a4ac3:booking-schema",
+        "question_text": "JD đề cập việc xây dựng GraphQL API. Trong CV, bạn có ghi kinh nghiệm thiết kế schema cho module lập kế hoạch tuyến đường. Bạn hãy định nghĩa type Booking trong GraphQL API đó.",
+        "introduction": "",
+        "supporting_evidence": {
+          "jd_evidence_spans": [
+            "• Build and consume GraphQL APIs shared across web and internal admin tools."
+          ],
+          "verified_jd_excerpt": "• Build and consume GraphQL APIs shared across web and internal admin tools.",
+          "cv_evidence_spans": [
+            "• Backend: Node.js, Express, NestJS, GraphQL (Apollo)",
+            "• Designed the PostgreSQL schema and GraphQL API for a route-planning module, cutting average dispatcher planning time by 25%."
+          ],
+          "verified_cv_excerpt": "• Designed the PostgreSQL schema and GraphQL API for a route-planning module, cutting average dispatcher planning time by 25%.",
+          "detail_to_verify": "Liệt kê các trường (fields) cụ thể trong type Booking của GraphQL API đã thiết kế cho module lập kế hoạch tuyến đường.",
+          "context_job": "Kỹ năng khác (Không thuộc dự án cụ thể) | Full-Stack Engineer (2022-06 - Nay)"
+        }
+      },
+      {
+        "question_id": "Q09",
+        "queue_rank": 9,
+        "generation_kind": "INITIAL_PLANNED",
+        "turn_id": "525b6103-80b1-4149-8c18-7a826e1922f2",
+        "objective_id": "05b58a41-d269-5f99-bf39-b0dfea50661b",
+        "requirement_id": "nestjs:871610fd-9f6e-5aa3-9d9f-87b078b85876",
+        "skill_id": "nestjs",
+        "skill_name": "NestJS",
+        "priority_score_q": 0.0,
+        "importance_weight_w_j": 0.8604,
+        "gap_magnitude_g": 0.0,
+        "semantic_alignment": "MATCH",
+        "mode": "CODING",
+        "action": "INITIAL",
+        "question_depth": "L3",
+        "question_depth_int": 3,
+        "target_depth": "L3",
+        "extension_depth": "L4",
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Xây dựng tính năng backend phức tạp liên quan đến logic đặt phòng thuộc L3.",
+        "claim": "Develop backend features using NestJS",
+        "criterion_id": "05b58a41-d269-5f99-bf39-b0dfea50661b:c1",
+        "criterion_description": "Thiết kế API RESTful để xử lý yêu cầu đặt phòng mới",
+        "expected_evidence": "Định nghĩa DTO, Controller và Service method nhận dữ liệu đặt phòng.",
+        "at_target_anchor": "Triển khai endpoint POST với kiểm tra đầu vào và trả về mã trạng thái đúng.",
+        "above_target_anchor": "Áp dụng transaction để đảm bảo tính nhất quán khi ghi nhiều bảng liên quan.",
+        "evidence_scope": "nestjs-booking-api",
+        "question_text": "JD yêu cầu xây dựng tính năng đặt phòng mới trên NestJS. Hãy viết code TypeScript cho Controller và Service xử lý endpoint POST `/bookings` với DTO chứa `hotelId`, `checkInDate`, `guestName`. Đảm bảo kiểm tra đầu vào cơ bản và trả về mã trạng thái 201 khi thành công.",
+        "introduction": "",
+        "supporting_evidence": {
+          "jd_evidence_spans": [
+            "• Design and build features spanning our Node.js/NestJS backend and React/Next.js frontend."
+          ],
+          "verified_jd_excerpt": "• Design and build features spanning our Node.js/NestJS backend and React/Next.js frontend.",
+          "cv_evidence_spans": [
+            "• Backend: Node.js, Express, NestJS, GraphQL (Apollo)",
+            "• Built a real-time shipment-tracking feature end to end (NestJS + WebSocket backend, React frontend), adopted by 1,200+ active drivers."
+          ],
+          "verified_cv_excerpt": "• Built a real-time shipment-tracking feature end to end (NestJS + WebSocket backend, React frontend), adopted by 1,200+ active drivers.",
+          "detail_to_verify": "Xác nhận tính năng theo dõi lô hàng thực tế có sử dụng DTO, Controller và Service method để xử lý yêu cầu đặt phòng hay không, hoặc mô tả chi tiết cơ chế xử lý yêu cầu tương tự trong NestJS.",
+          "context_job": "Kỹ năng khác (Không thuộc dự án cụ thể) | Full-Stack Engineer (2022-06 - Nay)"
+        }
+      },
+      {
+        "question_id": "Q10",
+        "queue_rank": 10,
+        "generation_kind": "INITIAL_PLANNED",
+        "turn_id": "4963285b-447e-4cec-9841-c13ff6feb8c8",
+        "objective_id": "840aa179-e7e8-5683-8446-d709e910ad93",
+        "requirement_id": "postgresql:22172dba-747c-5281-98b7-bc38043995ab",
+        "skill_id": "postgresql",
+        "skill_name": "PostgreSQL",
+        "priority_score_q": 0.0,
+        "importance_weight_w_j": 0.8389,
+        "gap_magnitude_g": 0.0,
+        "semantic_alignment": "MATCH",
+        "mode": "TECHNICAL_EXPLANATION",
+        "action": "INITIAL",
+        "question_depth": "L3",
+        "question_depth_int": 3,
+        "target_depth": "L3",
+        "extension_depth": "L4",
+        "depth_basis": "TASK_INTERPRETATION",
+        "depth_rationale": "Mô hình hóa schema cho logic giá cả và đặt phòng phức tạp thuộc L3.",
+        "claim": "Model and evolve PostgreSQL schemas for complex logic",
+        "criterion_id": "840aa179-e7e8-5683-8446-d709e910ad93:c1",
+        "criterion_description": "Thiết kế bảng lưu trữ lịch sử thay đổi giá phòng theo thời gian",
+        "expected_evidence": "Định nghĩa bảng có khóa ngoại tham chiếu đến phòng và cột timestamp.",
+        "at_target_anchor": "Tạo bảng riêng cho price_history với ràng buộc khóa chính hợp lệ.",
+        "above_target_anchor": "Thêm chỉ mục composite để tối ưu truy vấn lọc theo khoảng thời gian.",
+        "evidence_scope": "price-history-schema",
+        "question_text": "JD yêu cầu mô hình hóa PostgreSQL cho logic giá phòng phức tạp. Hãy viết lệnh CREATE TABLE để lưu trữ lịch sử thay đổi giá phòng theo thời gian, đảm bảo có khóa ngoại tham chiếu đến bảng phòng và cột timestamp.",
+        "introduction": "",
+        "supporting_evidence": {
+          "jd_evidence_spans": [
+            "• Model and evolve our PostgreSQL schema as booking and pricing logic grows more complex."
+          ],
+          "verified_jd_excerpt": "• Model and evolve our PostgreSQL schema as booking and pricing logic grows more complex.",
+          "cv_evidence_spans": [
+            "Full-stack engineer with 5 years of experience across Node.js/Express backends and React frontends, plus hands-on work with MongoDB and PostgreSQL.",
+            "• Designed the PostgreSQL schema and GraphQL API for a route-planning module, cutting average dispatcher planning time by 25%.",
+            "• Data: MongoDB, PostgreSQL, Redis"
+          ],
+          "verified_cv_excerpt": "• Designed the PostgreSQL schema and GraphQL API for a route-planning module, cutting average dispatcher planning time by 25%.",
+          "detail_to_verify": "Xác nhận cụ thể bảng lưu trữ lịch sử thay đổi giá phòng có cột timestamp và khóa ngoại tham chiếu đến bảng phòng.",
+          "context_job": "Kỹ năng khác (Không thuộc dự án cụ thể) | Full-Stack Engineer (2022-06 - Nay)"
+        }
+      }
+    ],
+    "adaptive_probing_demonstrations_note": "The two follow-up items below execute the real Module 3 ReflectiveJudge -> next_action -> QuestionGenerator -> AlignmentReviewer chain using clearly labeled simulated candidate answers solely to demonstrate adaptive clarification (L2 CLARIFY) and extension probing (L3 -> L4 PROBE_DEEPER).",
+    "adaptive_probing_demonstrations": [
+      {
+        "demo_id": "ADAPTIVE_DEMO_1_CLARIFY",
+        "parent_question_id": "Q01",
+        "skill_id": "next.js",
+        "skill_name": "Next.js",
+        "is_simulated_candidate_answer": true,
+        "disclaimer_vi": "Câu trả lời giả lập minh họa chưa kèm mã nguồn nhằm kích hoạt nhánh làm rõ (CLARIFY) của Module 3; KHÔNG phải câu trả lời thực tế của ứng viên Huy Nguyen.",
+        "parent_question_text": "JD yêu cầu tích hợp frontend Next.js với backend NestJS. Trong CV, bạn có ghi kinh nghiệm với Next.js. Hãy viết một component Next.js dùng `fetch` gọi API `/api/hotels` và render danh sách khách sạn vào giao diện.",
+        "simulated_candidate_answer": "Mình sẽ dùng hàm fetch gọi tới đường dẫn /api/hotels bên trong component Next.js, sau đó parse JSON và dùng hàm map để render danh sách tên khách sạn lên trang tìm kiếm.",
+        "judge_result": {
+          "observations": [
+            {
+              "criterion_id": "f7e6246d-02ca-5101-a72c-8e9a6e3000b7:c1",
+              "response_excerpt": "",
+              "response_line_range": null,
+              "observation": "UNCLEAR",
+              "performance": "UNDETERMINED",
+              "rationale": "Ứng viên mô tả logic fetch và render nhưng không cung cấp mã nguồn cụ thể (component, JSX) để xác minh việc áp dụng đúng cú pháp Next.js và xử lý dữ liệu.",
+              "resolves_contradiction": false,
+              "unresolved_aspects": [
+                "Mã nguồn component Next.js cụ thể",
+                "Cú pháp render danh sách với key"
+              ]
+            }
+          ],
+          "feedback": "Bạn đã nêu ý tưởng tích hợp, vui lòng cung cấp đoạn mã code cụ thể để mình đánh giá chi tiết hơn.",
+          "explicit_inability": false,
+          "inability_excerpt": "",
+          "feedback_contains_hint": false
+        },
+        "routed_next_action": "CLARIFY",
+        "generated_followup_question": {
+          "question_id": "Q01-F1",
+          "queue_rank": 1,
+          "generation_kind": "ADAPTIVE_CLARIFY_DEMO",
+          "turn_id": "0bfe01d7-5540-44aa-aace-fee1b55be6bf",
+          "objective_id": "f7e6246d-02ca-5101-a72c-8e9a6e3000b7",
+          "requirement_id": "next.js:af8ece24-6b87-5fc7-a413-ebe6f9be60ad",
+          "skill_id": "next.js",
+          "skill_name": "Next.js",
+          "priority_score_q": 0.208005,
+          "importance_weight_w_j": 0.7924,
+          "gap_magnitude_g": 0.375,
+          "semantic_alignment": "MATCH",
+          "mode": "CODING",
+          "action": "CLARIFY",
+          "question_depth": "L2",
+          "question_depth_int": 2,
+          "target_depth": "L2",
+          "extension_depth": null,
+          "depth_basis": "TASK_INTERPRETATION",
+          "depth_rationale": "Triển khai giao diện người dùng tương tác với backend thuộc L2.",
+          "claim": "Implement frontend features using Next.js",
+          "criterion_id": "f7e6246d-02ca-5101-a72c-8e9a6e3000b7:c1",
+          "criterion_description": "Hiển thị danh sách khách sạn từ API backend lên trang tìm kiếm",
+          "expected_evidence": "Gọi API trong component Next.js và render danh sách kết quả.",
+          "at_target_anchor": "Fetch dữ liệu từ NestJS API và hiển thị chính xác thông tin khách sạn.",
+          "above_target_anchor": "Xử lý trạng thái loading và error khi API không phản hồi kịp.",
+          "evidence_scope": "nextjs-hotel-list",
+          "question_text": "Trong đoạn mã JSX render danh sách khách sạn, bạn đã gán thuộc tính `key` duy nhất cho mỗi phần tử `<li>` hoặc `<div>` như thế nào?",
+          "introduction": "Bạn đã nêu ý tưởng tích hợp, vui lòng cung cấp đoạn mã code cụ thể để mình đánh giá chi tiết hơn.",
+          "supporting_evidence": {
+            "jd_evidence_spans": [
+              "• Design and build features spanning our Node.js/NestJS backend and React/Next.js frontend."
+            ],
+            "verified_jd_excerpt": "• Design and build features spanning our Node.js/NestJS backend and React/Next.js frontend.",
+            "cv_evidence_spans": [
+              "• Frontend: React, Next.js, Redux, Tailwind CSS",
+              "• Open-source Markdown-based note app (Next.js, MongoDB) — self-hosted by ~500 users"
+            ],
+            "verified_cv_excerpt": "• Frontend: React, Next.js, Redux, Tailwind CSS",
+            "detail_to_verify": "Mô tả cụ thể cách gọi API backend và xử lý việc render danh sách khách sạn trong component Next.js.",
+            "context_job": "Kỹ năng khác (Không thuộc dự án cụ thể)"
+          }
+        }
+      },
+      {
+        "demo_id": "ADAPTIVE_DEMO_2_PROBE_DEEPER_L4",
+        "parent_question_id": "Q09",
+        "skill_id": "nestjs",
+        "skill_name": "NestJS",
+        "is_simulated_candidate_answer": true,
+        "disclaimer_vi": "Câu trả lời giả lập minh họa ở mức đạt chuẩn (AT_TARGET) nhằm kích hoạt nhánh mở rộng PROBE_DEEPER từ L3 lên L4 của Module 3; KHÔNG phải câu trả lời thực tế của ứng viên Huy Nguyen.",
+        "parent_question_text": "JD yêu cầu xây dựng tính năng đặt phòng mới trên NestJS. Hãy viết code TypeScript cho Controller và Service xử lý endpoint POST `/bookings` với DTO chứa `hotelId`, `checkInDate`, `guestName`. Đảm bảo kiểm tra đầu vào cơ bản và trả về mã trạng thái 201 khi thành công.",
+        "simulated_candidate_answer": "import { Body, Controller, HttpCode, HttpStatus, Injectable, Post } from '@nestjs/common';\nimport { IsDateString, IsNotEmpty, IsString } from 'class-validator';\n\nexport class CreateBookingDto {\n  @IsString()\n  @IsNotEmpty()\n  hotelId: string;\n\n  @IsDateString()\n  checkInDate: string;\n\n  @IsString()\n  @IsNotEmpty()\n  guestName: string;\n}\n\n@Injectable()\nexport class BookingsService {\n  async create(dto: CreateBookingDto) {\n    return { id: 'bk_001', ...dto, status: 'CONFIRMED' };\n  }\n}\n\n@Controller('bookings')\nexport class BookingsController {\n  constructor(private readonly bookingsService: BookingsService) {}\n\n  @Post()\n  @HttpCode(HttpStatus.CREATED)\n  createBooking(@Body() dto: CreateBookingDto) {\n    return this.bookingsService.create(dto);\n  }\n}",
+        "judge_result": {
+          "observations": [
+            {
+              "criterion_id": "05b58a41-d269-5f99-bf39-b0dfea50661b:c1",
+              "response_excerpt": "import { Body, Controller, HttpCode, HttpStatus, Injectable, Post } from '@nestjs/common';\nimport { IsDateString, IsNotEmpty, IsString } from 'class-validator';\n\nexport class CreateBookingDto {\n  @IsString()\n  @IsNotEmpty()\n  hotelId: string;\n\n  @IsDateString()\n  checkInDate: string;\n\n  @IsString()\n  @IsNotEmpty()\n  guestName: string;\n}\n\n@Injectable()\nexport class BookingsService {\n  async create(dto: CreateBookingDto) {\n    return { id: 'bk_001', ...dto, status: 'CONFIRMED' };\n  }\n}\n\n@Controller('bookings')\nexport class BookingsController {\n  constructor(private readonly bookingsService: BookingsService) {}\n\n  @Post()\n  @HttpCode(HttpStatus.CREATED)\n  createBooking(@Body() dto: CreateBookingDto) {\n    return this.bookingsService.create(dto);\n  }\n}",
+              "response_line_range": [
+                1,
+                33
+              ],
+              "observation": "SUPPORTS",
+              "performance": "AT_TARGET",
+              "rationale": "Ứng viên đã định nghĩa đúng DTO với các decorator kiểm tra đầu vào (IsString, IsNotEmpty, IsDateString), xây dựng Service method xử lý logic và Controller với endpoint @Post() cùng HttpCode(HttpStatus.CREATED) để trả về mã trạng thái 201. Đây là cấu trúc chuẩn cho API RESTful trong NestJS đáp ứng yêu cầu at_target.",
+              "resolves_contradiction": false,
+              "unresolved_aspects": []
+            }
+          ],
+          "feedback": "Bạn đã triển khai đúng cấu trúc cơ bản của API đặt phòng theo yêu cầu.",
+          "explicit_inability": false,
+          "inability_excerpt": "",
+          "feedback_contains_hint": false
+        },
+        "routed_next_action": "PROBE_DEEPER",
+        "generated_followup_question": {
+          "question_id": "Q09-F1",
+          "queue_rank": 9,
+          "generation_kind": "ADAPTIVE_EXTENSION_L4_DEMO",
+          "turn_id": "88e40398-cd14-4f28-87b7-27bdc3d8cec4",
+          "objective_id": "05b58a41-d269-5f99-bf39-b0dfea50661b",
+          "requirement_id": "nestjs:871610fd-9f6e-5aa3-9d9f-87b078b85876",
+          "skill_id": "nestjs",
+          "skill_name": "NestJS",
+          "priority_score_q": 0.0,
+          "importance_weight_w_j": 0.8604,
+          "gap_magnitude_g": 0.0,
+          "semantic_alignment": "MATCH",
+          "mode": "CODING",
+          "action": "PROBE_DEEPER",
+          "question_depth": "L4",
+          "question_depth_int": 4,
+          "target_depth": "L3",
+          "extension_depth": "L4",
+          "depth_basis": "TASK_INTERPRETATION",
+          "depth_rationale": "Xây dựng tính năng backend phức tạp liên quan đến logic đặt phòng thuộc L3.",
+          "claim": "Develop backend features using NestJS",
+          "criterion_id": "05b58a41-d269-5f99-bf39-b0dfea50661b:c1",
+          "criterion_description": "Thiết kế API RESTful để xử lý yêu cầu đặt phòng mới",
+          "expected_evidence": "Định nghĩa DTO, Controller và Service method nhận dữ liệu đặt phòng.",
+          "at_target_anchor": "Triển khai endpoint POST với kiểm tra đầu vào và trả về mã trạng thái đúng.",
+          "above_target_anchor": "Áp dụng transaction để đảm bảo tính nhất quán khi ghi nhiều bảng liên quan.",
+          "evidence_scope": "nestjs-booking-api-tx",
+          "question_text": "JD yêu cầu xây dựng tính năng đặt phòng mới trên NestJS. Trong Service `BookingsService`, hãy sửa phương thức `create` để sử dụng `@Transaction()` của TypeORM, đảm bảo việc tạo bản ghi booking và cập nhật số lượng phòng trống trong bảng `rooms` được thực hiện trong cùng một giao dịch. Nếu có lỗi xảy ra ở bất kỳ bước nào, toàn bộ thay đổi phải được rollback.",
+          "introduction": "Bạn đã triển khai đúng cấu trúc cơ bản của API đặt phòng theo yêu cầu.",
+          "supporting_evidence": {
+            "jd_evidence_spans": [
+              "• Design and build features spanning our Node.js/NestJS backend and React/Next.js frontend."
+            ],
+            "verified_jd_excerpt": "• Design and build features spanning our Node.js/NestJS backend and React/Next.js frontend.",
+            "cv_evidence_spans": [
+              "• Backend: Node.js, Express, NestJS, GraphQL (Apollo)",
+              "• Built a real-time shipment-tracking feature end to end (NestJS + WebSocket backend, React frontend), adopted by 1,200+ active drivers."
+            ],
+            "verified_cv_excerpt": "• Built a real-time shipment-tracking feature end to end (NestJS + WebSocket backend, React frontend), adopted by 1,200+ active drivers.",
+            "detail_to_verify": "Xác nhận tính năng theo dõi lô hàng thực tế có sử dụng DTO, Controller và Service method để xử lý yêu cầu đặt phòng hay không, hoặc mô tả chi tiết cơ chế xử lý yêu cầu tương tự trong NestJS.",
+            "context_job": "Kỹ năng khác (Không thuộc dự án cụ thể) | Full-Stack Engineer (2022-06 - Nay)"
+          }
+        }
+      }
+    ]
+  }
+}
