@@ -1,0 +1,15 @@
+services:
+  backend:
+    build: !reset null
+    env_file: !override
+      - path: ../backend/.env
+        format: raw
+    image: ${BACKEND_IMAGE:?Missing backend digest}
+  ai-service:
+    build: !reset null
+    env_file: !override
+      - path: ../ai-service/.env
+        format: raw
+    image: ${AI_IMAGE:?Missing AI digest}
+    environment:
+      GNN_REQUIRE_CHECKPOINT: "true"

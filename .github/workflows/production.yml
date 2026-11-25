@@ -1,0 +1,131 @@
+name: Production release
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      rollback_sha:
+        description: Full SHA of a successful release to restore (blank deploys current main)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+concurrency:
+  group: smile-production
+  cancel-in-progress: false
+
+jobs:
+  # Enable automatic releases only after the manual acceptance drill.
+  gate:
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || vars.PRODUCTION_CD_ENABLED == 'true')
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'Release requested from main'
+
+  backend:
+    needs: gate
+    if: ${{ !inputs.rollback_sha }}
+    uses: ./.github/workflows/backend-ci.yml
+  web:
+    needs: gate
+    if: ${{ !inputs.rollback_sha }}
+    uses: ./.github/workflows/web-app-ci.yml
+  ai:
+    needs: gate
+    if: ${{ !inputs.rollback_sha }}
+    uses: ./.github/workflows/ai-deploy-ci.yml
+
+  release:
+    needs: [gate, backend, web, ai]
+    if: >-
+      always() && !cancelled() && needs.gate.result == 'success' &&
+      (inputs.rollback_sha != '' ||
+      (needs.backend.result == 'success' && needs.web.result == 'success' && needs.ai.result == 'success'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      RELEASE_BUCKET: ${{ vars.RELEASE_BUCKET }}
+      EC2_INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+      API_ORIGIN: ${{ vars.API_ORIGIN }}
+      WEB_ORIGIN: ${{ vars.WEB_ORIGIN }}
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+      ROLLBACK_SHA: ${{ inputs.rollback_sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a
+        with:
+          role-to-assume: ${{ vars.AWS_RELEASE_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-duration-seconds: 10800
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install release CLI
+        run: npm install --global vercel@66.6.0
+      - name: Build candidate images
+        if: ${{ !inputs.rollback_sha }}
+        run: |
+          docker build -t smile/backend:candidate backend
+          docker build -t smile/ai-service:candidate ai-service
+      - name: Scan backend image
+        if: ${{ !inputs.rollback_sha }}
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          image-ref: smile/backend:candidate
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
+      - name: Scan AI image
+        if: ${{ !inputs.rollback_sha }}
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          image-ref: smile/ai-service:candidate
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
+      - name: Publish verified images by digest
+        if: ${{ !inputs.rollback_sha }}
+        run: |
+          account=$(aws sts get-caller-identity --query Account --output text)
+          registry="$account.dkr.ecr.$AWS_REGION.amazonaws.com"
+          aws ecr get-login-password | docker login --username AWS --password-stdin "$registry"
+          tag="$GITHUB_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          for svc in backend ai-service; do
+            repo="smile/$svc"
+            docker tag "$repo:candidate" "$registry/$repo:$tag"
+            docker push "$registry/$repo:$tag"
+            digest=$(aws ecr describe-images --repository-name "$repo" --image-ids imageTag="$tag" --query 'imageDetails[0].imageDigest' --output text)
+            [[ $digest =~ ^sha256:[0-9a-f]{64}$ ]]
+            key=BACKEND_IMAGE
+            if [[ $svc == ai-service ]]; then key=AI_IMAGE; fi
+            echo "$key=$registry/$repo@$digest" >> "$GITHUB_ENV"
+          done
+      - name: Build Vercel production deployment
+        if: ${{ !inputs.rollback_sha }}
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          vercel pull --yes --environment=production --token "$VERCEL_TOKEN"
+          NEXT_PUBLIC_API_BASE_URL="$API_ORIGIN" vercel build --prod --token "$VERCEL_TOKEN"
+      - name: Release and verify
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ -z "$ROLLBACK_SHA" ]]; then
+            main_sha=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')
+            if [[ "$main_sha" != "$GITHUB_SHA" ]]; then
+              echo 'A newer commit is on main. Skipping the outdated release.' >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+          fi
+          python deploy/production/release.py
