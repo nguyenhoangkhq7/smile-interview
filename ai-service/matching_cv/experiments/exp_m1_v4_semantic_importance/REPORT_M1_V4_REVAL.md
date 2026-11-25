@@ -8,6 +8,13 @@ Toàn bộ thực nghiệm chạy **100% local trên CPU** (`0` request OpenRout
 - Đồ thị tái trọng số `v4`: `graphs/{train,val,test}_graphs_v4.pt`
 - Checkpoints 5 seed × 4 cấu hình: `checkpoints/*.pt`
 
+Để lấy `train.csv` và `validation.csv` của tập ATS công khai, cài Git LFS và chạy lệnh sau từ thư mục gốc repository. Submodule ghim dataset tại revision dùng cho thí nghiệm.
+
+```bash
+git lfs install
+git submodule update --init -- ai-service/matching_cv/dataset/resume-ats-score-v1-en
+```
+
 ## 1. Bảng kết quả chính (Validation 20 cặp & Test độc lập 112 cặp / 14 JD)
 
 | Nhóm | Cấu hình | Val MAE (20) | Test MAE ↓ (112) | Test NDCG@5 ↑ (112) | Test Spearman ↑ (112) | Asym With-Rel ↑ (30) |

@@ -1,6 +1,0 @@
-{
-  "operation": "respond",
-  "from": "10-q07-retry",
-  "scenario": "Gửi lại cùng câu không biết từ snapshot v10, sau khi lời đáp đã đi qua nhánh tất định nhưng bước sinh câu tiếp theo trả 503.",
-  "answer": "Em không biết ạ."
-}
