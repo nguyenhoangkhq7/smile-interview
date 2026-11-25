@@ -1,5 +1,7 @@
 # Triển khai Smile Interview trên Vercel, EC2 và RDS PostgreSQL
 
+Để triển khai tự động từ `main`, xem [runbook CD production](production/README.md).
+
 Vercel phục vụ `web-app`. EC2 chạy Nginx, backend và AI service. Backend kết nối RDS PostgreSQL 17 trong cùng VPC, qua TLS có xác minh chứng chỉ và hostname.
 
 ## 1. Khởi tạo máy chủ EC2 (`t3a.large` hoặc `t3.large`: 2 vCPU, 8 GB RAM, 40 GB EBS gp3)
