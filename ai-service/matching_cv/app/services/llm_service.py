@@ -47,8 +47,8 @@ class LLMService:
 
         # OpenRouter standard tracking headers
         self.default_headers = {
-            "HTTP-Referer": "http://localhost:8000",
-            "X-Title": "AI Inference Service",
+            "HTTP-Referer": settings.OPENROUTER_REFERER,
+            "X-Title": "Smile Interview AI Service",
         }
 
         # Initialize AsyncOpenAI client (fallback placeholder if key not yet provided in .env)

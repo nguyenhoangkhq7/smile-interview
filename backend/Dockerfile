@@ -19,11 +19,19 @@ RUN ./mvnw clean package -DskipTests -B
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 
+RUN groupadd --system --gid 1001 appgroup \
+ && useradd --system --uid 1001 --gid appgroup appuser \
+ && mkdir -p /app/uploads/avatars \
+ && chown -R appuser:appgroup /app
+
 # Copy the built jar from the builder stage
-COPY --from=builder /app/target/*.jar app.jar
+COPY --from=builder --chown=appuser:appgroup /app/target/*.jar app.jar
 
-# Expose the default port
-EXPOSE 8080
+USER appuser
 
-# Run the jar file
+EXPOSE 8081
+
+HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=5 \
+  CMD curl -fsS http://127.0.0.1:8081/actuator/health || exit 1
+
 ENTRYPOINT ["java", "-jar", "app.jar"]

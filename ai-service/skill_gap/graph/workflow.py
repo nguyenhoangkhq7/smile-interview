@@ -9,10 +9,13 @@ Implements parallel Fan-out / Fan-in execution:
 """
 
 from concurrent.futures import ThreadPoolExecutor
+import logging
 from typing import List, Optional, Tuple, TypedDict
 import uuid
 
 from langgraph.graph import END, START, StateGraph
+
+logger = logging.getLogger(__name__)
 
 from skill_gap.adapters.config import AppConfig
 from skill_gap.adapters.llm_client import LLMClient
@@ -118,7 +121,7 @@ class SkillGapWorkflow:
         return [s for s in cv_skills if s.skill_id in active_ids]
 
     def _node_segment_cv(self, state: SkillGapGraphState) -> SkillGapGraphState:
-        print("[LangGraph] Nhánh song song 1A: Phân tách CV (Resume Segmenter)...")
+        logger.info("[LangGraph] Parallel branch 1A: Resume segmentation")
         active_cv_skills = self._filter_active_cv_skills(
             state.get("cv_skills", []),
             state.get("match_results", []),
@@ -130,7 +133,7 @@ class SkillGapWorkflow:
         return {"segment_output": segment_output}
 
     def _node_parse_jd(self, state: SkillGapGraphState) -> SkillGapGraphState:
-        print("[LangGraph] Nhánh song song 1B: Đọc hiểu chuẩn yêu cầu JD (JD Requirement Parser)...")
+        logger.info("[LangGraph] Parallel branch 1B: JD requirement parsing")
         jd_parser_output = self.jd_parser.parse(
             jd_text=state["jd_text"],
             jd_skills=state.get("jd_skills", []),
@@ -143,8 +146,9 @@ class SkillGapWorkflow:
             state.get("match_results", []),
         )
         segment_output = state["segment_output"]
-        print(
-            f"[LangGraph] Bước 2 (Fan-in): Đo lường hàng loạt (Batch Deduplicated) {len(active_cv_skills)} kỹ năng ứng viên hoạt động..."
+        logger.info(
+            "[LangGraph] Step 2 (Fan-in): Batch proficiency estimation for %d active CV skills",
+            len(active_cv_skills),
         )
 
         if not active_cv_skills:
@@ -176,7 +180,7 @@ class SkillGapWorkflow:
         return {"proficiencies": proficiencies}
 
     def _node_detect_gaps(self, state: SkillGapGraphState) -> SkillGapGraphState:
-        print("[LangGraph] Bước 3: Định lượng khoảng trống năng lực tất định (Gap Detector)...")
+        logger.info("[LangGraph] Step 3: Deterministic skill-gap quantification")
         segment_output = state["segment_output"]
         jd_parser_output = state["jd_parser_output"]
         proficiencies = state.get("proficiencies", [])

@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import logging
 import time
 import re
 from abc import ABC, abstractmethod
@@ -8,6 +9,8 @@ from pathlib import Path
 from typing import Optional, Type, TypeVar, Union
 from pydantic import BaseModel
 import openai
+
+logger = logging.getLogger(__name__)
 
 os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
 
@@ -59,7 +62,7 @@ class OpenRouterClient(LLMClient):
             f"Your output must perfectly validate against this JSON schema:\n{json.dumps(schema_json)}"
         )
         
-        print(f"    [LLM] Đang gọi {self.model} ({schema.__name__})... ", end="", flush=True)
+        logger.info("[LLM] Calling %s (%s)", self.model, schema.__name__)
         
         extra_body = {
             "reasoning": {
@@ -86,13 +89,16 @@ class OpenRouterClient(LLMClient):
                     create_kwargs["extra_body"] = extra_body
                 
                 response = self.client.chat.completions.create(**create_kwargs)
-                print("Xong!")
+                logger.info("[LLM] Completed %s (%s)", self.model, schema.__name__)
                 break
             except Exception as e:
                 last_exception = e
                 if attempt < max_attempts - 1:
                     wait_time = 2 ** (attempt + 1)
-                    print(f"Thử lại sau {wait_time}s ({type(e).__name__})... ", end="", flush=True)
+                    logger.warning(
+                        "[LLM] Retrying %s (%s) in %ss after %s",
+                        self.model, schema.__name__, wait_time, type(e).__name__,
+                    )
                     time.sleep(wait_time)
                 else:
                     raise last_exception

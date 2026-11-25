@@ -29,8 +29,8 @@ public class SessionController {
     public ResponseEntity<SessionResponse> createSession(
             @AuthenticationPrincipal User currentUser,
             @jakarta.validation.Valid @RequestBody CreateSessionRequest request) {
-        log.info("Received request to create session: userId={}, request={}",
-                currentUser != null ? currentUser.getId() : null, request);
+        log.info("Received request to create session: userId={}, sessionId={}, roleTitle={}",
+                currentUser != null ? currentUser.getId() : null, request.getId(), request.getRoleTitle());
         SessionResponse response = sessionService.createSession(currentUser, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }

@@ -33,15 +33,32 @@ def create_app() -> FastAPI:
         ),
         version="2.2.0",
         lifespan=app_lifespan,
+        docs_url="/docs" if settings.DEBUG else None,
+        redoc_url="/redoc" if settings.DEBUG else None,
+        openapi_url="/openapi.json" if settings.DEBUG else None,
     )
 
-    application.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    configured_origins = [
+        origin.strip()
+        for origin in settings.AI_CORS_ALLOWED_ORIGINS.split(",")
+        if origin.strip()
+    ]
+    if configured_origins:
+        application.add_middleware(
+            CORSMiddleware,
+            allow_origins=configured_origins,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+    elif settings.DEBUG:
+        application.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=False,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
 
     application.include_router(matching_cv_router)
     application.include_router(skill_gap_router)

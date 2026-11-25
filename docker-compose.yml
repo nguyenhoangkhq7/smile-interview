@@ -32,6 +32,8 @@ services:
       FASTAPI_AI_BASE_URL: http://ai-service:8000
     ports:
       - "8081:8081"
+    volumes:
+      - backend_uploads:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -47,11 +49,11 @@ services:
       - ./ai-service/.env
     environment:
       PORT: 8000
-      HF_HOME: /root/.cache/huggingface
+      HF_HOME: /app/.cache/huggingface
     ports:
       - "8000:8000"
     volumes:
-      - sbert_cache:/root/.cache/huggingface
+      - sbert_cache:/app/.cache/huggingface
 
   web-app:
     build:
@@ -72,4 +74,5 @@ services:
 
 volumes:
   postgres_data:
+  backend_uploads:
   sbert_cache:
