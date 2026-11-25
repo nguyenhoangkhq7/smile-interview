@@ -1,6 +1,0 @@
-{
-  "operation": "respond",
-  "from": "03-intro",
-  "scenario": "Gửi lại nguyên văn câu 1 từ snapshot v3 sau HTTP 503. Giữ cùng turn_id và expected_state_version để kiểm chứng chuyển trạng thái có thể thử lại.",
-  "answer": "Seq Scan phải đọc bảng rồi lọc các đơn pending, còn Sort phải sắp các dòng phù hợp theo created_at. Nếu số dòng giữ lại lớn thì sắp xếp có thể tốn bộ nhớ hoặc tràn xuống đĩa. Em nghĩ nên thêm chỉ mục, nhưng chưa chốt cột nào đứng trước nên chưa đưa câu lệnh SQL."
-}

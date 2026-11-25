@@ -1,6 +1,0 @@
-{
-  "operation": "respond",
-  "from": "09-q06",
-  "scenario": "Trả lời đúng tiêu chí cấu hình broker sau khi được hỏi sâu, phân biệt consumer crash và broker restart.",
-  "answer": "Em đặt auto_ack=False và gọi basic_ack trên cùng channel chỉ sau khi ghi nhận giao dịch thành công. Nếu consumer hoặc channel chết trước ACK, message chưa ACK có thể được giao lại. Em khai báo queue durable=True và exchange durable; để message có thể tồn tại qua lần khởi động lại broker, phía publish cũng đánh dấu message là persistent. Durable giữ cấu hình queue, còn việc gửi message thành công có thể xác nhận bằng publisher confirms."
-}

@@ -1,6 +1,0 @@
-{
-  "operation": "respond",
-  "from": "06-q03",
-  "scenario": "Trả lời sai có chủ đích bằng một lỗi Python thực tế. Dict giữ thứ tự chèn khóa nhưng comprehension ghi đè giá trị khi event_id lặp.",
-  "answer": "def deduplicate_events(events):\n    by_id = {event['event_id']: event for event in events}\n    return list(by_id.values())\n\nEm dùng dict vì tra theo khóa nhanh. Dict giữ thứ tự lần đầu thêm khóa nên theo em mỗi mã sẽ giữ nguyên sự kiện đầu tiên."
-}

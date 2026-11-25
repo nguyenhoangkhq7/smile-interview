@@ -1,6 +1,0 @@
-{
-  "operation": "respond",
-  "from": "04-q01-retry",
-  "scenario": "Trả lời đúng câu chẩn đoán ở mức dễ hơn, có điều kiện theo selectivity và tách phần lọc khỏi phần sắp xếp.",
-  "answer": "Có thể. B-tree trên status cho phép tìm các bản ghi pending mà không phải đọc tuần tự cả bảng, nhất là khi pending chiếm tỷ lệ nhỏ. Nếu phần lớn đơn hàng là pending, PostgreSQL vẫn có thể chọn Seq Scan vì đọc nhiều heap page qua index đắt hơn. Index riêng trên status cũng không cung cấp thứ tự created_at, nên vẫn có thể cần Sort."
-}
