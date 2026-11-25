@@ -1,5 +1,5 @@
-.env
 **/.env
+**/.env.*
 .git
 .gitignore
 **/__pycache__
@@ -9,8 +9,11 @@
 *.md
 *.zip
 matching_cv/data/cache/
+matching_cv/data/checkpoints/
 matching_cv/data/processed/
 matching_cv/dataset/
+matching_cv/experiments/
+matching_cv/tests/
 adaptive_questioning/optimization/results/
 adaptive_questioning/optimization/corpora/
 tests_adaptive_questioning/

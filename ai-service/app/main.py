@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from matching_cv.app.api.v1.endpoints.unified import router as matching_cv_router
+from matching_cv.app.services.gnn_inference_service import gnn_inference_service
 from skill_gap.api.routes import router as skill_gap_router
 from adaptive_questioning.evidence.routes import init_evidence_workflow, router as evidence_router
 from voice.routes import router as voice_router
@@ -18,6 +19,8 @@ load_dotenv(_ROOT_DIR / ".env", override=True)
 
 @asynccontextmanager
 async def app_lifespan(application: FastAPI):
+    if settings.GNN_REQUIRE_CHECKPOINT:
+        gnn_inference_service.get_model()
     init_evidence_workflow(application)
     yield
 

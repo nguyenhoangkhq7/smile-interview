@@ -3,9 +3,10 @@ set -euo pipefail
 
 # Nightly PostgreSQL backup from Docker Compose container directly to private Amazon S3.
 # Required env: BACKUP_S3_BUCKET (e.g. smile-interview)
-# Optional env: COMPOSE_FILE (default deploy/docker-compose.staging.yml), POSTGRES_DB, POSTGRES_USER, BACKUP_S3_PREFIX
+# Optional env: COMPOSE_FILE, COMPOSE_ENV_FILE, POSTGRES_DB, POSTGRES_USER, BACKUP_S3_PREFIX
 
 COMPOSE_FILE="${COMPOSE_FILE:-deploy/docker-compose.staging.yml}"
+COMPOSE_ENV_FILE="${COMPOSE_ENV_FILE:-.env}"
 POSTGRES_DB="${POSTGRES_DB:-interview_practice_db}"
 POSTGRES_USER="${POSTGRES_USER:-postgres}"
 BACKUP_S3_BUCKET="${BACKUP_S3_BUCKET:?Set BACKUP_S3_BUCKET}"
@@ -17,7 +18,7 @@ cleanup() { rm -f "$TMP_FILE"; }
 trap cleanup EXIT
 
 echo "[backup] Dumping PostgreSQL database '${POSTGRES_DB}'..."
-docker compose -f "$COMPOSE_FILE" exec -T postgres \
+docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE" exec -T postgres \
   pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc --no-owner --no-acl > "$TMP_FILE"
 
 if [ ! -s "$TMP_FILE" ]; then

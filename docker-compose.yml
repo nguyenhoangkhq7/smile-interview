@@ -23,7 +23,6 @@ services:
       dockerfile: Dockerfile
     restart: always
     env_file:
-      - .env
       - ./backend/.env
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-interview_practice_db}
@@ -45,7 +44,6 @@ services:
     container_name: ai_service
     restart: always
     env_file:
-      - .env
       - ./ai-service/.env
     environment:
       PORT: 8000
@@ -54,23 +52,24 @@ services:
       - "8000:8000"
     volumes:
       - sbert_cache:/app/.cache/huggingface
+      - type: bind
+        source: ${GNN_CHECKPOINT_DIR:-./ai-service/matching_cv/data/checkpoints/paper_aligned_gnn}
+        target: /app/matching_cv/data/checkpoints/paper_aligned_gnn
+        read_only: true
 
   web-app:
     build:
       context: ./web-app
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8081}
     container_name: web_app
     restart: always
-    env_file:
-      - .env
-      - ./web-app/.env.local
     ports:
       - "3000:3000"
-    environment:
-      NODE_ENV: production
-      NEXT_PUBLIC_API_BASE_URL: http://localhost:8081
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
 volumes:
   postgres_data:
