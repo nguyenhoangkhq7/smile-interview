@@ -58,9 +58,17 @@ server:
     keep-alive-timeout: 300000
 
 app:
+  cors:
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:*}
+
   jwt:
     secret: ${JWT_SECRET:c3VwZXJzZWNyZXRrZXlmb3JkZXZlbG9wbWVudGVudmlyb25tZW50MjU2Yml0cw==}
     expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+    allow-default-secret: ${APP_JWT_ALLOW_DEFAULT_SECRET:true}
+
+  security:
+    require-hardened-admin: ${APP_SECURITY_REQUIRE_HARDENED_ADMIN:false}
+    admin-bootstrap-password: ${ADMIN_BOOTSTRAP_PASSWORD:}
 
   ai:
     fastapi:

@@ -7,6 +7,7 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -33,11 +34,36 @@ import java.util.function.Function;
 @Service
 public class JwtService {
 
+    public static final String DEV_DEFAULT_SECRET =
+            "c3VwZXJzZWNyZXRrZXlmb3JkZXZlbG9wbWVudGVudmlyb25tZW50MjU2Yml0cw==";
+
     @Value("${app.jwt.secret}")
     private String jwtSecret;
 
     @Value("${app.jwt.expiration-ms:86400000}")
     private long jwtExpirationMs;
+
+    @Value("${app.jwt.allow-default-secret:true}")
+    private boolean allowDefaultSecret = true;
+
+    @PostConstruct
+    void validateSecret() {
+        boolean blank = jwtSecret == null || jwtSecret.isBlank();
+        boolean isDefault = !blank && DEV_DEFAULT_SECRET.equals(jwtSecret.trim());
+        if (!allowDefaultSecret) {
+            if (blank) {
+                throw new IllegalStateException("JWT_SECRET must be configured when app.jwt.allow-default-secret=false");
+            }
+            if (isDefault) {
+                throw new IllegalStateException("Refusing to start with the public development JWT_SECRET");
+            }
+            if (decodeKeyBytes().length < 32) {
+                throw new IllegalStateException("JWT_SECRET must be at least 256 bits (32 bytes)");
+            }
+        } else if (isDefault) {
+            log.warn("Using development default JWT_SECRET; set JWT_SECRET and APP_JWT_ALLOW_DEFAULT_SECRET=false for staging/production");
+        }
+    }
 
     // ----------------------------------------------------------------
     // Token generation
@@ -140,16 +166,18 @@ public class JwtService {
     // ----------------------------------------------------------------
 
     private Key getSigningKey() {
-        byte[] keyBytes;
+        return Keys.hmacShaKeyFor(decodeKeyBytes());
+    }
+
+    private byte[] decodeKeyBytes() {
         try {
-            keyBytes = Decoders.BASE64.decode(jwtSecret);
+            return Decoders.BASE64.decode(jwtSecret);
         } catch (Exception e1) {
             try {
-                keyBytes = Decoders.BASE64URL.decode(jwtSecret);
+                return Decoders.BASE64URL.decode(jwtSecret);
             } catch (Exception e2) {
-                keyBytes = jwtSecret.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                return jwtSecret.getBytes(java.nio.charset.StandardCharsets.UTF_8);
             }
         }
-        return Keys.hmacShaKeyFor(keyBytes);
     }
 }

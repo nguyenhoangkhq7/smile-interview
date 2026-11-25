@@ -704,7 +704,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dataset-root",
         type=Path,
-        default=Path(r"matching_cv\dataset\synthetic_cv_jd_dataset_v2-20261118T164928Z-1-001\synthetic_cv_jd_dataset_v2"),
+        default=Path(r"matching_cv\dataset\synthetic_cv_jd_dataset_v2\synthetic_cv_jd_dataset_v2"),
     )
     parser.add_argument("--output", type=Path, default=Path("adaptive_questioning/optimization/results/module3_100_cases.json"))
     parser.add_argument("--answer-model", type=str, default="google/gemini-2.5-flash")
