@@ -13,8 +13,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.security.Key;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
@@ -22,20 +25,14 @@ import java.util.function.Function;
 /**
  * Centralized JWT service for token generation, claim extraction and validation.
  *
- * <p>Configure via {@code application.yaml}:
- * <pre>
- * app:
- *   jwt:
- *     secret: &lt;Base64-encoded 256-bit key&gt;
- *     expiration-ms: 86400000   # 24 h
- * </pre>
+ * <p>Set {@code JWT_SECRET} to a signing key of at least 256 bits.
  */
 @Slf4j
 @Service
 public class JwtService {
 
-    public static final String DEV_DEFAULT_SECRET =
-            "c3VwZXJzZWNyZXRrZXlmb3JkZXZlbG9wbWVudGVudmlyb25tZW50MjU2Yml0cw==";
+    private static final String PUBLIC_DEVELOPMENT_KEY_SHA256 =
+            "0e170e0d88b06b1128197f6344b9f560928711d0f86d02db19f6aae9fa2de91e";
 
     @Value("${app.jwt.secret}")
     private String jwtSecret;
@@ -43,25 +40,26 @@ public class JwtService {
     @Value("${app.jwt.expiration-ms:86400000}")
     private long jwtExpirationMs;
 
-    @Value("${app.jwt.allow-default-secret:true}")
-    private boolean allowDefaultSecret = true;
-
     @PostConstruct
     void validateSecret() {
-        boolean blank = jwtSecret == null || jwtSecret.isBlank();
-        boolean isDefault = !blank && DEV_DEFAULT_SECRET.equals(jwtSecret.trim());
-        if (!allowDefaultSecret) {
-            if (blank) {
-                throw new IllegalStateException("JWT_SECRET must be configured when app.jwt.allow-default-secret=false");
-            }
-            if (isDefault) {
-                throw new IllegalStateException("Refusing to start with the public development JWT_SECRET");
-            }
-            if (decodeKeyBytes().length < 32) {
-                throw new IllegalStateException("JWT_SECRET must be at least 256 bits (32 bytes)");
-            }
-        } else if (isDefault) {
-            log.warn("Using development default JWT_SECRET; set JWT_SECRET and APP_JWT_ALLOW_DEFAULT_SECRET=false for staging/production");
+        if (jwtSecret == null || jwtSecret.isBlank()) {
+            throw new IllegalStateException("JWT_SECRET must be configured");
+        }
+        byte[] keyBytes = decodeKeyBytes();
+        if (keyBytes.length < 32) {
+            throw new IllegalStateException("JWT_SECRET must be at least 256 bits (32 bytes)");
+        }
+        if (isPublicDevelopmentKey(keyBytes)) {
+            throw new IllegalStateException("Refusing to start with the public development JWT_SECRET");
+        }
+    }
+
+    private static boolean isPublicDevelopmentKey(byte[] keyBytes) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(keyBytes);
+            return PUBLIC_DEVELOPMENT_KEY_SHA256.equals(HexFormat.of().formatHex(digest));
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA-256 unavailable", ex);
         }
     }
 
