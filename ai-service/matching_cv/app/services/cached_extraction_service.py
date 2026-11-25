@@ -9,6 +9,7 @@ from typing import Any, Dict, Optional, Tuple
 
 from fastapi import HTTPException, status
 
+from app.ai_runtime import active
 from matching_cv.app.core.config import settings
 from matching_cv.app.schemas.unified_skill_extraction import UnifiedExtractFileResponse
 from matching_cv.app.services.document_parser import DocumentParserService
@@ -96,6 +97,8 @@ class CachedExtractionService:
         jd_filename: str,
     ) -> Tuple[Optional[UnifiedExtractFileResponse], Optional[str], Optional[str]]:
         """Return cached extraction, matching pair ID, and cache provenance when available."""
+        if active.get().settings is not None:
+            return None, None, None
         mapping, hash_to_id = self._load_mapping()
         cv_hash = hashlib.sha256(cv_text.encode("utf-8")).hexdigest()
         jd_hash = hashlib.sha256(jd_text.encode("utf-8")).hexdigest()

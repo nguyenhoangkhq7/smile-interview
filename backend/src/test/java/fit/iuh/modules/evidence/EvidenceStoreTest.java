@@ -20,7 +20,8 @@ class EvidenceStoreTest {
     private final SessionRepository sessions = mock(SessionRepository.class);
     private final SessionTurnRepository turns = mock(SessionTurnRepository.class);
     private final EvidenceJson json = new EvidenceJson(new ObjectMapper());
-    private final EvidenceStore store = new EvidenceStore(runs, commands, sessions, turns, json);
+    private final EvidenceStore store = new EvidenceStore(runs, commands, sessions, turns, json,
+            mock(EvidenceAdmission.class));
 
     @BeforeEach
     void setup() {

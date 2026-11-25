@@ -2,10 +2,13 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Dict
 from dotenv import load_dotenv
+import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
+from app.ai_runtime import runtime_middleware
+from app.ai_runtime_routes import router as runtime_router
 from matching_cv.app.api.v1.endpoints.unified import router as matching_cv_router
 from skill_gap.api.routes import router as skill_gap_router
 from adaptive_questioning.evidence.routes import init_evidence_workflow, router as evidence_router
@@ -19,7 +22,9 @@ load_dotenv(_ROOT_DIR / ".env", override=True)
 @asynccontextmanager
 async def app_lifespan(application: FastAPI):
     init_evidence_workflow(application)
-    yield
+    async with httpx.AsyncClient(timeout=5, trust_env=False) as client:
+        application.state.ai_runtime_http = client
+        yield
 
 
 def create_app() -> FastAPI:
@@ -47,6 +52,8 @@ def create_app() -> FastAPI:
     application.include_router(skill_gap_router)
     application.include_router(evidence_router)
     application.include_router(voice_router)
+    application.include_router(runtime_router)
+    application.middleware("http")(runtime_middleware)
 
     @application.get("/health", tags=["Health"])
     async def health_check() -> Dict[str, str]:

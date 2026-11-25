@@ -28,12 +28,10 @@ class ModelLoader:
         if getattr(self, "_initialized", False):
             return
 
-        self._model: Optional[SentenceTransformer] = None
         self._models: dict[tuple[str, Optional[str]], SentenceTransformer] = {}
         self._resolved_revisions: dict[tuple[str, Optional[str]], Optional[str]] = {}
         self._device: str = self._resolve_device()
         self._model_name: str = settings.STAGE3_MODEL_NAME
-        self._is_loaded: bool = False
         self._initialized: bool = True
 
     def _resolve_device(self) -> str:
@@ -69,7 +67,7 @@ class ModelLoader:
 
             logger.info(f"Loading embedding model '{target_model}' (revision={revision}) on device: {self._device}...")
             try:
-                load_kwargs: dict[str, Any] = {"device": self._device}
+                load_kwargs: dict[str, Any] = {"device": self._device, "trust_remote_code": False}
                 if revision:
                     load_kwargs["revision"] = revision
                 loaded_model = SentenceTransformer(target_model, **load_kwargs)
@@ -87,14 +85,18 @@ class ModelLoader:
                     resolved_rev = revision
                 self._resolved_revisions[target_key] = resolved_rev
 
-                if target_model == self._model_name and revision is None:
-                    self._model = loaded_model
-                    self._is_loaded = True
+                if len(self._models) > 2:
+                    oldest = next(iter(self._models))
+                    del self._models[oldest]
+                    self._resolved_revisions.pop(oldest, None)
                 logger.info(f"Model '{target_model}' (resolved_revision={resolved_rev}) loaded successfully on {self._device}.")
                 return loaded_model
             except Exception as e:
                 logger.error(f"Failed to load model '{target_model}': {str(e)}", exc_info=True)
                 raise e
+
+    def loaded(self, model_name: str, revision: Optional[str]) -> bool:
+        return (model_name, revision) in self._models
 
     def get_model(
         self,
@@ -105,15 +107,9 @@ class ModelLoader:
         target_model = model_name or self._model_name
         target_key = (target_model, revision)
 
-        if target_key not in self._models or self._models[target_key] is None:
-            logger.warning(
-                f"Model '{target_model}' (revision={revision}) requested before initialization. Attempting on-demand load..."
-            )
-            self.load_model(target_model, revision=revision)
-
         model = self._models.get(target_key)
         if model is None:
-            raise RuntimeError(f"Model '{target_model}' (revision={revision}) is not initialized and could not be loaded.")
+            return self.load_model(target_model, revision=revision)
         return model
 
     def get_model_dimension(
@@ -172,7 +168,7 @@ class ModelLoader:
     @property
     def is_loaded(self) -> bool:
         """Check if default model is currently loaded in memory."""
-        return (self._is_loaded and self._model is not None) or len(self._models) > 0
+        return bool(self._models)
 
     def get_info(self) -> dict[str, Any]:
         """Return diagnostic details regarding model status."""

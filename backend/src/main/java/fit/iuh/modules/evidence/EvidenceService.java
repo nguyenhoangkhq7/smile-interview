@@ -47,6 +47,7 @@ public class EvidenceService {
     private final EvidenceAiClient ai;
     private final EvidenceInputs inputs;
     private final EvidenceJson json;
+    private final EvidenceAdmission admission;
 
     public JsonNode read(String sessionId, User user) {
         owned(sessionId, user);
@@ -96,6 +97,8 @@ public class EvidenceService {
         if (session.getAiInterviewSessionId() != null || !turns.findBySessionIdOrderByIdAsc(sessionId).isEmpty()) {
             throw EvidenceStore.conflict("Legacy session must continue with its original engine; clone to use V2");
         }
+        admission.check(config);
+        admission.checkQuota(user.getId(), false);
         var start = new java.util.HashMap<String, Object>();
         start.put("session_id", sessionId);
         start.put("config", config);

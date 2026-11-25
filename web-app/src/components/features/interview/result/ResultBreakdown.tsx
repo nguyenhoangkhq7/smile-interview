@@ -13,7 +13,7 @@ import {
   skillStatuses, uniqueFindings, type ResultData,
 } from './resultData';
 
-export const resultPanel = 'min-w-0 rounded-2xl border border-slate-200/80 bg-card p-4 shadow-xs sm:p-5';
+export const resultPanel = 'min-w-0 rounded-2xl border border-slate-200/80 dark:border-border/80 bg-card p-4 shadow-xs sm:p-5';
 export const resultSection = 'scroll-mt-(--result-scroll-mt,5rem) space-y-3';
 
 export function AnswerContent({ content, mode, compact = false }: { content: string; mode?: string; compact?: boolean }) {
@@ -39,7 +39,7 @@ export function FindingList({ items, empty, preview = 3 }: { items: readonly str
       </ul>
       {items.length > preview && (
         <details className="group/findings">
-          <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-xs font-semibold text-slate-600 underline-offset-4 hover:underline">
+          <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-xs font-semibold text-slate-600 dark:text-muted-foreground underline-offset-4 hover:underline">
             Xem thêm {items.length - preview} ý <ChevronDown size={14} className="group-open/findings:rotate-180" />
           </summary>
           <ul className="mt-2 list-disc space-y-1.5 pl-4 text-sm leading-relaxed wrap-anywhere">
@@ -57,7 +57,7 @@ export function ResultCoachingSummary({ summary }: { summary: string }) {
       <h2 className="flex items-center gap-1.5 text-sm font-bold">
         <MessageSquare size={16} className="text-indigo-700" /> Nhận xét & Coaching tổng hợp
       </h2>
-      <p className="text-sm leading-relaxed text-slate-800">{summary}</p>
+      <p className="text-sm leading-relaxed text-slate-800 dark:text-foreground">{summary}</p>
     </div>
   );
 }
@@ -80,12 +80,12 @@ export function ResultFeedback({ data }: { data: ResultData }) {
         'space-y-2 rounded-xl border p-4',
         mergedWeaknesses.length ? 'border-orange-200/70 bg-orange-50/70 text-orange-950'
           : attentionItems.length ? 'border-amber-200/70 bg-amber-50/60 text-amber-950'
-            : 'border-slate-200/80 bg-slate-50/80 text-slate-700',
+            : 'border-slate-200/80 dark:border-border/80 bg-slate-50/80 text-slate-700 dark:text-foreground',
       )}>
         <h2 className="flex items-center gap-1.5 text-sm font-bold">
           {mergedWeaknesses.length ? <TriangleAlert size={16} className="text-orange-700" />
             : attentionItems.length ? <Clock3 size={16} className="text-amber-700" />
-              : <MessageSquare size={16} className="text-slate-600" />}
+              : <MessageSquare size={16} className="text-slate-600 dark:text-muted-foreground" />}
           {mergedWeaknesses.length ? 'Cần cải thiện' : 'Lưu ý đánh giá'}
         </h2>
         <FindingList items={attentionItems} preview={2} empty="Không ghi nhận thiếu sót trong các nội dung đã đánh giá." />
@@ -103,10 +103,10 @@ function FilterBar<T extends string>({ filters, value, onChange, label }: {
   label: string;
 }) {
   return (
-    <div role="group" aria-label={label} className="flex flex-wrap gap-1 rounded-xl bg-slate-100 p-1 text-xs">
+    <div role="group" aria-label={label} className="flex flex-wrap gap-1 rounded-xl bg-slate-100 dark:bg-muted p-1 text-xs">
       {filters.map(filter => (
         <button type="button" key={filter.id} aria-pressed={value === filter.id} onClick={() => onChange(filter.id)}
-          className="cursor-pointer rounded-lg px-2.5 py-1 font-medium text-slate-700 hover:bg-white/60 aria-pressed:bg-white aria-pressed:text-[#a02707] aria-pressed:shadow-xs">
+          className="cursor-pointer rounded-lg px-2.5 py-1 font-medium text-slate-700 dark:text-foreground hover:bg-white/60 dark:hover:bg-card/60 aria-pressed:bg-white dark:aria-pressed:bg-card aria-pressed:text-[#a02707] dark:aria-pressed:text-orange-300 aria-pressed:shadow-xs">
           {filter.label} ({filter.count})
         </button>
       ))}
@@ -138,18 +138,18 @@ function SkillCard({ skill }: { skill: ResultData['skills'][number] }) {
             {status.label}
           </span>
         </div>
-        <p className="text-xs text-slate-600">
+        <p className="text-xs text-slate-600 dark:text-muted-foreground">
           {skill.questionCount} câu hỏi
           {allCriteria.length > 0 && ` · Đạt ${passedCount}/${allCriteria.length} tiêu chí`}
         </p>
         {meaningfulClaims.length > 0 && (
-          <p className="line-clamp-2 text-sm text-slate-700">{meaningfulClaims.join('; ')}</p>
+          <p className="line-clamp-2 text-sm text-slate-700 dark:text-foreground">{meaningfulClaims.join('; ')}</p>
         )}
       </div>
 
       {allCriteria.length > 0 && (
-        <details className="group border-t border-slate-100 pt-2.5">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-xs font-semibold text-[#a02707]">
+        <details className="group border-t border-slate-100 dark:border-border pt-2.5">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-xs font-semibold text-[#a02707] dark:text-orange-300">
             Xem tiêu chí ({allCriteria.length})
             <ChevronDown size={15} className="group-open:rotate-180" />
           </summary>
@@ -159,13 +159,13 @@ function SkillCard({ skill }: { skill: ResultData['skills'][number] }) {
               const customClaim = !isBoilerplateClaim(objective.claim, objective.skill_id);
               return (
                 <div key={objective.objective_id} className="space-y-1.5 text-xs">
-                  {customClaim && <p className="font-semibold text-slate-800">{objective.claim}</p>}
+                  {customClaim && <p className="font-semibold text-slate-800 dark:text-foreground">{objective.claim}</p>}
                   <ul className="space-y-1.5">
                     {criteria.map(criterion => {
                       const cStatus = skillStatuses[assessmentStatus(criterion.assessment)];
                       return (
                         <li key={criterion.criterion_id} className="flex flex-wrap items-start justify-between gap-2 rounded-lg bg-slate-50 px-2.5 py-2">
-                          <span className="min-w-0 flex-1 leading-relaxed text-slate-700 wrap-anywhere">{criterion.description}</span>
+                          <span className="min-w-0 flex-1 leading-relaxed text-slate-700 dark:text-foreground wrap-anywhere">{criterion.description}</span>
                           <span className={cn('shrink-0 rounded-md px-2 py-0.5 text-[11px] font-medium', cStatus.tone)}>
                             {assessmentLabels[criterion.assessment]}
                           </span>
@@ -264,54 +264,54 @@ export function ResultQuestions({ questions }: { questions: ResultData['question
           const hasEvaluation = Boolean(turn.feedback?.trim() || rationales.length || excerpts.length);
 
           return (
-            <details key={turn.turn_id} className="group rounded-xl border border-slate-200/80 bg-card shadow-xs">
+            <details key={turn.turn_id} className="group rounded-xl border border-slate-200/80 dark:border-border/80 bg-card shadow-xs">
               <summary className="flex cursor-pointer list-none items-center gap-3 p-3.5 sm:px-4">
                 <span className={cn('grid size-7 shrink-0 place-items-center rounded-lg border text-xs font-bold tabular-nums', badge.tone)}>
                   {String(index + 1).padStart(2, '0')}
                 </span>
                 <span className="min-w-0 flex-1 space-y-0.5">
                   <span className="flex flex-wrap items-center gap-2 text-xs">
-                    {skillId && <span className="font-semibold text-slate-700">{skillLabel(skillId)}</span>}
+                    {skillId && <span className="font-semibold text-slate-700 dark:text-foreground">{skillLabel(skillId)}</span>}
                     <span className={cn('rounded-full border px-2 py-0.5 text-[11px] font-medium', badge.tone)}>{badge.label}</span>
                   </span>
-                  <span className="line-clamp-1 block text-sm font-medium text-slate-900 wrap-anywhere">{turn.question}</span>
+                  <span className="line-clamp-1 block text-sm font-medium text-slate-900 dark:text-foreground wrap-anywhere">{turn.question}</span>
                 </span>
-                <ChevronDown size={17} className="shrink-0 text-slate-500 group-open:rotate-180" />
+                <ChevronDown size={17} className="shrink-0 text-slate-500 dark:text-muted-foreground group-open:rotate-180" />
               </summary>
-              <div className="space-y-3 border-t border-slate-100 bg-slate-50/60 p-4 text-sm wrap-anywhere">
+              <div className="space-y-3 border-t border-slate-100 dark:border-border bg-slate-50/60 p-4 text-sm wrap-anywhere">
                 <div className="space-y-1">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-xs font-semibold text-slate-500 uppercase">Câu hỏi</p>
+                    <p className="text-xs font-semibold text-slate-500 dark:text-muted-foreground uppercase">Câu hỏi</p>
                     {depthRole && depthRole !== 'TARGET' && (
-                      <span className="rounded-md bg-slate-200/80 px-2 py-0.5 text-[11px] font-medium text-slate-700">
+                      <span className="rounded-md bg-slate-200/80 dark:bg-muted/80 px-2 py-0.5 text-[11px] font-medium text-slate-700 dark:text-foreground">
                         {evidenceDepthLabels[depthRole]}
                       </span>
                     )}
                   </div>
                   <MarkdownContent content={turn.question} />
                 </div>
-                <div className="space-y-1.5 rounded-lg border border-slate-200/70 bg-card p-3">
-                  <p className="text-xs font-semibold text-slate-500 uppercase">Câu trả lời của bạn</p>
+                <div className="space-y-1.5 rounded-lg border border-slate-200/70 dark:border-border/70 bg-card p-3">
+                  <p className="text-xs font-semibold text-slate-500 dark:text-muted-foreground uppercase">Câu trả lời của bạn</p>
                   <AnswerContent content={turn.answer || 'Chưa có câu trả lời.'} mode={turn.mode} />
                 </div>
                 {hasEvaluation ? (
-                  <div className="space-y-1.5 rounded-lg border border-sky-200/60 bg-sky-50/70 p-3 text-slate-800">
+                  <div className="space-y-1.5 rounded-lg border border-sky-200/60 bg-sky-50/70 p-3 text-slate-800 dark:text-foreground">
                     <p className="text-xs font-semibold text-sky-900 uppercase">Đánh giá từ AI</p>
                     {turn.feedback && <MarkdownContent content={turn.feedback} />}
                     {rationales.map(rationale => (
                       (!turn.feedback || !normalizeSameText(rationale, turn.feedback)) && (
-                        <p key={rationale} className="text-sm text-slate-700">{rationale}</p>
+                        <p key={rationale} className="text-sm text-slate-700 dark:text-foreground">{rationale}</p>
                       )
                     ))}
                     {excerpts.map((item, idx) => (
-                      <div key={idx} className="border-l-2 border-orange-300 pl-3 text-xs text-slate-600">
-                        <p className="mb-1 font-medium text-slate-500">Đoạn được ghi nhận:</p>
+                      <div key={idx} className="border-l-2 border-orange-300 pl-3 text-xs text-slate-600 dark:text-muted-foreground">
+                        <p className="mb-1 font-medium text-slate-500 dark:text-muted-foreground">Đoạn được ghi nhận:</p>
                         <AnswerContent content={item.response_excerpt} mode={turn.mode} compact />
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-slate-600">
+                  <p className="text-xs text-slate-600 dark:text-muted-foreground">
                     {clarifiedLater
                       ? 'Câu trả lời đúng một phần; người phỏng vấn đã hỏi tiếp ngay sau đó để làm rõ thêm.'
                       : 'Chưa đủ dữ kiện để kết luận cho câu trả lời này.'}
@@ -359,7 +359,7 @@ export function ResultStudy({
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="space-y-1">
           <h2 className="text-lg font-bold">Ôn tập & bước tiếp theo</h2>
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-slate-600 dark:text-muted-foreground">
             {groups.length > 0
               ? 'Tập trung ôn lại các điểm chưa vững trước khi luyện lượt phỏng vấn mới.'
               : 'Buổi này không ghi nhận điểm yếu cần ôn thêm. Bạn có thể mở lộ trình ôn tập hoặc thử sức lượt mới.'}
@@ -384,7 +384,7 @@ export function ResultStudy({
       {groups.length > 0 && (
         <div className="grid items-start gap-3 pt-1 md:grid-cols-2">
           {groups.map(group => (
-            <article key={group.id} className="space-y-2 rounded-xl border border-slate-200/80 bg-white p-4">
+            <article key={group.id} className="space-y-2 rounded-xl border border-slate-200/80 dark:border-border/80 bg-white dark:bg-card p-4">
               <h3 className="flex items-center gap-2 text-sm font-bold wrap-anywhere">
                 <BookOpen size={16} className="shrink-0 text-orange-700" />
                 {skillLabel(group.id, null, group.objectives.flatMap(objective => objective.jd_evidence_spans))}
@@ -396,7 +396,7 @@ export function ResultStudy({
       )}
 
       {additionalRecommendations.length > 0 && (
-        <div className="rounded-xl border border-slate-200/80 bg-white p-4">
+        <div className="rounded-xl border border-slate-200/80 dark:border-border/80 bg-white dark:bg-card p-4">
           <FindingList items={additionalRecommendations} preview={3} />
         </div>
       )}

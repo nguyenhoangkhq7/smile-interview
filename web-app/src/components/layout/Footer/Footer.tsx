@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowUpRight, Mail, MapPin, Phone } from 'lucide-react';
+import { SystemThemeButton } from '../ThemePicker/ThemePicker';
 import styles from './footer.module.css';
 
 const footerGroups = [
@@ -71,7 +72,10 @@ export default function Footer() {
 
       <div className={styles.bottom}>
         <p>© 2025 Smile Interview. Giữ toàn bộ bản quyền.</p>
-        <Link href="/" className={styles.backToTop}>Smile Interview <span aria-hidden="true">↑</span></Link>
+        <div className={styles.bottomActions}>
+          <SystemThemeButton className={styles.systemTheme} />
+          <Link href="/" className={styles.backToTop}>Smile Interview <span aria-hidden="true">↑</span></Link>
+        </div>
       </div>
     </footer>
   );

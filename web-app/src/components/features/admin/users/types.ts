@@ -1,72 +1,50 @@
-export type AdminUserRole = 'USER' | 'ADMIN';
+export type AdminUserRole = 'USER' | 'ADMIN' | 'CANDIDATE';
 export type AdminUserStatus = 'ACTIVE' | 'LOCKED';
-export type UserDrawerTabKey = 'sessions' | 'resumes' | 'plans';
 
-export interface UserSessionSummaryItem {
-  id: string;
-  roleTitle: string;
-  scoreLabel: string;
-  scoreVariant: 'emerald' | 'blue' | 'neutral';
-  competencyText: string;
-  durationLabel: string;
-  confidencePct: number;
-  dateTimeLabel: string;
-}
-
-export interface UserResumeSummaryItem {
-  id: string;
-  fileName: string;
-  updatedAt: string;
-  fileSize: string;
-  matchPct: number;
-  iconColorClass: string;
-}
-
-export interface UserStudyPlanTask {
-  id: string;
-  label: string;
-  completed: boolean;
-}
-
-export interface UserStudyPlanSummary {
-  title: string;
-  completionPct: number;
-  tasks: UserStudyPlanTask[];
+export interface UserCatalogFilter {
+  search: string;
+  role: Exclude<AdminUserRole, 'ADMIN'> | '';
+  status: AdminUserStatus | '';
 }
 
 export interface AdminUserRecord {
-  key: string;
-  userIdCode: string;
-  initials: string;
+  id: string;
   fullName: string;
   email: string;
-  phone: string;
-  resumesCount: number;
-  sessionsCount: number;
-  avgScoreLabel: string;
-  completedTasksRatio: string;
+  phone: string | null;
   role: AdminUserRole;
   status: AdminUserStatus;
-  joinedDate: string;
-  isVerified?: boolean;
-  isSelfAccount?: boolean;
-  lockReason?: string;
-  avatarBgClass: string;
-  avatarTextClass: string;
-  recentSessions: UserSessionSummaryItem[];
-  resumes: UserResumeSummaryItem[];
-  studyPlan: UserStudyPlanSummary;
-  frequencyDeltaLabel: string;
-  frequencyBars: { heightClass: string; colorClass: string; label?: string }[];
+  joinedAt: string;
+  profilesCount: number;
+  sessionsCount: number;
+  self: boolean;
+  lockReason: string | null;
 }
 
 export interface UsersOverviewStats {
   totalUsers: number;
-  totalGrowth: string;
   activeUsers: number;
-  activeRatePct: string;
   lockedUsers: number;
-  lockedTag: string;
-  adminUsers: number;
-  adminTag: string;
+  registeredLast30Days: number;
+}
+
+export interface AdminUserPage {
+  users: AdminUserRecord[];
+  total: number;
+  page: number;
+  size: number;
+  stats: UsersOverviewStats;
+}
+
+export interface AdminUserDetail {
+  user: AdminUserRecord;
+  interviews: { id: string; roleTitle: string | null; status: string | null; score: number | null;
+    startedAt: string; endedAt: string | null }[];
+  profiles: { id: string; title: string; roleTitle: string; createdAt: string }[];
+  plans: { id: number; title: string; totalTasks: number; completedTasks: number }[];
+}
+
+export interface PasswordSetupLink {
+  token: string;
+  expiresAt: string;
 }

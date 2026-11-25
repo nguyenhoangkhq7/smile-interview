@@ -59,7 +59,7 @@ export function TaskNotesSection({ task, disabled, onUpdate }: TaskNotesSectionP
           <button
             type="button"
             onClick={startEditing}
-            className="rounded-lg px-2.5 py-1 text-xs font-semibold text-(--practice-muted) transition-colors hover:bg-slate-100 hover:text-(--practice-primary)"
+            className="rounded-lg px-2.5 py-1 text-xs font-semibold text-(--practice-muted) transition-colors hover:bg-slate-100 dark:hover:bg-muted hover:text-(--practice-primary)"
           >
             Chỉnh sửa
           </button>
@@ -71,7 +71,7 @@ export function TaskNotesSection({ task, disabled, onUpdate }: TaskNotesSectionP
           'rounded-xl border p-3.5 transition-all duration-150',
           editing
             ? 'border-(--practice-primary)/35 bg-card shadow-xs ring-2 ring-(--practice-primary)/10'
-            : 'border-slate-200/70 bg-(--practice-pale)/55 hover:border-slate-300/80',
+            : 'border-slate-200/70 dark:border-border/70 bg-(--practice-pale)/55 hover:border-slate-300/80 dark:hover:border-border/80',
         )}
       >
         {editing ? (
@@ -97,7 +97,7 @@ export function TaskNotesSection({ task, disabled, onUpdate }: TaskNotesSectionP
               placeholder="Thêm mô tả chi tiết, kiến thức trọng tâm hoặc câu hỏi cần ôn..."
               className="min-h-24 resize-y border-0 bg-transparent p-0 text-sm leading-relaxed shadow-none focus-visible:ring-0"
             />
-            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 dark:border-border pt-2.5">
               <span className="inline-flex items-center gap-1 text-[11px] text-(--practice-muted)">
                 <Sparkles size={12} aria-hidden="true" />
                 Nhấn Ctrl + Enter để lưu nhanh

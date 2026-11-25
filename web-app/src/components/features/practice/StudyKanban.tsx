@@ -69,7 +69,7 @@ function StudyTaskCard({ task, children, childrenById, selectedTaskId, selectedT
       }}
       onDragLeave={(event) => { if (!(event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget))) onDropOnTask(event, task, 'leave'); }}
       onDrop={(event) => onDropOnTask(event, task)}
-      className={cn(styles.kanbanTaskCard, 'relative rounded-xl border bg-card p-2 shadow-xs sm:p-2.5', nestTargetId === task.id && styles.kanbanNestingTarget, nestingTaskId === task.id && styles.kanbanNestedArrival, selectedTaskId === task.id ? 'border-(--practice-primary) ring-2 ring-(--practice-orange)' : 'border-slate-200')}>
+      className={cn(styles.kanbanTaskCard, 'relative rounded-xl border bg-card p-2 shadow-xs sm:p-2.5', nestTargetId === task.id && styles.kanbanNestingTarget, nestingTaskId === task.id && styles.kanbanNestedArrival, selectedTaskId === task.id ? 'border-(--practice-primary) ring-2 ring-(--practice-orange)' : 'border-slate-200 dark:border-border')}>
       {task.status !== 'DONE' && <button type="button"
         aria-label={task.gapNeedsConfirmation ? `Xác nhận ${task.title} đã được xử lý` : `Đánh dấu ${task.title} đã hoàn thành`}
         title={task.gapNeedsConfirmation ? 'Xác nhận đã xử lý theo kết quả phỏng vấn mới' : 'Đánh dấu hoàn thành'}
@@ -124,7 +124,7 @@ function StudyTaskCard({ task, children, childrenById, selectedTaskId, selectedT
         {nestTargetId === task.id && <span aria-hidden="true" className={cn(styles.kanbanNestPlaceholder, 'mt-2 grid min-h-9 place-items-center rounded-lg border border-dashed px-2 text-center text-[11px] font-medium text-(--practice-primary)')}>Thả để lồng thành task con</span>}
       </button>
       {task.checklist.length > 0 && (
-        <div className="mt-1.5 border-t border-slate-100 pt-1.5 text-[11px]">
+        <div className="mt-1.5 border-t border-slate-100 dark:border-border pt-1.5 text-[11px]">
           <button
             type="button"
             aria-expanded={checklistOpen}
@@ -333,7 +333,7 @@ export function StudyKanban({ tasks, selectedTaskId, disabled, hasActiveFilters,
             className={cn(
               styles.kanbanColumn,
               'flex h-[68dvh] min-h-[26rem] min-w-0 flex-col gap-2 rounded-2xl border p-2.5 shadow-2xs transition-colors',
-              (isTarget || isSaving) ? 'border-(--practice-primary) bg-(--practice-orange)/35' : 'border-slate-100 bg-slate-50/70',
+              (isTarget || isSaving) ? 'border-(--practice-primary) bg-(--practice-orange)/35' : 'border-slate-100 dark:border-border bg-slate-50/70',
             )}>
             <div className="flex shrink-0 items-center justify-between gap-1 rounded-lg px-1.5 py-1"
               onDragOver={(event) => { if (!disabled && draggingId != null) { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; } }}
@@ -346,11 +346,11 @@ export function StudyKanban({ tasks, selectedTaskId, disabled, hasActiveFilters,
                 finishDrag();
                 void onChangeParent(draggedTask, null, status);
               }}>
-              <h3 className="flex items-center gap-1.5 text-[11px] font-bold tracking-wide uppercase text-slate-700">
+              <h3 className="flex items-center gap-1.5 text-[11px] font-bold tracking-wide uppercase text-slate-700 dark:text-foreground">
                 <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: studyTaskTones[status].color }} aria-hidden="true" />
                 {label}
               </h3>
-              <span className="rounded-full bg-card px-2 py-0.5 text-xs font-semibold tabular-nums text-slate-500 shadow-2xs border border-slate-100">{visibleCardCount}</span>
+              <span className="rounded-full bg-card px-2 py-0.5 text-xs font-semibold tabular-nums text-slate-500 dark:text-muted-foreground shadow-2xs border border-slate-100 dark:border-border">{visibleCardCount}</span>
             </div>
             {columnTasks.length ? (
               <ul tabIndex={0} aria-label={`Đầu việc: ${label}`}
@@ -392,14 +392,14 @@ export function StudyKanban({ tasks, selectedTaskId, disabled, hasActiveFilters,
                   data-insert-before={isTarget && insertion?.status === status && insertion.beforeId === null || undefined} />
               </ul>
             ) : (
-              <p className="grid min-h-16 flex-1 place-items-center rounded-xl border border-dashed border-slate-200 bg-card/40 px-2 py-2 text-center text-xs text-slate-400 sm:min-h-40 xl:min-h-0">
+              <p className="grid min-h-16 flex-1 place-items-center rounded-xl border border-dashed border-slate-200 dark:border-border bg-card/40 px-2 py-2 text-center text-xs text-slate-400 dark:text-muted-foreground sm:min-h-40 xl:min-h-0">
                 {isSaving ? 'Đang chuyển…' : isTarget ? 'Thả vào đây' : hasActiveFilters ? 'Không có task phù hợp' : 'Chưa có đầu việc'}
               </p>
             )}
             {addingStatus === status ? (
-              <form className="space-y-2 rounded-xl border border-slate-200 bg-card p-2 shadow-xs" onSubmit={(event) => { event.preventDefault(); void addQuickTask(status); }}>
+              <form className="space-y-2 rounded-xl border border-slate-200 dark:border-border bg-card p-2 shadow-xs" onSubmit={(event) => { event.preventDefault(); void addQuickTask(status); }}>
                 <Input autoFocus aria-label={`Tên task mới trong ${label}`} maxLength={160} placeholder="Nhập tiêu đề task…" value={newTitle}
-                  onChange={(event) => setNewTitle(event.target.value)} className="h-9 border-0 bg-slate-100/70 px-2 text-sm shadow-none focus-visible:bg-card" />
+                  onChange={(event) => setNewTitle(event.target.value)} className="h-9 border-0 bg-slate-100/70 dark:bg-muted/70 px-2 text-sm shadow-none focus-visible:bg-card" />
                 <div className="flex items-center gap-1.5">
                   <Button type="submit" size="sm" disabled={disabled || !newTitle.trim()} className="h-8 rounded-lg bg-[#315f86] px-3 text-white hover:bg-[#294f70]">Thêm thẻ</Button>
                   <Button type="button" size="icon-sm" variant="ghost" aria-label="Hủy thêm task" onClick={() => { setAddingStatus(null); setNewTitle(''); }}><X aria-hidden="true" /></Button>
@@ -407,7 +407,7 @@ export function StudyKanban({ tasks, selectedTaskId, disabled, hasActiveFilters,
               </form>
             ) : (
               <Button type="button" variant="ghost" disabled={disabled} onClick={() => { setAddingStatus(status); setNewTitle(''); }}
-                className="h-8.5 w-full justify-start rounded-xl px-2 text-xs font-semibold text-slate-500 hover:bg-card hover:text-slate-800 hover:shadow-2xs transition-all cursor-pointer">
+                className="h-8.5 w-full justify-start rounded-xl px-2 text-xs font-semibold text-slate-500 dark:text-muted-foreground hover:bg-card hover:text-slate-800 dark:hover:text-foreground hover:shadow-2xs transition-all cursor-pointer">
                 <Plus size={15} aria-hidden="true" /> Thêm thẻ
               </Button>
             )}

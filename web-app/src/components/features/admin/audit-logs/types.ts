@@ -1,36 +1,49 @@
-export type AuditActionType =
-  | 'UPDATE_POLICY'
-  | 'FORCE_CLOSE_SESSION'
-  | 'RETRY_JOB'
-  | 'LOCK_USER'
-  | 'UNLOCK_USER'
-  | 'RESET_PASSWORD'
-  | 'RELEASE_JOB_LEASE';
+export const auditActions = [
+  'CREATE_ADMIN', 'CHANGE_USER_ROLE', 'LOCK_USER', 'UNLOCK_USER', 'RESET_PASSWORD',
+  'RETRY_JOB', 'RETRY_FAILED_JOBS', 'RELEASE_JOB_LEASE', 'PRIORITIZE_JOB',
+  'UPDATE_POLICY', 'RESET_POLICY', 'REQUEST_STORAGE_CLEANUP', 'CLEANUP_STORAGE',
+] as const;
 
+export type AuditActionType = typeof auditActions[number];
 export type AuditBadgeVariant = 'primary' | 'error' | 'secondary' | 'neutral';
+export type AuditDatePreset = 'all' | 'today' | '7d' | '1m' | '2m' | 'day' | 'range';
 
-export interface AuditDiffItem {
-  field: string;
-  oldValue: string;
-  newValue: string;
-  description?: string;
+export interface AuditFilter {
+  search: string;
+  actorId: string;
+  action: '' | AuditActionType;
+  datePreset: AuditDatePreset;
+  date: string;
+  fromDate: string;
+  toDate: string;
 }
 
-export interface AuditLogRecord {
+export interface AuditActor { id: string; name: string }
+export interface AuditStats { total: number; today: number; admins: number }
+
+export interface AuditRow {
   id: string;
-  recordCode: string;
-  time: string;
-  date: string;
-  adminName: string;
-  adminInitials: string;
-  adminRole: string;
-  adminIp: string;
-  adminAvatarBgClass: string;
+  occurredAt: string;
+  actorId: string;
+  actorName: string;
   action: AuditActionType;
-  badgeVariant: AuditBadgeVariant;
-  targetType: string;
+  targetType: 'USER' | 'SKILL_GAP' | 'POLICY' | 'STORAGE';
   targetCode: string;
-  summaryText: string;
-  diffs: AuditDiffItem[];
-  jsonPayload: Record<string, unknown>;
+  summary: string;
+}
+
+export interface AuditPage {
+  rows: AuditRow[];
+  total: number;
+  page: number;
+  size: number;
+  stats: AuditStats;
+  actors: AuditActor[];
+}
+
+export interface AuditDetail {
+  event: AuditRow;
+  peerAddress: string | null;
+  changes: { field: string; oldValue: string; newValue: string }[];
+  details: Record<string, unknown>;
 }

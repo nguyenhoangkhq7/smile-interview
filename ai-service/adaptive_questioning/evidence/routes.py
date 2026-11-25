@@ -6,6 +6,8 @@ from time import monotonic
 
 from fastapi import APIRouter, HTTPException, Request
 
+from app.ai_runtime import active
+
 from ..optimization.compiler import DEFAULT_COMPILED_DIR
 from .models import (
     Blueprint, BlueprintRequest, ConversationRequest, NextQuestionRequest, Snapshot,
@@ -40,6 +42,20 @@ def init_evidence_workflow(app) -> EvidenceWorkflow | None:
 
 
 def workflow(request: Request) -> EvidenceWorkflow:
+    revision = active.get().revision
+    if revision:
+        with _workflow_lock:
+            entry = getattr(request.app.state, "configured_evidence_workflow", None)
+            if entry is None or entry[0] != revision:
+                workflow = EvidenceWorkflow(
+                    DSPyAssessmentProvider(compiled_dir=str(DEFAULT_COMPILED_DIR)),
+                    policy=configured_policy(),
+                    preparation_cache=PreparationCache(),
+                    prewarm_q1=True,
+                )
+                entry = (revision, workflow)
+                request.app.state.configured_evidence_workflow = entry
+            return entry[1]
     existing = getattr(request.app.state, "evidence_workflow", None)
     if existing is not None:
         return existing

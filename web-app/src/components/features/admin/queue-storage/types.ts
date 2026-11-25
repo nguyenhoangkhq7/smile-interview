@@ -1,50 +1,58 @@
-export type QueuePrimaryTabKey = 'skill-gap-jobs' | 'web-push' | 'trash-profiles' | 'storage';
-
 export type QueueJobStatus = 'FAILED' | 'RUNNING' | 'SUCCEEDED' | 'PENDING';
 
 export interface SkillGapJobItem {
   id: string;
   candidateName: string;
-  roleTitle: string;
+  roleTitle: string | null;
+  sessionId: string;
   status: QueueJobStatus;
-  statusDetail: string;
-  attemptsUsed: number;
-  maxAttempts: number;
-  availableAt: string;
-  leaseExpiresAt: string;
-  leaseRemainingText?: string;
-  isLeaseExpired?: boolean;
+  attempts: number;
   createdAt: string;
+  availableAt: string;
+  claimedAt: string | null;
+  leaseUntil: string | null;
+  claimToken: string | null;
+  finishedAt: string | null;
+  failureCode: string | null;
+  prioritized: boolean;
 }
 
 export interface QueueKpiStats {
   pendingCount: number;
-  pendingLatencyText: string;
   runningCount: number;
-  runningCpuLoadText: string;
   succeededCount: number;
-  succeededRateText: string;
   failedCount: number;
-  failedAlertText: string;
 }
 
-export interface StorageSegmentItem {
-  id: string;
-  label: string;
-  sizeGb: number;
-  subLabel?: string;
-  widthPct: number;
-  colorClass: string;
+export interface AdminQueuePage {
+  jobs: SkillGapJobItem[];
+  stats: QueueKpiStats;
+  page: number;
+  size: number;
+  total: number;
+  maxAttempts: number;
+}
+
+export interface QueueJobDetail {
+  job: SkillGapJobItem;
+  skillCount: number | null;
+  matchingScore: number | null;
+  degraded: boolean | null;
 }
 
 export interface StorageOverviewData {
-  bucketRegion: string;
-  totalUsedGb: number;
-  totalCapacityGb: number;
-  usedPercentage: number;
-  segments: StorageSegmentItem[];
-  orphanedFilesCount: number;
-  orphanedFilesSizeMb: number;
-  lastSyncedText: string;
-  retentionDays: number;
+  totalBytes: number;
+  quotaBytes: number | null;
+  segments: { code: string; bytes: number }[];
+  s3Available: boolean;
+  complete: boolean;
+  orphans: { ids: string[]; bytes: number; minimumAgeHours: number } | null;
+  cleanupBatchSize: number;
+  measuredAt: string;
+}
+
+export interface StorageCleanupResult {
+  deleted: number;
+  skipped: number;
+  failed: number;
 }

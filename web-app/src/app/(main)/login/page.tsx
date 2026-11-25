@@ -3,10 +3,11 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import styles from './login.module.css';
 import axiosClient from '@/lib/axiosClient';
 import { useAuthStore } from '@/store/authStore';
-import { analysisResultSearch } from '@/lib/authSession';
+import { analysisResultSearch, consumeSessionExpiredNotice } from '@/lib/authSession';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -17,9 +18,21 @@ export default function LoginPage() {
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    const notice = consumeSessionExpiredNotice();
+    if (notice) {
+      setError(notice);
+      toast.error(notice);
+    }
+  }, []);
+
   // Redirect if already logged in
   useEffect(() => {
     if (isAuthenticated && user) {
+      if (user.role === 'ADMIN') {
+        router.replace('/admin');
+        return;
+      }
       const result = analysisResultSearch();
       if (result) {
         router.replace('/interview/new' + result);
@@ -53,6 +66,10 @@ export default function LoginPage() {
         },
         data.token
       );
+
+      if (data.role === 'ADMIN') {
+        router.replace('/admin');
+      }
 
     } catch (err) {
       const axiosError = err as { response?: { data?: { detail?: string; message?: string } } };

@@ -62,3 +62,26 @@ a.contactLink:hover { color: #244f3b; }
   .contactColumn { max-width: 24rem; }
   .bottom { width: min(100% - 2rem, 1360px); font-size: 0.64rem; }
 }
+
+@media screen {
+  :global(.dark) .footer { border-color: var(--border); background: var(--card); color: var(--foreground); }
+  :global(.dark) .footer::before { background: var(--border); }
+  :global(.dark) :is(.brand, .columnTitle) { color: var(--foreground); }
+  :global(.dark) :is(.tagline, .description, .link, .contactIntro, .contactLink, .bottom, .backToTop) { color: var(--muted-foreground); }
+  :global(.dark) :is(.link:hover, a.contactLink:hover, .contactLink svg, .backToTop:hover) { color: #a5d4bb; }
+  :global(.dark) .bottom { border-color: var(--border); }
+}
+
+.bottomActions { display: flex; align-items: center; flex-wrap: wrap; gap: 0.75rem; }
+.systemTheme { display: inline-flex; align-items: center; gap: 0.3rem; min-height: 1.65rem; cursor: pointer; }
+.systemTheme:hover { text-decoration: underline; }
+.systemTheme:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.systemTheme[aria-pressed='true'] { color: var(--foreground); font-weight: 650; }
+
+@media (max-width: 700px) {
+  .bottom { flex-wrap: wrap; }
+}
+
+@media print {
+  .systemTheme { display: none; }
+}

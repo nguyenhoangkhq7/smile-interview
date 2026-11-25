@@ -57,6 +57,15 @@ server:
     connection-timeout: 300000
     keep-alive-timeout: 300000
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
 app:
   jwt:
     secret: ${JWT_SECRET:c3VwZXJzZWNyZXRrZXlmb3JkZXZlbG9wbWVudGVudmlyb25tZW50MjU2Yml0cw==}

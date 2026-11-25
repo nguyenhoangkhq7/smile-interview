@@ -74,7 +74,7 @@ export function StudyTaskChecklist({ items, actions, disabled, inputRef }: {
             <button
               type="button"
               onClick={openAddInput}
-              className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold text-foreground transition-colors hover:bg-slate-200/80"
+              className="inline-flex items-center gap-1 rounded-lg bg-slate-100 dark:bg-muted px-2.5 py-1 text-xs font-semibold text-foreground transition-colors hover:bg-slate-200/80 dark:hover:bg-muted/80"
             >
               <Plus size={13} aria-hidden="true" />
               Thêm mục
@@ -85,7 +85,7 @@ export function StudyTaskChecklist({ items, actions, disabled, inputRef }: {
 
       {/* Checklist Progress Bar */}
       {items.length > 0 && (
-        <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200/80 shadow-inner">
+        <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-muted/80 shadow-inner">
           <div
             className={cn(
               'h-full rounded-full transition-all duration-300 ease-out',
@@ -135,7 +135,7 @@ export function StudyTaskChecklist({ items, actions, disabled, inputRef }: {
                         'mt-0.5 grid size-5 shrink-0 place-items-center rounded-md border shadow-2xs',
                         item.isCompleted
                           ? 'scale-105 border-(--practice-primary) bg-(--practice-primary) text-white'
-                          : 'border-slate-300 bg-white text-transparent hover:border-(--practice-primary)',
+                          : 'border-slate-300 dark:border-border bg-white dark:bg-card text-transparent hover:border-(--practice-primary)',
                       )}
                     >
                       <Check size={13} strokeWidth={3} />

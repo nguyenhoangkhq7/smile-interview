@@ -8,6 +8,7 @@ import { loginPath } from '@/lib/authSession';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
+  requiredRole?: string;
 }
 
 // Zustand restores localStorage synchronously in the browser. The server
@@ -16,9 +17,10 @@ const subscribe = () => () => undefined;
 const browserSnapshot = () => true;
 const serverSnapshot = () => false;
 
-export default function ProtectedRoute({ children }: ProtectedRouteProps) {
+export default function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
   const router = useRouter();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const role = useAuthStore((state) => state.user?.role);
   const isBrowser = useSyncExternalStore(subscribe, browserSnapshot, serverSnapshot);
 
   useEffect(() => {
@@ -36,5 +38,14 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     );
   }
 
-  return isAuthenticated ? children : null;
+  if (!isAuthenticated) return null;
+  if (requiredRole && role !== requiredRole) {
+    return (
+      <p role="alert" className="mx-auto max-w-7xl px-4 py-10 text-sm text-muted-foreground">
+        Bạn không có quyền truy cập trang quản trị.
+      </p>
+    );
+  }
+
+  return children;
 }

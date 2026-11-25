@@ -1,78 +1,73 @@
-export type SessionFilterTabKey = 'all' | 'completed' | 'in_progress' | 'anomaly';
+import type { Assessment } from '@/services/evidenceInterview';
 
-export interface InspectionPipelineStage {
-  id: number;
-  stepCode: string;
-  title: string;
-  description: string;
-  leftMeta: string;
-  rightMeta: string;
-  isErrorMeta?: boolean;
-  isLockedMeta?: boolean;
-  isVerifiedStep?: boolean;
-}
+export type InterviewStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | 'ANOMALY' | 'OTHER';
+export type InterviewFilter = 'all' | InterviewStatus;
 
-export interface SessionTurnDetail {
+export interface InterviewSummary {
   id: string;
-  pillLabel: string;
-  dotVariant: 'emerald' | 'amber' | 'rose';
-  isDeepProbe?: boolean;
-  turnBadge: string;
-  topicTitle: string;
-  timeRange: string;
-  depthLabel: string;
-  aiStrategyTag: string;
-  aiStrategyDescription: string;
-  aiTimestamp: string;
-  aiTtsQuality: string;
-  aiPromptText: string;
-  candidateInitials: string;
-  candidateName: string;
-  candidateTimestamp: string;
-  candidateConfidencePct: number;
-  audioDuration: string;
-  transcriptBeforeMark: string;
-  transcriptHighlightedMark: string;
-  transcriptAfterMark: string;
-  transcriptSecondParagraph: string;
-  pitchLabel: string;
-  evidenceCode: string;
-  rubricLevel:
-    | 'DEMONSTRATED_ABOVE_TARGET'
-    | 'DEMONSTRATED_AT_TARGET'
-    | 'DEMONSTRATED_BELOW_TARGET';
-  linkedSkill: string;
-  taxonomyCode: string;
-  confidenceScoreLabel: string;
-  sourceTag: string;
-  sourceNote: string;
-  exactQuote: string;
+  candidateName: string | null;
+  roleTitle: string | null;
+  status: InterviewStatus;
+  mode: 'TEXT' | 'VOICE' | null;
+  createdAt: string;
+  startedAt: string | null;
+  endedAt: string | null;
+  userRating: number | null;
 }
 
-export interface InspectedSessionData {
-  sessionId: string;
-  traceToken: string;
-  candidateName: string;
-  candidateId: string;
-  candidateEmail: string;
-  candidateAvatarUrl: string;
-  workspaceImageUrl: string;
-  roleTitle: string;
-  shortRoleBadge: string;
-  matchingScorePct: number;
-  statusLabel: string;
-  durationLabel: string;
-  fullDurationText: string;
-  modeLabel: string;
-  overallRatingLabel: string;
-  endingReasonLabel: string;
-  fallbackUsedLabel: string;
-  pipelineStages: InspectionPipelineStage[];
-  turns: SessionTurnDetail[];
-  metadata: {
-    engineCore: string;
-    audioPipeline: string;
-    evidenceHash: string;
-    evaluationSeed: string;
-  };
+export interface InterviewPage {
+  sessions: InterviewSummary[];
+  total: number;
+  page: number;
+  size: number;
+  counts: Partial<Record<InterviewStatus, number>>;
+}
+
+export interface InterviewEvidence {
+  criterionId: string | null;
+  excerpt: string | null;
+  rationale: string | null;
+  performance: string | null;
+}
+
+export interface InterviewTurn {
+  id: string;
+  skill: string | null;
+  mode: string | null;
+  question: string | null;
+  answer: string | null;
+  feedback: string | null;
+  score: number | null;
+  strengths: string | null;
+  improvements: string | null;
+  suggestedAnswer: string | null;
+  evidence: InterviewEvidence[];
+}
+
+export interface InterviewObjective {
+  skill: string;
+  claim: string | null;
+  assessment: Assessment | null;
+  strengths: string[];
+  weaknesses: string[];
+}
+
+export interface InterviewDetail {
+  session: InterviewSummary;
+  inputs: { cvName: string | null; jdTitle: string | null; company: string | null };
+  matching: { score: number | null; available: boolean };
+  blueprint: {
+    maxQuestions: number | null; durationSeconds: number | null;
+    maxQuestionsPerObjective: number | null; questionMode: string | null; objectiveCount: number | null;
+    policy: {
+      coreImportance: number | null; reserveFollowupFraction: number | null;
+      fallbackDepth: number | null; minFailureContexts: number | null; allowExtensionProbes: boolean | null;
+    } | null;
+  } | null;
+  finalized: boolean;
+  transcript: { opening: string | null; introduction: string | null; closing: string | null; turns: InterviewTurn[] } | null;
+  report: {
+    terminationReason: string | null; objectives: InterviewObjective[];
+    overallScore: number | null; feedback: string | null;
+  } | null;
 }

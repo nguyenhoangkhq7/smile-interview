@@ -1,9 +1,9 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ChevronDown, Clock3, LoaderCircle, MessageSquareText, Mic, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { InterviewStartConfig, QuestionMode, defaultConfig, questionModes } from '@/services/evidenceInterview';
+import { InterviewLimits, InterviewStartConfig, QuestionMode, defaultConfig, evidenceInterview, questionModes } from '@/services/evidenceInterview';
 
 export const modeLabels: Record<QuestionMode, string> = {
   CODING: 'Lập trình', DEBUGGING: 'Tìm và sửa lỗi', DESIGN: 'Thiết kế hệ thống',
@@ -32,7 +32,30 @@ interface Props { busy: boolean; onStart: (config: InterviewStartConfig) => void
 
 export function EvidenceSetup({ busy, onStart }: Props) {
   const [config, setConfig] = useState(defaultConfig);
-  const invalidLimits = config.max_questions < 1 || config.max_questions > 40 || config.duration_seconds < 60 || config.duration_seconds > 7200;
+  const [limits, setLimits] = useState<InterviewLimits>();
+  const [ready, setReady] = useState(false);
+  const maxQuestions = limits?.maxQuestions ?? 40;
+  const maxMinutes = Math.floor((limits?.durationSeconds ?? 7200) / 60);
+  const invalidLimits = config.max_questions < 1 || config.max_questions > maxQuestions
+    || config.duration_seconds < 60 || config.duration_seconds > maxMinutes * 60;
+
+  useEffect(() => {
+    const request = new AbortController();
+    void evidenceInterview.limits(request.signal).then((current) => {
+      if (request.signal.aborted) return;
+      setLimits(current);
+      setConfig((previous) => ({
+        ...previous,
+        interaction_mode: current.voiceEnabled ? previous.interaction_mode : 'TEXT',
+        max_questions: Math.min(previous.max_questions, current.maxQuestions),
+        duration_seconds: Math.min(previous.duration_seconds, Math.floor(current.durationSeconds / 60) * 60),
+        max_questions_per_objective: current.maxQuestionsPerObjective < 8 ? current.maxQuestionsPerObjective : undefined,
+      }));
+    }).catch(() => {}).finally(() => {
+      if (!request.signal.aborted) setReady(true);
+    });
+    return () => request.abort();
+  }, []);
 
   return (
     <section aria-busy={busy} className="space-y-6 rounded-2xl border bg-card p-6 shadow-xs sm:p-8">
@@ -47,6 +70,7 @@ export function EvidenceSetup({ busy, onStart }: Props) {
         <legend className="text-sm font-semibold text-foreground">Hình thức phỏng vấn</legend>
         <div className="grid gap-3 sm:grid-cols-2">
           {interactionOptions.map(({ value, title, description, icon: Icon }) => {
+            if (value === 'VOICE' && limits?.voiceEnabled === false) return null;
             const selected = config.interaction_mode === value;
             return (
               <label
@@ -102,7 +126,7 @@ export function EvidenceSetup({ busy, onStart }: Props) {
             className="h-10 bg-background px-3 tabular-nums"
             type="number"
             min={1}
-            max={120}
+            max={maxMinutes}
             disabled={busy}
             value={config.duration_seconds / 60}
             onChange={e => setConfig({ ...config, duration_seconds: Number(e.target.value) * 60 })}
@@ -116,7 +140,7 @@ export function EvidenceSetup({ busy, onStart }: Props) {
             className="h-10 bg-background px-3 tabular-nums"
             type="number"
             min={1}
-            max={40}
+            max={maxQuestions}
             disabled={busy}
             value={config.max_questions}
             onChange={e => setConfig({ ...config, max_questions: Number(e.target.value) })}
@@ -129,7 +153,7 @@ export function EvidenceSetup({ busy, onStart }: Props) {
           <Clock3 size={15} aria-hidden="true" className="shrink-0" />
           Lần phỏng vấn đầu tiên có thể mất vài phút để chuẩn bị câu hỏi.
         </p>
-        <Button size="lg" className="w-full px-5 sm:w-auto" disabled={busy || invalidLimits} onClick={() => onStart(config)}>
+        <Button size="lg" className="w-full px-5 sm:w-auto" disabled={busy || !ready || invalidLimits} onClick={() => onStart(config)}>
           {busy ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Play aria-hidden="true" />}
           {busy ? 'Đang chuẩn bị mục tiêu và câu hỏi…' : 'Bắt đầu phỏng vấn'}
         </Button>

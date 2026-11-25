@@ -1,203 +1,82 @@
 'use client';
 
-import React, { useState } from 'react';
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Lock,
-  LockOpen,
-  UserPlus,
-  X,
-} from 'lucide-react';
-import { AdminUserRecord } from './types';
+import { useState, type FormEvent, type ReactNode } from 'react';
+import { CheckCircle2 } from 'lucide-react';
+import type { AdminUserRecord } from './types';
 
-interface LockAccountModalProps {
-  targetUser: AdminUserRecord | null;
-  onClose: () => void;
-  onConfirm: (user: AdminUserRecord) => void;
-}
+const input = 'mt-1 w-full rounded-lg bg-[#f1f3ff] dark:bg-muted p-2 text-sm';
+const button = 'rounded-lg bg-[#ad2c00] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60';
 
-export function LockAccountModal({
-  targetUser,
-  onClose,
-  onConfirm,
-}: LockAccountModalProps) {
-  if (!targetUser) return null;
-
-  const isLocked = targetUser.status === 'LOCKED';
-
+function Dialog({ title, busy, onClose, children }: {
+  title: string; busy: boolean; onClose: () => void; children: ReactNode;
+}) {
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#293041]/40 p-4 backdrop-blur-xs"
-      role="dialog"
-      aria-modal="true"
-    >
-      <div className="relative w-full max-w-md animate-in fade-in zoom-in-95 duration-200 rounded-2xl bg-white p-6 shadow-2xl">
-        <div
-          className={`mb-4 flex size-12 items-center justify-center rounded-full ${
-            isLocked ? 'bg-[#95f8a7] text-[#00210a]' : 'bg-[#ffdad6] text-[#93000a]'
-          }`}
-        >
-          {isLocked ? <LockOpen className="size-6" /> : <AlertTriangle className="size-6" />}
+    <div role="dialog" aria-modal="true" aria-label={title} className="fixed inset-0 z-[70] grid place-items-center bg-black/40 p-4">
+      <div className="w-full max-w-md rounded-2xl bg-white dark:bg-card p-6 shadow-lg">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h3 className="text-lg font-semibold">{title}</h3>
+          <button type="button" onClick={onClose} disabled={busy} className="text-sm disabled:opacity-50">Đóng</button>
         </div>
-
-        <h3 className="text-xl font-bold text-[#141b2c]">
-          {isLocked ? 'Xác nhận mở khóa tài khoản' : 'Xác nhận khóa tài khoản'}
-        </h3>
-
-        <p className="mt-2 text-sm text-[#5c4039]">
-          {isLocked ? (
-            <>
-              Bạn có chắc muốn khôi phục quyền truy cập và đăng nhập cho tài khoản{' '}
-              <strong className="font-semibold text-[#141b2c]">{targetUser.fullName}</strong>?
-            </>
-          ) : (
-            <>
-              Bạn có chắc muốn vô hiệu hóa phiên và khóa quyền đăng nhập của người dùng{' '}
-              <strong className="font-semibold text-[#141b2c]">{targetUser.fullName}</strong>?
-            </>
-          )}
-        </p>
-
-        <div className="mt-4 rounded-lg bg-[#f1f3ff] p-3 text-xs text-[#5c4039]">
-          {isLocked
-            ? 'Ghi chú: Người dùng sẽ có thể đăng nhập lại và tiếp tục các phiên luyện tập phỏng vấn.'
-            : 'Lý do khóa: Phát hiện hành vi nghi vấn spam session hoặc yêu cầu từ bộ phận An ninh & Bảo mật dữ liệu.'}
-        </div>
-
-        <div className="mt-6 flex items-center justify-end gap-2.5">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg bg-[#e0e8ff] px-4 py-2 text-[13px] font-medium text-[#141b2c] transition-colors hover:bg-[#e9edff] cursor-pointer"
-          >
-            Hủy bỏ
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onConfirm(targetUser)}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-[13px] font-semibold text-white transition-colors cursor-pointer ${
-              isLocked ? 'bg-[#006b2f] hover:bg-[#1f8642]' : 'bg-[#ba1a1a] hover:bg-[#ba1a1a]/90'
-            }`}
-          >
-            {isLocked ? <LockOpen className="size-4" /> : <Lock className="size-4" />}
-            <span>{isLocked ? 'Mở khóa ngay' : 'Khóa ngay'}</span>
-          </button>
-        </div>
+        {children}
       </div>
     </div>
   );
 }
 
-interface AddAdminModalProps {
-  open: boolean;
-  onClose: () => void;
-  onAddAdmin: (payload: { fullName: string; email: string; level: string }) => void;
-}
-
-export function AddAdminModal({ open, onClose, onAddAdmin }: AddAdminModalProps) {
-  const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
-  const [level, setLevel] = useState('ADMIN (Điều phối viên hệ thống)');
-
-  if (!open) return null;
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onAddAdmin({
-      fullName: fullName.trim() || 'Trần Quốc Toản',
-      email: email.trim() || 'toan.tran@smile.ai',
-      level,
-    });
-    setFullName('');
-    setEmail('');
-    onClose();
-  };
+export function LockAccountModal({ targetUser, busy, onClose, onConfirm }: {
+  targetUser: AdminUserRecord; busy: boolean; onClose: () => void;
+  onConfirm: (user: AdminUserRecord, reason?: string) => void;
+}) {
+  const [reason, setReason] = useState('');
+  const locked = targetUser.status === 'LOCKED';
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#293041]/40 p-4 backdrop-blur-xs"
-      role="dialog"
-      aria-modal="true"
-    >
-      <form
-        onSubmit={handleSubmit}
-        className="relative w-full max-w-lg animate-in fade-in zoom-in-95 duration-200 rounded-2xl bg-white p-6 shadow-2xl"
-      >
-        <div className="mb-4 flex items-center justify-between border-b border-[#e9edff] pb-3">
-          <div className="flex items-center gap-2">
-            <UserPlus className="size-5.5 text-[#ad2c00]" />
-            <h3 className="text-xl font-bold text-[#141b2c]">Thêm Quản trị viên mới</h3>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Đóng"
-            className="rounded p-1 text-[#5c4039] transition-colors hover:text-[#141b2c] cursor-pointer"
-          >
-            <X className="size-5" />
-          </button>
-        </div>
+    <Dialog title={locked ? 'Mở khóa tài khoản' : 'Khóa tài khoản'} busy={busy} onClose={onClose}>
+      <p className="mb-4 text-sm">
+        {locked ? 'Khôi phục quyền đăng nhập cho ' : 'Vô hiệu hóa quyền đăng nhập và các phiên đang dùng của '}
+        <strong>{targetUser.fullName}</strong>.
+      </p>
+      {!locked && (
+        <label className="block text-sm">Lý do khóa (không bắt buộc)
+          <textarea className={input} maxLength={500} rows={3} value={reason} onChange={event => setReason(event.target.value)} />
+        </label>
+      )}
+      <div className="mt-4 flex justify-end">
+        <button type="button" className={button} disabled={busy} onClick={() => onConfirm(targetUser, reason.trim() || undefined)}>
+          {locked ? 'Mở khóa' : 'Khóa tài khoản'}
+        </button>
+      </div>
+    </Dialog>
+  );
+}
 
-        <div className="space-y-4 text-sm">
-          <div>
-            <label className="mb-1 block text-[13px] font-medium text-[#141b2c]">Họ và tên</label>
-            <input
-              type="text"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              placeholder="Ví dụ: Trần Quốc Toản"
-              className="w-full rounded-lg bg-[#f1f3ff] px-3 py-2 text-sm text-[#141b2c] outline-none transition-colors focus:bg-[#e9edff]"
-            />
-          </div>
+export function AddAdminModal({ busy, onClose, onAddAdmin }: {
+  busy: boolean; onClose: () => void;
+  onAddAdmin: (payload: { fullName: string; email: string }) => void;
+}) {
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
 
-          <div>
-            <label className="mb-1 block text-[13px] font-medium text-[#141b2c]">
-              Email tổ chức (@smile.ai)
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="toan.tran@smile.ai"
-              className="w-full rounded-lg bg-[#f1f3ff] px-3 py-2 text-sm text-[#141b2c] outline-none transition-colors focus:bg-[#e9edff]"
-            />
-          </div>
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (fullName.trim() && email.trim()) onAddAdmin({ fullName: fullName.trim(), email: email.trim() });
+  }
 
-          <div>
-            <label className="mb-1 block text-[13px] font-medium text-[#141b2c]">
-              Cấp độ phân quyền
-            </label>
-            <select
-              value={level}
-              onChange={(e) => setLevel(e.target.value)}
-              className="w-full rounded-lg bg-[#f1f3ff] px-3 py-2 text-sm text-[#141b2c] outline-none transition-colors focus:bg-[#e9edff]"
-            >
-              <option>ADMIN (Điều phối viên hệ thống)</option>
-              <option>MODERATOR (Giám sát phỏng vấn)</option>
-              <option>SECURITY_AUDITOR (Kiểm toán bảo mật)</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="mt-6 flex items-center justify-end gap-2.5">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg bg-[#e0e8ff] px-4 py-2 text-[13px] font-medium text-[#141b2c] transition-colors hover:bg-[#e9edff] cursor-pointer"
-          >
-            Đóng
-          </button>
-          <button
-            type="submit"
-            className="rounded-lg bg-[#ad2c00] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[#d83900] cursor-pointer"
-          >
-            Cấp quyền ngay
-          </button>
-        </div>
+  return (
+    <Dialog title="Thêm quản trị viên mới" busy={busy} onClose={onClose}>
+      <form className="space-y-4" onSubmit={submit}>
+        <label className="block text-sm">Họ và tên
+          <input type="text" autoComplete="name" required maxLength={255} className={input}
+            value={fullName} onChange={event => setFullName(event.target.value)} />
+        </label>
+        <label className="block text-sm">Email
+          <input type="email" autoComplete="email" required maxLength={255} className={input}
+            value={email} onChange={event => setEmail(event.target.value)} />
+        </label>
+        <p className="text-xs text-[#5c4039] dark:text-muted-foreground">Hệ thống tạo liên kết dùng một lần để quản trị viên mới đặt mật khẩu.</p>
+        <div className="flex justify-end"><button type="submit" className={button} disabled={busy}>Tạo quản trị viên</button></div>
       </form>
-    </div>
+    </Dialog>
   );
 }
 

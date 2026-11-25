@@ -10,7 +10,7 @@
   max-width: 100%;
   overflow: hidden;
   box-sizing: border-box;
-  background: #f8fafc;
+  background: light-dark(#f8fafc, var(--background));
 }
 
 /* ── Header ── */
@@ -22,8 +22,8 @@
   height: 56px;
   width: 100%;
   box-sizing: border-box;
-  border-bottom: 1px solid #e2e8f0;
-  background: #ffffff;
+  border-bottom: 1px solid light-dark(#e2e8f0, var(--border));
+  background: light-dark(#ffffff, var(--card));
   position: sticky;
   top: 0;
   z-index: 100;
@@ -106,8 +106,8 @@
   gap: 6px;
   padding: 5px 14px;
   border-radius: 999px;
-  background: #ffffff;
-  color: #1e293b;
+  background: light-dark(#ffffff, var(--card));
+  color: light-dark(#1e293b, var(--foreground));
   font-size: 0.75rem;
   font-weight: 600;
   border: none;
@@ -119,13 +119,13 @@
 }
 
 .recordBtn:hover {
-  background: #f1f5f9;
+  background: light-dark(#f1f5f9, var(--muted));
 }
 
 /* Recording active state */
 .recordBtn.recording {
-  background: #fff0f0;
-  color: #dc2626;
+  background: light-dark(#fff0f0, #452427);
+  color: light-dark(#dc2626, #fecaca);
 }
 
 .recordPulse {
@@ -218,7 +218,7 @@
 
 .startSpeakingBtn:disabled {
   background: #cbd5e1;
-  color: #94a3b8;
+  color: light-dark(#94a3b8, var(--muted-foreground));
   cursor: not-allowed;
   box-shadow: none;
 }
@@ -254,7 +254,7 @@
   flex-direction: column;
   padding: 16px 24px 20px;
   box-sizing: border-box;
-  background: #ffffff;
+  background: light-dark(#ffffff, var(--card));
   min-height: 0;
 }
 
@@ -264,7 +264,7 @@
   justify-content: space-between;
   margin-bottom: 12px;
   padding-bottom: 8px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid light-dark(#f1f5f9, var(--border));
 }
 
 .transcriptScroll {
@@ -282,9 +282,9 @@
   max-width: 100%;
   padding: 12px 16px;
   border-radius: 0 12px 12px 12px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  color: #1e293b;
+  background: light-dark(#f8fafc, var(--background));
+  border: 1px solid light-dark(#e2e8f0, var(--border));
+  color: light-dark(#1e293b, var(--foreground));
   align-self: flex-start;
 }
 
@@ -311,7 +311,7 @@
 }
 
 .modalCard {
-  background: #ffffff;
+  background: light-dark(#ffffff, var(--card));
   border-radius: 14px;
   padding: 2rem 2rem 1.5rem;
   max-width: 420px;
@@ -329,19 +329,19 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #dc2626;
+  color: light-dark(#dc2626, #fecaca);
 }
 
 .modalTitle {
   font-size: 1.1rem;
   font-weight: 700;
-  color: #0f172a;
+  color: light-dark(#0f172a, var(--foreground));
   margin-bottom: 0.5rem;
 }
 
 .modalDesc {
   font-size: 0.875rem;
-  color: #64748b;
+  color: light-dark(#64748b, var(--muted-foreground));
   line-height: 1.6;
   margin-bottom: 1.5rem;
 }
@@ -358,8 +358,8 @@
   padding: 9px 0;
   border-radius: 8px;
   background: transparent;
-  border: 1.5px solid #e2e8f0;
-  color: #475569;
+  border: 1.5px solid light-dark(#e2e8f0, var(--border));
+  color: light-dark(#475569, var(--muted-foreground));
   font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
@@ -367,8 +367,8 @@
 }
 
 .modalCancelBtn:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
+  background: light-dark(#f8fafc, var(--background));
+  border-color: light-dark(#cbd5e1, var(--input));
 }
 
 /* Confirm button — solid red */
@@ -391,7 +391,7 @@
 
 /* ── FINISHED screen card ── */
 .finishedCard {
-  background: #ffffff;
+  background: light-dark(#ffffff, var(--card));
   border-radius: 16px;
   padding: 2.5rem 2.5rem 2rem;
   max-width: 520px;
@@ -407,13 +407,13 @@
 .finishedTitle {
   font-size: 1.4rem;
   font-weight: 700;
-  color: #0f172a;
+  color: light-dark(#0f172a, var(--foreground));
   margin: 0;
 }
 
 .finishedDesc {
   font-size: 0.875rem;
-  color: #64748b;
+  color: light-dark(#64748b, var(--muted-foreground));
   line-height: 1.6;
   margin: 0;
   max-width: 380px;
@@ -428,7 +428,7 @@
   border-radius: 8px;
   background: transparent;
   border: 1.5px solid #4f46e5;
-  color: #4f46e5;
+  color: light-dark(#4f46e5, #c7d2fe);
   font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;

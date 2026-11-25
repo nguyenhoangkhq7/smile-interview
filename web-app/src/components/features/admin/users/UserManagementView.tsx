@@ -1,189 +1,115 @@
 'use client';
 
-import React, { useMemo, useRef, useState } from 'react';
-import { INITIAL_ADMIN_USERS, INITIAL_USERS_STATS } from './mockUsersData';
-import { AdminUserRecord, AdminUserRole, AdminUserStatus } from './types';
+import { useRef, useState } from 'react';
+import { toast } from 'sonner';
+import { adminUsersError, useAdminUserDetail, useAdminUsers } from '@/hooks/useAdminUsers';
+import { adminUsers } from '@/services/adminUsers';
+import type { AdminUserRecord, PasswordSetupLink } from './types';
 import UserDetailDrawer from './UserDetailDrawer';
-import { ActionToast, AddAdminModal, LockAccountModal } from './UserModals';
+import { AddAdminModal, LockAccountModal } from './UserModals';
+import PasswordSetupLinkDialog from './PasswordSetupLinkDialog';
 import UsersFilterBar from './UsersFilterBar';
 import UsersHeader from './UsersHeader';
 import UsersStatsBento from './UsersStatsBento';
 import UsersTable from './UsersTable';
 
 export default function UserManagementView() {
-  const [users, setUsers] = useState<AdminUserRecord[]>(INITIAL_ADMIN_USERS);
-  const [stats, setStats] = useState(INITIAL_USERS_STATS);
+  const catalog = useAdminUsers();
+  const [selected, setSelected] = useState<string | null>(null);
+  const [lockTarget, setLockTarget] = useState<AdminUserRecord | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [link, setLink] = useState<PasswordSetupLink>();
+  const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
+  const detail = useAdminUserDetail(selected, catalog.revision);
+  const page = catalog.result?.data;
 
-  const [localSearch, setLocalSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState<'' | AdminUserRole>('');
-  const [statusFilter, setStatusFilter] = useState<'' | AdminUserStatus>('');
+  async function perform(action: () => Promise<void>) {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setBusy(true);
+    try {
+      await action();
+    } catch (error) {
+      toast.error(adminUsersError(error, 'Không thực hiện được thao tác.'));
+    } finally {
+      inFlight.current = false;
+      setBusy(false);
+    }
+  }
 
-  const [selectedUserKey, setSelectedUserKey] = useState<string | null>(null);
-  const [lockModalTarget, setLockModalTarget] = useState<AdminUserRecord | null>(null);
-  const [addAdminOpen, setAddAdminOpen] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const triggerToast = (msg: string) => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setToastMessage(msg);
-    toastTimerRef.current = setTimeout(() => {
-      setToastMessage(null);
-    }, 3000);
-  };
-
-  const effectiveSearch = localSearch.trim().toLowerCase();
-
-  const filteredUsers = useMemo(() => {
-    return users.filter((u) => {
-      if (roleFilter && u.role !== roleFilter) return false;
-      if (statusFilter && u.status !== statusFilter) return false;
-      if (effectiveSearch) {
-        const matchName = u.fullName.toLowerCase().includes(effectiveSearch);
-        const matchEmail = u.email.toLowerCase().includes(effectiveSearch);
-        const matchPhone = u.phone.toLowerCase().includes(effectiveSearch);
-        if (!matchName && !matchEmail && !matchPhone) return false;
-      }
-      return true;
+  function exportCsv() {
+    void perform(async () => {
+      const file = await adminUsers.export(catalog.filter);
+      const url = URL.createObjectURL(file);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = 'users.csv';
+      anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     });
-  }, [users, roleFilter, statusFilter, effectiveSearch]);
-
-  const selectedUser = useMemo(
-    () => users.find((u) => u.key === selectedUserKey) ?? null,
-    [users, selectedUserKey]
-  );
-
-  const handleToggleRole = (target: AdminUserRecord) => {
-    const nextRole: AdminUserRole = target.role === 'ADMIN' ? 'USER' : 'ADMIN';
-    setUsers((prev) =>
-      prev.map((u) => (u.key === target.key ? { ...u, role: nextRole } : u))
-    );
-    setStats((prev) => ({
-      ...prev,
-      adminUsers: nextRole === 'ADMIN' ? prev.adminUsers + 1 : Math.max(1, prev.adminUsers - 1),
-    }));
-    triggerToast(
-      nextRole === 'ADMIN'
-        ? `Đã cấp quyền quản trị viên cho ${target.fullName}!`
-        : `Đã chuyển ${target.fullName} về vai trò USER.`
-    );
-  };
-
-  const handleResetPassword = (target: AdminUserRecord) => {
-    triggerToast(`Email đặt lại mật khẩu đã được gửi tới ${target.email}!`);
-  };
-
-  const handleConfirmToggleLock = (target: AdminUserRecord) => {
-    const nextStatus: AdminUserStatus = target.status === 'LOCKED' ? 'ACTIVE' : 'LOCKED';
-    setUsers((prev) =>
-      prev.map((u) => (u.key === target.key ? { ...u, status: nextStatus } : u))
-    );
-    setStats((prev) => ({
-      ...prev,
-      activeUsers: nextStatus === 'ACTIVE' ? prev.activeUsers + 1 : prev.activeUsers - 1,
-      lockedUsers: nextStatus === 'LOCKED' ? prev.lockedUsers + 1 : Math.max(0, prev.lockedUsers - 1),
-    }));
-    setLockModalTarget(null);
-    triggerToast(
-      nextStatus === 'LOCKED'
-        ? `Đã khóa tài khoản ${target.fullName}`
-        : `Đã mở khóa tài khoản ${target.fullName}`
-    );
-  };
-
-  const handleAddAdmin = (payload: { fullName: string; email: string; level: string }) => {
-    const parts = payload.fullName.trim().split(/\s+/);
-    const initials =
-      parts.length >= 2
-        ? `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
-        : payload.fullName.slice(0, 2).toUpperCase();
-
-    const newRecord: AdminUserRecord = {
-      ...INITIAL_ADMIN_USERS[3],
-      key: `admin-${Date.now()}`,
-      userIdCode: `USR-${Math.floor(100000 + Math.random() * 900000)}`,
-      initials,
-      fullName: payload.fullName,
-      email: payload.email,
-      role: 'ADMIN',
-      status: 'ACTIVE',
-      isSelfAccount: false,
-      joinedDate: '25/11/2026',
-    };
-
-    setUsers((prev) => [newRecord, ...prev]);
-    setStats((prev) => ({
-      ...prev,
-      totalUsers: prev.totalUsers + 1,
-      activeUsers: prev.activeUsers + 1,
-      adminUsers: prev.adminUsers + 1,
-    }));
-    triggerToast(`Đã cấp quyền ${payload.level.split(' ')[0]} cho ${payload.email}!`);
-  };
-
-  const handleRefresh = () => {
-    setIsRefreshing(true);
-    setTimeout(() => {
-      setIsRefreshing(false);
-      triggerToast('Đã làm mới danh sách người dùng');
-    }, 450);
-  };
+  }
 
   return (
     <div className="relative flex w-full flex-col gap-5 pb-8">
-      <UsersHeader
-        onExportCsv={() => triggerToast('Đang xuất danh sách người dùng ra CSV...')}
-        onOpenAddAdmin={() => setAddAdminOpen(true)}
-      />
-
-      <UsersStatsBento stats={stats} />
-
+      <UsersHeader onExportCsv={exportCsv} onOpenAddAdmin={() => setAddOpen(true)} />
+      {page && <UsersStatsBento stats={page.stats} />}
       <UsersFilterBar
-        searchTerm={localSearch}
-        onSearchChange={setLocalSearch}
-        roleFilter={roleFilter}
-        onRoleFilterChange={setRoleFilter}
-        statusFilter={statusFilter}
-        onStatusFilterChange={setStatusFilter}
-        onResetFilters={() => {
-          setLocalSearch('');
-          setRoleFilter('');
-          setStatusFilter('');
-        }}
+        searchTerm={catalog.filter.search}
+        onSearchChange={(search) => catalog.changeFilter({ ...catalog.filter, search })}
+        roleFilter={catalog.filter.role}
+        onRoleFilterChange={(role) => catalog.changeFilter({ ...catalog.filter, role })}
+        statusFilter={catalog.filter.status}
+        onStatusFilterChange={(status) => catalog.changeFilter({ ...catalog.filter, status })}
+        onResetFilters={catalog.reset}
       />
 
-      <UsersTable
-        users={filteredUsers}
-        totalCatalogCount={stats.totalUsers}
-        selectedUserKey={selectedUserKey}
-        onSelectUser={(key) => setSelectedUserKey(key)}
-        onRequestToggleLock={(user) => setLockModalTarget(user)}
-        onRefresh={handleRefresh}
-        isRefreshing={isRefreshing}
-      />
+      {page ? (
+        <UsersTable users={page.users} totalCatalogCount={page.total} page={page.page} pageSize={page.size}
+          selectedUserKey={selected} onSelectUser={setSelected} onRequestToggleLock={setLockTarget}
+          onRefresh={catalog.refresh} onPageChange={catalog.setPage} />
+      ) : (
+        <div className="rounded-xl bg-white dark:bg-card p-6 text-sm text-[#5c4039] dark:text-muted-foreground" role={catalog.result?.error ? 'alert' : 'status'}>
+          {catalog.result?.error ?? 'Đang tải danh sách người dùng…'}
+          {catalog.result?.error && (
+            <button type="button" onClick={catalog.refresh} className="ml-3 font-semibold underline">Thử lại</button>
+          )}
+        </div>
+      )}
 
-      <UserDetailDrawer
-        user={selectedUser}
-        onClose={() => setSelectedUserKey(null)}
-        onToggleRole={handleToggleRole}
-        onResetPassword={handleResetPassword}
-        onRequestLockAction={(user) => setLockModalTarget(user)}
-      />
+      {selected && (
+        <UserDetailDrawer
+          key={selected} detail={detail?.data} error={detail?.error} busy={busy} onClose={() => setSelected(null)}
+          onResetPassword={(user) => void perform(async () => setLink(await adminUsers.resetPassword(user.id)))}
+          onRequestLockAction={setLockTarget}
+        />
+      )}
 
-      <LockAccountModal
-        targetUser={lockModalTarget}
-        onClose={() => setLockModalTarget(null)}
-        onConfirm={handleConfirmToggleLock}
-      />
+      {lockTarget && (
+        <LockAccountModal key={lockTarget.id} targetUser={lockTarget} busy={busy}
+          onClose={() => setLockTarget(null)}
+          onConfirm={(user, reason) => void perform(async () => {
+            const status = user.status === 'LOCKED' ? 'ACTIVE' : 'LOCKED';
+            await adminUsers.changeStatus(user.id, status, reason);
+            setLockTarget(null);
+            catalog.refresh();
+            toast.success(status === 'LOCKED' ? 'Đã khóa tài khoản.' : 'Đã mở khóa tài khoản.');
+          })}
+        />
+      )}
 
-      <AddAdminModal
-        open={addAdminOpen}
-        onClose={() => setAddAdminOpen(false)}
-        onAddAdmin={handleAddAdmin}
-      />
-
-      <ActionToast message={toastMessage} />
+      {addOpen && (
+        <AddAdminModal busy={busy} onClose={() => setAddOpen(false)}
+          onAddAdmin={(input) => void perform(async () => {
+            const setup = await adminUsers.create(input);
+            setAddOpen(false);
+            setLink(setup);
+            catalog.setPage(1);
+            catalog.refresh();
+          })}
+        />
+      )}
+      {link && <PasswordSetupLinkDialog link={link} onClose={() => setLink(undefined)} />}
     </div>
   );
 }

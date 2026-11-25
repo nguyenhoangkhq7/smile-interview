@@ -89,7 +89,7 @@ export function StudyTaskResources({ items, actions, disabled, detailsRef }: {
             const reference = item.url && getStudyReferenceUrl(item.url);
             if (editingId === item.id) {
               return (
-                <li key={item.id} className="rounded-xl border border-slate-200 bg-(--practice-pale) p-3 sm:col-span-2">
+                <li key={item.id} className="rounded-xl border border-slate-200 dark:border-border bg-(--practice-pale) p-3 sm:col-span-2">
                   <form onSubmit={(event) => void saveLink(event, item)} className="space-y-2">
                     <fieldset disabled={disabled} className="space-y-2">
                       <Input name="title" aria-label="Sửa tên tài liệu" maxLength={255} defaultValue={item.title} />
@@ -106,7 +106,7 @@ export function StudyTaskResources({ items, actions, disabled, detailsRef }: {
             return (
               <li
                 key={item.id}
-                className="group flex items-center justify-between gap-2 rounded-xl border border-slate-200/70 bg-(--practice-pale)/60 p-2.5 text-xs transition-colors hover:bg-(--practice-pale)"
+                className="group flex items-center justify-between gap-2 rounded-xl border border-slate-200/70 dark:border-border/70 bg-(--practice-pale)/60 p-2.5 text-xs transition-colors hover:bg-(--practice-pale)"
               >
                 {reference ? (
                   <a
@@ -115,7 +115,7 @@ export function StudyTaskResources({ items, actions, disabled, detailsRef }: {
                     rel="noopener noreferrer"
                     className="flex min-w-0 flex-1 items-center gap-2.5"
                   >
-                    <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-slate-200/70 text-(--practice-primary)">
+                    <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-slate-200/70 dark:bg-muted/70 text-(--practice-primary)">
                       <BookOpen size={15} aria-hidden="true" />
                     </span>
                     <span className="min-w-0 flex-1">
@@ -133,7 +133,7 @@ export function StudyTaskResources({ items, actions, disabled, detailsRef }: {
                     onClick={() => void download(item)}
                     className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
                   >
-                    <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-slate-200/70 text-(--practice-primary)">
+                    <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-slate-200/70 dark:bg-muted/70 text-(--practice-primary)">
                       <Download size={15} aria-hidden="true" />
                     </span>
                     <span className="min-w-0 flex-1">

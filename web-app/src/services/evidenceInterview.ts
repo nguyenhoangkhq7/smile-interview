@@ -112,7 +112,17 @@ async function requestStart(id: string, config: InterviewStartConfig): Promise<E
   }
 }
 
+export interface InterviewLimits {
+  maxQuestions: number;
+  durationSeconds: number;
+  maxQuestionsPerObjective: number;
+  voiceEnabled: boolean;
+}
+
 export const evidenceInterview = {
+  async limits(signal: AbortSignal) {
+    return (await axiosClient.get<InterviewLimits>('/api/v2/interview/limits', { signal })).data;
+  },
   async get(id: string): Promise<EvidenceSession | null> {
     try {
       return (await axiosClient.get<EvidenceSession>(endpoint(id))).data;
@@ -152,6 +162,8 @@ export function interviewError(error: unknown): string {
   if (axios.isAxiosError<{ message?: string; detail?: string }>(error)) {
     if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT' || error.response?.status === 504)
       return 'Chuẩn bị phỏng vấn mất quá nhiều thời gian. Vui lòng thử lại; dữ liệu hồ sơ của bạn vẫn được giữ nguyên.';
+    if (error.response?.status === 429) return 'Bạn đã hết hạn mức phỏng vấn hôm nay.';
+    if (error.response?.status === 422) return 'Thiết lập vượt giới hạn hoặc chế độ phỏng vấn vừa thay đổi. Tải lại để cập nhật.';
     if (error.response?.status === 409) return 'Phiên đã thay đổi. Hãy tải lại phiên trước khi tiếp tục.';
     return error.response?.data?.message || error.response?.data?.detail || 'Không thể xử lý yêu cầu. Bạn có thể thử lại.';
   }

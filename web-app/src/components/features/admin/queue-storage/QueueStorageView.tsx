@@ -1,210 +1,79 @@
 'use client';
 
-import React, { useMemo, useRef, useState } from 'react';
-import { ActionToast } from '../users/UserModals';
-import {
-  INITIAL_QUEUE_KPI_STATS,
-  INITIAL_SKILL_GAP_JOBS,
-  INITIAL_STORAGE_OVERVIEW,
-} from './mockQueueStorageData';
+import { useState } from 'react';
+import { useAdminJobDetail, useAdminQueue, useAdminStorage } from '@/hooks/useAdminQueueStorage';
+import { useQueueStorageActions } from '@/hooks/useQueueStorageActions';
+import type { StorageOverviewData } from './types';
+import { storageBytes } from './queueStorageFormat';
 import QueueFilterActionBar from './QueueFilterActionBar';
+import QueueJobDetailDialog from './QueueJobDetailDialog';
 import QueueKpiBento from './QueueKpiBento';
 import QueueStorageHeader from './QueueStorageHeader';
 import SkillGapQueueTable from './SkillGapQueueTable';
 import StorageAllocationSection from './StorageAllocationSection';
-import { QueueJobStatus, SkillGapJobItem } from './types';
+
+function StatusPanel({ error, pending, onRetry }: { error?: string; pending: string; onRetry: () => void }) {
+  return (
+    <div className="rounded-xl bg-white dark:bg-card p-5 text-sm text-[#5c4039] dark:text-muted-foreground" role={error ? 'alert' : 'status'}>
+      {error ?? pending}
+      {error && <button type="button" className="ml-3 font-semibold underline" onClick={onRetry}>Thử lại</button>}
+    </div>
+  );
+}
+
+function ConfirmCleanup({ snapshot, onCancel, onConfirm }: {
+  snapshot: NonNullable<StorageOverviewData['orphans']>; onCancel: () => void; onConfirm: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="queue-cleanup-title">
+      <div className="w-full max-w-md rounded-2xl bg-white dark:bg-card p-6 shadow-lg">
+        <h2 id="queue-cleanup-title" className="text-lg font-semibold">Dọn dẹp CV mồ côi</h2>
+        <p className="mt-3 text-sm">Xác nhận xóa {snapshot.ids.length.toLocaleString('vi-VN')} CV ({storageBytes(snapshot.bytes)}) khỏi S3.</p>
+        <div className="mt-5 flex justify-end gap-3 text-sm">
+          <button type="button" onClick={onCancel}>Hủy</button>
+          <button type="button" className="rounded-lg bg-[#ba1a1a] px-4 py-2 font-semibold text-white" onClick={onConfirm}>Xóa CV mồ côi</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function QueueStorageView() {
-  const [kpiStats, setKpiStats] = useState(INITIAL_QUEUE_KPI_STATS);
-  const [jobs, setJobs] = useState<SkillGapJobItem[]>(INITIAL_SKILL_GAP_JOBS);
-  const [storage, setStorage] = useState(INITIAL_STORAGE_OVERVIEW);
-
-  const [jobSearch, setJobSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'' | QueueJobStatus>('');
-
-  const [retryingJobIds, setRetryingJobIds] = useState<Set<string>>(new Set());
-  const [isBulkRetrying, setIsBulkRetrying] = useState(false);
-  const [isCleaningOrphans, setIsCleaningOrphans] = useState(false);
-
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const triggerToast = (msg: string) => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setToastMessage(msg);
-    toastTimerRef.current = setTimeout(() => {
-      setToastMessage(null);
-    }, 3000);
-  };
-
-  const filteredJobs = useMemo(() => {
-    const query = jobSearch.trim().toLowerCase();
-    return jobs.filter((job) => {
-      if (statusFilter && job.status !== statusFilter) return false;
-      if (query) {
-        const matchId = job.id.toLowerCase().includes(query);
-        const matchName = job.candidateName.toLowerCase().includes(query);
-        const matchRole = job.roleTitle.toLowerCase().includes(query);
-        if (!matchId && !matchName && !matchRole) return false;
-      }
-      return true;
-    });
-  }, [jobs, jobSearch, statusFilter]);
-
-  const handleRetryJob = (jobId: string) => {
-    setRetryingJobIds((prev) => new Set(prev).add(jobId));
-    triggerToast(`Đang thử lại tiến trình ${jobId}...`);
-
-    setTimeout(() => {
-      setJobs((prev) =>
-        prev.map((j) =>
-          j.id === jobId
-            ? {
-                ...j,
-                status: 'RUNNING',
-                statusDetail: 'Đang xử lý lại...',
-                attemptsUsed: 1,
-              }
-            : j
-        )
-      );
-      setKpiStats((prev) => ({
-        ...prev,
-        failedCount: Math.max(0, prev.failedCount - 1),
-        runningCount: prev.runningCount + 1,
-      }));
-    }, 350);
-
-    setTimeout(() => {
-      setJobs((prev) =>
-        prev.map((j) =>
-          j.id === jobId
-            ? {
-                ...j,
-                status: 'SUCCEEDED',
-                statusDetail: 'Hoàn tất',
-              }
-            : j
-        )
-      );
-      setKpiStats((prev) => ({
-        ...prev,
-        runningCount: Math.max(0, prev.runningCount - 1),
-        succeededCount: prev.succeededCount + 1,
-      }));
-      setRetryingJobIds((prev) => {
-        const next = new Set(prev);
-        next.delete(jobId);
-        return next;
-      });
-      triggerToast(`Tiến trình ${jobId} đã xử lý hoàn tất!`);
-    }, 1500);
-  };
-
-  const handleReleaseLease = (jobId: string) => {
-    setJobs((prev) =>
-      prev.map((j) =>
-        j.id === jobId
-          ? {
-              ...j,
-              status: 'PENDING',
-              statusDetail: 'Chờ worker mới',
-            }
-          : j
-      )
-    );
-    setKpiStats((prev) => ({
-      ...prev,
-      runningCount: Math.max(0, prev.runningCount - 1),
-      pendingCount: prev.pendingCount + 1,
-    }));
-    triggerToast(`Đã giải phóng ${jobId} về trạng thái PENDING.`);
-  };
-
-  const handlePrioritizeJob = (jobId: string) => {
-    triggerToast(`Đã ưu tiên chạy ${jobId}!`);
-    setJobs((prev) =>
-      prev.map((j) =>
-        j.id === jobId
-          ? {
-              ...j,
-              status: 'RUNNING',
-              attemptsUsed: 1,
-            }
-          : j
-      )
-    );
-    setKpiStats((prev) => ({
-      ...prev,
-      pendingCount: Math.max(0, prev.pendingCount - 1),
-      runningCount: prev.runningCount + 1,
-    }));
-  };
-
-  const handleRetryAllFailed = () => {
-    setIsBulkRetrying(true);
-    const failedJob = jobs.find((j) => j.status === 'FAILED');
-    if (failedJob) {
-      handleRetryJob(failedJob.id);
-    } else {
-      triggerToast('Đang thử lại các tiến trình lỗi...');
-    }
-    setTimeout(() => {
-      setIsBulkRetrying(false);
-    }, 1200);
-  };
-
-  const handleCleanOrphans = () => {
-    setIsCleaningOrphans(true);
-    triggerToast(`Đang dọn dẹp ${storage.orphanedFilesCount} tệp mồ côi...`);
-    setTimeout(() => {
-      setIsCleaningOrphans(false);
-      setStorage((prev) => ({
-        ...prev,
-        totalUsedGb: Number((prev.totalUsedGb - 0.2).toFixed(1)),
-        usedPercentage: Number((prev.usedPercentage - 0.1).toFixed(1)),
-        orphanedFilesCount: 0,
-        orphanedFilesSizeMb: 0,
-      }));
-      triggerToast('Đã dọn dẹp xong 186 MB tệp mồ côi!');
-    }, 1300);
-  };
+  const queue = useAdminQueue();
+  const storage = useAdminStorage();
+  const [selected, setSelected] = useState<string | null>(null);
+  const [cleanup, setCleanup] = useState<StorageOverviewData>();
+  const detail = useAdminJobDetail(selected);
+  const actions = useQueueStorageActions({ refreshQueue: queue.refresh, refreshStorage: storage.refresh, refreshDetail: detail.refresh });
+  const page = queue.result?.data;
+  const inventory = storage.result?.data;
 
   return (
     <div className="flex w-full flex-col gap-5 pb-8">
       <QueueStorageHeader />
-
-      <QueueKpiBento stats={kpiStats} />
-
+      {page && <QueueKpiBento stats={page.stats} />}
       <QueueFilterActionBar
-        jobSearch={jobSearch}
-        onJobSearchChange={setJobSearch}
-        statusFilter={statusFilter}
-        onStatusFilterChange={setStatusFilter}
-        failedJobsCount={kpiStats.failedCount}
-        onRetryAllFailed={handleRetryAllFailed}
-        isBulkRetrying={isBulkRetrying}
+        jobSearch={queue.query.search} onJobSearchChange={search => queue.setQuery({ ...queue.query, search, page: 1 })}
+        statusFilter={queue.query.status} onStatusFilterChange={status => queue.setQuery({ ...queue.query, status, page: 1 })}
       />
-
-      <SkillGapQueueTable
-        jobs={filteredJobs}
-        totalJobsCount={14210}
-        retryingJobIds={retryingJobIds}
-        onRetryJob={handleRetryJob}
-        onReleaseLease={handleReleaseLease}
-        onPrioritizeJob={handlePrioritizeJob}
-        onInspectJob={(job) =>
-          triggerToast(`Đã xem chi tiết tiến trình ${job.id} (${job.candidateName})`)
-        }
-      />
-
-      <StorageAllocationSection
-        storage={storage}
-        isCleaningOrphans={isCleaningOrphans}
-        onCleanOrphans={handleCleanOrphans}
-      />
-
-      <ActionToast message={toastMessage} />
+      {page ? (
+        <SkillGapQueueTable data={page} busy={actions.queueBusy} onInspect={setSelected} onAction={actions.act}
+          onPageChange={number => queue.setQuery({ ...queue.query, page: number })} onRefresh={queue.refresh} />
+      ) : (
+        <StatusPanel error={queue.result?.error} pending="Đang tải hàng đợi…" onRetry={queue.refresh} />
+      )}
+      {inventory ? (
+        <StorageAllocationSection storage={inventory} busy={actions.cleaning}
+          onRefresh={storage.refresh} onCleanOrphans={() => setCleanup(inventory)} />
+      ) : (
+        <StatusPanel error={storage.result?.error} pending="Đang đo dung lượng lưu trữ…" onRetry={storage.refresh} />
+      )}
+      {selected && <QueueJobDetailDialog detail={detail.result?.data} error={detail.result?.error}
+        onRefresh={detail.refresh} onClose={() => setSelected(null)} />}
+      {cleanup?.orphans && <ConfirmCleanup snapshot={cleanup.orphans} onCancel={() => setCleanup(undefined)} onConfirm={() => {
+        actions.clean(cleanup);
+        setCleanup(undefined);
+      }} />}
     </div>
   );
 }

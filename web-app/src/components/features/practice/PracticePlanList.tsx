@@ -16,7 +16,7 @@ interface PracticePlanEmptyStateProps {
 
 function PracticePlanEmptyState({ onReset }: PracticePlanEmptyStateProps) {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-2xl border border-slate-100 bg-card px-5 py-10 text-center shadow-xs">
+    <div className="flex flex-col items-center gap-3 rounded-2xl border border-slate-100 dark:border-border bg-card px-5 py-10 text-center shadow-xs">
       <span className="grid size-12 place-items-center rounded-full bg-(--practice-blue) text-(--practice-muted)">
         <SearchX size={22} aria-hidden="true" />
       </span>
@@ -53,7 +53,7 @@ export function PracticePlanList({ plans }: PracticePlanListProps) {
               aria-pressed={status === value}
               onClick={() => setStatus(value)}
               className={cn('h-8 rounded-full px-3 text-xs font-semibold sm:px-4',
-                status === value ? 'bg-card text-(--practice-primary) shadow-xs hover:bg-card' : 'text-(--practice-muted) hover:bg-white/60')}
+                status === value ? 'bg-card text-(--practice-primary) shadow-xs hover:bg-card' : 'text-(--practice-muted) hover:bg-white/60 dark:hover:bg-card/60')}
             >
               {label} ({counts[value]})
             </Button>
@@ -70,7 +70,7 @@ export function PracticePlanList({ plans }: PracticePlanListProps) {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Tìm theo vị trí hoặc công ty..."
-            className="h-10 rounded-full border-slate-200/60 bg-card pr-4 pl-9 shadow-xs"
+            className="h-10 rounded-full border-slate-200/60 dark:border-border/60 bg-card pr-4 pl-9 shadow-xs"
           />
         </div>
       </div>

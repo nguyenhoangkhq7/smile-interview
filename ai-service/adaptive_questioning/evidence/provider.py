@@ -1,6 +1,8 @@
 """LLM boundary. Policy and state transitions never depend on model-selected routes."""
 import json
 import os
+
+from app.ai_runtime import credential, model_value
 from time import monotonic
 from typing import Literal, Protocol
 
@@ -374,7 +376,7 @@ class DSPyAssessmentProvider:
 
 
 def _build_openrouter_lm(model: str) -> dspy.LM:
-    key = os.environ.get("OPENROUTER_API_KEY")
+    key = credential("openRouterKey", os.environ.get("OPENROUTER_API_KEY", ""))
     if not key:
         raise RuntimeError("Configure OPENROUTER_API_KEY to run evidence interviews")
     name = model if model.startswith("openrouter/") else f"openrouter/{model}"
@@ -391,13 +393,13 @@ def _build_openrouter_lm(model: str) -> dspy.LM:
 
 
 def configured_lm() -> dspy.LM:
-    model = os.environ.get("OPENROUTER_MODEL", "qwen/qwen3.7-flash")
+    model = model_value("interviewModel", os.environ.get("OPENROUTER_MODEL", "qwen/qwen3.7-flash"))
     return _build_openrouter_lm(model)
 
 
 def configured_fast_lm(fallback: dspy.LM | None = None) -> dspy.LM:
-    primary = os.environ.get("OPENROUTER_MODEL", "qwen/qwen3.7-flash")
-    fast = os.environ.get("OPENROUTER_FAST_MODEL", "").strip()
+    primary = model_value("interviewModel", os.environ.get("OPENROUTER_MODEL", "qwen/qwen3.7-flash"))
+    fast = model_value("fastModel", os.environ.get("OPENROUTER_FAST_MODEL", "")).strip()
     if not fast or fast == primary:
         return fallback if fallback is not None else _build_openrouter_lm(primary)
     return _build_openrouter_lm(fast)

@@ -16,8 +16,8 @@ const statusIcons = {
 
 const statusPillStyles: Record<StudyTaskStatus, { idle: string; active: string }> = {
   TODO: {
-    idle: 'border-slate-200/80 bg-card text-slate-700 hover:bg-slate-100',
-    active: 'border-slate-500 bg-slate-100 text-slate-900 ring-2 ring-slate-200',
+    idle: 'border-slate-200/80 dark:border-border/80 bg-card text-slate-700 dark:text-foreground hover:bg-slate-100 dark:hover:bg-muted',
+    active: 'border-slate-500 bg-slate-100 dark:bg-muted text-slate-900 dark:text-foreground ring-2 ring-slate-200',
   },
   IN_PROGRESS: {
     idle: 'border-blue-200/80 bg-card text-blue-700 hover:bg-blue-50',
@@ -55,7 +55,7 @@ export function TaskModalSidebar({
   const isDone = task.status === 'DONE';
 
   return (
-    <aside className="flex flex-col gap-5 rounded-xl border border-slate-200/70 bg-slate-50/85 p-4">
+    <aside className="flex flex-col gap-5 rounded-xl border border-slate-200/70 dark:border-border/70 bg-slate-50/85 p-4">
       {/* Status Switcher */}
       <div className="space-y-2">
         <span className="block px-0.5 text-[11px] font-bold tracking-wider text-(--practice-muted) uppercase">
@@ -103,7 +103,7 @@ export function TaskModalSidebar({
           disabled={disabled}
           value={task.skillId ?? ''}
           onChange={(event) => void onUpdate({ skillId: event.target.value || null })}
-          className="w-full cursor-pointer rounded-lg border border-slate-200/90 bg-card px-3 py-2 text-xs font-medium text-foreground shadow-2xs outline-none transition-colors hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-(--practice-primary)/30 disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-full cursor-pointer rounded-lg border border-slate-200/90 dark:border-border/90 bg-card px-3 py-2 text-xs font-medium text-foreground shadow-2xs outline-none transition-colors hover:border-slate-300 dark:hover:border-border focus-visible:ring-2 focus-visible:ring-(--practice-primary)/30 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <option value="">Không gắn kỹ năng</option>
           {skillIds.map((id) => (
@@ -124,7 +124,7 @@ export function TaskModalSidebar({
             type="button"
             disabled={disabled}
             onClick={onFocusChecklist}
-            className="flex w-full items-center gap-2.5 rounded-lg bg-card px-3 py-2 text-left text-xs font-semibold text-foreground shadow-2xs ring-1 ring-slate-200/70 transition-colors hover:bg-slate-100 disabled:opacity-50"
+            className="flex w-full items-center gap-2.5 rounded-lg bg-card px-3 py-2 text-left text-xs font-semibold text-foreground shadow-2xs ring-1 ring-slate-200/70 transition-colors hover:bg-slate-100 dark:hover:bg-muted disabled:opacity-50"
           >
             <ListChecks size={15} className="shrink-0 text-(--practice-muted)" aria-hidden="true" />
             <span>Thêm việc cần làm</span>
@@ -133,7 +133,7 @@ export function TaskModalSidebar({
             type="button"
             disabled={disabled}
             onClick={onFocusResources}
-            className="flex w-full items-center gap-2.5 rounded-lg bg-card px-3 py-2 text-left text-xs font-semibold text-foreground shadow-2xs ring-1 ring-slate-200/70 transition-colors hover:bg-slate-100 disabled:opacity-50"
+            className="flex w-full items-center gap-2.5 rounded-lg bg-card px-3 py-2 text-left text-xs font-semibold text-foreground shadow-2xs ring-1 ring-slate-200/70 transition-colors hover:bg-slate-100 dark:hover:bg-muted disabled:opacity-50"
           >
             <Paperclip size={15} className="shrink-0 text-(--practice-muted)" aria-hidden="true" />
             <span>Đính kèm tài liệu</span>
@@ -159,7 +159,7 @@ export function TaskModalSidebar({
       </div>
 
       {/* Bottom Primary CTA */}
-      <div className="mt-auto flex flex-col gap-2 border-t border-slate-200/70 pt-4">
+      <div className="mt-auto flex flex-col gap-2 border-t border-slate-200/70 dark:border-border/70 pt-4">
         {!isDone ? (
           <Button
             type="button"
@@ -185,7 +185,7 @@ export function TaskModalSidebar({
         <button
           type="button"
           onClick={onClose}
-          className="w-full rounded-lg py-2 text-center text-xs font-semibold text-(--practice-muted) transition-colors hover:bg-slate-200/60 hover:text-foreground"
+          className="w-full rounded-lg py-2 text-center text-xs font-semibold text-(--practice-muted) transition-colors hover:bg-slate-200/60 dark:hover:bg-muted/60 hover:text-foreground"
         >
           Đóng cửa sổ
         </button>

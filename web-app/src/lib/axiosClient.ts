@@ -41,7 +41,10 @@ axiosClient.interceptors.response.use(
     if (error.response?.status === 401) {
       const authorization = error.config?.headers?.Authorization;
       if (typeof authorization === 'string' && authorization.startsWith('Bearer ')) {
-        expireSession(authorization.slice(7));
+        expireSession(
+          authorization.slice(7),
+          'Tài khoản của bạn đã bị khóa hoặc phiên đăng nhập đã hết hiệu lực.'
+        );
       }
     }
     return Promise.reject(error);

@@ -443,7 +443,7 @@ export default function ProfilePage() {
             <div className={styles.grid}>
               {/* Left: Avatar upload */}
               <div className={styles.field} style={{ gap: '0.75rem' }}>
-                <h3 className={styles.label} style={{ color: '#475569' }}>Ảnh đại diện</h3>
+                <h3 className={styles.label} style={{ color: 'light-dark(#475569, var(--muted-foreground))' }}>Ảnh đại diện</h3>
                 <p className={styles.cardSubText} style={{ margin: 0 }}>JPG, PNG, WebP hoặc GIF — Tối đa 2MB.</p>
                 
                 <Toast toast={avatarToast} />
@@ -475,7 +475,7 @@ export default function ProfilePage() {
 
               {/* Right: Default CV */}
               <div className={styles.field} style={{ gap: '0.75rem' }}>
-                <h3 className={styles.label} style={{ color: '#475569' }}>CV mặc định (PDF)</h3>
+                <h3 className={styles.label} style={{ color: 'light-dark(#475569, var(--muted-foreground))' }}>CV mặc định (PDF)</h3>
                 <p className={styles.cardSubText} style={{ margin: 0 }}>
                   Dùng để tự động chọn khi khởi tạo phiên phỏng vấn mới.
                 </p>
@@ -683,7 +683,7 @@ export default function ProfilePage() {
               <Toast toast={pwToast} />
 
               <div className={styles.field}>
-                <label className={styles.label} style={{ color: '#475569' }}>Mật khẩu hiện tại</label>
+                <label className={styles.label} style={{ color: 'light-dark(#475569, var(--muted-foreground))' }}>Mật khẩu hiện tại</label>
                 <input
                   type="password"
                   value={currentPass}
@@ -695,7 +695,7 @@ export default function ProfilePage() {
                 />
               </div>
               <div className={styles.field}>
-                <label className={styles.label} style={{ color: '#475569' }}>Mật khẩu mới</label>
+                <label className={styles.label} style={{ color: 'light-dark(#475569, var(--muted-foreground))' }}>Mật khẩu mới</label>
                 <input
                   type="password"
                   value={newPass}
@@ -708,7 +708,7 @@ export default function ProfilePage() {
                 />
               </div>
               <div className={styles.field}>
-                <label className={styles.label} style={{ color: '#475569' }}>Xác nhận mật khẩu</label>
+                <label className={styles.label} style={{ color: 'light-dark(#475569, var(--muted-foreground))' }}>Xác nhận mật khẩu</label>
                 <input
                   type="password"
                   value={confirmPass}

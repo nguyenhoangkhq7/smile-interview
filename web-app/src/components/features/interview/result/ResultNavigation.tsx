@@ -65,21 +65,21 @@ export function ResultNavigation({ studyHref, hasNavbar = false }: { studyHref: 
       ref={nav}
       aria-label="Các phần của báo cáo"
       style={{ top: stickyTop }}
-      className="sticky z-20 border-b border-slate-200 bg-[#f9f8f6]/95 backdrop-blur print:hidden"
+      className="sticky z-20 border-b border-slate-200 dark:border-border bg-[#f9f8f6]/95 dark:bg-background/95 backdrop-blur print:hidden"
     >
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-2 px-3 py-2 sm:px-6">
         <div className="flex min-w-0 items-center gap-1 overflow-x-auto px-0.5 py-0.5">
           {sections.map(({ id, label, Icon }) => (
             <a key={id} href={`#${id}`} aria-current={active === id ? 'location' : undefined} onClick={() => setActive(id)}
-              className={cn(control, active === id ? 'bg-[#e4edf8] text-slate-900' : 'text-[#63504a] hover:bg-[#eee9e5]')}>
-              <Icon size={14} aria-hidden="true" className={active === id ? 'text-[#b02700]' : undefined} />
+              className={cn(control, active === id ? 'bg-[#e4edf8] dark:bg-secondary text-slate-900 dark:text-foreground' : 'text-[#63504a] dark:text-muted-foreground hover:bg-[#eee9e5] dark:hover:bg-muted')}>
+              <Icon size={14} aria-hidden="true" className={active === id ? 'text-[#b02700] dark:text-orange-300' : undefined} />
               {label}
             </a>
           ))}
         </div>
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           <button type="button" onClick={() => window.print()} title="In kết quả"
-            className={cn(control, 'cursor-pointer bg-[#e4edf8] text-slate-800 hover:bg-[#d7e4f4]')}>
+            className={cn(control, 'cursor-pointer bg-[#e4edf8] dark:bg-secondary text-slate-800 dark:text-foreground hover:bg-[#d7e4f4] dark:hover:bg-secondary')}>
             <Printer size={14} aria-hidden="true" /> <span className="sr-only sm:not-sr-only">In</span>
           </button>
           <Link href={studyHref} title="Lập kế hoạch" className={cn(control, 'bg-[#b02700] text-white hover:bg-[#8c2100]')}>

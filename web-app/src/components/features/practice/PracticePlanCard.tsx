@@ -52,7 +52,7 @@ export interface PracticePlanCardProps {
 
 export function PracticePlanCard({ plan }: PracticePlanCardProps) {
   return (
-    <article className="flex min-w-0 flex-col gap-4 rounded-2xl border border-slate-100 bg-card p-5 shadow-xs sm:p-6">
+    <article className="flex min-w-0 flex-col gap-4 rounded-2xl border border-slate-100 dark:border-border bg-card p-5 shadow-xs sm:p-6">
       <PlanHeading plan={plan} />
       <PlanDocuments plan={plan} />
       <p className="flex flex-wrap items-center justify-between gap-2 text-xs text-(--practice-muted)">

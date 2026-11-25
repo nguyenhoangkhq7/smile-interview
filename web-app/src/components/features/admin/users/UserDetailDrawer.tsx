@@ -1,326 +1,307 @@
 'use client';
 
-import React, { useState } from 'react';
-import {
-  CheckCircle2,
-  Circle,
-  ClipboardCheck,
-  Eye,
-  FileText,
-  KeyRound,
-  Lock,
-  LockOpen,
-  UserCog,
-  Video,
-  X,
-} from 'lucide-react';
-import { AdminUserRecord, UserDrawerTabKey } from './types';
+import { useState } from 'react';
+import { Calendar, FileText, KeyRound, Lock, Unlock, Video, X } from 'lucide-react';
+import type { AdminUserDetail, AdminUserRecord } from './types';
+import { userDate, userInitials } from './userDisplay';
+
+const tabs = [
+  { key: 'interviews', label: 'Phiên phỏng vấn' },
+  { key: 'profiles', label: 'Hồ sơ' },
+  { key: 'plans', label: 'Kế hoạch học tập' },
+] as const;
 
 interface UserDetailDrawerProps {
-  user: AdminUserRecord | null;
+  detail?: AdminUserDetail;
+  error?: string;
+  busy: boolean;
   onClose: () => void;
-  onToggleRole: (user: AdminUserRecord) => void;
   onResetPassword: (user: AdminUserRecord) => void;
   onRequestLockAction: (user: AdminUserRecord) => void;
 }
 
+const entry =
+  'flex items-center justify-between gap-3 rounded-xl border border-[#e0e8ff] dark:border-border bg-[#f9f9ff] dark:bg-background px-3.5 py-2.5 transition-colors hover:bg-[#f1f3ff] dark:hover:bg-muted';
+const action =
+  'inline-flex items-center gap-1.5 rounded-lg border border-[#e0e8ff] dark:border-border bg-white dark:bg-card px-3 py-2 text-xs font-semibold text-[#141b2c] dark:text-foreground transition-colors hover:bg-[#f1f3ff] dark:hover:bg-muted disabled:opacity-50';
+
 export default function UserDetailDrawer({
-  user,
+  detail,
+  error,
+  busy,
   onClose,
-  onToggleRole,
   onResetPassword,
   onRequestLockAction,
 }: UserDetailDrawerProps) {
-  const [activeTab, setActiveTab] = useState<UserDrawerTabKey>('sessions');
-
-  const isOpen = user !== null;
-  const isLocked = user?.status === 'LOCKED';
+  const [tab, setTab] = useState<(typeof tabs)[number]['key']>('interviews');
+  const user = detail?.user;
 
   return (
-    <>
-      {isOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-[#141b2c]/25 backdrop-blur-[1px] transition-opacity duration-300"
-          onClick={onClose}
-        />
-      )}
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-[#141b2c]/45 p-4 backdrop-blur-[2px]"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="admin-user-detail-title"
+    >
+      <button
+        type="button"
+        tabIndex={-1}
+        className="absolute inset-0 cursor-default"
+        aria-label="Đóng chi tiết"
+        onClick={onClose}
+      />
 
-      <aside
-        aria-label="Chi tiết người dùng"
-        className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col bg-white shadow-2xl transition-transform duration-300 ease-in-out ${
-          isOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
-      >
-        {user && (
-          <>
-            {/* Drawer Header */}
-            <div className="flex items-start justify-between bg-[#f1f3ff] p-5">
-              <div className="flex items-center gap-3.5">
-                <div
-                  className={`flex size-12 shrink-0 items-center justify-center rounded-full text-lg font-bold shadow-xs ${user.avatarBgClass} ${user.avatarTextClass}`}
+      <div className="relative z-10 flex max-h-[85vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-[#e0e8ff] dark:border-border bg-white dark:bg-card shadow-2xl">
+        {/* Modal Header */}
+        <header className="flex items-start justify-between gap-4 border-b border-[#e0e8ff] dark:border-border bg-[#f9f9ff] dark:bg-background px-6 py-4">
+          <div className="flex min-w-0 items-center gap-3.5">
+            {user && (
+              <span className="grid size-11 shrink-0 place-items-center rounded-full bg-[#e9edff] dark:bg-secondary text-sm font-bold text-[#186392] dark:text-sky-300">
+                {userInitials(user.fullName)}
+              </span>
+            )}
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2
+                  id="admin-user-detail-title"
+                  className="truncate text-base font-bold text-[#141b2c] dark:text-foreground"
                 >
-                  {user.initials}
-                </div>
-
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-lg font-bold leading-tight text-[#141b2c]">
-                      {user.fullName}
-                    </h2>
-                    {isLocked ? (
-                      <span className="rounded-full bg-[#ffdad6] px-2 py-0.5 text-[11px] font-semibold text-[#93000a]">
-                        LOCKED
-                      </span>
-                    ) : (
-                      <span className="rounded-full bg-[#95f8a7] px-2 py-0.5 text-[11px] font-semibold text-[#00210a]">
-                        ACTIVE
-                      </span>
-                    )}
-                  </div>
-                  <p className="mt-0.5 text-xs text-[#5c4039]">
-                    {user.email} • {user.phone}
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Đóng"
-                className="rounded-lg p-1.5 text-[#5c4039] transition-colors hover:bg-[#e9edff] hover:text-[#141b2c] cursor-pointer"
-              >
-                <X className="size-5" />
-              </button>
-            </div>
-
-            {/* Stats Tri-card Overview */}
-            <div className="grid grid-cols-3 gap-2 bg-white p-4">
-              <div className="rounded-lg bg-[#f1f3ff] p-2.5 text-center">
-                <span className="block text-xl font-bold text-[#141b2c] tabular-nums">
-                  {user.resumesCount}
-                </span>
-                <span className="text-[11px] font-semibold uppercase text-[#5c4039]">
-                  Hồ sơ
-                </span>
-              </div>
-
-              <div className="rounded-lg bg-[#f1f3ff] p-2.5 text-center">
-                <span className="block text-xl font-bold text-[#ad2c00] tabular-nums">
-                  {user.sessionsCount}
-                </span>
-                <span className="text-[11px] font-semibold uppercase text-[#5c4039]">
-                  Phiên ({user.avgScoreLabel})
-                </span>
-              </div>
-
-              <div className="rounded-lg bg-[#f1f3ff] p-2.5 text-center">
-                <span className="block text-xl font-bold text-[#186392] tabular-nums">
-                  {user.completedTasksRatio}
-                </span>
-                <span className="text-[11px] font-semibold uppercase text-[#5c4039]">
-                  Ôn tập
-                </span>
-              </div>
-            </div>
-
-            {/* Tabs Header */}
-            <div className="flex border-b border-[#e9edff] bg-white px-5">
-              <button
-                type="button"
-                onClick={() => setActiveTab('sessions')}
-                className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs font-semibold transition-all cursor-pointer ${
-                  activeTab === 'sessions'
-                    ? 'border-[#ad2c00] text-[#ad2c00]'
-                    : 'border-transparent text-[#5c4039] hover:text-[#141b2c]'
-                }`}
-              >
-                <Video className="size-3.5" />
-                <span>Phiên phỏng vấn ({user.sessionsCount})</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('resumes')}
-                className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs font-semibold transition-all cursor-pointer ${
-                  activeTab === 'resumes'
-                    ? 'border-[#ad2c00] text-[#ad2c00]'
-                    : 'border-transparent text-[#5c4039] hover:text-[#141b2c]'
-                }`}
-              >
-                <FileText className="size-3.5" />
-                <span>Hồ sơ ({user.resumesCount})</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('plans')}
-                className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs font-semibold transition-all cursor-pointer ${
-                  activeTab === 'plans'
-                    ? 'border-[#ad2c00] text-[#ad2c00]'
-                    : 'border-transparent text-[#5c4039] hover:text-[#141b2c]'
-                }`}
-              >
-                <ClipboardCheck className="size-3.5" />
-                <span>Kế hoạch ôn tập</span>
-              </button>
-            </div>
-
-            {/* Drawer Body */}
-            <div className="flex-1 space-y-3 overflow-y-auto bg-white p-5">
-              {activeTab === 'sessions' && (
-                <div className="animate-fade-up space-y-2.5">
-                  {user.recentSessions.map((session) => {
-                    const badgeClasses =
-                      session.scoreVariant === 'emerald'
-                        ? 'bg-[#95f8a7] text-[#00210a]'
-                        : session.scoreVariant === 'blue'
-                          ? 'bg-[#cce5ff] text-[#001e31]'
-                          : 'bg-[#e9edff] text-[#141b2c]';
-
-                    return (
-                      <div
-                        key={session.id}
-                        className="rounded-xl bg-[#f1f3ff] p-3.5 transition-all hover:bg-[#e9edff]"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="text-sm font-semibold text-[#141b2c]">
-                                {session.roleTitle}
-                              </span>
-                              <span
-                                className={`rounded-full px-2 py-0.5 font-mono text-xs font-bold ${badgeClasses}`}
-                              >
-                                {session.scoreLabel}
-                              </span>
-                            </div>
-                            <p className="mt-1 text-xs text-[#5c4039]">
-                              {session.dateTimeLabel} • {session.durationLabel}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {activeTab === 'resumes' && (
-                <div className="animate-fade-up space-y-2.5">
-                  {user.resumes.map((res) => (
-                    <div
-                      key={res.id}
-                      className="flex items-center justify-between rounded-xl bg-[#f1f3ff] p-3.5"
+                  {user?.fullName ?? 'Chi tiết tài khoản'}
+                </h2>
+                {user && (
+                  <>
+                    <span
+                      className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-bold ${
+                        user.role === 'ADMIN'
+                          ? 'bg-[#e0e8ff] dark:bg-secondary text-[#186392] dark:text-sky-300'
+                          : 'bg-[#f1f3ff] dark:bg-muted text-[#5c4039] dark:text-muted-foreground'
+                      }`}
                     >
-                      <div className="flex min-w-0 items-center gap-3">
-                        <FileText className={`size-6 shrink-0 ${res.iconColorClass}`} />
-                        <div className="min-w-0">
-                          <div className="truncate text-sm font-semibold text-[#141b2c]">
-                            {res.fileName}
-                          </div>
-                          <div className="text-xs text-[#5c4039]">
-                            {res.updatedAt} • {res.fileSize}
-                          </div>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        aria-label="Xem hồ sơ"
-                        className="rounded-lg p-1.5 text-[#186392] transition-colors hover:bg-[#e9edff] cursor-pointer"
-                      >
-                        <Eye className="size-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {activeTab === 'plans' && (
-                <div className="animate-fade-up rounded-xl bg-[#f1f3ff] p-4">
-                  <div className="mb-2 flex items-center justify-between">
-                    <span className="text-sm font-semibold text-[#141b2c]">
-                      {user.studyPlan.title}
+                      {user.role}
                     </span>
-                    <span className="font-mono text-xs font-bold text-[#006b2f]">
-                      {user.studyPlan.completionPct}%
+                    <span
+                      className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-bold ${
+                        user.status === 'ACTIVE'
+                          ? 'bg-[#95f8a7]/45 dark:bg-emerald-950/45 text-[#005323] dark:text-emerald-200'
+                          : 'bg-[#ffdad6] dark:bg-red-950 text-[#93000a] dark:text-red-200'
+                      }`}
+                    >
+                      {user.status === 'ACTIVE' ? 'Đang hoạt động' : 'Đã khóa'}
                     </span>
-                  </div>
-
-                  <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-[#dbe2f9]">
-                    <div
-                      className="h-full rounded-full bg-[#006b2f] transition-all duration-500"
-                      style={{ width: `${user.studyPlan.completionPct}%` }}
-                    />
-                  </div>
-
-                  <ul className="space-y-2 text-xs text-[#5c4039]">
-                    {user.studyPlan.tasks.map((task) => (
-                      <li
-                        key={task.id}
-                        className={`flex items-center gap-2 ${
-                          task.completed ? 'font-medium text-[#141b2c]' : 'text-[#5c4039]'
-                        }`}
-                      >
-                        {task.completed ? (
-                          <CheckCircle2 className="size-4 shrink-0 text-[#006b2f]" />
-                        ) : (
-                          <Circle className="size-4 shrink-0 text-[#907067]" />
-                        )}
-                        <span>{task.label}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-
-            {/* Administrative Actions Footer */}
-            <div className="flex flex-col gap-2 border-t border-[#e9edff] bg-[#f1f3ff] p-4">
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => onToggleRole(user)}
-                  className="flex items-center justify-center gap-1.5 rounded-lg bg-white px-3 py-2 text-xs font-medium text-[#141b2c] shadow-2xs transition-all hover:bg-[#e9edff] cursor-pointer"
-                >
-                  <UserCog className="size-4 text-[#186392]" />
-                  <span>{user.role === 'ADMIN' ? 'Hạ về quyền User' : 'Nâng quyền Admin'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => onResetPassword(user)}
-                  className="flex items-center justify-center gap-1.5 rounded-lg bg-white px-3 py-2 text-xs font-medium text-[#141b2c] shadow-2xs transition-all hover:bg-[#e9edff] cursor-pointer"
-                >
-                  <KeyRound className="size-4 text-[#ad2c00]" />
-                  <span>Đặt lại mật khẩu</span>
-                </button>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => onRequestLockAction(user)}
-                className={`flex w-full items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold transition-all cursor-pointer ${
-                  isLocked
-                    ? 'bg-[#95f8a7] text-[#00210a] hover:bg-[#006b2f] hover:text-white'
-                    : 'bg-[#ffdad6] text-[#93000a] hover:bg-[#ba1a1a] hover:text-white'
-                }`}
-              >
-                {isLocked ? (
-                  <>
-                    <LockOpen className="size-4" />
-                    <span>Mở khóa tài khoản</span>
-                  </>
-                ) : (
-                  <>
-                    <Lock className="size-4" />
-                    <span>Khóa tài khoản</span>
                   </>
                 )}
-              </button>
+              </div>
+              {user && (
+                <p className="mt-0.5 break-all text-xs text-[#5c4039] dark:text-muted-foreground">
+                  {user.email}
+                  {user.phone && ' · ' + user.phone}
+                </p>
+              )}
             </div>
-          </>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Đóng"
+            className="shrink-0 rounded-lg p-1.5 text-[#5c4039] dark:text-muted-foreground transition-colors hover:bg-[#e9edff] dark:hover:bg-secondary hover:text-[#141b2c] dark:hover:text-foreground"
+          >
+            <X className="size-5" />
+          </button>
+        </header>
+
+        {/* Modal Body */}
+        <div className="flex min-h-0 flex-1 flex-col px-6 py-4">
+          {!detail && (
+            <p
+              role={error ? 'alert' : 'status'}
+              className="py-8 text-center text-sm text-[#5c4039] dark:text-muted-foreground"
+            >
+              {error ?? 'Đang tải chi tiết…'}
+            </p>
+          )}
+
+          {detail && user && (
+            <>
+              {/* Quick Stats Strip */}
+              <div className="grid grid-cols-3 gap-2.5 rounded-xl bg-[#f1f3ff] dark:bg-muted p-3 text-xs">
+                <div className="flex items-center gap-2">
+                  <Calendar className="size-4 shrink-0 text-[#186392] dark:text-sky-300" />
+                  <div>
+                    <p className="text-[11px] text-[#5c4039] dark:text-muted-foreground">Ngày tham gia</p>
+                    <p className="font-semibold text-[#141b2c] dark:text-foreground">{userDate(user.joinedAt)}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <FileText className="size-4 shrink-0 text-[#186392] dark:text-sky-300" />
+                  <div>
+                    <p className="text-[11px] text-[#5c4039] dark:text-muted-foreground">Hồ sơ ứng tuyển</p>
+                    <p className="font-semibold text-[#141b2c] dark:text-foreground">{user.profilesCount} hồ sơ</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Video className="size-4 shrink-0 text-[#ad2c00] dark:text-orange-300" />
+                  <div>
+                    <p className="text-[11px] text-[#5c4039] dark:text-muted-foreground">Phiên phỏng vấn</p>
+                    <p className="font-semibold text-[#141b2c] dark:text-foreground">{user.sessionsCount} phiên</p>
+                  </div>
+                </div>
+                {user.lockReason && (
+                  <p className="col-span-3 mt-1 border-t border-[#e0e8ff] dark:border-border pt-2 text-xs font-medium text-[#93000a] dark:text-red-200">
+                    Lý do khóa: {user.lockReason}
+                  </p>
+                )}
+              </div>
+
+              {/* Tabs */}
+              <div
+                className="mt-4 flex flex-wrap gap-1.5 border-b border-[#e0e8ff] dark:border-border pb-3"
+                aria-label="Thông tin người dùng"
+              >
+                {tabs.map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    aria-pressed={tab === item.key}
+                    onClick={() => setTab(item.key)}
+                    className={
+                      'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition-colors ' +
+                      (tab === item.key
+                        ? 'bg-[#141b2c] font-semibold text-white'
+                        : 'bg-[#f1f3ff] dark:bg-muted font-medium text-[#5c4039] dark:text-muted-foreground hover:bg-[#e0e8ff] dark:hover:bg-secondary hover:text-[#141b2c] dark:hover:text-foreground')
+                    }
+                  >
+                    <span>{item.label}</span>
+                    <span
+                      className={`rounded-full px-1.5 py-0.2 text-[10px] ${
+                        tab === item.key
+                          ? 'bg-white/20 text-white'
+                          : 'bg-white dark:bg-card text-[#141b2c] dark:text-foreground'
+                      }`}
+                    >
+                      {detail[item.key].length}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Scrollable Tab Content */}
+              <div className="mt-3 max-h-[38vh] min-h-[140px] space-y-2 overflow-y-auto pr-1 text-sm">
+                {!detail[tab].length && (
+                  <p className="py-8 text-center text-xs text-[#5c4039] dark:text-muted-foreground">
+                    Chưa có dữ liệu trong mục này.
+                  </p>
+                )}
+
+                {tab === 'interviews' &&
+                  detail.interviews.map((interview) => (
+                    <div className={entry} key={interview.id}>
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-semibold text-[#141b2c] dark:text-foreground">
+                          {interview.roleTitle || 'Phiên phỏng vấn'}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-[#5c4039] dark:text-muted-foreground">
+                          {userDate(interview.startedAt)}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2 text-xs">
+                        {interview.score !== null && (
+                          <span className="rounded-md bg-[#e9edff] dark:bg-secondary px-2 py-0.5 text-[11px] font-bold text-[#186392] dark:text-sky-300">
+                            Điểm {interview.score}
+                          </span>
+                        )}
+                        <span className="rounded-md bg-white dark:bg-card px-2 py-0.5 text-[11px] font-medium text-[#5c4039] dark:text-muted-foreground shadow-2xs">
+                          {interview.status ?? 'Chưa rõ'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+
+                {tab === 'profiles' &&
+                  detail.profiles.map((profile) => (
+                    <div className={entry} key={profile.id}>
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-semibold text-[#141b2c] dark:text-foreground">
+                          {profile.title}
+                        </p>
+                        <p className="mt-0.5 truncate text-[11px] text-[#5c4039] dark:text-muted-foreground">
+                          {profile.roleTitle}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-[11px] text-[#5c4039] dark:text-muted-foreground">
+                        {userDate(profile.createdAt)}
+                      </span>
+                    </div>
+                  ))}
+
+                {tab === 'plans' &&
+                  detail.plans.map((plan) => (
+                    <div className={entry} key={plan.id}>
+                      <p className="truncate text-xs font-semibold text-[#141b2c] dark:text-foreground">
+                        {plan.title}
+                      </p>
+                      <span className="shrink-0 rounded-md bg-[#e9edff] dark:bg-secondary px-2 py-0.5 text-[11px] font-semibold text-[#186392] dark:text-sky-300">
+                        {plan.completedTasks}/{plan.totalTasks} nhiệm vụ
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Modal Footer */}
+        {detail && user && (
+          <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-[#e0e8ff] dark:border-border bg-[#f9f9ff] dark:bg-background px-6 py-3.5">
+            {!user.self ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  disabled={busy}
+                  className={action}
+                  onClick={() => onResetPassword(user)}
+                >
+                  <KeyRound className="size-3.5 text-[#5c4039] dark:text-muted-foreground" />
+                  Đặt lại mật khẩu
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  className={
+                    action +
+                    (user.status === 'LOCKED'
+                      ? ' border-[#006b2f]/30 text-[#006b2f] dark:text-emerald-300'
+                      : ' border-[#ad2c00]/30 text-[#ad2c00] dark:text-orange-300')
+                  }
+                  onClick={() => onRequestLockAction(user)}
+                >
+                  {user.status === 'LOCKED' ? (
+                    <>
+                      <Unlock className="size-3.5" />
+                      Mở khóa tài khoản
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="size-3.5" />
+                      Khóa tài khoản
+                    </>
+                  )}
+                </button>
+              </div>
+            ) : (
+              <span className="text-xs text-[#5c4039] dark:text-muted-foreground">Tài khoản quản trị đang đăng nhập</span>
+            )}
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="ml-auto rounded-lg bg-[#141b2c] px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#293041]"
+            >
+              Đóng
+            </button>
+          </footer>
         )}
-      </aside>
-    </>
+      </div>
+    </div>
   );
 }

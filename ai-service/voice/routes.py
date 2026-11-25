@@ -4,6 +4,8 @@ import binascii
 import io
 import logging
 import os
+
+from app.ai_runtime import credential, model_value, openrouter_id, policy_value
 import re
 import wave
 from contextlib import asynccontextmanager
@@ -82,26 +84,28 @@ def _get_simli_client() -> httpx.AsyncClient:
 
 
 def settings() -> dict:
-    tts_model = os.getenv("OPENROUTER_TTS_MODEL", DEFAULT_TTS_MODEL)
+    tts_model = openrouter_id(model_value("ttsModel", os.getenv("OPENROUTER_TTS_MODEL", DEFAULT_TTS_MODEL)))
     heygen = tts_model.startswith("heygen/")
     return {
-        "enabled": bool(os.getenv("OPENROUTER_API_KEY"))
-        and os.getenv("INTERVIEW_VOICE_ENABLED", "true").lower() == "true",
-        "stt_model": os.getenv("OPENROUTER_STT_MODEL", "openai/gpt-transcribe"),
+        "enabled": bool(credential("openRouterKey", os.getenv("OPENROUTER_API_KEY", "")))
+        and policy_value("voiceEnabled", os.getenv("INTERVIEW_VOICE_ENABLED", "true").lower() == "true"),
+        "stt_model": openrouter_id(model_value("sttModel", os.getenv("OPENROUTER_STT_MODEL", "openai/gpt-transcribe"))),
         "tts_model": tts_model,
-        "voice": os.getenv("OPENROUTER_TTS_VOICE", "nadine" if heygen else "Kore"),
-        "format": os.getenv("OPENROUTER_TTS_FORMAT", "pcm"),
-        "sample_rate": int(os.getenv("OPENROUTER_TTS_SAMPLE_RATE", "44100" if heygen else "24000")),
+        "voice": model_value("ttsVoice", os.getenv("OPENROUTER_TTS_VOICE", "nadine" if heygen else "Kore")),
+        "format": model_value("ttsFormat", os.getenv("OPENROUTER_TTS_FORMAT", "pcm")),
+        "sample_rate": model_value("ttsSampleRate", int(os.getenv("OPENROUTER_TTS_SAMPLE_RATE", "44100" if heygen else "24000"))),
         "language": "vi",
-        "avatar": {"provider": "simli", "configured": bool(os.getenv("SIMLI_API_KEY", "").strip())
-                   and bool(os.getenv("SIMLI_FACE_ID", "").strip()), "sample_rate": 16000},
+        "avatar": {"provider": "simli", "configured": policy_value("simliAvatarEnabled", True)
+                   and bool(credential("simliKey", os.getenv("SIMLI_API_KEY", "")).strip())
+                   and bool(model_value("simliFaceId", os.getenv("SIMLI_FACE_ID", "")).strip()), "sample_rate": 16000},
     }
 
 
 def headers() -> dict[str, str]:
     if not settings()["enabled"]:
         raise HTTPException(503, "Giọng nói chưa được cấu hình trên máy chủ.")
-    return {"Authorization": f"Bearer {os.environ['OPENROUTER_API_KEY']}",
+    api_key = credential("openRouterKey", os.getenv("OPENROUTER_API_KEY", ""))
+    return {"Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json", "X-Title": "Smile Interview"}
 
 
@@ -137,8 +141,8 @@ async def avatar_session(payload: AvatarSession):
         client = _get_simli_client()
         response = await client.post(
             "https://api.simli.ai/compose/token",
-            headers={"x-simli-api-key": os.environ["SIMLI_API_KEY"].strip(), "Content-Type": "application/json"},
-            json={"faceId": os.environ["SIMLI_FACE_ID"].strip(), "handleSilence": True,
+            headers={"x-simli-api-key": credential("simliKey", os.getenv("SIMLI_API_KEY", "")).strip(), "Content-Type": "application/json"},
+            json={"faceId": model_value("simliFaceId", os.getenv("SIMLI_FACE_ID", "")).strip(), "handleSilence": True,
                   "maxSessionLength": payload.max_session_length,
                   "maxIdleTime": min(300, payload.max_session_length), "audioInputFormat": "pcm16"},
         )

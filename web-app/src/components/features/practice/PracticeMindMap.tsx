@@ -65,7 +65,7 @@ function NodeHandle({ id, title, point, position, className }: {
         'absolute grid touch-none cursor-grab place-items-center text-(--practice-muted) hover:bg-(--practice-pale) focus-visible:outline-2 active:cursor-grabbing',
         id.startsWith('task:')
           ? 'top-1.5 right-1.5 size-5 rounded-md opacity-0 transition-opacity group-hover/task:opacity-100 focus-visible:opacity-100'
-          : 'top-2 left-2 size-6 rounded-md text-[#9a8179]',
+          : 'top-2 left-2 size-6 rounded-md text-[#9a8179] dark:text-muted-foreground',
         className,
       )}
       onPointerDown={(event) => position.start(event, id, point)}
@@ -82,8 +82,8 @@ function NodeHandle({ id, title, point, position, className }: {
 
 const taskIcons = { TODO: Circle, IN_PROGRESS: Clock, DONE: CircleCheck };
 const gapTones = {
-  weak: { label: 'Cần ôn', color: '#b02700', lineColor: '#d53e15', badge: 'bg-[#ffded6] text-[#81230f]' },
-  needsVerification: { label: 'Cần kiểm chứng', color: '#92400e', lineColor: '#e68b0a', badge: 'bg-[#fef0bd] text-[#78350f]' },
+  weak: { label: 'Cần ôn', color: '#b02700', lineColor: '#d53e15', badge: 'bg-[#ffded6] dark:bg-orange-950 text-[#81230f] dark:text-orange-200' },
+  needsVerification: { label: 'Cần kiểm chứng', color: '#92400e', lineColor: '#e68b0a', badge: 'bg-[#fef0bd] dark:bg-amber-950 text-[#78350f] dark:text-amber-200' },
 };
 
 function layoutMap(tasks: readonly StudyTask[], gaps?: KnowledgeGaps) {
@@ -759,7 +759,7 @@ export function PracticeMindMap({
   };
 
   return (
-    <div ref={map} className={cn('relative flex min-h-0 min-w-0 flex-col bg-[#fafbfe] fullscreen:h-dvh', styles.mindMapCanvasEnter)}>
+    <div ref={map} className={cn('relative flex min-h-0 min-w-0 flex-col bg-[#fafbfe] dark:bg-background fullscreen:h-dvh', styles.mindMapCanvasEnter)}>
       <p role="status" className="sr-only">{drag.announcement}</p>
       <p id="mind-map-position-help" className="sr-only">
         Dùng tay nắm trên thẻ để sắp xếp sơ đồ. Nhấn H để bật Hand Tool hoặc giữ Space để kéo bảng vẽ.
@@ -800,7 +800,7 @@ export function PracticeMindMap({
                 >
                   <StatusIcon size={15} className="shrink-0" aria-hidden="true" />
                   <span className="truncate">{saving ? 'Đang chuyển…' : label}</span>
-                  <span className="rounded-full bg-white/80 px-1.5 py-0.5 text-[10px] tabular-nums sm:text-[11px]">{count}</span>
+                  <span className="rounded-full bg-white/80 dark:bg-card/80 px-1.5 py-0.5 text-[10px] tabular-nums sm:text-[11px]">{count}</span>
                 </button>
               );
             })}
@@ -823,7 +823,7 @@ export function PracticeMindMap({
         onPointerUp={handleViewportPointerUp}
         onPointerCancel={handleViewportPointerUp}
         className={cn(
-          'relative min-h-0 flex-1 touch-none overflow-hidden bg-[#f8f9fb] select-none focus-visible:outline-2 focus-visible:outline-offset-[-2px]',
+          'relative min-h-0 flex-1 touch-none overflow-hidden bg-[#f8f9fb] dark:bg-muted select-none focus-visible:outline-2 focus-visible:outline-offset-[-2px]',
           isPanning ? 'cursor-grabbing' : isHandActive ? 'cursor-grab' : 'cursor-default',
         )}
         style={{
@@ -951,21 +951,21 @@ export function PracticeMindMap({
             onMouseLeave={() => setHoveredNodeId((curr) => (curr === 'root' ? null : curr))}
             className={cn(
               styles.mindMapNode,
-              'absolute -translate-y-1/2 rounded-xl border border-[#f2e9e6] bg-card p-4 shadow-[0_12px_28px_-9px_#b027003b]',
+              'absolute -translate-y-1/2 rounded-xl border border-[#f2e9e6] dark:border-border bg-card p-4 shadow-[0_12px_28px_-9px_#b027003b]',
               position.draft?.id === 'root' && 'z-20',
               isHandActive && 'pointer-events-none',
             )}
             style={{ left: rootPoint.x, top: rootPoint.y, width: root.width }}
           >
             <div className="flex items-center justify-between gap-2 pl-5 text-(--practice-primary)">
-              <span className="flex items-center gap-1.5 rounded-full bg-[#fce9e3] px-2 py-0.5 text-[11px] font-bold tracking-wide uppercase">
+              <span className="flex items-center gap-1.5 rounded-full bg-[#fce9e3] dark:bg-orange-950 px-2 py-0.5 text-[11px] font-bold tracking-wide uppercase">
                 <span className="size-1.5 rounded-full bg-current" aria-hidden="true" /> Gốc kế hoạch
               </span>
               <Network size={18} aria-hidden="true" />
             </div>
             <p className="mt-2 line-clamp-2 text-lg leading-snug font-extrabold wrap-anywhere" title={title}>{title}</p>
-            {subtitle && <p className="mt-0.5 truncate text-sm text-[#735951]" title={subtitle}>{subtitle}</p>}
-            <div className="mt-3 space-y-1.5 border-t border-slate-100 pt-2.5 text-xs font-semibold text-[#735951]">
+            {subtitle && <p className="mt-0.5 truncate text-sm text-[#735951] dark:text-muted-foreground" title={subtitle}>{subtitle}</p>}
+            <div className="mt-3 space-y-1.5 border-t border-slate-100 dark:border-border pt-2.5 text-xs font-semibold text-[#735951] dark:text-muted-foreground">
               <div className="flex justify-between gap-2">
                 <span>Tổng quan</span>
                 <strong className="text-right text-(--practice-primary) tabular-nums">
@@ -1016,7 +1016,7 @@ export function PracticeMindMap({
                     {gapTone && <span className={cn('shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold', gapTone.badge)}>{gapTone.label}</span>}
                     <strong className="ml-auto shrink-0 text-xs tabular-nums" style={{ color }}>{formatStudyPercent(branchProgress)}</strong>
                   </div>
-                  <div className="mt-2 flex items-center justify-between gap-2 text-xs text-[#735951]">
+                  <div className="mt-2 flex items-center justify-between gap-2 text-xs text-[#735951] dark:text-muted-foreground">
                     <span className="tabular-nums">{completed}/{nodes.length} hoàn thành</span>
                     <NodeProgress percent={branchProgress} color={color} className="w-16 shrink-0" />
                   </div>
@@ -1144,7 +1144,7 @@ export function PracticeMindMap({
         onClick={keepToolbarOpen}
         onFocusCapture={keepToolbarOpen}
         onMouseLeave={scheduleToolbarCollapse}
-        className="absolute bottom-3 left-3 z-20 flex max-w-[calc(100%-1.5rem)] items-center rounded-2xl border border-slate-200/80 bg-card/95 p-1 shadow-lg backdrop-blur-md sm:left-4"
+        className="absolute bottom-3 left-3 z-20 flex max-w-[calc(100%-1.5rem)] items-center rounded-2xl border border-slate-200/80 dark:border-border/80 bg-card/95 p-1 shadow-lg backdrop-blur-md sm:left-4"
       >
         {/* Single collapsed anchor button (shows active tool, expands drawer on hover/click) */}
         <Tooltip>
@@ -1169,7 +1169,7 @@ export function PracticeMindMap({
                   'shrink-0 rounded-xl transition-colors',
                   isHandActive
                     ? 'bg-(--practice-orange) text-(--practice-primary) hover:bg-(--practice-orange)'
-                    : 'bg-slate-100/80 text-slate-700 hover:bg-slate-200/80',
+                    : 'bg-slate-100/80 dark:bg-muted/80 text-slate-700 dark:text-foreground hover:bg-slate-200/80 dark:hover:bg-muted/80',
                 )}
               />
             }
@@ -1184,7 +1184,7 @@ export function PracticeMindMap({
         {/* Smoothly sliding tool drawer */}
         <div className={styles.mindMapToolbarDrawer} data-open={toolbarOpen}>
           <div className={cn(styles.mindMapToolbarDrawerInner, 'pl-0.5')}>
-            <span aria-hidden="true" className="mx-0.5 h-4 w-px shrink-0 bg-slate-200" />
+            <span aria-hidden="true" className="mx-0.5 h-4 w-px shrink-0 bg-slate-200 dark:bg-muted" />
 
             <Tooltip>
               <TooltipTrigger
@@ -1230,7 +1230,7 @@ export function PracticeMindMap({
               <TooltipContent>Kéo bảng vẽ (H / giữ Space)</TooltipContent>
             </Tooltip>
 
-            <span aria-hidden="true" className="mx-0.5 h-4 w-px shrink-0 bg-slate-200" />
+            <span aria-hidden="true" className="mx-0.5 h-4 w-px shrink-0 bg-slate-200 dark:bg-muted" />
 
             <Tooltip>
               <TooltipTrigger
@@ -1258,7 +1258,7 @@ export function PracticeMindMap({
                     type="button"
                     onClick={() => resetView(1)}
                     aria-label="Đặt mức thu phóng về 100%"
-                    className="min-w-11 rounded-lg px-1.5 py-1 text-center text-xs font-medium tabular-nums text-(--practice-muted) transition-colors hover:bg-slate-100 hover:text-slate-900"
+                    className="min-w-11 rounded-lg px-1.5 py-1 text-center text-xs font-medium tabular-nums text-(--practice-muted) transition-colors hover:bg-slate-100 dark:hover:bg-muted hover:text-slate-900 dark:hover:text-foreground"
                   >
                     {formatStudyPercent(Math.round(camera.zoom * 100))}
                   </button>
@@ -1322,7 +1322,7 @@ export function PracticeMindMap({
               <TooltipContent>Đặt lại góc nhìn</TooltipContent>
             </Tooltip>
 
-            <span aria-hidden="true" className="mx-0.5 h-4 w-px shrink-0 bg-slate-200" />
+            <span aria-hidden="true" className="mx-0.5 h-4 w-px shrink-0 bg-slate-200 dark:bg-muted" />
 
             <Tooltip>
               <TooltipTrigger
@@ -1435,7 +1435,7 @@ export function PracticeMindMap({
         <div
           className={cn(
             styles.mindMapOverviewEnter,
-            'absolute right-4 bottom-3 z-20 hidden w-44 rounded-xl border border-slate-200/80 bg-card/95 p-2 shadow-lg backdrop-blur-md sm:block',
+            'absolute right-4 bottom-3 z-20 hidden w-44 rounded-xl border border-slate-200/80 dark:border-border/80 bg-card/95 p-2 shadow-lg backdrop-blur-md sm:block',
           )}
         >
           <div className="mb-1 flex items-center justify-between">

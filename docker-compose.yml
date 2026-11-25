@@ -30,8 +30,18 @@ services:
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       FASTAPI_AI_BASE_URL: http://ai-service:8000
+      APP_AI_RUNTIME_AUTO_PROVISION: "true"
+      AI_RUNTIME_KEY_FILE: /run/smile-ai/ai-runtime.key
+    volumes:
+      - ai_runtime_key:/run/smile-ai
     ports:
       - "8081:8081"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "3", "http://127.0.0.1:8081/actuator/health"]
+      interval: 5s
+      timeout: 4s
+      retries: 10
+      start_period: 40s
     depends_on:
       postgres:
         condition: service_healthy
@@ -48,10 +58,13 @@ services:
     environment:
       PORT: 8000
       HF_HOME: /root/.cache/huggingface
+      AI_RUNTIME_BACKEND_URL: http://backend:8081
+      AI_RUNTIME_KEY_FILE: /run/smile-ai/ai-runtime.key
     ports:
       - "8000:8000"
     volumes:
       - sbert_cache:/root/.cache/huggingface
+      - ai_runtime_key:/run/smile-ai:ro
 
   web-app:
     build:
@@ -66,10 +79,13 @@ services:
       - "3000:3000"
     environment:
       NODE_ENV: production
+      BACKEND_INTERNAL_URL: http://backend:8081
       NEXT_PUBLIC_API_BASE_URL: http://localhost:8081
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
 volumes:
   postgres_data:
   sbert_cache:
+  ai_runtime_key:

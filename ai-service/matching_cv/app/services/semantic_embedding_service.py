@@ -8,6 +8,7 @@ import numpy as np
 import torch
 from sentence_transformers import SentenceTransformer
 
+from app.ai_runtime import active
 from matching_cv.app.core.config import settings
 from matching_cv.app.core.model_loader import ModelLoader, model_loader
 from matching_cv.app.schemas.semantic_representation import EmbeddingRecord
@@ -31,9 +32,17 @@ class SemanticEmbeddingService:
         batch_size: Optional[int] = None,
     ) -> None:
         self.loader = loader or model_loader
-        self.model_name = model_name or settings.STAGE3_MODEL_NAME
-        self.revision = revision or settings.STAGE3_MODEL_REVISION
+        self._model_name = model_name
+        self._revision = revision
         self.batch_size = batch_size or settings.STAGE3_BATCH_SIZE
+
+    @property
+    def model_name(self) -> str:
+        return self._model_name or settings.STAGE3_MODEL_NAME
+
+    @property
+    def revision(self) -> Optional[str]:
+        return self._revision or settings.STAGE3_MODEL_REVISION
 
     def _get_model(self) -> SentenceTransformer:
         return self.loader.get_model(self.model_name, revision=self.revision)
@@ -46,8 +55,10 @@ class SemanticEmbeddingService:
 
     def _compute_vector_id(self, text_hash: str) -> str:
         """Generate content-based vector identifier tied to model revision and text hash."""
-        rev_prefix = (self.revision or "default")[:8]
-        return f"vec_{rev_prefix}_{text_hash[:16]}"
+        revision = self.revision or "default"
+        if active.get().settings is not None:
+            revision = hashlib.sha256(f"{self.model_name}:{revision}".encode()).hexdigest()
+        return f"vec_{revision[:8]}_{text_hash[:16]}"
 
     def check_truncation(self, text: str) -> Tuple[bool, int, int]:
         """

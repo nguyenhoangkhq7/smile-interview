@@ -1,0 +1,14 @@
+@media screen {
+  :global(.dark) .surface [class~="bg-white"] { background: var(--card); }
+  :global(.dark) .surface :is([class~="bg-[#edf0ff]"], [class~="bg-[#f1f3ff]"]) { background: var(--muted); }
+  :global(.dark) .surface [class~="bg-[#f8f9ff]"] { background: var(--background); }
+  :global(.dark) .surface [class~="bg-[#ffdfd1]"] { background: #43271a; }
+  :global(.dark) .surface :is([class~="border-[#dbe2f9]"], [class~="border-[#edf0ff]"], [class~="border-[#eef0ff]"]) {
+    border-color: var(--border);
+  }
+
+  :global(.dark) .surface [class~="text-[#141b2c]"] { color: var(--foreground); }
+  :global(.dark) .surface [class~="text-[#5c4039]"] { color: var(--muted-foreground); }
+  :global(.dark) .surface [class~="text-[#186392]"] { color: #7dd3fc; }
+  :global(.dark) .surface :is([class~="text-[#722600]"], [class~="text-[#ad2c00]"]) { color: #fdba74; }
+}
