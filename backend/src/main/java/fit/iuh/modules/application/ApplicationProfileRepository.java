@@ -10,6 +10,8 @@ public interface ApplicationProfileRepository extends JpaRepository<ApplicationP
     List<ApplicationProfile> findByUserIdOrderByCreatedAtDesc(UUID userId);
     List<ApplicationProfile> findByUserIdAndDeletedAtIsNullOrderByCreatedAtDesc(UUID userId);
     List<ApplicationProfile> findByUserIdAndDeletedAtIsNotNullOrderByDeletedAtDesc(UUID userId);
+    boolean existsByResumeId(UUID resumeId);
+    boolean existsByJobDescriptionId(UUID jobDescriptionId);
 
     @Query("select p from ApplicationProfile p where p.deletedAt <= :cutoff")
     List<ApplicationProfile> findExpired(@Param("cutoff") java.time.LocalDateTime cutoff);
