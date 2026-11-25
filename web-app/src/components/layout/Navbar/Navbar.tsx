@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { BookOpen, ChevronDown, History, UserRound } from 'lucide-react';
+import { BookOpen, ChevronDown, History, ShieldCheck, UserRound } from 'lucide-react';
 import styles from './navbar.module.css';
 import { useAuthStore } from '@/store/authStore';
 
@@ -115,6 +115,13 @@ export default function Navbar() {
 
                   {/* Menu Options */}
                   <div>
+                    {user.role === 'ADMIN' && (
+                      <Link href="/admin" className={styles.dropdownItem}>
+                        <ShieldCheck size={14} className={styles.dropdownItemBlue} aria-hidden="true" />
+                        Bảng điều phối Admin
+                      </Link>
+                    )}
+
                     <Link href="/profile" className={styles.dropdownItem}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={styles.dropdownItemBlue}>
                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
