@@ -2,24 +2,28 @@ package fit.iuh.modules.session.controller;
 
 import fit.iuh.common.service.S3StorageService;
 import fit.iuh.exception.ResourceNotFoundException;
+import fit.iuh.modules.application.ApplicationProfileRepository;
+import fit.iuh.modules.auth.entity.Role;
 import fit.iuh.modules.auth.entity.User;
 import fit.iuh.modules.session.entity.Resume;
 import fit.iuh.modules.session.repository.ResumeRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import org.apache.pdfbox.Loader;
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.text.PDFTextStripper;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 @Slf4j
@@ -29,26 +33,30 @@ import java.util.UUID;
 public class ResumeController {
 
     private final ResumeRepository resumeRepository;
+    private final ApplicationProfileRepository applicationProfileRepository;
     private final S3StorageService s3StorageService;
 
     @GetMapping
     public ResponseEntity<List<Resume>> getResumes(@AuthenticationPrincipal User currentUser) {
-        if (currentUser != null && !"ADMIN".equalsIgnoreCase(currentUser.getRole().name())) {
-            return ResponseEntity.ok(resumeRepository.findByUserIdOrderByCreatedAtDesc(currentUser.getId()));
+        User user = requireUser(currentUser);
+        if (!isAdmin(user)) {
+            return ResponseEntity.ok(resumeRepository.findByUserIdOrderByCreatedAtDesc(user.getId()));
         }
         return ResponseEntity.ok(resumeRepository.findAllByOrderByCreatedAtDesc());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Resume> getResume(@PathVariable UUID id) {
-        return ResponseEntity.ok(resumeRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Resume not found with id: " + id)));
+    public ResponseEntity<Resume> getResume(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal User currentUser) {
+        return ResponseEntity.ok(requireOwnedResume(id, currentUser));
     }
 
     @GetMapping("/{id}/raw")
-    public ResponseEntity<Map<String, String>> getResumeRaw(@PathVariable UUID id) {
-        Resume resume = resumeRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Resume not found with id: " + id));
+    public ResponseEntity<Map<String, String>> getResumeRaw(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal User currentUser) {
+        Resume resume = requireOwnedResume(id, currentUser);
         String rawText = resume.getRawText();
         return ResponseEntity.ok(Map.of(
                 "fileName", resume.getFileName(),
@@ -62,9 +70,10 @@ public class ResumeController {
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "parsed_content", required = false) String parsedContent) {
 
-        UUID userId = (currentUser != null) ? currentUser.getId() : null;
+        User user = requireUser(currentUser);
+        UUID userId = user.getId();
         String fileName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "cv.pdf";
-        String fileUrl = null;
+        String fileUrl;
 
         if ((parsedContent == null || parsedContent.isBlank()) && fileName.toLowerCase().endsWith(".pdf")) {
             try (PDDocument document = Loader.loadPDF(file.getBytes())) {
@@ -75,7 +84,7 @@ public class ResumeController {
         }
 
         try {
-            String s3Key = "resumes/" + (userId != null ? userId : "guest") + "/" + System.currentTimeMillis() + "_" + fileName;
+            String s3Key = "resumes/" + userId + "/" + System.currentTimeMillis() + "_" + fileName;
             fileUrl = s3StorageService.uploadFile(s3Key, file.getBytes(), file.getContentType());
         } catch (Exception e) {
             log.warn("[ResumeController] S3 upload skipped or failed: {}", e.getMessage());
@@ -100,18 +109,17 @@ public class ResumeController {
             @AuthenticationPrincipal User currentUser,
             @RequestBody Map<String, Object> body) {
 
-        UUID userId = (currentUser != null) ? currentUser.getId() : null;
+        User user = requireUser(currentUser);
         String fileName = (String) body.getOrDefault("file_name", "CV.pdf");
         String parsedContent = (String) body.getOrDefault("parsed_content", body.get("extracted_text"));
         String rawText = (String) body.get("raw_text");
         if (rawText == null || rawText.isBlank()) rawText = parsedContent;
-        String fileUrl = (String) body.get("file_url");
 
         Resume resume = Resume.builder()
                 .id(UUID.randomUUID())
-                .userId(userId)
+                .userId(user.getId())
                 .fileName(fileName)
-                .fileUrl(fileUrl)
+                .fileUrl(null)
                 .rawText(rawText)
                 .createdAt(LocalDateTime.now())
                 .build();
@@ -121,11 +129,36 @@ public class ResumeController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Map<String, Object>> deleteResume(@PathVariable UUID id) {
-        if (!resumeRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Resume not found with id: " + id);
+    public ResponseEntity<Map<String, Object>> deleteResume(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal User currentUser) {
+        Resume resume = requireOwnedResume(id, currentUser);
+        if (applicationProfileRepository.existsByResumeId(resume.getId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "CV đang được sử dụng bởi hồ sơ ứng tuyển và không thể xóa.");
         }
-        resumeRepository.deleteById(id);
+        resumeRepository.delete(resume);
         return ResponseEntity.ok(Map.of("success", true, "message", "Resume deleted successfully"));
+    }
+
+    private Resume requireOwnedResume(UUID id, User currentUser) {
+        User user = requireUser(currentUser);
+        Resume resume = resumeRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Resume not found with id: " + id));
+        if (!isAdmin(user) && !Objects.equals(resume.getUserId(), user.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This resume belongs to another user");
+        }
+        return resume;
+    }
+
+    private User requireUser(User currentUser) {
+        if (currentUser == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
+        }
+        return currentUser;
+    }
+
+    private boolean isAdmin(User user) {
+        return user.getRole() == Role.ADMIN;
     }
 }

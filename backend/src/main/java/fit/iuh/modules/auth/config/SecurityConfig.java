@@ -3,6 +3,7 @@ package fit.iuh.modules.auth.config;
 import fit.iuh.modules.auth.security.JwtAuthenticationFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -45,6 +46,9 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final UserDetailsService userDetailsService;
 
+    @Value("${app.cors.allowed-origins:*}")
+    private List<String> allowedOriginPatterns;
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
@@ -69,7 +73,10 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOriginPatterns(List.of("*"));
+        List<String> origins = (allowedOriginPatterns == null || allowedOriginPatterns.isEmpty())
+                ? List.of("*")
+                : allowedOriginPatterns.stream().map(String::trim).filter(s -> !s.isBlank()).toList();
+        config.setAllowedOriginPatterns(origins.isEmpty() ? List.of("*") : origins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
@@ -90,7 +97,7 @@ public class SecurityConfig {
                     .authenticationEntryPoint((request, response, exception) ->
                             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED)))
             .authorizeHttpRequests(auth -> auth
-                    .requestMatchers("/api/auth/**").permitAll()
+                    .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
                     .requestMatchers("/uploads/**").permitAll()
                     .requestMatchers("/actuator/health").permitAll()
                     .requestMatchers("/api/admin/**", "/api/v1/admin/**").hasRole("ADMIN")

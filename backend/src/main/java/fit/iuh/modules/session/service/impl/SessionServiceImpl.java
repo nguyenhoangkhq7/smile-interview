@@ -1,6 +1,8 @@
 package fit.iuh.modules.session.service.impl;
 
 import fit.iuh.exception.ResourceNotFoundException;
+import fit.iuh.modules.auth.entity.Role;
+import fit.iuh.modules.auth.entity.User;
 import fit.iuh.modules.session.dto.CreateSessionRequest;
 import fit.iuh.modules.session.dto.SessionResponse;
 import fit.iuh.modules.session.dto.SessionResponse.SessionTurnDto;
@@ -16,12 +18,15 @@ import fit.iuh.modules.session.repository.SessionTurnRepository;
 import fit.iuh.modules.session.service.SessionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 @Slf4j
@@ -37,7 +42,9 @@ public class SessionServiceImpl implements SessionService {
 
     @Override
     @Transactional
-    public SessionResponse createSession(UUID userId, CreateSessionRequest request) {
+    public SessionResponse createSession(User currentUser, CreateSessionRequest request) {
+        User user = requireUser(currentUser);
+        UUID userId = user.getId();
         String sessionId = (request.getId() != null && !request.getId().isBlank())
                 ? request.getId()
                 : "session-" + System.currentTimeMillis();
@@ -45,8 +52,8 @@ public class SessionServiceImpl implements SessionService {
         log.info("[SessionService] Creating/Upserting session: id={}, userId={}, roleTitle={}", sessionId, userId, request.getRoleTitle());
 
         Session session = sessionRepository.lockById(sessionId).orElse(null);
-        if (session != null && !java.util.Objects.equals(session.getUserId(), userId)) {
-            throw new ResourceNotFoundException("Session not found");
+        if (session != null && !Objects.equals(session.getUserId(), userId)) {
+            throw forbidden("This session belongs to another user");
         }
         requireLegacyWrite(sessionId);
         if (session == null) {
@@ -58,9 +65,7 @@ public class SessionServiceImpl implements SessionService {
                     .build();
         }
 
-        if (userId != null) {
-            session.setUserId(userId);
-        }
+        session.setUserId(userId);
         if (request.getRoleTitle() != null) {
             session.setRoleTitle(request.getRoleTitle());
         }
@@ -88,15 +93,19 @@ public class SessionServiceImpl implements SessionService {
 
         if (request.getResumeId() != null) {
             Resume resume = resumeRepository.findById(request.getResumeId())
-                    .filter(item -> java.util.Objects.equals(item.getUserId(), userId))
                     .orElseThrow(() -> new ResourceNotFoundException("Resume not found"));
+            if (!Objects.equals(resume.getUserId(), userId)) {
+                throw forbidden("This resume belongs to another user");
+            }
             session.setResume(resume);
         }
 
         if (request.getJdId() != null) {
             JobDescription jd = jobDescriptionRepository.findById(request.getJdId())
-                    .filter(item -> java.util.Objects.equals(item.getUserId(), userId))
                     .orElseThrow(() -> new ResourceNotFoundException("Job description not found"));
+            if (!Objects.equals(jd.getUserId(), userId)) {
+                throw forbidden("This job description belongs to another user");
+            }
             session.setJobDescription(jd);
         }
 
@@ -126,9 +135,11 @@ public class SessionServiceImpl implements SessionService {
 
     @Override
     @Transactional(readOnly = true)
-    public SessionResponse getSession(String sessionId) {
+    public SessionResponse getSession(User currentUser, String sessionId) {
+        User user = requireUser(currentUser);
         Session session = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found with id: " + sessionId));
+        requireCanRead(session.getUserId(), user, "This session belongs to another user");
         var turns = sessionTurnRepository.findBySessionIdOrderByIdAsc(sessionId);
         return SessionResponse.from(session, turns);
     }
@@ -147,9 +158,11 @@ public class SessionServiceImpl implements SessionService {
 
     @Override
     @Transactional
-    public SessionResponse updateSession(String sessionId, UpdateSessionRequest request) {
+    public SessionResponse updateSession(User currentUser, String sessionId, UpdateSessionRequest request) {
+        User user = requireUser(currentUser);
         Session session = sessionRepository.lockById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found with id: " + sessionId));
+        requireOwner(session.getUserId(), user, "This session belongs to another user");
         if (request.getRoleTitle() != null || request.getInterviewType() != null || request.getStatus() != null
                 || request.getOverallScore() != null || request.getOverallFeedback() != null || request.getEndedAt() != null) {
             requireLegacyWrite(sessionId);
@@ -175,23 +188,26 @@ public class SessionServiceImpl implements SessionService {
 
     @Override
     @Transactional
-    public void deleteSession(String sessionId) {
-        if (sessionRepository.findById(sessionId).map(s -> s.getApplicationProfile() != null).orElse(false)) {
-            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT,
+    public void deleteSession(User currentUser, String sessionId) {
+        User user = requireUser(currentUser);
+        Session session = sessionRepository.lockById(sessionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Session not found with id: " + sessionId));
+        requireOwner(session.getUserId(), user, "This session belongs to another user");
+        if (session.getApplicationProfile() != null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Application profile attempts are retained as interview history");
         }
-        if (!sessionRepository.existsById(sessionId)) {
-            throw new ResourceNotFoundException("Session not found with id: " + sessionId);
-        }
         sessionTurnRepository.deleteBySessionId(sessionId);
-        sessionRepository.deleteById(sessionId);
+        sessionRepository.delete(session);
     }
 
     @Override
     @Transactional
-    public SessionTurn addTurn(String sessionId, SessionTurn turn) {
-        sessionRepository.lockById(sessionId)
+    public SessionTurn addTurn(User currentUser, String sessionId, SessionTurn turn) {
+        User user = requireUser(currentUser);
+        Session session = sessionRepository.lockById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + sessionId));
+        requireOwner(session.getUserId(), user, "This session belongs to another user");
         requireLegacyWrite(sessionId);
         turn.setSessionId(sessionId);
         return sessionTurnRepository.save(turn);
@@ -200,30 +216,42 @@ public class SessionServiceImpl implements SessionService {
     private void requireLegacyWrite(String sessionId) {
         if (evidenceRuns.existsById(sessionId) || sessionRepository.findById(sessionId)
                 .map(s -> s.getApplicationProfile() != null).orElse(false)) {
-            throw new org.springframework.web.server.ResponseStatusException(
-                    org.springframework.http.HttpStatus.CONFLICT, "V2 interview state must be updated through its interview API");
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT, "V2 interview state must be updated through its interview API");
         }
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<SessionTurn> getSessionTurns(String sessionId) {
+    public List<SessionTurn> getSessionTurns(User currentUser, String sessionId) {
+        User user = requireUser(currentUser);
+        Session session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Session not found with id: " + sessionId));
+        requireCanRead(session.getUserId(), user, "This session belongs to another user");
         return sessionTurnRepository.findBySessionIdOrderByIdAsc(sessionId);
     }
 
     @Override
     @Transactional
-    public String cloneSession(String sessionId) {
+    public String cloneSession(User currentUser, String sessionId) {
+        User user = requireUser(currentUser);
         Session original = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + sessionId));
+        requireOwner(original.getUserId(), user, "This session belongs to another user");
         if (original.getApplicationProfile() != null) {
-            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT,
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Create a new attempt from the application profile");
+        }
+        if (original.getResume() != null) {
+            requireOwner(original.getResume().getUserId(), user, "This resume belongs to another user");
+        }
+        if (original.getJobDescription() != null) {
+            requireOwner(original.getJobDescription().getUserId(), user, "This job description belongs to another user");
         }
         String newSessionId = "session-" + System.currentTimeMillis();
         Session cloned = Session.builder()
                 .id(newSessionId)
-                .userId(original.getUserId())
+                .userId(user.getId())
                 .resume(original.getResume())
                 .jobDescription(original.getJobDescription())
                 .roleTitle(original.getRoleTitle())
@@ -237,27 +265,26 @@ public class SessionServiceImpl implements SessionService {
 
     @Override
     @Transactional(readOnly = true)
-    public Map<String, Object> getRawTexts(UUID resumeId, UUID jdId) {
+    public Map<String, Object> getRawTexts(User currentUser, UUID resumeId, UUID jdId) {
+        User user = requireUser(currentUser);
         String rawCvText = null;
         String cvFilename = null;
         if (resumeId != null) {
-            var resumeOpt = resumeRepository.findById(resumeId);
-            if (resumeOpt.isPresent()) {
-                var r = resumeOpt.get();
-                rawCvText = r.getRawText();
-                cvFilename = r.getFileName();
-            }
+            Resume r = resumeRepository.findById(resumeId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Resume not found with id: " + resumeId));
+            requireCanRead(r.getUserId(), user, "This resume belongs to another user");
+            rawCvText = r.getRawText();
+            cvFilename = r.getFileName();
         }
 
         String rawJdText = null;
         String jdFilename = null;
         if (jdId != null) {
-            var jdOpt = jobDescriptionRepository.findById(jdId);
-            if (jdOpt.isPresent()) {
-                var j = jdOpt.get();
-                rawJdText = j.getRawText();
-                jdFilename = j.getTitle();
-            }
+            JobDescription j = jobDescriptionRepository.findById(jdId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Job description not found with id: " + jdId));
+            requireCanRead(j.getUserId(), user, "This job description belongs to another user");
+            rawJdText = j.getRawText();
+            jdFilename = j.getTitle();
         }
 
         return Map.of(
@@ -266,5 +293,29 @@ public class SessionServiceImpl implements SessionService {
                 "cvFilename", cvFilename != null ? cvFilename : "",
                 "jdFilename", jdFilename != null ? jdFilename : ""
         );
+    }
+
+    private User requireUser(User currentUser) {
+        if (currentUser == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
+        }
+        return currentUser;
+    }
+
+    private void requireOwner(UUID ownerId, User user, String message) {
+        if (ownerId == null || !Objects.equals(ownerId, user.getId())) {
+            throw forbidden(message);
+        }
+    }
+
+    private void requireCanRead(UUID ownerId, User user, String message) {
+        if (user.getRole() == Role.ADMIN) {
+            return;
+        }
+        requireOwner(ownerId, user, message);
+    }
+
+    private ResponseStatusException forbidden(String message) {
+        return new ResponseStatusException(HttpStatus.FORBIDDEN, message);
     }
 }
