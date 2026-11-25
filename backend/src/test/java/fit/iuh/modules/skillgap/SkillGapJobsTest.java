@@ -1,6 +1,7 @@
 package fit.iuh.modules.skillgap;
 
 import fit.iuh.exception.ResourceNotFoundException;
+import fit.iuh.modules.admin.queue.service.AdminQueueService;
 import fit.iuh.modules.skillgap.dto.SkillGapDtos.AnalyzeWithReportResponseDto;
 import fit.iuh.modules.skillgap.dto.SkillGapDtos.SkillGapReportDto;
 import org.junit.jupiter.api.Test;
@@ -18,6 +19,7 @@ import static org.assertj.core.api.Assertions.*;
 @Transactional
 class SkillGapJobsTest {
     @Autowired SkillGapJobs jobs;
+    @Autowired AdminQueueService adminQueue;
     @Autowired JdbcTemplate db;
 
     private final UUID owner = UUID.fromString("a1111111-1111-1111-1111-111111111111");
@@ -80,5 +82,34 @@ class SkillGapJobsTest {
         }
         assertThat(jobs.status(session, owner, id).status()).isEqualTo("FAILED");
         assertThat(jobs.submit(session, owner, false).job().job_id()).isNotEqualTo(id);
+    }
+    @Test void prioritizationAndReleaseFenceWorkersEvenWhenAttemptNumbersRepeat() throws Exception {
+        prepare();
+        UUID actor = UUID.randomUUID();
+        db.update("INSERT INTO users(id,username,email,password_hash,role) VALUES (?, 'Queue admin', ?, 'unused', 'ADMIN')",
+                actor, actor + "@example.test");
+        String other = UUID.randomUUID().toString();
+        db.update("INSERT INTO sessions(id,user_id) VALUES (?,?)", other, owner);
+        var normal = jobs.submit(other, owner, false).job().job_id();
+        var priority = jobs.submit(session, owner, false).job().job_id();
+        db.update("UPDATE skill_gap_jobs SET available_at=now()-interval '1 minute' WHERE id=?", normal);
+
+        adminQueue.prioritize(actor, priority);
+        var original = jobs.claim(60);
+        assertThat(original.id()).isEqualTo(priority);
+        adminQueue.release(actor, priority, original.token());
+        db.update("UPDATE skill_gap_jobs SET available_at=now() WHERE id=?", priority);
+        adminQueue.prioritize(actor, priority);
+        var replacement = jobs.claim(60);
+        assertThat(replacement.attempt()).isEqualTo(original.attempt());
+        assertThat(replacement.token()).isNotEqualTo(original.token());
+
+        jobs.complete(original, result());
+        jobs.retry(original);
+        assertThat(jobs.status(session, owner, priority).status()).isEqualTo("RUNNING");
+        assertThatThrownBy(() -> adminQueue.release(actor, priority, original.token()))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        jobs.complete(replacement, result());
+        assertThat(jobs.status(session, owner, priority).status()).isEqualTo("SUCCEEDED");
     }
 }

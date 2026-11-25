@@ -29,7 +29,7 @@ import { StudyGapCard, type StudyGap, type StudyGapActions } from './StudyGapCar
 import { StudyGapTaskDialog } from './StudyGapTaskDialog';
 import styles from './practice.module.css';
 
-const panelStyle = 'flex min-w-0 flex-col rounded-2xl border border-slate-100 bg-card p-4 shadow-xs sm:p-5';
+const panelStyle = 'flex min-w-0 flex-col rounded-2xl border border-slate-100 dark:border-border bg-card p-4 shadow-xs sm:p-5';
 const workspacePanelStyle = cn(panelStyle, 'min-h-0 gap-4');
 const workspaceScrollStyle = 'min-h-0 flex-1 xl:overflow-y-auto';
 const mutedText = 'text-sm leading-6 text-(--practice-muted)';
@@ -125,13 +125,13 @@ function ProgressSummary({ progress }: { progress: StudyProgress }) {
   };
 
   return (
-    <div className="flex shrink-0 flex-col justify-center gap-1.5 rounded-2xl border border-slate-200/80 bg-slate-50/70 px-3.5 py-2 shadow-2xs w-[min(48vw,16.5rem)] sm:w-[17rem]">
+    <div className="flex shrink-0 flex-col justify-center gap-1.5 rounded-2xl border border-slate-200/80 dark:border-border/80 bg-slate-50/70 px-3.5 py-2 shadow-2xs w-[min(48vw,16.5rem)] sm:w-[17rem]">
       {/* Tầng 1: Phần trăm và số lượng nằm cùng một hàng */}
       <div className="flex items-baseline justify-between gap-2">
         <span className={cn('text-base sm:text-lg font-black leading-none tabular-nums tracking-tight', textColorByLevel[level])}>
           {displayPercent}
         </span>
-        <span className="text-[11px] font-medium text-slate-500 tabular-nums">
+        <span className="text-[11px] font-medium text-slate-500 dark:text-muted-foreground tabular-nums">
           {done}/{total} đầu việc hoàn thành
         </span>
       </div>
@@ -508,9 +508,9 @@ export function PracticePlanBoard({ profile, initialPlan }: {
           {needsRefresh && <Button type="button" size="sm" variant="outline" disabled={pending} onClick={() => void reload()}>Tải lại kế hoạch</Button>}
         </div>
       )}
-      <header className="sticky top-0 z-30 flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200/80 bg-card/95 p-2 shadow-xs backdrop-blur-md sm:flex-nowrap sm:px-3">
+      <header className="sticky top-0 z-30 flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200/80 dark:border-border/80 bg-card/95 p-2 shadow-xs backdrop-blur-md sm:flex-nowrap sm:px-3">
         <div className="mr-auto min-w-0 flex-1 sm:flex-none">
-          <h1 className="truncate text-base font-extrabold leading-tight tracking-tight sm:text-lg text-slate-900">{plan.title}</h1>
+          <h1 className="truncate text-base font-extrabold leading-tight tracking-tight sm:text-lg text-slate-900 dark:text-foreground">{plan.title}</h1>
           <Link href={`/applications/${profile.id}`} className="text-[11px] font-medium text-(--practice-muted) hover:text-(--practice-primary) hover:underline">
             {profile.roleTitle || 'Kế hoạch ôn tập'} · Xem hồ sơ
           </Link>
@@ -520,19 +520,19 @@ export function PracticePlanBoard({ profile, initialPlan }: {
           <summary
             aria-label="Lỗ hổng kiến thức"
             title={`Lỗ hổng kiến thức (${gapCount} nội dung)`}
-            className="flex flex-col items-center justify-center size-10 cursor-pointer list-none rounded-xl border border-slate-200/80 bg-slate-50/70 hover:bg-slate-100/90 transition-all text-slate-700 hover:border-slate-300 focus-visible:outline-2 focus-visible:outline-(--practice-primary) [&::-webkit-details-marker]:hidden"
+            className="flex flex-col items-center justify-center size-10 cursor-pointer list-none rounded-xl border border-slate-200/80 dark:border-border/80 bg-slate-50/70 hover:bg-slate-100/90 dark:hover:bg-muted/90 transition-all text-slate-700 dark:text-foreground hover:border-slate-300 dark:hover:border-border focus-visible:outline-2 focus-visible:outline-(--practice-primary) [&::-webkit-details-marker]:hidden"
           >
             <Radar size={15} className={cn(gapCount > 0 && "text-(--practice-primary)")} aria-hidden="true" />
             <span
               className={cn(
                 "text-[10px] font-bold leading-none mt-0.5 tabular-nums",
-                gapCount > 0 ? "text-(--practice-primary)" : "text-slate-400"
+                gapCount > 0 ? "text-(--practice-primary)" : "text-slate-400 dark:text-muted-foreground"
               )}
             >
               {gaps.state.status === 'loading' ? '·' : gapCount}
             </span>
           </summary>
-          <div className="absolute right-0 top-12 z-50 max-h-[65vh] w-[min(90vw,24rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-card p-3 shadow-xl">
+          <div className="absolute right-0 top-12 z-50 max-h-[65vh] w-[min(90vw,24rem)] overflow-y-auto rounded-2xl border border-slate-200 dark:border-border bg-card p-3 shadow-xl">
             <KnowledgeGaps
               profile={profile}
               request={gaps}
@@ -544,7 +544,7 @@ export function PracticePlanBoard({ profile, initialPlan }: {
         <div
           role="group"
           aria-label="Chế độ xem kế hoạch"
-          className="relative order-2 inline-flex items-center rounded-xl bg-slate-100 p-0.5 border border-slate-200/60 shadow-inner sm:order-none"
+          className="relative order-2 inline-flex items-center rounded-xl bg-slate-100 dark:bg-muted p-0.5 border border-slate-200/60 dark:border-border/60 shadow-inner sm:order-none"
         >
           <span
             aria-hidden="true"
@@ -565,7 +565,7 @@ export function PracticePlanBoard({ profile, initialPlan }: {
                 "relative z-10 flex h-8 items-center gap-1.5 rounded-lg px-2.5 sm:px-3 text-xs font-semibold transition-colors duration-200 cursor-pointer",
                 view === value
                   ? "text-(--practice-primary)"
-                  : "text-slate-500 hover:text-slate-800"
+                  : "text-slate-500 dark:text-muted-foreground hover:text-slate-800 dark:hover:text-foreground"
               )}
             >
               <Icon size={15} aria-hidden="true" />
@@ -579,24 +579,24 @@ export function PracticePlanBoard({ profile, initialPlan }: {
           size="icon-sm"
           aria-label="Cài đặt kế hoạch"
           title="Cài đặt"
-          className="order-1 size-10 rounded-xl border-slate-200/80 bg-slate-50/70 hover:bg-slate-100 text-slate-700 sm:order-none transition-colors"
+          className="order-1 size-10 rounded-xl border-slate-200/80 dark:border-border/80 bg-slate-50/70 hover:bg-slate-100 dark:hover:bg-muted text-slate-700 dark:text-foreground sm:order-none transition-colors"
           disabled={disabled}
           onClick={() => setSettingsOpen(true)}
         >
           <Settings2 size={16} aria-hidden="true" />
         </Button>
       </header>
-      <section aria-label="Bộ lọc đầu việc" className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200/70 bg-card/90 px-3.5 py-2 shadow-xs backdrop-blur-sm">
+      <section aria-label="Bộ lọc đầu việc" className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200/70 dark:border-border/70 bg-card/90 px-3.5 py-2 shadow-xs backdrop-blur-sm">
         <div className="relative min-w-[11rem] flex-1 sm:max-w-xs">
           <label htmlFor="practice-task-search" className="sr-only">Tìm theo tên đầu việc</label>
-          <Search size={14} aria-hidden="true" className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-slate-400" />
+          <Search size={14} aria-hidden="true" className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-slate-400 dark:text-muted-foreground" />
           <Input
             id="practice-task-search"
             type="search"
             value={taskFilters.query}
             onChange={(event) => setTaskFilters((current) => ({ ...current, query: event.target.value }))}
             placeholder="Tìm theo tên đầu việc…"
-            className="h-8.5 rounded-xl border-0 bg-slate-100/70 pl-8 pr-3 text-xs placeholder:text-slate-400 focus-visible:bg-card focus-visible:ring-1 focus-visible:ring-(--practice-primary)"
+            className="h-8.5 rounded-xl border-0 bg-slate-100/70 dark:bg-muted/70 pl-8 pr-3 text-xs placeholder:text-slate-400 dark:placeholder:text-muted-foreground focus-visible:bg-card focus-visible:ring-1 focus-visible:ring-(--practice-primary)"
           />
         </div>
         <div className="relative">
@@ -605,7 +605,7 @@ export function PracticePlanBoard({ profile, initialPlan }: {
             id="practice-skill-filter"
             value={taskFilters.skillId}
             onChange={(event) => setTaskFilters((current) => ({ ...current, skillId: event.target.value }))}
-            className="h-8.5 rounded-xl border-0 bg-slate-100/70 px-2.5 pr-7 text-xs font-medium text-slate-700 outline-none cursor-pointer hover:bg-slate-100 focus-visible:ring-1 focus-visible:ring-(--practice-primary) transition-colors"
+            className="h-8.5 rounded-xl border-0 bg-slate-100/70 dark:bg-muted/70 px-2.5 pr-7 text-xs font-medium text-slate-700 dark:text-foreground outline-none cursor-pointer hover:bg-slate-100 dark:hover:bg-muted focus-visible:ring-1 focus-visible:ring-(--practice-primary) transition-colors"
           >
             <option value="">Tất cả kỹ năng</option>
             <option value={noTaskSkill}>Chưa gắn kỹ năng</option>
@@ -622,7 +622,7 @@ export function PracticePlanBoard({ profile, initialPlan }: {
             "flex h-8.5 items-center gap-1.5 rounded-xl px-2.5 text-xs font-medium transition-all duration-150 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50",
             taskFilters.improvementOnly
               ? "bg-(--practice-orange) text-(--practice-primary) ring-1 ring-(--practice-primary)/30 font-semibold"
-              : "bg-slate-100/70 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+              : "bg-slate-100/70 dark:bg-muted/70 text-slate-600 dark:text-muted-foreground hover:bg-slate-100 dark:hover:bg-muted hover:text-slate-900 dark:hover:text-foreground"
           )}
         >
           <Radar size={13} aria-hidden="true" />
@@ -636,21 +636,21 @@ export function PracticePlanBoard({ profile, initialPlan }: {
             "flex h-8.5 items-center gap-1.5 rounded-xl px-2.5 text-xs font-medium transition-all duration-150 cursor-pointer",
             taskFilters.checklistOpenOnly
               ? "bg-blue-100 text-blue-800 ring-1 ring-blue-300 font-semibold"
-              : "bg-slate-100/70 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+              : "bg-slate-100/70 dark:bg-muted/70 text-slate-600 dark:text-muted-foreground hover:bg-slate-100 dark:hover:bg-muted hover:text-slate-900 dark:hover:text-foreground"
           )}
         >
           <ListChecks size={13} aria-hidden="true" />
           <span>Checklist còn việc</span>
         </button>
         <div className="ml-auto flex items-center gap-2">
-          <span role="status" className="text-xs font-medium tabular-nums text-slate-400">
+          <span role="status" className="text-xs font-medium tabular-nums text-slate-400 dark:text-muted-foreground">
             Hiện {matchingTasks.length}/{tasks.length}
           </span>
           {hasActiveTaskFilters && (
             <button
               type="button"
               onClick={() => setTaskFilters({ query: '', skillId: '', improvementOnly: false, checklistOpenOnly: false })}
-              className="flex h-7 items-center gap-1 rounded-lg px-2 text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
+              className="flex h-7 items-center gap-1 rounded-lg px-2 text-xs font-medium text-slate-500 dark:text-muted-foreground hover:bg-slate-100 dark:hover:bg-muted hover:text-slate-900 dark:hover:text-foreground transition-colors cursor-pointer"
             >
               <X size={13} aria-hidden="true" />
               <span>Xóa lọc</span>

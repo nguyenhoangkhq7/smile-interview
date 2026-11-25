@@ -1,92 +1,59 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { AiEvalLevelItem } from '../types';
+import { useState } from 'react';
+import type { DistributionItem } from '../types';
 
-interface AiEvaluationV2SectionProps {
-  levels: AiEvalLevelItem[];
-}
+const LEVELS: Record<string, { title: string; color: string }> = {
+  DEMONSTRATED_ABOVE_TARGET: { title: 'Vượt kỳ vọng', color: '#006b2f' },
+  DEMONSTRATED_AT_TARGET: { title: 'Đạt chuẩn yêu cầu', color: '#186392' },
+  DEMONSTRATED_BELOW_TARGET: { title: 'Dưới chuẩn yêu cầu', color: '#a65800' },
+  NOT_DEMONSTRATED: { title: 'Chưa thể hiện được', color: '#ba1a1a' },
+  INSUFFICIENT_EVIDENCE: { title: 'Chưa đủ bằng chứng', color: '#765a52' },
+  NOT_ASSESSED: { title: 'Chưa được đánh giá', color: '#68728a' },
+};
+const numbers = new Intl.NumberFormat('vi-VN');
+const percentages = new Intl.NumberFormat('vi-VN', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
-export default function AiEvaluationV2Section({
-  levels,
-}: AiEvaluationV2SectionProps) {
-  const [animated, setAnimated] = useState(false);
-  const [hoveredCode, setHoveredCode] = useState<string | null>(null);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setAnimated(true), 200);
-    return () => clearTimeout(timer);
-  }, []);
+export default function AiEvaluationV2Section({ levels }: { levels: DistributionItem[] }) {
+  const [active, setActive] = useState<string | null>(null);
+  const total = levels.reduce((sum, level) => sum + level.count, 0);
+  const visible = levels.filter((level) => LEVELS[level.code]);
 
   return (
-    <div className="space-y-4 rounded-xl bg-white p-6 shadow-xs">
-      {/* Header */}
-      <div className="space-y-0.5">
-        <h2 className="text-lg font-semibold tracking-tight text-[#141b2c]">
-          Phân bổ kết quả đánh giá năng lực AI
-        </h2>
-        <p className="text-xs text-[#5c4039]">
-          Thống kê 6 mức độ chuẩn hóa năng lực dựa trên bằng chứng phỏng vấn
-        </p>
-      </div>
-
-      {/* Cumulative Stacked Ribbon */}
-      <div className="flex h-3.5 w-full overflow-hidden rounded-full bg-[#e9edff] shadow-inner">
-        {levels.map((level) => {
-          const isHovered = hoveredCode === level.code;
-          return (
-            <div
-              key={level.code}
-              onMouseEnter={() => setHoveredCode(level.code)}
-              onMouseLeave={() => setHoveredCode(null)}
-              className={`${level.ribbonColorClass} h-full cursor-pointer transition-all duration-700 ease-out ${
-                isHovered ? 'brightness-110' : ''
-              }`}
-              style={{ width: animated ? `${level.percentage}%` : '0%' }}
-              title={`${level.title}: ${level.percentage}%`}
-            />
-          );
-        })}
-      </div>
-
-      {/* 6 Compact Level Cards Grid */}
-      <div className="grid grid-cols-2 gap-3 pt-1 md:grid-cols-3 lg:grid-cols-6">
-        {levels.map((level) => {
-          const isHighlighted = hoveredCode === level.code;
-          return (
-            <div
-              key={level.code}
-              onMouseEnter={() => setHoveredCode(level.code)}
-              onMouseLeave={() => setHoveredCode(null)}
-              className={`flex flex-col justify-between rounded-xl p-3.5 transition-all duration-200 ${
-                isHighlighted
-                  ? 'bg-[#e9edff] ring-1 ring-[#186392]/25 shadow-2xs'
-                  : 'bg-[#f1f3ff]/60 hover:bg-[#f1f3ff]'
-              }`}
-            >
-              <div className="flex items-center justify-between gap-1">
-                <span className="truncate text-xs font-semibold text-[#141b2c]">
-                  {level.title}
-                </span>
-                <span className={`font-mono text-xs font-bold ${level.percentTextClass}`}>
-                  {level.percentage.toFixed(1)}%
-                </span>
-              </div>
-
-              <div className="mt-1.5 text-[11px] text-[#5c4039] tabular-nums">
-                {level.evaluationsCount.toLocaleString('en-US')} lượt
-              </div>
-
-              <div className="mt-2.5 h-1 w-full overflow-hidden rounded-full bg-[#e9edff]">
-                <div
-                  className={`${level.barColorClass} h-full rounded-full transition-all duration-700 ease-out`}
-                  style={{ width: animated ? `${level.percentage}%` : '0%' }}
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
+    <section className="rounded-xl bg-white dark:bg-card p-6 shadow-xs">
+      <h2 className="text-lg font-semibold tracking-tight text-[#141b2c] dark:text-foreground">Phân bố kết quả đánh giá năng lực AI</h2>
+      <p className="text-xs text-[#5c4039] dark:text-muted-foreground">Thống kê mức năng lực theo từng mục tiêu trong báo cáo phỏng vấn</p>
+      {total === 0 ? (
+        <p className="mt-6 text-sm text-[#5c4039] dark:text-muted-foreground">Chưa có báo cáo đánh giá trong kỳ này.</p>
+      ) : (
+        <>
+          <div className="mb-4 mt-4 flex h-3.5 overflow-hidden rounded-full bg-[#e9edff] dark:bg-secondary" aria-hidden="true">
+            {visible.map((level) => (
+              <span key={level.code} title={LEVELS[level.code].title}
+                className={active && active !== level.code ? 'opacity-40' : ''}
+                style={{ width: level.count * 100 / total + '%', backgroundColor: LEVELS[level.code].color }} />
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
+            {visible.map((level) => {
+              const display = LEVELS[level.code];
+              return (
+                <div key={level.code} onMouseEnter={() => setActive(level.code)} onMouseLeave={() => setActive(null)}
+                  className="min-w-0 rounded-xl bg-[#f4f5ff] dark:bg-muted p-3 text-xs">
+                  <div className="flex flex-wrap items-start justify-between gap-1 font-semibold">
+                    <span>{display.title}</span>
+                    <span style={{ color: display.color }}>{percentages.format(level.percentage)}%</span>
+                  </div>
+                  <div className="mt-2 text-[#5c4039] dark:text-muted-foreground">{numbers.format(level.count)} mục tiêu</div>
+                  <div className="mt-2 h-1 overflow-hidden rounded-full bg-[#e9edff] dark:bg-secondary" aria-hidden="true">
+                    <div className="h-full rounded-full" style={{ width: level.percentage + '%', backgroundColor: display.color }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </section>
   );
 }

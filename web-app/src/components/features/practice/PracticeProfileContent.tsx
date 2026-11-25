@@ -24,12 +24,12 @@ function ProfileStatus({ loadingLabel, message, onRetry }: ProfileStatusProps) {
     );
   }
 
-  return <p role="status" className="rounded-xl border border-slate-100 bg-card p-5 text-sm text-(--practice-muted)">{loadingLabel}</p>;
+  return <p role="status" className="rounded-xl border border-slate-100 dark:border-border bg-card p-5 text-sm text-(--practice-muted)">{loadingLabel}</p>;
 }
 
 function NoPracticeProfiles() {
   return (
-    <section className="flex flex-col items-center gap-3 rounded-2xl border border-slate-100 bg-card p-8 text-center">
+    <section className="flex flex-col items-center gap-3 rounded-2xl border border-slate-100 dark:border-border bg-card p-8 text-center">
       <FolderOpen size={24} className="text-(--practice-primary)" aria-hidden="true" />
       <h2 className="font-semibold">Bạn chưa có hồ sơ ứng tuyển</h2>
       <p className="text-sm text-(--practice-muted)">Hồ sơ bạn tạo sẽ tự xuất hiện trong danh sách ôn tập.</p>

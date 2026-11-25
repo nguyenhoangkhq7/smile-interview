@@ -4,6 +4,8 @@ import hashlib
 import json
 import logging
 import os
+
+from app.ai_runtime import model_value, openrouter_id
 import re
 from typing import Any, Dict, List, Optional
 from openai import AsyncOpenAI
@@ -624,10 +626,10 @@ class LLMService:
         )
 
         verifier_env_model = (
-            os.getenv("OPENROUTER_VERIFIER_MODEL")
+            model_value("verifierModel", os.getenv("OPENROUTER_VERIFIER_MODEL") or "")
             or getattr(settings, "OPENROUTER_VERIFIER_MODEL", "")
         ).strip()
-        model_to_use = model or verifier_env_model or settings.OPENROUTER_MODEL or self.model
+        model_to_use = openrouter_id(model or verifier_env_model or settings.OPENROUTER_MODEL or self.model)
         temp_to_use = 0.0 if temperature is None else float(temperature)
 
         try:

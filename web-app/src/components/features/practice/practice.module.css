@@ -1,19 +1,20 @@
+/* Practice palette */
 .surface,
 .taskDialog {
-  --practice-ink: #141c24;
-  --practice-muted: #526071;
+  --practice-ink: light-dark(#141c24, var(--foreground));
+  --practice-muted: light-dark(#526071, var(--muted-foreground));
   --practice-primary: #b02700;
   --practice-primary-hover: #8a1d00;
-  --practice-orange: #ffdad2;
-  --practice-pale: #edf4ff;
-  --practice-blue: #e5edf9;
-  --practice-blue-strong: #dbe3ef;
-  --practice-green: #146535;
-  --practice-green-bg: #a9f3ba;
+  --practice-orange: light-dark(#ffdad2, #502b22);
+  --practice-pale: light-dark(#edf4ff, #1c2a40);
+  --practice-blue: light-dark(#e5edf9, #243651);
+  --practice-blue-strong: light-dark(#dbe3ef, #35465f);
+  --practice-green: light-dark(#146535, #a7f3d0);
+  --practice-green-bg: light-dark(#a9f3ba, #1d4939);
 }
 
 .surface {
-  background: #f4f7fd;
+  background: light-dark(#f4f7fd, var(--background));
   color: var(--practice-ink);
 }
 
@@ -28,7 +29,7 @@
 
 .kanbanCard[data-nest-target] {
   border-color: var(--practice-primary);
-  background-color: color-mix(in srgb, var(--practice-orange) 28%, white);
+  background-color: color-mix(in srgb, var(--practice-orange) 28%, light-dark(white, var(--card)));
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--practice-primary) 20%, transparent);
 }
 
@@ -47,7 +48,7 @@
 
 .mindMapStatusFilter[data-drop-active] {
   border-color: var(--practice-primary);
-  background: color-mix(in srgb, var(--practice-orange) 45%, white);
+  background: color-mix(in srgb, var(--practice-orange) 45%, light-dark(white, var(--card)));
   box-shadow: inset 0 0 0 1px var(--practice-primary), 0 0 0 3px color-mix(in srgb, var(--practice-primary) 14%, transparent);
 }
 
@@ -105,14 +106,14 @@
 }
 
 .kanbanNestingTarget {
-  border-color: color-mix(in srgb, var(--practice-primary) 72%, white);
-  background: color-mix(in srgb, var(--practice-orange) 30%, white);
+  border-color: color-mix(in srgb, var(--practice-primary) 72%, light-dark(white, var(--card)));
+  background: color-mix(in srgb, var(--practice-orange) 30%, light-dark(white, var(--card)));
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--practice-primary) 16%, transparent);
 }
 
 .kanbanNestPlaceholder {
   min-height: 2.5rem;
-  border-color: color-mix(in srgb, var(--practice-primary) 58%, white);
+  border-color: color-mix(in srgb, var(--practice-primary) 58%, light-dark(white, var(--card)));
   background: color-mix(in srgb, var(--practice-orange) 35%, transparent);
   animation: kanban-nest-placeholder-in 180ms ease-out both;
 }
@@ -540,7 +541,7 @@
 .progressGradientTrack {
   position: relative;
   overflow: hidden;
-  background-color: #e7eef9;
+  background-color: light-dark(#e7eef9, var(--muted));
   border-radius: 9999px;
   box-shadow: inset 0 1px 3px rgba(15, 23, 42, 0.08);
 }

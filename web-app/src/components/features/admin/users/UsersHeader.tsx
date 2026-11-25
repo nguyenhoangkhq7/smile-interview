@@ -15,10 +15,10 @@ export default function UsersHeader({
   return (
     <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold leading-8 tracking-tight text-[#141b2c]">
+        <h1 className="text-2xl font-semibold leading-8 tracking-tight text-[#141b2c] dark:text-foreground">
           Quản lý người dùng
         </h1>
-        <p className="max-w-2xl text-sm leading-5 text-[#5c4039]">
+        <p className="max-w-2xl text-sm leading-5 text-[#5c4039] dark:text-muted-foreground">
           Quản lý tài khoản, quyền truy cập và hoạt động phỏng vấn trực tiếp của ứng viên trên nền
           tảng Smile AI.
         </p>
@@ -29,9 +29,9 @@ export default function UsersHeader({
         <button
           type="button"
           onClick={onExportCsv}
-          className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 text-[13px] font-medium text-[#141b2c] shadow-xs transition-all hover:bg-[#f1f3ff] hover:shadow-sm cursor-pointer"
+          className="inline-flex items-center gap-2 rounded-lg bg-white dark:bg-card px-4 py-2.5 text-[13px] font-medium text-[#141b2c] dark:text-foreground shadow-xs transition-all hover:bg-[#f1f3ff] dark:hover:bg-muted hover:shadow-sm cursor-pointer"
         >
-          <Download className="size-4 text-[#5c4039]" />
+          <Download className="size-4 text-[#5c4039] dark:text-muted-foreground" />
           <span>Xuất dữ liệu CSV</span>
         </button>
 

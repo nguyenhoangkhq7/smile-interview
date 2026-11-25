@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import localFont from 'next/font/local';
+import { ThemeProvider } from 'next-themes';
 import '../globals.css';
 import 'katex/dist/katex.min.css';
 import { cn } from "@/lib/utils";
@@ -29,13 +30,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="vi" className={cn("font-sans", atlassianSans.variable)}>
+    <html lang="vi" suppressHydrationWarning className={cn("font-sans", atlassianSans.variable)}>
       <body className="flex min-h-screen flex-col font-sans bg-background">
-        <TooltipProvider>
-          <AuthSessionMonitor />
-          {children}
-          <Toaster position="top-center" richColors />
-        </TooltipProvider>
+        <ThemeProvider attribute="class" defaultTheme="light" storageKey="smile-interview-theme" enableSystem enableColorScheme={false}>
+          <TooltipProvider>
+            <AuthSessionMonitor />
+            {children}
+            <Toaster position="top-center" richColors />
+          </TooltipProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

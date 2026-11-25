@@ -1,10 +1,30 @@
 """Core configuration and settings module."""
 from pathlib import Path
 from typing import Literal, Optional
+from app.ai_runtime import credential, model_value, openrouter_id
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+_RUNTIME_FIELDS = {
+    "OPENROUTER_MODEL": "matchingModel",
+    "OPENROUTER_VERIFIER_MODEL": "verifierModel",
+    "STAGE3_MODEL_NAME": "embeddingModel",
+    "STAGE3_MODEL_REVISION": "embeddingRevision",
+}
+
+
 class Settings(BaseSettings):
+    def __getattribute__(self, name: str):
+        value = super().__getattribute__(name)
+        if name == "OPENROUTER_API_KEY":
+            return credential("openRouterKey", value)
+        if name in _RUNTIME_FIELDS:
+            value = model_value(_RUNTIME_FIELDS[name], value)
+            if name.startswith("OPENROUTER_"):
+                return openrouter_id(value)
+            return value or None
+        return value
+
     PROJECT_NAME: str = "AI Inference Service"
     API_V1_STR: str = "/api/v1"
     ENVIRONMENT: str = "production"

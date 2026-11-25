@@ -15,7 +15,7 @@ interface TaskModalTopBarProps {
 export function TaskModalTopBar({ task, onClose }: TaskModalTopBarProps) {
   const currentStatus = studyTaskStatuses.find(({ value }) => value === task.status);
   return (
-    <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 bg-card px-5 py-3.5 sm:px-6">
+    <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 dark:border-border bg-card px-5 py-3.5 sm:px-6">
       <div className="flex min-w-0 items-center gap-2 text-xs text-(--practice-muted)">
         <View size={16} className="shrink-0 text-(--practice-primary)" aria-hidden="true" />
         <span className="truncate">
@@ -113,7 +113,7 @@ export function TaskModalHeader({
             'mt-1 grid size-7 shrink-0 place-items-center rounded-full transition-all duration-200 focus-visible:outline-2 disabled:cursor-not-allowed disabled:opacity-50',
             isDone
               ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-              : 'bg-slate-100 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600',
+              : 'bg-slate-100 dark:bg-muted text-slate-400 dark:text-muted-foreground hover:bg-emerald-50 hover:text-emerald-600',
           )}
         >
           {isDone ? <CheckCircle2 size={18} aria-hidden="true" /> : <Circle size={18} aria-hidden="true" />}
@@ -131,7 +131,7 @@ export function TaskModalHeader({
             onKeyDown={handleTitleKeyDown}
             className={cn(
               '-ml-2 w-full rounded-xl bg-transparent px-2 py-1 text-lg font-extrabold tracking-tight text-foreground outline-none transition-all sm:text-xl',
-              'hover:bg-slate-100/70 focus:bg-(--practice-pale)/70 focus:ring-2 focus:ring-(--practice-primary)/25',
+              'hover:bg-slate-100/70 dark:hover:bg-muted/70 focus:bg-(--practice-pale)/70 focus:ring-2 focus:ring-(--practice-primary)/25',
               isDone && 'text-(--practice-muted)',
             )}
           />
@@ -162,7 +162,7 @@ export function TaskModalHeader({
               type="button"
               disabled={disabled}
               onClick={onFocusChecklist}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100/90 px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-200/80 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100/90 dark:bg-muted/90 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-foreground transition-colors hover:bg-slate-200/80 dark:hover:bg-muted/80 disabled:opacity-50"
             >
               <ListChecks size={14} aria-hidden="true" />
               Việc cần làm
@@ -171,7 +171,7 @@ export function TaskModalHeader({
               type="button"
               disabled={disabled}
               onClick={onFocusSkill}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100/90 px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-200/80 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100/90 dark:bg-muted/90 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-foreground transition-colors hover:bg-slate-200/80 dark:hover:bg-muted/80 disabled:opacity-50"
             >
               <Tag size={14} aria-hidden="true" />
               Kỹ năng
@@ -180,7 +180,7 @@ export function TaskModalHeader({
               type="button"
               disabled={disabled}
               onClick={onFocusResources}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100/90 px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-200/80 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100/90 dark:bg-muted/90 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-foreground transition-colors hover:bg-slate-200/80 dark:hover:bg-muted/80 disabled:opacity-50"
             >
               <Paperclip size={14} aria-hidden="true" />
               Tài liệu

@@ -1,74 +1,49 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
-import { ActionToast } from '../users/UserModals';
-import EvaluationSummaryColumn from './EvaluationSummaryColumn';
-import FocusedSessionBanner from './FocusedSessionBanner';
-import InspectionPipelineStepper from './InspectionPipelineStepper';
-import { DEFAULT_INSPECTED_SESSION } from './mockSessionsData';
+import { useState } from 'react';
+import { ArrowLeft, RefreshCw } from 'lucide-react';
+import { useAdminInterviews } from '@/hooks/useAdminInterviews';
+import AdminInterviewDetail from './AdminInterviewDetail';
+import InterviewSessionList from './InterviewSessionList';
 import SessionsFilterBar from './SessionsFilterBar';
 import SessionsHeader from './SessionsHeader';
-import TranscriptInspectorColumn from './TranscriptInspectorColumn';
-import { SessionFilterTabKey } from './types';
+import themeStyles from '../layout/admin-theme.module.css';
+import type { InterviewFilter } from './types';
 
 export default function SessionInspectorView() {
-  const [activeFilterTab, setActiveFilterTab] = useState<SessionFilterTabKey>('completed');
-  const [sessionSearch, setSessionSearch] = useState<string>('#SESS-2025-0891');
-  const [activeStageId, setActiveStageId] = useState<number>(4);
-  const [selectedTurnId, setSelectedTurnId] = useState<string>('T3');
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const session = DEFAULT_INSPECTED_SESSION;
-
-  const triggerToast = (msg: string) => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setToastMessage(msg);
-    toastTimerRef.current = setTimeout(() => {
-      setToastMessage(null);
-    }, 3000);
-  };
+  const [status, setStatus] = useState<InterviewFilter>('all');
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState<string | null>(null);
+  const { catalog, detail, reload } = useAdminInterviews(search.trim(), status, page, selected);
+  const current = selected ? detail : catalog;
 
   return (
-    <div className="flex w-full flex-col gap-5 pb-8">
-      {/* 1. Clean Top Header */}
-      <SessionsHeader />
-
-      {/* 2. Filter Tabs & Search Bar */}
-      <SessionsFilterBar
-        activeFilterTab={activeFilterTab}
-        onSelectFilterTab={setActiveFilterTab}
-        sessionSearch={sessionSearch}
-        onSessionSearchChange={setSessionSearch}
-      />
-
-      {/* 3. Focused Session Card Banner */}
-      <FocusedSessionBanner
-        session={session}
-        onExportPdf={() =>
-          triggerToast(`Đang tải xuống Báo cáo năng lực PDF cho phiên ${session.sessionId}`)
-        }
-      />
-
-      {/* 4. Compact 5-Stage Pipeline Stepper */}
-      <InspectionPipelineStepper
-        stages={session.pipelineStages}
-        activeStageId={activeStageId}
-        onSelectStage={setActiveStageId}
-      />
-
-      {/* 5. Main Two-Column Workspace (8:4) */}
-      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-12">
-        <TranscriptInspectorColumn
-          turns={session.turns}
-          selectedTurnId={selectedTurnId}
-          onSelectTurn={setSelectedTurnId}
-        />
-
-        <EvaluationSummaryColumn session={session} />
+    <div className={`flex w-full flex-col gap-5 pb-8 ${themeStyles.surface}`}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <SessionsHeader />
+        {!selected && <button type="button" onClick={reload} disabled={!catalog}
+          className="flex items-center gap-2 rounded-lg bg-white dark:bg-card px-3 py-2 text-sm text-[#186392] dark:text-sky-300 disabled:opacity-50">
+          <RefreshCw className="size-4" /> Làm mới
+        </button>}
       </div>
-
-      <ActionToast message={toastMessage} />
+      {selected
+        ? <button type="button" onClick={() => setSelected(null)}
+            className="flex w-fit items-center gap-2 rounded-lg bg-white dark:bg-card px-3 py-2 text-sm font-medium text-[#186392] dark:text-sky-300">
+            <ArrowLeft className="size-4" /> Về danh sách phiên
+          </button>
+        : <SessionsFilterBar status={status} search={search} counts={catalog?.data?.counts}
+            setStatus={(next) => { setStatus(next); setPage(1); }}
+            setSearch={(next) => { setSearch(next); setPage(1); }} />}
+      {current?.failed && <p role="alert" className="rounded-xl bg-white dark:bg-card p-5 text-sm text-red-700 dark:text-red-300">
+        {selected ? 'Không thể tải chi tiết phiên.' : 'Không thể tải danh sách phiên.'}
+        <button type="button" onClick={reload} className="ml-3 underline">Thử lại</button>
+      </p>}
+      {!current && <p role="status" className="rounded-xl bg-white dark:bg-card p-5 text-sm">
+        {selected ? 'Đang tải chi tiết phiên…' : 'Đang tải danh sách phiên…'}
+      </p>}
+      {selected && detail?.data && <AdminInterviewDetail key={selected} detail={detail.data} onRefresh={reload} />}
+      {!selected && catalog?.data && <InterviewSessionList data={catalog.data} onPage={setPage} onSelect={setSelected} />}
     </div>
   );
 }

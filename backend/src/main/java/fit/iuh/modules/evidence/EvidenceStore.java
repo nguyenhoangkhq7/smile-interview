@@ -23,6 +23,7 @@ public class EvidenceStore {
     private final SessionRepository sessions;
     private final SessionTurnRepository turns;
     private final EvidenceJson json;
+    private final EvidenceAdmission admission;
 
     public record Commit(String sessionId, long expectedVersion, UUID requestId,
                          String requestHash, JsonNode config, JsonNode result) {}
@@ -49,6 +50,7 @@ public class EvidenceStore {
         }
         if ((run == null ? 0 : run.getStateVersion()) != input.expectedVersion()) throw conflict("State changed; refresh the interview");
         validateTransition(input);
+        if (run == null) admission.checkQuota(session.getUserId(), true);
         run = updateRun(run, input);
         runs.save(run);
         var profile = session.getApplicationProfile();

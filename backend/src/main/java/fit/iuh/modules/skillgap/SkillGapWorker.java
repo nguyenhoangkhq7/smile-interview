@@ -1,6 +1,8 @@
 package fit.iuh.modules.skillgap;
 
 import fit.iuh.config.AppProperties;
+import fit.iuh.exception.AiServiceException;
+import fit.iuh.modules.skillgap.SkillGapJobs.Failure;
 import fit.iuh.modules.skillgap.client.SkillGapClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,7 +29,15 @@ public class SkillGapWorker {
             jobs.complete(job, result);
         } catch (Exception ex) {
             log.warn("Analysis job {} failed on attempt {} ({})", job.id(), job.attempt(), ex.getClass().getSimpleName());
-            jobs.retry(job);
+            jobs.retry(job, failure(ex));
         }
+    }
+    private static Failure failure(Exception error) {
+        for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+            if (cause instanceof java.net.SocketTimeoutException || cause instanceof java.net.http.HttpTimeoutException) {
+                return Failure.TIMEOUT;
+            }
+        }
+        return error instanceof AiServiceException ? Failure.UPSTREAM : Failure.PROCESSING_FAILED;
     }
 }

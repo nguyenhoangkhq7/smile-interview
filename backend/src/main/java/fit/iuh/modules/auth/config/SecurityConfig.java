@@ -95,11 +95,13 @@ public class SecurityConfig {
                     session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .exceptionHandling(exceptions -> exceptions
                     .authenticationEntryPoint((request, response, exception) ->
-                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED)))
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED))
+                    .accessDeniedHandler((request, response, exception) ->
+                            response.setStatus(HttpServletResponse.SC_FORBIDDEN)))
             .authorizeHttpRequests(auth -> auth
-                    .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
+                    .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/password-setup").permitAll()
                     .requestMatchers("/uploads/**").permitAll()
-                    .requestMatchers("/actuator/health").permitAll()
+                    .requestMatchers("/actuator/health", "/api/internal/ai-runtime").permitAll()
                     .requestMatchers("/api/admin/**", "/api/v1/admin/**").hasRole("ADMIN")
                     .requestMatchers("/api/v1/**", "/api/v2/**").authenticated()
                     .anyRequest().authenticated()

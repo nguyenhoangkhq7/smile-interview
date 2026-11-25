@@ -78,6 +78,7 @@ public class JwtService {
         extraClaims.put("username", user.getDisplayUsername());
         extraClaims.put("role",     user.getRole() != null ? user.getRole().name() : "USER");
 
+        extraClaims.put("ver", user.getTokenVersion());
         return buildToken(extraClaims, user.getEmail());
     }
 
@@ -147,16 +148,21 @@ public class JwtService {
      */
     public boolean isTokenValid(String token, org.springframework.security.core.userdetails.UserDetails userDetails) {
         try {
-            final String subject = extractSubject(token);
-            return subject.equals(userDetails.getUsername()) && !isTokenExpired(token);
+            Claims claims = extractAllClaims(token);
+            return userDetails.getUsername().equals(claims.getSubject())
+                    && userDetails.isAccountNonLocked() && userDetails.isEnabled()
+                    && claims.getExpiration() != null && !claims.getExpiration().before(new Date())
+                    && (!(userDetails instanceof User user) || matchesVersion(claims, user));
         } catch (JwtException | IllegalArgumentException ex) {
             log.warn("JWT validation failed: {}", ex.getMessage());
             return false;
         }
     }
 
-    private boolean isTokenExpired(String token) {
-        return extractExpiration(token).before(new Date());
+    private boolean matchesVersion(Claims claims, User user) {
+        Object value = claims.get("ver");
+        if (value == null) return user.getTokenVersion() == 0;
+        return value instanceof Number version && version.longValue() == user.getTokenVersion();
     }
 
     // ----------------------------------------------------------------

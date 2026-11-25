@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 import dspy
 from pydantic import ValidationError
 
+from app.ai_runtime import active
 from matching_cv.app.core.config import settings
 from matching_cv.app.schemas.skill_extraction import check_verbatim_mention
 from matching_cv.dspy_modules.modules import DSPyExplicitSkillExtractorModule
@@ -43,6 +44,7 @@ class DSPyExplicitSkillService:
         self._compiled_path = compiled_path or COMPILED_MODULE_PATH
         self._module: Optional[DSPyExplicitSkillExtractorModule] = None
         self._lm: Optional[dspy.LM] = None
+        self._lm_revision: Optional[int] = None
         self._lock = threading.Lock()
         self._prompt_sha256: Optional[str] = None
 
@@ -52,8 +54,9 @@ class DSPyExplicitSkillService:
 
     def _extract_sync(self, text: str, document_type: str) -> Dict[str, Any]:
         self._ensure_initialized()
-        assert self._module is not None and self._lm is not None
-        with dspy.context(lm=self._lm):
+        lm = self._active_lm()
+        assert self._module is not None
+        with dspy.context(lm=lm):
             prediction = self._module(document_type=document_type, document_text=text)
         candidates = getattr(prediction, "explicit_skills", None)
         if candidates is None:
@@ -237,9 +240,16 @@ class DSPyExplicitSkillService:
 
     def _initialize(self) -> None:
         module = self._load_module()
-        self._lm = self._create_lm()
         self._prompt_sha256 = self._hash_module(module)
         self._module = module
+
+    def _active_lm(self) -> dspy.LM:
+        revision = active.get().revision
+        with self._lock:
+            if self._lm is None or self._lm_revision != revision:
+                self._lm = self._create_lm()
+                self._lm_revision = revision
+            return self._lm
 
     @staticmethod
     def _create_lm() -> dspy.LM:

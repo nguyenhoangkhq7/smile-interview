@@ -9,6 +9,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
@@ -63,6 +64,19 @@ public class User implements UserDetails {
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "locked_at")
+    private Instant lockedAt;
+
+    @Column(name = "lock_reason", length = 500)
+    private String lockReason;
+
+    @Column(name = "token_version", nullable = false)
+    private long tokenVersion;
+
+    @Version
+    @Column(name = "row_version", nullable = false)
+    private long rowVersion;
+
     // ----------------------------------------------------------------
     // Lifecycle
     // ----------------------------------------------------------------
@@ -102,7 +116,7 @@ public class User implements UserDetails {
 
     @Override
     public boolean isAccountNonLocked() {
-        return true;
+        return lockedAt == null;
     }
 
     @Override

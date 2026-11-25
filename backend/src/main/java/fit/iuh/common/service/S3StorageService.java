@@ -1,5 +1,6 @@
 package fit.iuh.common.service;
 
+import fit.iuh.common.storage.ManagedCvRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -8,12 +9,15 @@ import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
+import java.util.UUID;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class S3StorageService {
 
     private final S3Client s3Client;
+    private final ManagedCvRegistry managedCvRegistry;
 
     @Value("${aws.s3.bucket:smile-interview}")
     private String bucketName;
@@ -30,6 +34,8 @@ public class S3StorageService {
      * @return Public S3 HTTPS URL of the uploaded file
      */
     public String uploadFile(String key, byte[] content, String contentType) {
+        UUID managedId = key.startsWith("resumes/") ? UUID.randomUUID() : null;
+        if (managedId != null) key = ManagedCvRegistry.PREFIX + managedId;
         log.info("[S3StorageService] Uploading file to bucket={}, key={}, size={} bytes", bucketName, key, content.length);
         PutObjectRequest putRequest = PutObjectRequest.builder()
                 .bucket(bucketName)
@@ -37,7 +43,8 @@ public class S3StorageService {
                 .contentType(contentType != null ? contentType : "application/octet-stream")
                 .build();
 
-        s3Client.putObject(putRequest, RequestBody.fromBytes(content));
+        var uploaded = s3Client.putObject(putRequest, RequestBody.fromBytes(content));
+        if (managedId != null) managedCvRegistry.recordUpload(managedId, bucketName, uploaded.eTag());
         String fileUrl = String.format("https://%s.s3.%s.amazonaws.com/%s", bucketName, region, key);
         log.info("[S3StorageService] Successfully uploaded to: {}", fileUrl);
         return fileUrl;

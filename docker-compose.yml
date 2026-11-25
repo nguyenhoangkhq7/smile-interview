@@ -29,10 +29,19 @@ services:
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       FASTAPI_AI_BASE_URL: http://ai-service:8000
+      APP_AI_RUNTIME_AUTO_PROVISION: "true"
+      AI_RUNTIME_KEY_FILE: /run/smile-ai/ai-runtime.key
+    volumes:
+      - ai_runtime_key:/run/smile-ai
+      - backend_uploads:/app/uploads
     ports:
       - "8081:8081"
-    volumes:
-      - backend_uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "3", "http://127.0.0.1:8081/actuator/health"]
+      interval: 5s
+      timeout: 4s
+      retries: 10
+      start_period: 40s
     depends_on:
       postgres:
         condition: service_healthy
@@ -48,9 +57,12 @@ services:
     environment:
       PORT: 8000
       HF_HOME: /app/.cache/huggingface
+      AI_RUNTIME_BACKEND_URL: http://backend:8081
+      AI_RUNTIME_KEY_FILE: /run/smile-ai/ai-runtime.key
     ports:
       - "8000:8000"
     volumes:
+      - ai_runtime_key:/run/smile-ai:ro
       - sbert_cache:/app/.cache/huggingface
       - type: bind
         source: ${GNN_CHECKPOINT_DIR:-./ai-service/matching_cv/data/checkpoints/paper_aligned_gnn}
@@ -67,6 +79,10 @@ services:
     restart: always
     ports:
       - "3000:3000"
+    environment:
+      NODE_ENV: production
+      BACKEND_INTERNAL_URL: http://backend:8081
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8081}
     depends_on:
       backend:
         condition: service_healthy
@@ -75,3 +91,4 @@ volumes:
   postgres_data:
   backend_uploads:
   sbert_cache:
+  ai_runtime_key:

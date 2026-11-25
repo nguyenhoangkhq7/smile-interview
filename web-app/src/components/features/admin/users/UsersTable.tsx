@@ -1,258 +1,95 @@
 'use client';
 
-import React from 'react';
-import {
-  BadgeCheck,
-  ChevronLeft,
-  ChevronRight,
-  Eye,
-  FileText,
-  Lock,
-  LockOpen,
-  RefreshCw,
-  Video,
-} from 'lucide-react';
-import { AdminUserRecord } from './types';
+import { ChevronLeft, ChevronRight, Eye, FileText, Lock, LockOpen, RefreshCw, Video } from 'lucide-react';
+import type { AdminUserRecord } from './types';
+import { userDate, userInitials } from './userDisplay';
 
 interface UsersTableProps {
   users: AdminUserRecord[];
   totalCatalogCount: number;
+  page: number;
+  pageSize: number;
   selectedUserKey: string | null;
   onSelectUser: (userKey: string) => void;
   onRequestToggleLock: (user: AdminUserRecord) => void;
   onRefresh: () => void;
-  isRefreshing: boolean;
+  onPageChange: (page: number) => void;
 }
 
+const columns = ['Người dùng', 'Số hồ sơ', 'Phiên phỏng vấn', 'Vai trò', 'Trạng thái', 'Ngày tham gia', 'Thao tác'];
+const numbers = new Intl.NumberFormat('vi-VN');
+const action = 'rounded-lg p-1.5 text-[#186392] dark:text-sky-300 hover:bg-[#e9edff] dark:hover:bg-secondary';
+const pagination = 'flex size-8 items-center justify-center rounded-lg bg-[#f1f3ff] dark:bg-muted disabled:opacity-40';
+
 export default function UsersTable({
-  users,
-  totalCatalogCount,
-  selectedUserKey,
-  onSelectUser,
-  onRequestToggleLock,
-  onRefresh,
-  isRefreshing,
+  users, totalCatalogCount, page, pageSize, selectedUserKey, onSelectUser, onRequestToggleLock, onRefresh, onPageChange,
 }: UsersTableProps) {
+  const pageCount = Math.max(1, Math.ceil(totalCatalogCount / pageSize));
+  const offset = (page - 1) * pageSize;
+  const start = users.length ? offset + 1 : 0;
+  const end = users.length ? offset + users.length : 0;
+
   return (
-    <div className="flex flex-col overflow-hidden rounded-xl bg-white shadow-xs">
-      {/* Table Header Info Bar */}
-      <div className="flex items-center justify-between bg-[#f1f3ff] px-6 py-3">
+    <div className="overflow-hidden rounded-xl bg-white dark:bg-card shadow-xs">
+      <div className="flex items-center justify-between bg-[#f1f3ff] dark:bg-muted px-6 py-3">
         <div className="flex items-center gap-2">
-          <span className="text-base font-semibold text-[#141b2c]">Danh sách tài khoản</span>
-          <span className="rounded-full bg-[#dbe2f9] px-2.5 py-0.5 font-mono text-xs font-medium text-[#5c4039]">
-            {totalCatalogCount.toLocaleString('en-US')}
-          </span>
+          <h2 className="font-semibold text-[#141b2c] dark:text-foreground">Danh sách tài khoản</h2>
+          <span className="rounded-full bg-[#dbe2f9] dark:bg-muted px-2.5 py-0.5 text-xs">{numbers.format(totalCatalogCount)}</span>
         </div>
-
-        <button
-          type="button"
-          onClick={onRefresh}
-          title="Làm mới"
-          className="rounded p-1.5 text-[#5c4039] transition-colors hover:bg-[#e9edff] hover:text-[#141b2c] cursor-pointer"
-        >
-          <RefreshCw className={`size-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-        </button>
+        <button type="button" onClick={onRefresh} aria-label="Làm mới danh sách" className={action}><RefreshCw className="size-4" /></button>
       </div>
-
-      {/* Data Grid Responsive Container */}
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-left">
-          <thead>
-            <tr className="select-none bg-[#f1f3ff] text-[11px] font-semibold uppercase tracking-wider text-[#5c4039]">
-              <th className="px-6 py-3">Người dùng</th>
-              <th className="px-4 py-3">Số hồ sơ</th>
-              <th className="px-4 py-3">Phiên phỏng vấn</th>
-              <th className="px-4 py-3">Vai trò</th>
-              <th className="px-4 py-3">Trạng thái</th>
-              <th className="px-4 py-3">Ngày tham gia</th>
-              <th className="px-6 py-3 text-right">Thao tác</th>
-            </tr>
+        <table className="w-full min-w-205 text-left text-sm">
+          <thead className="bg-[#f1f3ff] dark:bg-muted text-xs uppercase tracking-wide text-[#5c4039] dark:text-muted-foreground">
+            <tr>{columns.map((column, index) => <th key={column} scope="col"
+              className={index === columns.length - 1 ? 'px-5 py-3 text-right' : 'px-5 py-3'}>{column}</th>)}</tr>
           </thead>
-
-          <tbody className="divide-y divide-[#f1f3ff] text-sm text-[#141b2c]">
-            {users.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-6 py-10 text-center text-xs text-[#5c4039]">
-                  Không tìm thấy tài khoản người dùng nào khớp với bộ lọc hiện tại.
-                </td>
-              </tr>
-            ) : (
-              users.map((user) => {
-                const isSelected = selectedUserKey === user.key;
-                const isLocked = user.status === 'LOCKED';
-
-                return (
-                  <tr
-                    key={user.key}
-                    onClick={() => onSelectUser(user.key)}
-                    className={`cursor-pointer transition-colors ${
-                      isSelected
-                        ? 'bg-[#cce5ff]/25 hover:bg-[#cce5ff]/35'
-                        : isLocked
-                          ? 'bg-[#ffdad6]/15 hover:bg-[#f1f3ff]/80'
-                          : 'hover:bg-[#f1f3ff]/70'
-                    }`}
-                  >
-                    <td className="px-6 py-3.5">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${user.avatarBgClass} ${user.avatarTextClass}`}
-                        >
-                          {user.initials}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5 truncate text-sm font-semibold text-[#141b2c]">
-                            <span className="truncate">{user.fullName}</span>
-                            {user.isVerified && (
-                              <BadgeCheck
-                                className="size-4 shrink-0 text-[#186392]"
-                                aria-label="Được xác minh"
-                              />
-                            )}
-                          </div>
-                          <div className="truncate text-xs text-[#5c4039]">{user.email}</div>
-                        </div>
+          <tbody className="divide-y divide-[#e9edff]">
+            {!users.length && <tr><td colSpan={7} className="px-6 py-8 text-center text-sm text-[#5c4039] dark:text-muted-foreground">Không tìm thấy tài khoản phù hợp.</td></tr>}
+            {users.map((user) => {
+              const locked = user.status === 'LOCKED';
+              const LockIcon = locked ? LockOpen : Lock;
+              return (
+                <tr key={user.id} className={selectedUserKey === user.id ? 'bg-[#e9edff] dark:bg-secondary' : locked ? 'bg-[#fff6f5] dark:bg-red-950/40' : 'hover:bg-[#f8f9ff] dark:hover:bg-background'}>
+                  <td className="px-5 py-3.5">
+                    <button type="button" onClick={() => onSelectUser(user.id)} className="flex items-center gap-3 text-left">
+                      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[#e0e8ff] dark:bg-secondary text-xs font-semibold text-[#186392] dark:text-sky-300">
+                        {userInitials(user.fullName)}
+                      </span>
+                      <span><strong className="block text-[#141b2c] dark:text-foreground">{user.fullName}</strong><span className="text-xs text-[#5c4039] dark:text-muted-foreground">{user.email}</span></span>
+                    </button>
+                  </td>
+                  <td className="px-5 py-3.5"><span className="inline-flex items-center gap-1.5 rounded-lg bg-[#e9edff] dark:bg-secondary px-2 py-1 text-xs">
+                    <FileText className="size-3.5 text-[#186392] dark:text-sky-300" /> {numbers.format(user.profilesCount)} hồ sơ
+                  </span></td>
+                  <td className="px-5 py-3.5"><span className="inline-flex items-center gap-1.5 rounded-lg bg-[#e9edff] dark:bg-secondary px-2 py-1 text-xs">
+                    <Video className="size-3.5 text-[#ad2c00] dark:text-orange-300" /> {numbers.format(user.sessionsCount)} phiên
+                  </span></td>
+                  <td className="px-5 py-3.5"><span className={'rounded px-2 py-1 text-xs font-semibold ' + (user.role === 'ADMIN' ? 'bg-[#cce5ff] dark:bg-sky-950' : 'bg-[#e9edff] dark:bg-secondary')}>{user.role}</span></td>
+                  <td className="px-5 py-3.5"><span className={'rounded-full px-2.5 py-1 text-xs font-semibold ' + (locked ? 'bg-[#ffdad6] dark:bg-red-950 text-[#93000a] dark:text-red-200' : 'bg-[#95f8a7] dark:bg-emerald-950 text-[#006b2f] dark:text-emerald-300')}>{user.status}</span></td>
+                  <td className="whitespace-nowrap px-5 py-3.5 text-xs text-[#5c4039] dark:text-muted-foreground">{userDate(user.joinedAt)}</td>
+                  <td className="px-5 py-3.5 text-right">
+                    {user.self ? <span className="text-xs text-[#5c4039] dark:text-muted-foreground">Tài khoản hiện tại</span> : (
+                      <div className="flex justify-end gap-1">
+                        <button type="button" onClick={() => onSelectUser(user.id)} className={action} aria-label={'Xem ' + user.fullName}><Eye className="size-4" /></button>
+                        <button type="button" onClick={() => onRequestToggleLock(user)} className={action}
+                          aria-label={(locked ? 'Mở khóa ' : 'Khóa ') + user.fullName}><LockIcon className="size-4" /></button>
                       </div>
-                    </td>
-
-                    <td className="px-4 py-3.5">
-                      <span className="inline-flex items-center gap-1.5 rounded-md bg-[#e9edff] px-2.5 py-1 text-xs font-medium text-[#141b2c]">
-                        <FileText className="size-3.5 text-[#186392]" />
-                        {user.resumesCount} hồ sơ
-                      </span>
-                    </td>
-
-                    <td className="px-4 py-3.5">
-                      <span className="inline-flex items-center gap-1.5 rounded-md bg-[#e9edff] px-2.5 py-1 text-xs font-medium text-[#141b2c]">
-                        <Video className="size-3.5 text-[#ad2c00]" />
-                        {user.sessionsCount} phiên
-                      </span>
-                    </td>
-
-                    <td className="px-4 py-3.5">
-                      <span
-                        className={`inline-block rounded px-2 py-0.5 text-[11px] tracking-wide ${
-                          user.role === 'ADMIN'
-                            ? 'bg-[#cce5ff] font-bold text-[#001e31]'
-                            : 'bg-[#dbe2f9] font-semibold text-[#5c4039]'
-                        }`}
-                      >
-                        {user.role}
-                      </span>
-                    </td>
-
-                    <td className="px-4 py-3.5">
-                      {isLocked ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-[#ffdad6] px-2.5 py-1 text-[11px] font-semibold text-[#93000a]">
-                          <Lock className="size-3" />
-                          LOCKED
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-[#95f8a7] px-2.5 py-1 text-[11px] font-semibold text-[#00210a]">
-                          <span className="size-1.5 rounded-full bg-[#006b2f]" />
-                          ACTIVE
-                        </span>
-                      )}
-                    </td>
-
-                    <td className="px-4 py-3.5 font-mono text-xs text-[#5c4039]">
-                      {user.joinedDate}
-                    </td>
-
-                    <td className="px-6 py-3.5 text-right">
-                      <div
-                        className="inline-flex items-center gap-1"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {user.isSelfAccount ? (
-                          <span className="rounded bg-[#e9edff] px-2 py-1 font-mono text-xs text-[#5c4039]">
-                            Tài khoản hiện tại
-                          </span>
-                        ) : (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => onSelectUser(user.key)}
-                              title="Xem chi tiết"
-                              className="rounded-lg p-1.5 text-[#186392] transition-colors hover:bg-[#e9edff] cursor-pointer"
-                            >
-                              <Eye className="size-4.5" />
-                            </button>
-
-                            {isLocked && (
-                              <button
-                                type="button"
-                                onClick={() => onRequestToggleLock(user)}
-                                title="Mở khóa tài khoản"
-                                className="rounded-lg p-1.5 text-[#ba1a1a] transition-colors hover:bg-[#e9edff] cursor-pointer"
-                              >
-                                <LockOpen className="size-4.5" />
-                              </button>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
-
-      {/* Pagination Footer */}
-      <div className="flex flex-col items-center justify-between gap-4 border-t border-[#e9edff] bg-white px-6 py-3.5 sm:flex-row">
-        <div className="text-xs text-[#5c4039]">
-          Hiển thị <span className="font-semibold text-[#141b2c]">1 - {users.length}</span> /{' '}
-          <span className="font-semibold text-[#141b2c]">
-            {totalCatalogCount.toLocaleString('en-US')}
-          </span>{' '}
-          người dùng
-        </div>
-
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            disabled
-            aria-label="Trang trước"
-            className="flex size-7 cursor-not-allowed items-center justify-center rounded-lg bg-[#f1f3ff] text-[#5c4039] opacity-50"
-          >
-            <ChevronLeft className="size-4" />
-          </button>
-          <button
-            type="button"
-            className="flex size-7 items-center justify-center rounded-lg bg-[#d83900] text-xs font-semibold text-[#fffbff]"
-          >
-            1
-          </button>
-          <button
-            type="button"
-            className="flex size-7 items-center justify-center rounded-lg bg-[#f1f3ff] text-xs font-semibold text-[#141b2c] hover:bg-[#e9edff] cursor-pointer"
-          >
-            2
-          </button>
-          <button
-            type="button"
-            className="flex size-7 items-center justify-center rounded-lg bg-[#f1f3ff] text-xs font-semibold text-[#141b2c] hover:bg-[#e9edff] cursor-pointer"
-          >
-            3
-          </button>
-          <span className="px-1 text-xs text-[#5c4039]">...</span>
-          <button
-            type="button"
-            className="flex h-7 items-center justify-center rounded-lg bg-[#f1f3ff] px-2 text-xs font-semibold text-[#141b2c] hover:bg-[#e9edff] cursor-pointer"
-          >
-            2080
-          </button>
-          <button
-            type="button"
-            aria-label="Trang tiếp"
-            className="flex size-7 items-center justify-center rounded-lg bg-[#f1f3ff] text-[#141b2c] hover:bg-[#e9edff] cursor-pointer"
-          >
-            <ChevronRight className="size-4" />
-          </button>
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-4 border-t border-[#e9edff] dark:border-border px-6 py-3 text-xs">
+        <span>Hiển thị {numbers.format(start)}–{numbers.format(end)} / {numbers.format(totalCatalogCount)} người dùng</span>
+        <nav aria-label="Trang danh sách người dùng" className="flex items-center gap-2">
+          <button type="button" className={pagination} disabled={page <= 1} onClick={() => onPageChange(page - 1)} aria-label="Trang trước"><ChevronLeft className="size-4" /></button>
+          <span className="tabular-nums" aria-live="polite">{page} / {pageCount}</span>
+          <button type="button" className={pagination} disabled={page >= pageCount} onClick={() => onPageChange(page + 1)} aria-label="Trang tiếp"><ChevronRight className="size-4" /></button>
+        </nav>
       </div>
     </div>
   );

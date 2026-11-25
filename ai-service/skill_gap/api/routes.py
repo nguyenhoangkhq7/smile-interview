@@ -4,7 +4,11 @@ FastAPI REST API endpoints for Module 2 (Skill-Gap Detection):
   - POST /api/v1/skill-gap/analyze-with-report
 """
 
+import os
 import uuid
+from threading import Lock
+
+from app.ai_runtime import active, credential, model_value
 from fastapi import APIRouter, Request, status
 
 from skill_gap.adapters.config import load_config
@@ -18,7 +22,24 @@ from skill_gap.pipeline.orchestrator import SkillGapOrchestrator
 router = APIRouter(prefix="/api/v1/skill-gap", tags=["Skill-Gap Detection V2.0"])
 
 
+_orchestrator_lock = Lock()
+
+
 def _get_orchestrator(request: Request) -> SkillGapOrchestrator:
+    revision = active.get().revision
+    if revision:
+        with _orchestrator_lock:
+            entry = getattr(request.app.state, "configured_orchestrator", None)
+            if entry is None or entry[0] != revision:
+                config = load_config()
+                config.llm.model = model_value("skillGapModel", config.llm.model)
+                client = DSPyLLMClient(
+                    model=config.llm.model,
+                    api_key=credential("openRouterKey", os.getenv("OPENROUTER_API_KEY", "")),
+                )
+                entry = (revision, SkillGapOrchestrator(llm_client=client, config=config))
+                request.app.state.configured_orchestrator = entry
+            return entry[1]
     if not hasattr(request.app.state, "orchestrator"):
         config = load_config()
         llm_client = DSPyLLMClient(model=config.llm.model)

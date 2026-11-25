@@ -1,141 +1,113 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
-import { CheckCircle2 } from 'lucide-react';
-import AdaptivePolicyForm from './AdaptivePolicyForm';
-import AiPolicyHeader from './AiPolicyHeader';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  DEFAULT_ADAPTIVE_POLICY_CONFIG,
-  INITIAL_SERVICE_HEALTH_CARDS,
-} from './mockAiPolicyData';
+  adminAiPolicy, aiPolicyError, unchangedCredentials,
+  type AiConfiguration, type AiServiceCheck, type AiSettings,
+} from '@/services/adminAiPolicy';
+import AdaptivePolicyForm from './AdaptivePolicyForm';
+import AiModelsForm from './AiModelsForm';
+import AiPolicyHeader from './AiPolicyHeader';
 import ServiceHealthGrid from './ServiceHealthGrid';
-import { AdaptivePolicyConfig, ServiceHealthCardItem } from './types';
+import themeStyles from '../layout/admin-theme.module.css';
 
 export default function AiPolicyView() {
-  const [services, setServices] = useState<ServiceHealthCardItem[]>(
-    INITIAL_SERVICE_HEALTH_CARDS
-  );
-  const [config, setConfig] = useState<AdaptivePolicyConfig>(
-    DEFAULT_ADAPTIVE_POLICY_CONFIG
-  );
-  const [savedConfig, setSavedConfig] = useState<AdaptivePolicyConfig>(
-    DEFAULT_ADAPTIVE_POLICY_CONFIG
-  );
+  const [configuration, setConfiguration] = useState<AiConfiguration>();
+  const [draft, setDraft] = useState<AiSettings>();
+  const [credentials, setCredentials] = useState(unchangedCredentials);
+  const [health, setHealth] = useState<AiServiceCheck[]>([]);
+  const [checking, setChecking] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [healthError, setHealthError] = useState('');
+  const [notice, setNotice] = useState<{ text: string; error?: boolean }>();
 
-  const [isCheckingHealth, setIsCheckingHealth] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [toast, setToast] = useState<{ title: string; message: string } | null>(null);
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const load = useCallback(async (signal?: AbortSignal) => {
+    setLoading(true);
+    try {
+      const current = await adminAiPolicy.configuration(signal);
+      setConfiguration(current);
+      setDraft(current.settings);
+      setCredentials(unchangedCredentials);
+      return true;
+    } catch (error) {
+      if (!signal?.aborted) setNotice({ text: aiPolicyError(error), error: true });
+      return false;
+    } finally {
+      if (!signal?.aborted) setLoading(false);
+    }
+  }, []);
 
-  const showToast = (title: string, message: string) => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setToast({ title, message });
-    toastTimerRef.current = setTimeout(() => {
-      setToast(null);
-    }, 3200);
-  };
+  const check = useCallback(async (signal?: AbortSignal) => {
+    setChecking(true);
+    setHealthError('');
+    try {
+      setHealth(await adminAiPolicy.health(signal));
+    } catch {
+      if (!signal?.aborted) {
+        setHealth([]);
+        setHealthError('Không thể kiểm tra trạng thái dịch vụ.');
+      }
+    } finally {
+      if (!signal?.aborted) setChecking(false);
+    }
+  }, []);
 
-  const handleTriggerHealthCheck = () => {
-    setIsCheckingHealth(true);
-    setTimeout(() => {
-      setServices((prev) =>
-        prev.map((svc) => {
-          const jitter = Math.floor(Math.random() * 11) - 5;
-          const nextPct = Math.min(92, Math.max(8, svc.latencyBarPct + jitter));
-          return {
-            ...svc,
-            latencyBarPct: nextPct,
-            lastCheckedText: 'Vừa xong',
-          };
-        })
-      );
-      setIsCheckingHealth(false);
-      showToast(
-        'Đã làm mới Telemetry!',
-        'Toàn bộ 8/8 dịch vụ hạ tầng AI và lưu trữ đều hoạt động ổn định.'
-      );
-    }, 650);
-  };
+  useEffect(() => {
+    const request = new AbortController();
+    void load(request.signal);
+    void check(request.signal);
+    return () => request.abort();
+  }, [load, check]);
 
-  const handleUpdateField = <K extends keyof AdaptivePolicyConfig>(
-    key: K,
-    value: AdaptivePolicyConfig[K]
-  ) => {
-    setConfig((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
-  };
-
-  const handleSavePolicy = () => {
-    setIsSaving(true);
-    setTimeout(() => {
-      setIsSaving(false);
-      setSavedConfig(config);
-      showToast(
-        'Chính sách đã cập nhật!',
-        'Đã tạo Snapshot phiên bản mới và phân phối tới các worker pods.'
-      );
-    }, 750);
-  };
-
-  const handleResetDefault = () => {
-    setConfig(DEFAULT_ADAPTIVE_POLICY_CONFIG);
-    setSavedConfig(DEFAULT_ADAPTIVE_POLICY_CONFIG);
-    showToast(
-      'Đã khôi phục mặc định',
-      'Các tham số đã được hoàn về thiết lập gốc của hệ thống.'
-    );
-  };
-
-  const handleCancelChanges = () => {
-    setConfig(savedConfig);
-    showToast('Đã hủy thay đổi', 'Các thay đổi chưa lưu trên biểu mẫu đã được hoàn tác.');
-  };
+  async function update(reset: boolean) {
+    if (!configuration || !draft) return;
+    if (reset && !window.confirm('Khôi phục model và chính sách mặc định của môi trường?')) return;
+    setBusy(true);
+    setNotice(undefined);
+    try {
+      if (reset) await adminAiPolicy.reset(configuration.revision);
+      else await adminAiPolicy.save(configuration.revision, draft, credentials);
+      setCredentials(unchangedCredentials);
+      const refreshed = await load();
+      if (refreshed) {
+        setNotice({ text: reset ? 'Đã khôi phục model và chính sách mặc định.' : 'Đã lưu cấu hình AI.' });
+      } else {
+        setConfiguration(undefined);
+        setNotice({ text: 'Đã lưu cấu hình. Tải lại để xem phiên bản mới.', error: true });
+      }
+      void check();
+    } catch (error) {
+      setNotice({ text: aiPolicyError(error), error: true });
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <div className="flex w-full flex-col gap-8 pb-8">
-      {/* 1. Page Header & Policy Immutability Alert Banner */}
-      <AiPolicyHeader
-        isCheckingHealth={isCheckingHealth}
-        onTriggerHealthCheck={handleTriggerHealthCheck}
-      />
-
-      {/* 2. Section A: Health Monitor Grid (8 Service Cards) */}
-      <ServiceHealthGrid
-        services={services}
-        isCheckingHealth={isCheckingHealth}
-      />
-
-      {/* 3. Section B: Form Controls for Adaptive Policies */}
-      <AdaptivePolicyForm
-        config={config}
-        isSaving={isSaving}
-        onUpdateField={handleUpdateField}
-        onResetDefault={handleResetDefault}
-        onCancelChanges={handleCancelChanges}
-        onSavePolicy={handleSavePolicy}
-      />
-
-      {/* Toast Notification */}
-      <div
-        aria-live="polite"
-        className={`pointer-events-none fixed bottom-24 right-8 z-50 transition-all duration-300 ${
-          toast ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0'
-        }`}
-      >
-        <div className="flex items-center gap-3 rounded-xl bg-[#293041] px-4 py-3 text-[#edf0ff] shadow-xl">
-          <CheckCircle2 className="size-5 shrink-0 text-[#95f8a7]" />
-          <div className="flex flex-col">
-            <span className="text-sm font-semibold text-white">
-              {toast?.title || 'Đã lưu thành công'}
-            </span>
-            <span className="text-xs text-[#edf0ff]/80">
-              {toast?.message || 'Chính sách phỏng vấn mới đã được nạp vào Redis Cluster.'}
-            </span>
-          </div>
-        </div>
-      </div>
+      <AiPolicyHeader isCheckingHealth={checking} onTriggerHealthCheck={() => void check()} />
+      <ServiceHealthGrid services={health} isCheckingHealth={checking} />
+      {healthError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{healthError}</p>}
+      {notice && <div role={notice.error ? 'alert' : 'status'}
+        className={notice.error ? 'text-sm text-red-700 dark:text-red-300' : 'text-sm text-green-800 dark:text-green-300'}>
+        {notice.text}
+        {notice.error && <button type="button" className="ml-3 underline" disabled={loading || busy}
+          onClick={() => { setNotice(undefined); void load(); }}>Tải lại cấu hình</button>}
+      </div>}
+      {loading && <p role="status" className="text-sm">Đang tải cấu hình…</p>}
+      {draft && configuration && <AdaptivePolicyForm config={draft.policy}
+        parameters={configuration.skillGapParameters}
+        isSaving={busy || loading}
+        models={<div className={themeStyles.surface}>
+          <AiModelsForm settings={configuration} models={draft.models} credentials={credentials}
+            onModels={(models) => setDraft({ ...draft, models })} onCredentials={setCredentials} />
+        </div>}
+        onUpdateField={(key, value) => setDraft({ ...draft, policy: { ...draft.policy, [key]: value } })}
+        onResetDefault={() => void update(true)}
+        onCancelChanges={() => { setDraft(configuration.settings); setCredentials(unchangedCredentials); setNotice(undefined); }}
+        onSavePolicy={() => void update(false)}
+      />}
     </div>
   );
 }

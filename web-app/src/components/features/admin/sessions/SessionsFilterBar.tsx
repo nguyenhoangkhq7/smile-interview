@@ -1,109 +1,42 @@
-'use client';
+import { Search, X } from 'lucide-react';
+import { statusLabels } from './sessionDisplay';
+import type { InterviewFilter, InterviewPage } from './types';
 
-import React from 'react';
-import { CheckCircle2, Search, X } from 'lucide-react';
-import { SESSION_FILTER_TABS } from './mockSessionsData';
-import { SessionFilterTabKey } from './types';
+const tabs: InterviewFilter[] = ['all', 'COMPLETED', 'IN_PROGRESS', 'ANOMALY', 'NOT_STARTED', 'OTHER'];
 
-interface SessionsFilterBarProps {
-  activeFilterTab: SessionFilterTabKey;
-  onSelectFilterTab: (tab: SessionFilterTabKey) => void;
-  sessionSearch: string;
-  onSessionSearchChange: (value: string) => void;
-}
-
-export default function SessionsFilterBar({
-  activeFilterTab,
-  onSelectFilterTab,
-  sessionSearch,
-  onSessionSearchChange,
-}: SessionsFilterBarProps) {
+export default function SessionsFilterBar({ status, setStatus, search, setSearch, counts }: {
+  status: InterviewFilter;
+  setStatus: (status: InterviewFilter) => void;
+  search: string;
+  setSearch: (search: string) => void;
+  counts?: InterviewPage['counts'];
+}) {
+  const total = counts && Object.values(counts).reduce((sum, count) => sum + count, 0);
   return (
-    <div className="flex flex-col items-stretch justify-between gap-3 rounded-xl bg-white p-2.5 shadow-xs sm:flex-row sm:items-center">
-      {/* Filter Tabs */}
-      <div
-        role="tablist"
-        aria-label="Lọc trạng thái phiên phỏng vấn"
-        className="flex items-center gap-1 overflow-x-auto text-nowrap"
-      >
-        {SESSION_FILTER_TABS.map((tab) => {
-          const isActive = activeFilterTab === tab.key;
-
-          if (tab.isAnomaly) {
-            return (
-              <button
-                key={tab.key}
-                type="button"
-                role="tab"
-                aria-selected={isActive}
-                onClick={() => onSelectFilterTab(tab.key)}
-                className={`flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-medium transition-all cursor-pointer ${
-                  isActive
-                    ? 'bg-[#ba1a1a] text-white shadow-xs'
-                    : 'bg-[#ffdad6]/40 text-[#ba1a1a] hover:bg-[#ffdad6] hover:text-[#93000a]'
-                }`}
-              >
-                <span className="size-2 rounded-full bg-current" />
-                <span>Phiên bất thường</span>
-                <span
-                  className={`rounded-full px-1.5 py-0.5 font-mono text-[11px] font-semibold ${
-                    isActive ? 'bg-white/20 text-white' : 'bg-[#ba1a1a] text-white'
-                  }`}
-                >
-                  {tab.count}
-                </span>
-              </button>
-            );
-          }
-
-          return (
-            <button
-              key={tab.key}
-              type="button"
-              role="tab"
-              aria-selected={isActive}
-              onClick={() => onSelectFilterTab(tab.key)}
-              className={`flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] transition-all cursor-pointer ${
-                isActive
-                  ? 'bg-[#d83900] font-semibold text-[#fffbff] shadow-xs'
-                  : 'font-medium text-[#5c4039] hover:bg-[#f1f3ff] hover:text-[#141b2c]'
-              }`}
-            >
-              {isActive && <CheckCircle2 className="size-3.5" />}
-              <span>{tab.label}</span>
-              <span
-                className={`rounded-full px-1.5 py-0.5 font-mono text-[11px] ${
-                  isActive ? 'bg-white/20 text-[#fffbff]' : 'bg-[#e0e8ff] text-[#5c4039]'
-                }`}
-              >
-                {tab.count.toLocaleString('en-US')}
-              </span>
-            </button>
-          );
+    <div className="flex flex-col items-stretch justify-between gap-3 rounded-xl bg-white dark:bg-card p-3 shadow-xs xl:flex-row xl:items-center">
+      <div role="group" aria-label="Lọc trạng thái phiên" className="flex flex-wrap gap-1.5">
+        {tabs.filter((tab) => tab !== 'OTHER' || tab === status || Boolean(counts?.OTHER)).map((tab) => {
+          const count = tab === 'all' ? total : counts?.[tab] ?? (counts ? 0 : undefined);
+          return <button key={tab} type="button" aria-pressed={status === tab} onClick={() => setStatus(tab)}
+            className={status === tab
+              ? 'inline-flex items-center gap-2 rounded-lg bg-[#ad2c00] px-3 py-2 text-xs font-semibold text-white'
+              : 'inline-flex items-center gap-2 rounded-lg bg-[#f1f3ff] dark:bg-muted px-3 py-2 text-xs text-[#293041] dark:text-foreground hover:bg-[#e0e8ff] dark:hover:bg-secondary'}>
+            {tab === 'all' ? 'Tất cả phiên' : statusLabels[tab]}
+            <span className="font-mono tabular-nums">{count?.toLocaleString('vi-VN') ?? '—'}</span>
+          </button>;
         })}
       </div>
-
-      {/* Clean Search Input */}
-      <div className="relative w-full sm:w-64">
-        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#5c4039]" />
-        <input
-          type="text"
-          value={sessionSearch}
-          onChange={(e) => onSessionSearchChange(e.target.value)}
-          placeholder="Tìm mã phiên, ứng viên..."
-          className="w-full rounded-lg bg-[#f1f3ff] py-2 pl-9 pr-8 text-xs text-[#141b2c] outline-none transition-all focus:bg-white focus:ring-2 focus:ring-[#ad2c00]/20"
-        />
-        {sessionSearch && (
-          <button
-            type="button"
-            onClick={() => onSessionSearchChange('')}
-            aria-label="Xóa tìm kiếm"
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#5c4039] hover:text-[#141b2c] cursor-pointer"
-          >
-            <X className="size-3.5" />
-          </button>
-        )}
-      </div>
+      <label className="relative block w-full shrink-0 xl:w-64">
+        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#5c4039] dark:text-muted-foreground" />
+        <input aria-label="Tìm mã phiên, ứng viên hoặc vị trí"
+          value={search} maxLength={200} onChange={(event) => setSearch(event.target.value)}
+          placeholder="Tìm mã phiên, ứng viên, vị trí…"
+          className="w-full rounded-lg bg-[#f1f3ff] dark:bg-muted py-2 pl-9 pr-9 text-sm" />
+        {search && <button type="button" aria-label="Xóa tìm kiếm" onClick={() => setSearch('')}
+          className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-[#5c4039] dark:text-muted-foreground hover:text-[#ad2c00] dark:hover:text-orange-300">
+          <X className="size-4" />
+        </button>}
+      </label>
     </div>
   );
 }

@@ -116,9 +116,9 @@ export function InterviewProgressStepper({
                     <span
                       className={`absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full text-[10px] font-bold border ${
                         step.isCurrent
-                          ? 'bg-white text-brand-orange border-brand-orange shadow-sm'
+                          ? 'bg-white dark:bg-card text-brand-orange border-brand-orange shadow-sm'
                           : step.isCompleted
-                          ? 'bg-white text-emerald-600 border-emerald-500'
+                          ? 'bg-white dark:bg-card text-emerald-600 border-emerald-500'
                           : 'bg-muted text-muted-foreground border-border'
                       }`}
                     >

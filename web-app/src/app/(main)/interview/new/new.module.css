@@ -5,8 +5,8 @@
   background:
     radial-gradient(circle at top left, rgba(234, 88, 12, 0.08), transparent 32%),
     radial-gradient(circle at top right, rgba(59, 130, 246, 0.06), transparent 28%),
-    linear-gradient(180deg, #fffaf5 0%, #fefcf9 100%);
-  color: #0f172a;
+    linear-gradient(180deg, light-dark(#fffaf5, #33271f) 0%, light-dark(#fefcf9, var(--background)) 100%);
+  color: light-dark(#0f172a, var(--foreground));
   font-family: var(--font-sans);
   display: flex;
   flex-direction: column;
@@ -14,8 +14,8 @@
 
 /* ── Header ── */
 .header {
-  border-bottom: 1px solid #e2e8f0;
-  background-color: #ffffff;
+  border-bottom: 1px solid light-dark(#e2e8f0, var(--border));
+  background-color: light-dark(#ffffff, var(--card));
   padding: 1rem 2rem;
   display: flex;
   justify-content: space-between;
@@ -39,14 +39,14 @@
 }
 
 .navLink {
-  color: #475569;
+  color: light-dark(#475569, var(--muted-foreground));
   text-decoration: none;
   font-size: 0.9rem;
   font-weight: 500;
 }
 
 .navLink:hover {
-  color: #ea580c;
+  color: light-dark(#ea580c, #fdba74);
 }
 
 /* ── Content ── */
@@ -69,12 +69,12 @@
 .titleSection h1 {
   font-size: 2.5rem;
   font-weight: 800;
-  color: #0f172a;
+  color: light-dark(#0f172a, var(--foreground));
   letter-spacing: -0.025em;
 }
 
 .subtitle {
-  color: #64748b;
+  color: light-dark(#64748b, var(--muted-foreground));
   font-size: 1rem;
   margin-top: 0.5rem;
   max-width: 760px;
@@ -84,8 +84,8 @@
 
 /* ── Form Section ── */
 .formSection {
-  background-color: #ffffff;
-  border: 1px solid #e2e8f0;
+  background-color: light-dark(#ffffff, var(--card));
+  border: 1px solid light-dark(#e2e8f0, var(--border));
   border-radius: 1.5rem;
   padding: 2rem;
   box-shadow: 0 18px 40px -24px rgba(15, 23, 42, 0.2);
@@ -114,12 +114,12 @@
 .inputGroup label {
   font-weight: 600;
   font-size: 0.95rem;
-  color: #334155;
+  color: light-dark(#334155, var(--foreground));
 }
 
 .textInput {
   padding: 0.75rem 1rem;
-  border: 1px solid #cbd5e1;
+  border: 1px solid light-dark(#cbd5e1, var(--input));
   border-radius: 0.5rem;
   font-size: 0.95rem;
   outline: none;
@@ -150,20 +150,20 @@
   gap: 0.75rem;
   padding: 1.25rem;
   border-radius: 1.25rem;
-  border: 1px solid #e2e8f0;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border: 1px solid light-dark(#e2e8f0, var(--border));
+  background: linear-gradient(180deg, light-dark(#ffffff, var(--card)) 0%, light-dark(#f8fafc, var(--background)) 100%);
   min-width: 0;
 }
 
 .uploadLabel {
   font-weight: 600;
   font-size: 0.95rem;
-  color: #0f172a;
+  color: light-dark(#0f172a, var(--foreground));
 }
 
 .dropzone {
-  border: 1.5px dashed #cbd5e1;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border: 1.5px dashed light-dark(#cbd5e1, var(--input));
+  background: linear-gradient(180deg, light-dark(#ffffff, var(--card)) 0%, light-dark(#f8fafc, var(--background)) 100%);
   border-radius: 1rem;
   padding: 2.5rem 1.5rem;
   text-align: center;
@@ -178,30 +178,30 @@
 
 .dropzone:hover, .dropzoneActive {
   border-color: #ea580c;
-  background-color: #fff7ed;
+  background-color: light-dark(#fff7ed, #3a2b22);
   transform: translateY(-1px);
 }
 
 .uploadIcon {
   font-size: 2.5rem;
   margin-bottom: 1rem;
-  color: #94a3b8;
+  color: light-dark(#94a3b8, var(--muted-foreground));
 }
 
 .dropzoneText {
   font-size: 0.9rem;
-  color: #475569;
+  color: light-dark(#475569, var(--muted-foreground));
   font-weight: 500;
 }
 
 .dropzoneHint {
   font-size: 0.75rem;
-  color: #94a3b8;
+  color: light-dark(#94a3b8, var(--muted-foreground));
   margin-top: 0.5rem;
 }
 
 .browseLink {
-  color: #ea580c;
+  color: light-dark(#ea580c, #fdba74);
   text-decoration: underline;
   font-weight: 600;
 }
@@ -218,9 +218,9 @@
   display: flex;
   gap: 0.5rem;
   padding: 0.25rem;
-  border: 1px solid #e2e8f0;
+  border: 1px solid light-dark(#e2e8f0, var(--border));
   border-radius: 9999px;
-  background-color: #f8fafc;
+  background-color: light-dark(#f8fafc, var(--background));
 }
 
 .tabButton {
@@ -229,15 +229,15 @@
   padding: 0.6rem 1rem;
   font-size: 0.85rem;
   font-weight: 600;
-  color: #64748b;
+  color: light-dark(#64748b, var(--muted-foreground));
   cursor: pointer;
   transition: all 0.2s;
   border-radius: 9999px;
 }
 
 .tabButtonActive {
-  color: #ea580c;
-  background-color: #ffffff;
+  color: light-dark(#ea580c, #fdba74);
+  background-color: light-dark(#ffffff, var(--card));
   box-shadow: 0 4px 10px rgba(15, 23, 42, 0.06);
 }
 
@@ -245,7 +245,7 @@
   width: 100%;
   min-height: 200px;
   padding: 0.75rem 1rem;
-  border: 1px solid #cbd5e1;
+  border: 1px solid light-dark(#cbd5e1, var(--input));
   border-radius: 0.5rem;
   font-size: 0.9rem;
   resize: vertical;
@@ -260,10 +260,10 @@
 
 /* ── File States ── */
 .fileCard {
-  border: 1px solid #e2e8f0;
+  border: 1px solid light-dark(#e2e8f0, var(--border));
   border-radius: 1rem;
   padding: 1rem;
-  background-color: #ffffff;
+  background-color: light-dark(#ffffff, var(--card));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -281,13 +281,13 @@
 
 .fileIcon {
   font-size: 2rem;
-  color: #ea580c;
+  color: light-dark(#ea580c, #fdba74);
 }
 
 .fileName {
   font-size: 0.9rem;
   font-weight: 600;
-  color: #1e293b;
+  color: light-dark(#1e293b, var(--foreground));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -295,13 +295,13 @@
 
 .fileSize {
   font-size: 0.75rem;
-  color: #64748b;
+  color: light-dark(#64748b, var(--muted-foreground));
 }
 
 .removeBtn {
   background: none;
   border: none;
-  color: #94a3b8;
+  color: light-dark(#94a3b8, var(--muted-foreground));
   font-size: 1.25rem;
   cursor: pointer;
   transition: color 0.2s;
@@ -309,14 +309,14 @@
 }
 
 .removeBtn:hover {
-  color: #ef4444;
+  color: light-dark(#ef4444, #fca5a5);
 }
 
 /* ── Progress Bar ── */
 .progressContainer {
   margin-top: 0.5rem;
   width: 100%;
-  background-color: #e2e8f0;
+  background-color: light-dark(#e2e8f0, var(--border));
   height: 6px;
   border-radius: 9999px;
   overflow: hidden;
@@ -329,7 +329,7 @@
 }
 
 .errorText {
-  color: #dc2626;
+  color: light-dark(#dc2626, #fecaca);
   font-size: 0.8rem;
   margin-top: 0.25rem;
   font-weight: 500;
@@ -365,8 +365,8 @@
   width: fit-content;
   padding: 0.22rem 0.6rem;
   border-radius: 9999px;
-  background: #fff7ed;
-  color: #ea580c;
+  background: light-dark(#fff7ed, #3a2b22);
+  color: light-dark(#ea580c, #fdba74);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -377,7 +377,7 @@
   margin: 0;
   font-size: 1.35rem;
   font-weight: 800;
-  color: #0f172a;
+  color: light-dark(#0f172a, var(--foreground));
 }
 
 .sessionList {
@@ -419,7 +419,7 @@
 }
 
 .sessionTitle {
-  color: #0f172a;
+  color: light-dark(#0f172a, var(--foreground));
   font-size: 0.95rem;
   font-weight: 700;
 }
@@ -428,21 +428,21 @@
   font-size: 0.72rem;
   padding: 0.18rem 0.45rem;
   border-radius: 999px;
-  background-color: #e0e7ff;
-  color: #3730a3;
+  background-color: light-dark(#e0e7ff, #262848);
+  color: light-dark(#3730a3, #c7d2fe);
   font-weight: 700;
 }
 
 .sessionMeta {
   margin: 0;
   font-size: 0.86rem;
-  color: #64748b;
+  color: light-dark(#64748b, var(--muted-foreground));
 }
 
 .sessionDate {
   margin: 0;
   font-size: 0.78rem;
-  color: #94a3b8;
+  color: light-dark(#94a3b8, var(--muted-foreground));
 }
 
 .sessionActions {
@@ -475,15 +475,15 @@
 
 .primaryButton:disabled {
   background-color: #cbd5e1;
-  color: #94a3b8;
+  color: light-dark(#94a3b8, var(--muted-foreground));
   cursor: not-allowed;
   box-shadow: none;
 }
 
 .secondaryButton {
-  background-color: #ffffff;
-  color: #475569;
-  border: 1px solid #cbd5e1;
+  background-color: light-dark(#ffffff, var(--card));
+  color: light-dark(#475569, var(--muted-foreground));
+  border: 1px solid light-dark(#cbd5e1, var(--input));
   padding: 0.75rem 2rem;
   border-radius: 0.5rem;
   font-weight: 600;
@@ -512,15 +512,15 @@
 }
 
 .secondaryButton:hover {
-  background-color: #f8fafc;
+  background-color: light-dark(#f8fafc, var(--background));
   border-color: #94a3b8;
-  color: #0f172a;
+  color: light-dark(#0f172a, var(--foreground));
 }
 
 /* ── Loading Overlay ── */
 .loadingOverlay {
-  background-color: #ffffff;
-  border: 1px solid #e2e8f0;
+  background-color: light-dark(#ffffff, var(--card));
+  border: 1px solid light-dark(#e2e8f0, var(--border));
   border-radius: 0.75rem;
   padding: 4rem 2rem;
   text-align: center;
@@ -534,7 +534,7 @@
 .spinner {
   width: 50px;
   height: 50px;
-  border: 4px solid #f1f5f9;
+  border: 4px solid light-dark(#f1f5f9, var(--border));
   border-top: 4px solid #ea580c;
   border-radius: 50%;
   animation: spin 1s linear infinite;
@@ -550,14 +550,14 @@
   flex-direction: column;
   gap: 0.5rem;
   max-width: 400px;
-  color: #64748b;
+  color: light-dark(#64748b, var(--muted-foreground));
   font-size: 0.9rem;
 }
 
 /* ── Analysis Result Dashboard ── */
 .resultSection {
-  background-color: #ffffff;
-  border: 1px solid #e2e8f0;
+  background-color: light-dark(#ffffff, var(--card));
+  border: 1px solid light-dark(#e2e8f0, var(--border));
   border-radius: 0.75rem;
   padding: 2.5rem;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
@@ -570,7 +570,7 @@
   display: flex;
   align-items: center;
   gap: 2rem;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid light-dark(#f1f5f9, var(--border));
   padding-bottom: 2rem;
 }
 
@@ -597,7 +597,7 @@
   position: absolute;
   font-size: 2.25rem;
   font-weight: 900;
-  color: #ea580c;
+  color: light-dark(#ea580c, #fdba74);
 }
 
 .scoreText {
@@ -607,11 +607,11 @@
 .scoreText h2 {
   font-size: 1.5rem;
   font-weight: 800;
-  color: #0f172a;
+  color: light-dark(#0f172a, var(--foreground));
 }
 
 .scoreText p {
-  color: #64748b;
+  color: light-dark(#64748b, var(--muted-foreground));
   font-size: 0.95rem;
   margin-top: 0.25rem;
   line-height: 1.5;
@@ -639,7 +639,7 @@
 .skillsCol h3 {
   font-size: 1rem;
   font-weight: 700;
-  color: #334155;
+  color: light-dark(#334155, var(--foreground));
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -660,21 +660,21 @@
 }
 
 .skillMatched {
-  background-color: #ecfdf5;
-  color: #15803d;
+  background-color: light-dark(#ecfdf5, #133429);
+  color: light-dark(#15803d, #a7f3d0);
   border-color: #a7f3d0;
 }
 
 .skillMissing {
-  background-color: #fffbeb;
-  color: #b45309;
-  border-color: #fde68a;
+  background-color: light-dark(#fffbeb, #3a2d1e);
+  color: light-dark(#b45309, #fde68a);
+  border-color: light-dark(#fde68a, #6d532a);
 }
 
 /* Evaluation Box */
 .evaluationBox {
-  background-color: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background-color: light-dark(#f8fafc, var(--background));
+  border: 1px solid light-dark(#e2e8f0, var(--border));
   border-radius: 0.5rem;
   padding: 1.5rem;
 }
@@ -682,7 +682,7 @@
 .evaluationBox h3 {
   font-size: 1rem;
   font-weight: 700;
-  color: #1e293b;
+  color: light-dark(#1e293b, var(--foreground));
   margin-bottom: 0.75rem;
   display: flex;
   align-items: center;
@@ -690,7 +690,7 @@
 }
 
 .evaluationBox p {
-  color: #475569;
+  color: light-dark(#475569, var(--muted-foreground));
   font-size: 0.9rem;
   line-height: 1.6;
 }
@@ -704,16 +704,16 @@
 }
 
 .suggestionsList li {
-  color: #475569;
+  color: light-dark(#475569, var(--muted-foreground));
   font-size: 0.9rem;
   line-height: 1.5;
 }
 
 /* Error Banner */
 .errorBanner {
-  background-color: #fee2e2;
-  border: 1px solid #fecaca;
-  color: #991b1b;
+  background-color: light-dark(#fee2e2, #4b2426);
+  border: 1px solid light-dark(#fecaca, #753d3f);
+  color: light-dark(#991b1b, #fecaca);
   padding: 1.25rem;
   border-radius: 0.5rem;
   margin-bottom: 2rem;
@@ -744,8 +744,8 @@
 .footer {
   margin-top: auto;
   width: 100%;
-  border-top: 1px solid #e2e8f0;
-  background-color: #ffffff;
+  border-top: 1px solid light-dark(#e2e8f0, var(--border));
+  background-color: light-dark(#ffffff, var(--card));
   display: flex;
   justify-content: center;
   align-items: center;

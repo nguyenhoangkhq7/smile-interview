@@ -10,7 +10,7 @@ import {
   Video,
   X,
 } from 'lucide-react';
-import { ADMIN_NAV_ITEMS } from '../data/mockDashboardData';
+import { ADMIN_NAV_ITEMS } from '../data/dashboardOptions';
 import { AdminSectionKey } from '../types';
 
 interface AdminSidebarProps {
@@ -36,18 +36,18 @@ export default function AdminSidebar({
   onCloseMobile,
 }: AdminSidebarProps) {
   const sidebarContent = (
-    <div className="flex h-full w-64 flex-col bg-white border-r border-[#e5beb4]/35 shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
+    <div className="flex h-full w-64 flex-col bg-white dark:bg-card border-r border-[#e5beb4]/35 dark:border-border/35 shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
       <div className="flex min-h-0 flex-1 flex-col">
         {/* Section Group Title */}
         <div className="flex items-center justify-between px-4 pt-4 pb-2.5">
-          <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-[#5c4039]">
+          <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-[#5c4039] dark:text-muted-foreground">
             Hệ thống điều hành
           </div>
           <button
             type="button"
             onClick={onCloseMobile}
             aria-label="Đóng thanh điều hướng"
-            className="rounded-lg p-1.5 text-[#5c4039] hover:bg-[#e0e8ff] hover:text-[#141b2c] lg:hidden"
+            className="rounded-lg p-1.5 text-[#5c4039] dark:text-muted-foreground hover:bg-[#e0e8ff] dark:hover:bg-secondary hover:text-[#141b2c] dark:hover:text-foreground lg:hidden"
           >
             <X className="size-4" />
           </button>
@@ -68,7 +68,7 @@ export default function AdminSidebar({
                 }}
                 className={`flex w-full items-center gap-2.5 rounded-lg px-4 py-2.5 text-left transition-all duration-200 cursor-pointer ${isActive
                     ? 'bg-[#d83900] text-[#fffbff] text-[15px] font-semibold shadow-[0_1px_3px_rgba(0,0,0,0.08)]'
-                    : 'text-[#5c4039] text-[13px] font-medium hover:bg-[#e0e8ff] hover:text-[#141b2c]'
+                    : 'text-[#5c4039] dark:text-muted-foreground text-[13px] font-medium hover:bg-[#e0e8ff] dark:hover:bg-secondary hover:text-[#141b2c] dark:hover:text-foreground'
                   }`}
               >
                 {SECTION_ICONS[item.key]}

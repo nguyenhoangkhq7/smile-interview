@@ -1,7 +1,7 @@
 /* src/app/history/history.module.css */
 
 .page {
-  background-color: #fdfbf7;
+  background-color: light-dark(#fdfbf7, var(--background));
   min-height: calc(100vh - 4rem);
   padding: 3rem 1rem;
 }
@@ -31,23 +31,23 @@
   width: 3.5rem;
   height: 3.5rem;
   border-radius: 9999px;
-  background-color: #ecfdf5;
-  border: 1px solid #d1fae5;
-  color: #166534;
+  background-color: light-dark(#ecfdf5, #133429);
+  border: 1px solid light-dark(#d1fae5, #28624d);
+  color: light-dark(#166534, #a7f3d0);
   box-shadow: 0 4px 12px rgba(22, 101, 52, 0.08);
 }
 
 .title {
   font-size: 1.875rem;
   font-weight: 900;
-  color: #1e293b;
+  color: light-dark(#1e293b, var(--foreground));
   margin: 0;
   letter-spacing: -0.025em;
 }
 
 .subtitle {
   font-size: 0.8125rem;
-  color: #64748b;
+  color: light-dark(#64748b, var(--muted-foreground));
   margin: 0;
   max-width: 400px;
   line-height: 1.45;
@@ -55,8 +55,8 @@
 
 /* ── Filters Card ── */
 .filterCard {
-  background-color: #ffffff;
-  border: 1px solid #e2e8f0;
+  background-color: light-dark(#ffffff, var(--card));
+  border: 1px solid light-dark(#e2e8f0, var(--border));
   border-radius: 1.25rem;
   padding: 1.125rem;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
@@ -84,7 +84,7 @@
   left: 1rem;
   top: 50%;
   transform: translateY(-50%);
-  color: #94a3b8;
+  color: light-dark(#94a3b8, var(--muted-foreground));
   display: flex;
   align-items: center;
 }
@@ -92,11 +92,11 @@
 .searchInput {
   width: 100%;
   padding: 0.75rem 1rem 0.75rem 2.5rem;
-  border: 1px solid #cbd5e1;
+  border: 1px solid light-dark(#cbd5e1, var(--input));
   border-radius: 0.75rem;
   font-size: 0.8125rem;
-  color: #334155;
-  background-color: #f8fafc;
+  color: light-dark(#334155, var(--foreground));
+  background-color: light-dark(#f8fafc, var(--background));
   outline: none;
   transition: all 0.15s ease;
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.02);
@@ -104,7 +104,7 @@
 
 .searchInput:focus {
   border-color: #166534;
-  background-color: #ffffff;
+  background-color: light-dark(#ffffff, var(--card));
   box-shadow: 0 0 0 3px rgba(22, 101, 52, 0.08);
 }
 
@@ -120,12 +120,12 @@
 
 .select {
   padding: 0.75rem 2.25rem 0.75rem 1rem;
-  border: 1px solid #cbd5e1;
+  border: 1px solid light-dark(#cbd5e1, var(--input));
   border-radius: 0.75rem;
   font-size: 0.8125rem;
   font-weight: 700;
-  color: #475569;
-  background-color: #ffffff;
+  color: light-dark(#475569, var(--muted-foreground));
+  background-color: light-dark(#ffffff, var(--card));
   cursor: pointer;
   appearance: none;
   outline: none;
@@ -143,15 +143,15 @@
   top: 50%;
   transform: translateY(-50%);
   pointer-events: none;
-  color: #94a3b8;
+  color: light-dark(#94a3b8, var(--muted-foreground));
   display: flex;
   align-items: center;
 }
 
 /* ── List Container ── */
 .listCard {
-  background-color: #ffffff;
-  border: 1px solid #e2e8f0;
+  background-color: light-dark(#ffffff, var(--card));
+  border: 1px solid light-dark(#e2e8f0, var(--border));
   border-radius: 1.5rem;
   padding: 2rem;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
@@ -164,14 +164,14 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid light-dark(#f1f5f9, var(--border));
   padding-bottom: 1rem;
 }
 
 .listTitle {
   font-size: 0.8125rem;
   font-weight: 800;
-  color: #1e293b;
+  color: light-dark(#1e293b, var(--foreground));
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin: 0;
@@ -180,11 +180,11 @@
 .listCount {
   font-size: 0.75rem;
   font-weight: 700;
-  color: #475569;
-  background-color: #f1f5f9;
+  color: light-dark(#475569, var(--muted-foreground));
+  background-color: light-dark(#f1f5f9, var(--muted));
   padding: 0.25rem 0.625rem;
   border-radius: 0.5rem;
-  border: 1px solid #e2e8f0;
+  border: 1px solid light-dark(#e2e8f0, var(--border));
 }
 
 .listItems {
@@ -194,18 +194,18 @@
 }
 
 .itemCard {
-  border: 1px solid #f1f5f9;
+  border: 1px solid light-dark(#f1f5f9, var(--border));
   border-radius: 1.25rem;
   padding: 1.25rem 1.5rem;
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
-  background-color: #ffffff;
+  background-color: light-dark(#ffffff, var(--card));
   transition: all 0.15s ease;
 }
 
 .itemCard:hover {
-  border-color: #cbd5e1;
+  border-color: light-dark(#cbd5e1, var(--input));
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
 }
 
@@ -235,7 +235,7 @@
 .itemTitle {
   font-size: 0.875rem;
   font-weight: 800;
-  color: #1e293b;
+  color: light-dark(#1e293b, var(--foreground));
   margin: 0;
 }
 
@@ -247,15 +247,15 @@
 }
 
 .badgeGreen {
-  color: #15803d;
-  background-color: #f0fdf4;
-  border: 1px solid #bbf7d0;
+  color: light-dark(#15803d, #a7f3d0);
+  background-color: light-dark(#f0fdf4, #133429);
+  border: 1px solid light-dark(#bbf7d0, #28624d);
 }
 
 .badgeAmber {
-  color: #b45309;
-  background-color: #fef3c7;
-  border: 1px solid #fde68a;
+  color: light-dark(#b45309, #fde68a);
+  background-color: light-dark(#fef3c7, #453119);
+  border: 1px solid light-dark(#fde68a, #6d532a);
 }
 
 .itemMeta {
@@ -264,22 +264,22 @@
   gap: 1.5rem;
   font-size: 0.75rem;
   font-weight: 600;
-  color: #94a3b8;
+  color: light-dark(#94a3b8, var(--muted-foreground));
 }
 
 .metaLabel {
-  color: #64748b;
+  color: light-dark(#64748b, var(--muted-foreground));
   font-weight: 700;
   margin-right: 0.25rem;
 }
 
 .metaScore {
-  color: #ea580c;
+  color: light-dark(#ea580c, #fdba74);
   font-weight: 800;
 }
 
 .metaVal {
-  color: #334155;
+  color: light-dark(#334155, var(--foreground));
 }
 
 .btnMatching {
