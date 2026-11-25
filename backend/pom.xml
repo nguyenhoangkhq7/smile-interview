@@ -66,12 +66,6 @@
             <artifactId>spring-boot-starter-webmvc</artifactId>
         </dependency>
 
-        <!-- HTTP readiness for Docker Compose. -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-actuator</artifactId>
-        </dependency>
-
         <!-- Keep the existing com.fasterxml.jackson usage during the Boot 4 migration. -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

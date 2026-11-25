@@ -99,7 +99,7 @@ public class SecurityConfig {
                     .accessDeniedHandler((request, response, exception) ->
                             response.setStatus(HttpServletResponse.SC_FORBIDDEN)))
             .authorizeHttpRequests(auth -> auth
-                    .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
+                    .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/password-setup").permitAll()
                     .requestMatchers("/uploads/**").permitAll()
                     .requestMatchers("/actuator/health", "/api/internal/ai-runtime").permitAll()
                     .requestMatchers("/api/admin/**", "/api/v1/admin/**").hasRole("ADMIN")
