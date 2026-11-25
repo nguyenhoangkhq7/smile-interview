@@ -1,6 +1,0 @@
-{
-  "operation": "conversation",
-  "from": "13-q10",
-  "action": "NEXT",
-  "scenario": "Ứng viên xác nhận xem kết quả sau lời chào kết. Thực thi chuyển CLOSING sang FINISHED."
-}

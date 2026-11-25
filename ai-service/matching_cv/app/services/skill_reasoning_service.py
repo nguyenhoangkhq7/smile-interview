@@ -52,8 +52,8 @@ class SkillReasoningService:
         self.base_url: str = settings.OPENROUTER_BASE_URL
         self.model: str = settings.OPENROUTER_MODEL
         self.default_headers = {
-            "HTTP-Referer": "http://localhost:8000",
-            "X-Title": "AI Inference Service - Skill Semantic Reasoning",
+            "HTTP-Referer": settings.OPENROUTER_REFERER,
+            "X-Title": "Smile Interview AI Service - Skill Semantic Reasoning",
         }
 
     def _get_client(self) -> AsyncOpenAI:

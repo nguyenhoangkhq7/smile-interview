@@ -29,15 +29,17 @@ public class SessionController {
     public ResponseEntity<SessionResponse> createSession(
             @AuthenticationPrincipal User currentUser,
             @jakarta.validation.Valid @RequestBody CreateSessionRequest request) {
-        UUID userId = (currentUser != null) ? currentUser.getId() : null;
-        log.info("Received request to create session: userId={}, request={}", userId, request);
-        SessionResponse response = sessionService.createSession(userId, request);
+        log.info("Received request to create session: userId={}, sessionId={}, roleTitle={}",
+                currentUser != null ? currentUser.getId() : null, request.getId(), request.getRoleTitle());
+        SessionResponse response = sessionService.createSession(currentUser, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @GetMapping("/{sessionId}")
-    public ResponseEntity<SessionResponse> getSession(@PathVariable String sessionId) {
-        return ResponseEntity.ok(sessionService.getSession(sessionId));
+    public ResponseEntity<SessionResponse> getSession(
+            @PathVariable String sessionId,
+            @AuthenticationPrincipal User currentUser) {
+        return ResponseEntity.ok(sessionService.getSession(currentUser, sessionId));
     }
 
     @GetMapping("/user")
@@ -49,13 +51,16 @@ public class SessionController {
     @PutMapping("/{sessionId}")
     public ResponseEntity<SessionResponse> updateSession(
             @PathVariable String sessionId,
+            @AuthenticationPrincipal User currentUser,
             @jakarta.validation.Valid @RequestBody UpdateSessionRequest request) {
-        return ResponseEntity.ok(sessionService.updateSession(sessionId, request));
+        return ResponseEntity.ok(sessionService.updateSession(currentUser, sessionId, request));
     }
 
     @DeleteMapping("/{sessionId}")
-    public ResponseEntity<Map<String, String>> deleteSession(@PathVariable String sessionId) {
-        sessionService.deleteSession(sessionId);
+    public ResponseEntity<Map<String, String>> deleteSession(
+            @PathVariable String sessionId,
+            @AuthenticationPrincipal User currentUser) {
+        sessionService.deleteSession(currentUser, sessionId);
         return ResponseEntity.ok(Map.of(
                 "sessionId", sessionId,
                 "message", "Session deleted successfully."
@@ -65,19 +70,23 @@ public class SessionController {
     @PostMapping("/{sessionId}/turns")
     public ResponseEntity<SessionTurn> addTurn(
             @PathVariable String sessionId,
+            @AuthenticationPrincipal User currentUser,
             @RequestBody SessionTurn turn) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(sessionService.addTurn(sessionId, turn));
+        return ResponseEntity.status(HttpStatus.CREATED).body(sessionService.addTurn(currentUser, sessionId, turn));
     }
 
     @GetMapping("/{sessionId}/turns")
     public ResponseEntity<List<SessionTurn>> getSessionTurns(
-            @PathVariable String sessionId) {
-        return ResponseEntity.ok(sessionService.getSessionTurns(sessionId));
+            @PathVariable String sessionId,
+            @AuthenticationPrincipal User currentUser) {
+        return ResponseEntity.ok(sessionService.getSessionTurns(currentUser, sessionId));
     }
 
     @PostMapping("/{sessionId}/clone")
-    public ResponseEntity<Map<String, Object>> cloneSession(@PathVariable String sessionId) {
-        String newSessionId = sessionService.cloneSession(sessionId);
+    public ResponseEntity<Map<String, Object>> cloneSession(
+            @PathVariable String sessionId,
+            @AuthenticationPrincipal User currentUser) {
+        String newSessionId = sessionService.cloneSession(currentUser, sessionId);
         return ResponseEntity.ok(Map.of(
                 "success", true,
                 "newSessionId", newSessionId
@@ -86,8 +95,9 @@ public class SessionController {
 
     @GetMapping("/raw-texts")
     public ResponseEntity<Map<String, Object>> getRawTexts(
+            @AuthenticationPrincipal User currentUser,
             @RequestParam(value = "resumeId", required = false) UUID resumeId,
             @RequestParam(value = "jdId", required = false) UUID jdId) {
-        return ResponseEntity.ok(sessionService.getRawTexts(resumeId, jdId));
+        return ResponseEntity.ok(sessionService.getRawTexts(currentUser, resumeId, jdId));
     }
 }

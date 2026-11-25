@@ -56,7 +56,11 @@ public class DocumentUploadController {
             @AuthenticationPrincipal User currentUser) {
 
         log.info("[DocumentUpload] Uploading documents for sessionId={}", sessionId);
-        UUID userId = currentUser != null ? currentUser.getId() : null;
+        if (currentUser == null) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.UNAUTHORIZED, "Authentication required");
+        }
+        UUID userId = currentUser.getId();
 
         Session session = sessionRepository.lockById(sessionId)
                 .orElseGet(() -> {
@@ -72,7 +76,8 @@ public class DocumentUploadController {
                 });
 
         if (!java.util.Objects.equals(userId, session.getUserId())) {
-            throw new ResourceNotFoundException("Session not found");
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN, "This session belongs to another user");
         }
         if (session.getApplicationProfile() != null) {
             throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT,
@@ -85,14 +90,22 @@ public class DocumentUploadController {
             session.setInterviewType(interviewType);
         }
         if (resumeId != null && session.getResume() == null) {
-            session.setResume(resumeRepository.findById(resumeId)
-                    .filter(item -> java.util.Objects.equals(userId, item.getUserId()))
-                    .orElseThrow(() -> new ResourceNotFoundException("Resume not found")));
+            Resume requestedResume = resumeRepository.findById(resumeId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Resume not found"));
+            if (!java.util.Objects.equals(userId, requestedResume.getUserId())) {
+                throw new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.FORBIDDEN, "This resume belongs to another user");
+            }
+            session.setResume(requestedResume);
         }
         if (jdId != null && session.getJobDescription() == null) {
-            session.setJobDescription(jobDescriptionRepository.findById(jdId)
-                    .filter(item -> java.util.Objects.equals(userId, item.getUserId()))
-                    .orElseThrow(() -> new ResourceNotFoundException("Job description not found")));
+            JobDescription requestedJd = jobDescriptionRepository.findById(jdId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Job description not found"));
+            if (!java.util.Objects.equals(userId, requestedJd.getUserId())) {
+                throw new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.FORBIDDEN, "This job description belongs to another user");
+            }
+            session.setJobDescription(requestedJd);
         }
 
         // Process CV

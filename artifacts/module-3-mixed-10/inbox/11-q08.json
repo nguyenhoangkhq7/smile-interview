@@ -1,6 +1,0 @@
-{
-  "operation": "respond",
-  "from": "10-q07-retry",
-  "scenario": "Ứng viên nói chưa biết. Dùng câu tự nhiên khớp nhánh standalone_inability để xem workflow xử lý mà không gọi Judge.",
-  "answer": "Em không biết ạ."
-}

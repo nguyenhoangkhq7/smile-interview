@@ -23,7 +23,6 @@ services:
       dockerfile: Dockerfile
     restart: always
     env_file:
-      - .env
       - ./backend/.env
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-interview_practice_db}
@@ -34,6 +33,7 @@ services:
       AI_RUNTIME_KEY_FILE: /run/smile-ai/ai-runtime.key
     volumes:
       - ai_runtime_key:/run/smile-ai
+      - backend_uploads:/app/uploads
     ports:
       - "8081:8081"
     healthcheck:
@@ -53,39 +53,42 @@ services:
     container_name: ai_service
     restart: always
     env_file:
-      - .env
       - ./ai-service/.env
     environment:
       PORT: 8000
-      HF_HOME: /root/.cache/huggingface
+      HF_HOME: /app/.cache/huggingface
       AI_RUNTIME_BACKEND_URL: http://backend:8081
       AI_RUNTIME_KEY_FILE: /run/smile-ai/ai-runtime.key
     ports:
       - "8000:8000"
     volumes:
-      - sbert_cache:/root/.cache/huggingface
       - ai_runtime_key:/run/smile-ai:ro
+      - sbert_cache:/app/.cache/huggingface
+      - type: bind
+        source: ${GNN_CHECKPOINT_DIR:-./ai-service/matching_cv/data/checkpoints/paper_aligned_gnn}
+        target: /app/matching_cv/data/checkpoints/paper_aligned_gnn
+        read_only: true
 
   web-app:
     build:
       context: ./web-app
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8081}
     container_name: web_app
     restart: always
-    env_file:
-      - .env
-      - ./web-app/.env.local
     ports:
       - "3000:3000"
     environment:
       NODE_ENV: production
       BACKEND_INTERNAL_URL: http://backend:8081
-      NEXT_PUBLIC_API_BASE_URL: http://localhost:8081
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8081}
     depends_on:
       backend:
         condition: service_healthy
 
 volumes:
   postgres_data:
+  backend_uploads:
   sbert_cache:
   ai_runtime_key:

@@ -78,13 +78,6 @@
             <artifactId>spring-boot-jackson2</artifactId>
         </dependency>
 
-        <!-- Spring WebFlux (WebClient for async HTTP calls to Groq & OpenAI) -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-webflux</artifactId>
-        </dependency>
-
-
         <!-- Amazon S3 Client (AWS SDK v2) -->
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
@@ -173,11 +166,6 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.projectreactor</groupId>
-            <artifactId>reactor-test</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

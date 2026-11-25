@@ -10,6 +10,7 @@ from app.config import settings
 from app.ai_runtime import runtime_middleware
 from app.ai_runtime_routes import router as runtime_router
 from matching_cv.app.api.v1.endpoints.unified import router as matching_cv_router
+from matching_cv.app.services.gnn_inference_service import gnn_inference_service
 from skill_gap.api.routes import router as skill_gap_router
 from adaptive_questioning.evidence.routes import init_evidence_workflow, router as evidence_router
 from voice.routes import router as voice_router
@@ -21,6 +22,8 @@ load_dotenv(_ROOT_DIR / ".env", override=True)
 
 @asynccontextmanager
 async def app_lifespan(application: FastAPI):
+    if settings.GNN_REQUIRE_CHECKPOINT:
+        gnn_inference_service.get_model()
     init_evidence_workflow(application)
     async with httpx.AsyncClient(timeout=5, trust_env=False) as client:
         application.state.ai_runtime_http = client
@@ -38,15 +41,32 @@ def create_app() -> FastAPI:
         ),
         version="2.2.0",
         lifespan=app_lifespan,
+        docs_url="/docs" if settings.DEBUG else None,
+        redoc_url="/redoc" if settings.DEBUG else None,
+        openapi_url="/openapi.json" if settings.DEBUG else None,
     )
 
-    application.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    configured_origins = [
+        origin.strip()
+        for origin in settings.AI_CORS_ALLOWED_ORIGINS.split(",")
+        if origin.strip()
+    ]
+    if configured_origins:
+        application.add_middleware(
+            CORSMiddleware,
+            allow_origins=configured_origins,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+    elif settings.DEBUG:
+        application.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=False,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
 
     application.include_router(matching_cv_router)
     application.include_router(skill_gap_router)

@@ -763,13 +763,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--raw-dir",
         type=str,
-        default=r"ai-service\matching_cv\dataset\synthetic_cv_jd_dataset_v2-20261118T164928Z-1-001\synthetic_cv_jd_dataset_v2\raw",
+        default=r"ai-service\matching_cv\dataset\synthetic_cv_jd_dataset_v2\synthetic_cv_jd_dataset_v2\raw",
         help="Path to raw dataset directory containing jobs.jsonl and resumes.jsonl",
     )
     parser.add_argument(
         "--processed-file",
         type=str,
-        default=r"ai-service\matching_cv\dataset\synthetic_cv_jd_dataset_v2-20261118T164928Z-1-001\synthetic_cv_jd_dataset_v2\processed\accepted_pairs.jsonl",
+        default=r"ai-service\matching_cv\dataset\synthetic_cv_jd_dataset_v2\synthetic_cv_jd_dataset_v2\processed\accepted_pairs.jsonl",
         help="Path to accepted_pairs.jsonl",
     )
     parser.add_argument(

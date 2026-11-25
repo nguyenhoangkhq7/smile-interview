@@ -1,7 +1,0 @@
-{
-  "operation": "conversation",
-  "from": "02-next",
-  "action": "SUBMIT_INTRODUCTION",
-  "introduction": "Em làm backend gần ba năm, chủ yếu với Python và PostgreSQL cho API đơn hàng. Em từng phối hợp với QA xử lý lỗi đồng bộ giả lập. Hàng đợi trong hệ thống thanh toán là phần em mới tìm hiểu.",
-  "scenario": "Nộp lời tự giới thiệu giả lập, không dùng tên riêng hoặc thông tin hồ sơ thật."
-}

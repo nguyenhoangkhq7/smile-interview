@@ -14,9 +14,6 @@ public class AppProperties {
     /** External AI Service (FastAPI) configuration. */
     private Ai ai = new Ai();
 
-    /** JWT security configuration. */
-    private Jwt jwt = new Jwt();
-
     @Data
     public static class Ai {
         private Fastapi fastapi = new Fastapi();
@@ -27,11 +24,5 @@ public class AppProperties {
             private int connectTimeoutSeconds = 15;
             private int readTimeoutSeconds = 180;
         }
-    }
-
-    @Data
-    public static class Jwt {
-        private String secret = "c3VwZXJzZWNyZXRrZXlmb3JkZXZlbG9wbWVudGVudmlyb25tZW50MjU2Yml0cw==";
-        private long expirationMs = 86400000L;
     }
 }

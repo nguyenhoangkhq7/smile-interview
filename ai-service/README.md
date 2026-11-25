@@ -73,8 +73,13 @@ docker compose run --rm --no-deps ai-service python -c "from matching_cv.app.cor
 
 Chờ lệnh hoàn tất rồi gửi yêu cầu phân tích. Volume `sbert_cache` giữ model qua các lần tạo lại container. Có thể thêm `HF_TOKEN` vào `ai-service/.env` để dùng hạn mức tải có xác thực.
 
+Compose mount trọng số GNN từ `ai-service/matching_cv/data/checkpoints/paper_aligned_gnn/`, hoặc từ thư mục tuyệt đối đặt qua `GNN_CHECKPOINT_DIR` trong `.env` gốc. Dịch vụ local có thể chạy chế độ chẩn đoán khi chưa có checkpoint v4. Xem hướng dẫn staging để chạy chế độ yêu cầu checkpoint.
+
+Image Docker dùng `requirements-docker.lock` cho Python 3.14 trên Linux amd64 và arm64. Khi cập nhật dependencies, tạo lại lockfile từ `requirements-docker.in` bằng lệnh `uv pip compile` ở đầu lockfile. Điền SHA-256 của hai wheel PyTorch CPU `cp314-cp314` cho `x86_64` và `aarch64` từ liên kết trên chỉ mục PyTorch trong file `.in`, rồi build lại image AI.
+
 ### Chạy kiểm thử tự động (Unit & Integration Tests):
 ```bash
+pip install -r requirements-dev.txt
 pytest tests_skill_gap tests_adaptive_questioning -q
 ```
 Kết quả kiểm thử thay đổi theo phiên bản; chạy lệnh trên để kiểm tra mã hiện tại.

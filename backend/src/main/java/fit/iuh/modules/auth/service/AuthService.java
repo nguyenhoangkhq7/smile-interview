@@ -1,6 +1,7 @@
 package fit.iuh.modules.auth.service;
 
 import fit.iuh.common.service.S3StorageService;
+import fit.iuh.exception.ResourceNotFoundException;
 import fit.iuh.modules.auth.dto.AuthResponse;
 import fit.iuh.modules.auth.dto.ChangePasswordRequest;
 import fit.iuh.modules.auth.dto.LoginRequest;
@@ -18,6 +19,7 @@ import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.security.authentication.AccountStatusException;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -26,6 +28,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -110,8 +113,17 @@ public class AuthService {
             user.setAvatarUrl(request.avatarUrl());
         }
         if (request.defaultResumeId() != null) {
-            user.setDefaultResumeId(request.defaultResumeId().isBlank()
-                    ? null : UUID.fromString(request.defaultResumeId()));
+            if (request.defaultResumeId().isBlank()) {
+                user.setDefaultResumeId(null);
+            } else {
+                UUID resumeId = UUID.fromString(request.defaultResumeId());
+                Resume resume = resumeRepository.findById(resumeId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Resume not found with id: " + resumeId));
+                if (!java.util.Objects.equals(resume.getUserId(), user.getId())) {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This resume belongs to another user");
+                }
+                user.setDefaultResumeId(resumeId);
+            }
         }
 
         User updated = userRepository.save(user);

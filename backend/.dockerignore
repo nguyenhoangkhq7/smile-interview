@@ -16,3 +16,7 @@ out/
 HELP.md
 *.log
 logs/
+
+# Runtime configuration
+**/.env
+**/.env.*

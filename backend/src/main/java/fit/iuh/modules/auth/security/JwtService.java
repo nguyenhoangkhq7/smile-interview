@@ -7,13 +7,17 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.security.Key;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
@@ -21,23 +25,43 @@ import java.util.function.Function;
 /**
  * Centralized JWT service for token generation, claim extraction and validation.
  *
- * <p>Configure via {@code application.yaml}:
- * <pre>
- * app:
- *   jwt:
- *     secret: &lt;Base64-encoded 256-bit key&gt;
- *     expiration-ms: 86400000   # 24 h
- * </pre>
+ * <p>Set {@code JWT_SECRET} to a signing key of at least 256 bits.
  */
 @Slf4j
 @Service
 public class JwtService {
+
+    private static final String PUBLIC_DEVELOPMENT_KEY_SHA256 =
+            "0e170e0d88b06b1128197f6344b9f560928711d0f86d02db19f6aae9fa2de91e";
 
     @Value("${app.jwt.secret}")
     private String jwtSecret;
 
     @Value("${app.jwt.expiration-ms:86400000}")
     private long jwtExpirationMs;
+
+    @PostConstruct
+    void validateSecret() {
+        if (jwtSecret == null || jwtSecret.isBlank()) {
+            throw new IllegalStateException("JWT_SECRET must be configured");
+        }
+        byte[] keyBytes = decodeKeyBytes();
+        if (keyBytes.length < 32) {
+            throw new IllegalStateException("JWT_SECRET must be at least 256 bits (32 bytes)");
+        }
+        if (isPublicDevelopmentKey(keyBytes)) {
+            throw new IllegalStateException("Refusing to start with the public development JWT_SECRET");
+        }
+    }
+
+    private static boolean isPublicDevelopmentKey(byte[] keyBytes) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(keyBytes);
+            return PUBLIC_DEVELOPMENT_KEY_SHA256.equals(HexFormat.of().formatHex(digest));
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA-256 unavailable", ex);
+        }
+    }
 
     // ----------------------------------------------------------------
     // Token generation
@@ -146,16 +170,18 @@ public class JwtService {
     // ----------------------------------------------------------------
 
     private Key getSigningKey() {
-        byte[] keyBytes;
+        return Keys.hmacShaKeyFor(decodeKeyBytes());
+    }
+
+    private byte[] decodeKeyBytes() {
         try {
-            keyBytes = Decoders.BASE64.decode(jwtSecret);
+            return Decoders.BASE64.decode(jwtSecret);
         } catch (Exception e1) {
             try {
-                keyBytes = Decoders.BASE64URL.decode(jwtSecret);
+                return Decoders.BASE64URL.decode(jwtSecret);
             } catch (Exception e2) {
-                keyBytes = jwtSecret.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                return jwtSecret.getBytes(java.nio.charset.StandardCharsets.UTF_8);
             }
         }
-        return Keys.hmacShaKeyFor(keyBytes);
     }
 }

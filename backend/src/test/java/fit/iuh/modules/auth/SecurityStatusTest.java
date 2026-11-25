@@ -74,8 +74,12 @@ class SecurityStatusTest {
     }
 
     @Test
-    void publicAuthenticationEndpointRemainsAccessible() throws Exception {
-        mvc.perform(get("/api/auth/test")).andExpect(status().isOk());
+    void publicAuthenticationEndpointsRemainAccessibleWhileProtectedAuthEndpointsRequireJwt() throws Exception {
+        mvc.perform(get("/api/auth/login")).andExpect(status().isOk());
+        mvc.perform(get("/api/auth/register")).andExpect(status().isOk());
+        mvc.perform(get("/api/auth/me")).andExpect(status().isUnauthorized());
+        String authorization = "Bearer " + token(System.currentTimeMillis() + 60000);
+        mvc.perform(get("/api/auth/me").header("Authorization", authorization)).andExpect(status().isOk());
     }
 
     @Configuration
@@ -104,7 +108,7 @@ class SecurityStatusTest {
 
     @RestController
     static class TestController {
-        @GetMapping({"/api/v1/test", "/api/admin/test", "/api/auth/test"})
+        @GetMapping({"/api/v1/test", "/api/admin/test", "/api/auth/login", "/api/auth/register", "/api/auth/me"})
         String test() {
             return "ok";
         }

@@ -13,11 +13,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
 
@@ -58,44 +58,43 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<AuthResponse> me() {
-        User user = currentUser();
-        return ResponseEntity.ok(authService.toAuthResponse(null, user));
+    public ResponseEntity<AuthResponse> me(@AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(authService.toAuthResponse(null, requireUser(user)));
     }
 
     @PostMapping("/change-password")
     public ResponseEntity<Map<String, String>> changePassword(
+            @AuthenticationPrincipal User user,
             @Valid @RequestBody ChangePasswordRequest request) {
 
-        User user = currentUser();
-        authService.changePassword(user, request);
+        authService.changePassword(requireUser(user), request);
         return ResponseEntity.ok(Map.of("message", "Đổi mật khẩu thành công."));
     }
 
     @PutMapping("/profile")
     public ResponseEntity<AuthResponse> updateProfile(
+            @AuthenticationPrincipal User user,
             @Valid @RequestBody UpdateProfileRequest request) {
 
-        User user = currentUser();
-        User updated = authService.updateProfile(user, request);
+        User updated = authService.updateProfile(requireUser(user), request);
         return ResponseEntity.ok(authService.toAuthResponse(null, updated));
     }
 
     @PostMapping(value = "/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<AuthResponse> uploadAvatar(
+            @AuthenticationPrincipal User user,
             @RequestParam("file") MultipartFile file) {
 
-        User user = currentUser();
-        User updated = authService.uploadAvatar(user, file);
+        User updated = authService.uploadAvatar(requireUser(user), file);
         return ResponseEntity.ok(authService.toAuthResponse(null, updated));
     }
 
     @PostMapping(value = "/default-resume", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Map<String, Object>> uploadDefaultResume(
+            @AuthenticationPrincipal User user,
             @RequestParam("file") MultipartFile file) {
 
-        User user = currentUser();
-        Resume savedResume = authService.uploadAndSetDefaultResume(user, file);
+        Resume savedResume = authService.uploadAndSetDefaultResume(requireUser(user), file);
         return ResponseEntity.ok(Map.of(
                 "success", true,
                 "defaultResumeId", savedResume.getId().toString(),
@@ -107,5 +106,10 @@ public class AuthController {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null && authentication.getPrincipal() instanceof User user) return user;
         throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Vui lòng đăng nhập.");
+    private User requireUser(User user) {
+        if (user == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
+        }
+        return user;
     }
 }

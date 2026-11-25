@@ -1,14 +1,15 @@
 name: Web App Frontend CI
 
 on:
+  workflow_call:
   pull_request:
     branches: [ "develop", "main", "master" ]
-    paths:
-      - 'web-app/**'
-      - '.github/workflows/web-app-ci.yml'
 
+permissions:
+  contents: read
 jobs:
   build-and-test:
+    name: Web checks and scan
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -16,10 +17,10 @@ jobs:
     
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
           cache: 'npm'
@@ -35,7 +36,7 @@ jobs:
         run: npx tsc --noEmit
         
       - name: Run SAST Scan (Trivy)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         with:
           scan-type: 'fs'
           scan-ref: 'web-app'

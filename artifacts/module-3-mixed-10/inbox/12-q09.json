@@ -1,6 +1,0 @@
-{
-  "operation": "respond",
-  "from": "11-q08-retry",
-  "scenario": "Trả lời tình huống phối hợp với QA bằng các trách nhiệm, tiêu chí go/no-go và giao tiếp có thể quan sát.",
-  "answer": "Em để SRE rollback ngay theo runbook, không chờ QA chạy toàn bộ regression. Trong lúc đó, QA tái hiện lỗi bằng mã đơn thử, chốt hai luồng smoke là tạo đơn và đồng bộ trạng thái, rồi xác nhận trên bản rollback và bản hotfix thử nghiệm mà Dev chuẩn bị. QA đăng kết quả pass/fail cùng mã đơn và timestamp vào incident channel. Nếu hotfix vẫn làm lệch trạng thái đơn thì QA báo no-go, SRE giữ bản ổn định và Dev sửa tiếp. Em cũng nhờ QA xác nhận một lượt smoke sau khi SRE báo hệ thống đã phục hồi."
-}

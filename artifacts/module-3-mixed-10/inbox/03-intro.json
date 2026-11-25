@@ -1,7 +1,0 @@
-{
-  "operation": "conversation",
-  "from": "02-next",
-  "action": "SUBMIT_INTRODUCTION",
-  "introduction": "Em là Hà Anh. Em làm backend gần ba năm, chủ yếu với Python và PostgreSQL cho API đơn hàng. Em từng làm cùng QA để khoanh vùng lỗi đồng bộ đơn. Phần hàng đợi trong hệ thống thanh toán là mảng em mới bắt đầu tìm hiểu.",
-  "scenario": "Ứng viên gửi phần tự giới thiệu bằng tiếng Việt. Workflow bắt đầu tính giờ chuyên môn và sinh câu 1."
-}

@@ -24,6 +24,13 @@ The tests run Flyway, validate Hibernate mappings, and check persistence and
 foreign-key cleanup for the current pipeline. Use a separate test database:
 Flyway creates its schema and development accounts during application startup.
 
+## JWT signing key
+
+Set `JWT_SECRET` in `backend/.env` for Docker Compose or in the process environment
+when running Spring directly. Generate a separate key for each environment with
+`openssl rand -base64 48`. Spring requires a signing key of at least 32 bytes at
+startup. The test runtime generates its own key.
+
 ## Thông báo khi phân tích CV/JD hoàn tất
 
 Chạy `node scripts/init-web-push.mjs` từ thư mục gốc để tạo một cặp khóa VAPID trong `backend/.env`. Docker Compose nạp các biến này vào backend. Khi triển khai, dùng cùng `WEB_PUSH_PUBLIC_KEY` và `WEB_PUSH_PRIVATE_KEY` trên các replica và qua các lần khởi động. Đặt `WEB_PUSH_SUBJECT` thành URI liên hệ của đơn vị vận hành, ví dụ `mailto:ops@example.org`. Chạy lại backend và web-app với bản build mới để áp dụng migration V10 và phục vụ service worker. Khi chạy Spring ngoài Compose, truyền các biến qua môi trường của tiến trình.

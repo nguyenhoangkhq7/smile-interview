@@ -73,7 +73,7 @@ OUT_DIR = THIS_FILE.parent
 SYNTH_JOBS_PATH = (
     MATCHING_CV_DIR
     / "dataset"
-    / "synthetic_cv_jd_dataset_v2-20261118T164928Z-1-001"
+    / "synthetic_cv_jd_dataset_v2"
     / "synthetic_cv_jd_dataset_v2"
     / "raw"
     / "jobs.jsonl"

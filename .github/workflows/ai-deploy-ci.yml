@@ -1,0 +1,27 @@
+name: AI and deployment CI
+on:
+  workflow_call:
+  pull_request:
+    branches: [develop, main, master]
+permissions:
+  contents: read
+jobs:
+  validate:
+    name: AI and release checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Check production scripts and Compose
+        run: |
+          bash -n deploy/production/host.sh
+          python -m unittest discover -s deploy/production -p 'test_*.py'
+          cp backend/.env.example backend/.env
+          cp ai-service/.env.example ai-service/.env
+          export BACKEND_IMAGE=backend:test AI_IMAGE=ai:test
+          docker compose --env-file .env.example -f deploy/docker-compose.staging.yml -f deploy/production/compose.yml config --format json |
+            jq -e 'all(.services[]; has("build") | not) and .services["ai-service"].environment.GNN_REQUIRE_CHECKPOINT == "true"'
+      - name: Test matching and GNN graph contracts
+        run: |
+          docker build -t smile-ai:test ai-service
+          docker run --rm -e PYTHONPATH=/app -v "$PWD/ai-service/matching_cv/tests:/tests:ro" smile-ai:test \
+            sh -ec 'python -m venv --system-site-packages /tmp/testenv && /tmp/testenv/bin/pip install pytest==9.0.2 && /tmp/testenv/bin/python -m pytest -q -p no:cacheprovider /tests/test_semantic_importance_gnn_v4.py -k "not checkpoint"'

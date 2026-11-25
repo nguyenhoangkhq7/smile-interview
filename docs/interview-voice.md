@@ -40,7 +40,7 @@ Tất cả STT/TTS gọi OpenRouter bằng khóa trên AI service. Frontend ch�
 
 ## Cấu hình
 
-Giữ `OPENROUTER_API_KEY` ở `.env` gốc hoặc `ai-service/.env`. Không dùng biến `NEXT_PUBLIC_` cho khóa. AI service đọc `.env` gốc, rồi `ai-service/.env` với ưu tiên cao hơn. Docker Compose cũng truyền hai file này vào AI service.
+Đặt `OPENROUTER_API_KEY` trong `ai-service/.env` để Docker Compose cấp khóa cho dịch vụ AI. Nếu trước đây đặt khóa trong `.env` gốc, chuyển nó sang `ai-service/.env` trước khi tạo lại container.
 
 ```dotenv
 OPENROUTER_MODEL=qwen/qwen3.7-flash
