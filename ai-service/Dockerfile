@@ -11,11 +11,10 @@ RUN groupadd --system --gid 1001 appgroup \
  && mkdir -p /app/.cache/huggingface \
  && chown -R appuser:appgroup /app
 
-ARG TORCH_INDEX_URL=https://download.pytorch.org/whl/cpu
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir --index-url "${TORCH_INDEX_URL}" "torch>=2.2.0" \
- && pip install --no-cache-dir -r requirements.txt
+COPY requirements-docker.lock .
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python -m pip install --require-hashes --only-binary=:all: -r requirements-docker.lock \
+ && python -m pip check
 
 COPY --chown=appuser:appgroup . .
 

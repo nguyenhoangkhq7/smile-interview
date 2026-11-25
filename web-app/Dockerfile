@@ -5,8 +5,8 @@ FROM node:22-alpine AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-COPY package.json package-lock.json* ./
-RUN npm ci --frozen-lockfile
+COPY package.json package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 2: builder — compile the Next.js application
@@ -20,7 +20,8 @@ COPY . .
 # Disable Next.js telemetry during build
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN npm run build
+ARG NEXT_PUBLIC_API_BASE_URL=http://localhost:8081
+RUN --mount=type=cache,target=/app/.next/cache npm run build
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 3: runner — minimal production image

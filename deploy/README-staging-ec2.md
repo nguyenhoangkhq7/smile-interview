@@ -22,16 +22,25 @@ sudo sysctl --system
 ## 2. Cấu hình biến môi trường & khởi chạy Staging
 
 1. Cập nhật tên miền API Staging trong [staging.conf](nginx/staging.conf) (thay `api-staging.example.com`) và cấp chứng chỉ TLS bằng Certbot (`/etc/letsencrypt/live/<domain>/`).
-2. Cấu hình `.env`, `backend/.env`, `ai-service/.env` trên EC2, đặc biệt:
-   - `APP_CORS_ALLOWED_ORIGINS=https://<your-vercel-staging-domain>`
-   - `POSTGRES_PASSWORD=<strong-password>`
-   - `JWT_SECRET=<base64-secret-min-32-bytes>`
-3. Tải trước trọng số SBERT vào volume `sbert_cache` trước khi chạy thật:
+2. Cấu hình các file môi trường trên EC2. Nếu nâng cấp từ cấu hình cũ, chuyển các biến riêng của từng dịch vụ từ `.env` gốc sang file tương ứng.
+   - `.env` gốc chứa `APP_CORS_ALLOWED_ORIGINS=https://<your-vercel-staging-domain>` và `POSTGRES_PASSWORD=<strong-password>`.
+   - `backend/.env` chứa `JWT_SECRET=<base64-secret-min-32-bytes>` và cấu hình riêng của Spring Boot.
+   - `ai-service/.env` chứa `OPENROUTER_API_KEY` và cấu hình riêng của dịch vụ AI.
+3. Lấy checkpoint `semantic-importance-dependency-gnn-v4` do team huấn luyện, đặt file `paper_aligned_hybrid_gnn_v4_semantic_importance.pt` vào `ai-service/matching_cv/data/checkpoints/paper_aligned_gnn/` và cấp quyền đọc cho container. Nếu dùng thư mục khác, đặt `GNN_CHECKPOINT_DIR` trong `.env` gốc thành đường dẫn tuyệt đối và thay `checkpoint_dir` bên dưới bằng đường dẫn đó. Kiểm tra file bằng [checksum của checkpoint](gnn-v4.sha256) từ thư mục gốc repository.
+
    ```bash
-   docker compose -f deploy/docker-compose.staging.yml build
-   docker compose -f deploy/docker-compose.staging.yml run --rm --no-deps ai-service \
+   repo_dir="$PWD"
+   checkpoint_dir="$repo_dir/ai-service/matching_cv/data/checkpoints/paper_aligned_gnn"
+   (cd "$checkpoint_dir" && sha256sum --check "$repo_dir/deploy/gnn-v4.sha256")
+   ```
+
+   Compose mount thư mục ở chế độ chỉ đọc. AI kiểm tra và nạp trọng số lúc khởi động. Với staging chỉ dùng chế độ chẩn đoán, tạo thư mục mount và đặt `GNN_REQUIRE_CHECKPOINT=false` trong `.env` gốc.
+4. Tải trước trọng số SBERT vào volume `sbert_cache` trước khi chạy thật. Chạy từ thư mục gốc repository.
+   ```bash
+   docker compose --env-file .env -f deploy/docker-compose.staging.yml build
+   docker compose --env-file .env -f deploy/docker-compose.staging.yml run --rm --no-deps ai-service \
      python -c "from matching_cv.app.core.config import settings; from matching_cv.app.core.model_loader import model_loader; model_loader.load_model(settings.STAGE3_MODEL_NAME, revision=settings.STAGE3_MODEL_REVISION)"
-   docker compose -f deploy/docker-compose.staging.yml up -d
+   docker compose --env-file .env -f deploy/docker-compose.staging.yml up -d --wait
    ```
 
 ## 3. Thiết lập Backup PostgreSQL hằng đêm lên S3 & Diễn tập phục hồi

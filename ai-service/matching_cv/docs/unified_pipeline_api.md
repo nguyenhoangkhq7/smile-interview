@@ -55,6 +55,6 @@ The response uses the `standardized-output-v1` schema and includes the `X-Output
 - `OPENROUTER_API_KEY` is required when extraction or reasoning cannot be served from the local extraction caches.
 - The pinned Sentence Transformer is downloaded on first use if it is not already cached by Hugging Face.
 - Reusable extraction data is kept under `data/cache/stage6b3_live` and `data/cache/stage6c3b/doc_extraction`.
-- The default GNN checkpoint path is `data/checkpoints/paper_aligned_gnn/paper_aligned_hybrid_gnn_v1.pt`.
+- The default GNN checkpoint path is `data/checkpoints/paper_aligned_gnn/paper_aligned_hybrid_gnn_v4_semantic_importance.pt`.
 
 `GET /health` provides service and embedding-model status. OpenAPI documentation is available at `/docs`.

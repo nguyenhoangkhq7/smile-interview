@@ -1,0 +1,3 @@
+--find-links https://download.pytorch.org/whl/cpu/torch/
+-r requirements.txt
+torch==2.12.1+cpu

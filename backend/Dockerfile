@@ -2,18 +2,12 @@
 FROM eclipse-temurin:21-jdk AS builder
 WORKDIR /app
 
-# Copy the Maven wrapper and pom.xml first to cache dependencies
-COPY mvnw .
+COPY --chmod=0755 mvnw .
 COPY .mvn .mvn
 COPY pom.xml .
-
-# Grant execute permission for the maven wrapper and download dependencies
-RUN chmod +x mvnw
-RUN ./mvnw dependency:go-offline -B
-
-# Copy the source code and package the application
 COPY src src
-RUN ./mvnw clean package -DskipTests -B
+RUN --mount=type=cache,target=/root/.m2,sharing=locked \
+    ./mvnw -B -DskipTests package
 
 # Stage 2: Runtime stage
 FROM eclipse-temurin:21-jre

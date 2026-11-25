@@ -1,7 +1,11 @@
+x-logging: &app-logging
+  driver: local
+
 services:
   postgres:
     image: postgres:17
     restart: unless-stopped
+    logging: *app-logging
     mem_limit: 1024m
     cpus: "1.0"
     command:
@@ -40,16 +44,17 @@ services:
       context: ../ai-service
       dockerfile: Dockerfile
     restart: unless-stopped
+    logging: *app-logging
     mem_limit: 4096m
     cpus: "1.5"
     env_file:
-      - ../.env
       - ../ai-service/.env
     environment:
       PORT: 8000
       DEBUG: "false"
       ENVIRONMENT: production
       HF_HOME: /app/.cache/huggingface
+      GNN_REQUIRE_CHECKPOINT: ${GNN_REQUIRE_CHECKPOINT:-true}
       OMP_NUM_THREADS: "2"
       MKL_NUM_THREADS: "2"
       OPENBLAS_NUM_THREADS: "2"
@@ -58,12 +63,12 @@ services:
       - "8000"
     volumes:
       - sbert_cache:/app/.cache/huggingface
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+      - type: bind
+        source: ${GNN_CHECKPOINT_DIR:-../ai-service/matching_cv/data/checkpoints/paper_aligned_gnn}
+        target: /app/matching_cv/data/checkpoints/paper_aligned_gnn
+        read_only: true
+        bind:
+          create_host_path: false
     networks:
       - internal
 
@@ -72,10 +77,10 @@ services:
       context: ../backend
       dockerfile: Dockerfile
     restart: unless-stopped
+    logging: *app-logging
     mem_limit: 1280m
     cpus: "1.0"
     env_file:
-      - ../.env
       - ../backend/.env
     environment:
       JAVA_TOOL_OPTIONS: "-Xms384m -Xmx768m -XX:+UseG1GC"
@@ -90,12 +95,6 @@ services:
       - "8081"
     volumes:
       - backend_uploads:/app/uploads
-    healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8081/actuator/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
     depends_on:
       postgres:
         condition: service_healthy
@@ -107,6 +106,7 @@ services:
   nginx:
     image: nginx:1.27-alpine
     restart: unless-stopped
+    logging: *app-logging
     mem_limit: 128m
     cpus: "0.5"
     ports:
