@@ -6,6 +6,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
+from urllib.error import HTTPError
 
 import release
 
@@ -29,7 +30,7 @@ class ReleaseTests(unittest.TestCase):
         for name, callback in {
             "remote": lambda target, phase: self.event(phase, target["web"]),
             "api_check": lambda: self.event("api"),
-            "vercel": lambda cmd, target, flag: self.event(cmd, target),
+            "promote": lambda target: self.event("promote", target),
             "web_check": lambda target: self.event("web", target),
         }.items():
             stack.enter_context(patch.object(release, name, side_effect=callback))
@@ -91,3 +92,33 @@ class ReleaseTests(unittest.TestCase):
         release.main()
         self.assertIn(("promote", "dpl_old"), self.events)
         release.candidate.assert_not_called()
+
+
+class VercelPromotionTests(unittest.TestCase):
+    def test_promote_posts_to_project_in_configured_team(self):
+        with patch.dict(os.environ, {
+            "VERCEL_ORG_ID": "team_example",
+            "VERCEL_PROJECT_ID": "prj_example",
+            "VERCEL_TOKEN": "test-token",
+        }), patch.object(release, "urlopen") as request:
+            release.promote("dpl_example")
+
+        sent = request.call_args.args[0]
+        self.assertEqual(sent.full_url,
+                         "https://api.vercel.com/v10/projects/prj_example/promote/dpl_example?teamId=team_example")
+        self.assertEqual(sent.get_method(), "POST")
+        self.assertEqual(sent.get_header("Authorization"), "Bearer test-token")
+        self.assertEqual(sent.data, b"{}")
+
+    def test_web_check_waits_for_the_expected_alias(self):
+        missing = HTTPError("https://api.vercel.com", 404, "Not Found", None, None)
+        with patch.dict(os.environ, {"WEB_ORIGIN": "https://smile-example.vercel.app"}), \
+                patch.object(release, "vercel_api", side_effect=[
+                    missing, {"deploymentId": "dpl_old"}, {"deploymentId": "dpl_new"},
+                ]) as lookup, patch.object(release.time, "sleep"), \
+                patch.object(release.subprocess, "run") as smoke:
+            release.web_check("dpl_new")
+
+        self.assertEqual(lookup.call_count, 3)
+        lookup.assert_called_with("v4/aliases/smile-example.vercel.app")
+        smoke.assert_called_once()
