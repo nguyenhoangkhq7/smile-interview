@@ -18,6 +18,8 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 COPY --chown=appuser:appgroup . .
 
+# Keep the shared key directory owned by the backend's runtime UID.
+RUN install -d -o appuser -g appgroup -m 0700 /run/smile-ai
 USER appuser
 
 EXPOSE 8000

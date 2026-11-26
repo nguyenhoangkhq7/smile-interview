@@ -21,6 +21,8 @@ RUN groupadd --system --gid 1001 appgroup \
 # Copy the built jar from the builder stage
 COPY --from=builder --chown=appuser:appgroup /app/target/*.jar app.jar
 
+# Both services mount this volume and may initialize it first.
+RUN install -d -o appuser -g appgroup -m 0700 /run/smile-ai
 USER appuser
 
 EXPOSE 8081
