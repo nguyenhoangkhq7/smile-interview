@@ -1,0 +1,3 @@
+[submodule "ai-service/matching_cv/dataset/resume-ats-score-v1-en"]
+	path = ai-service/matching_cv/dataset/resume-ats-score-v1-en
+	url = https://huggingface.co/datasets/0xnbk/resume-ats-score-v1-en

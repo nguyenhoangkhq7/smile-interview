@@ -1,0 +1,107 @@
+package fit.iuh.modules.evidence;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import fit.iuh.modules.session.entity.JobDescription;
+import fit.iuh.modules.session.entity.Resume;
+import fit.iuh.modules.session.entity.Session;
+import fit.iuh.modules.skillgap.dto.SkillGapDtos.SkillGapResultDto;
+import org.junit.jupiter.api.Test;
+import java.util.List;
+import static org.assertj.core.api.Assertions.assertThat;
+
+class EvidenceContractTest {
+    @Test void conversationCommandUsesTheSameVersionedJsonContract() throws Exception {
+        var mapper = new ObjectMapper();
+        var command = mapper.readValue("""
+            {"request_id":"00000000-0000-0000-0000-000000000001","message_id":"intro",
+             "expected_state_version":2,"action":"SUBMIT_INTRODUCTION","introduction":"Em là Nam."}
+            """, EvidenceDtos.Conversation.class);
+        assertThat(command.expectedVersion()).isEqualTo(2);
+        assertThat(command.messageId()).isEqualTo("intro");
+        try (var factory = jakarta.validation.Validation.buildDefaultValidatorFactory()) {
+            assertThat(factory.getValidator().validate(command)).isEmpty();
+            assertThat(factory.getValidator().validate(new EvidenceDtos.Conversation(
+                    command.requestId(), "intro", 2, "CLIENT_SUPPLIED_SPEECH", ""))).isNotEmpty();
+        }
+    }
+    @Test void adaptiveDefaultsAllowMoreThanThreeQuestionsAndKeepExplicitLegacyCaps() throws Exception {
+        assertThat(EvidenceDtos.Config.defaults().maxPerObjective()).isEqualTo(8);
+        var mapper = new ObjectMapper();
+        var omitted = mapper.readValue("""
+                {"focused_question_mode":"DEBUGGING","max_questions":20,"duration_seconds":1800}
+                """, EvidenceDtos.Config.class);
+        assertThat(omitted.maxPerObjective()).isEqualTo(8);
+        var explicit = mapper.readValue("""
+                {"mode":"MIXED","max_questions":20,"duration_seconds":1800,"max_questions_per_objective":12}
+                """, EvidenceDtos.Config.class);
+        assertThat(explicit.maxPerObjective()).isEqualTo(12);
+        try (var factory = jakarta.validation.Validation.buildDefaultValidatorFactory()) {
+            assertThat(factory.getValidator().validate(omitted)).isEmpty();
+            assertThat(factory.getValidator().validate(explicit)).isEmpty();
+            var invalid = new EvidenceDtos.Config("MIXED", null, 20, 1800, 41);
+            assertThat(factory.getValidator().validate(invalid)).isNotEmpty();
+        }
+    }
+    @Test void legacyModeIsValidatedButOmittedFromAiConfig() throws Exception {
+        var mapper = new ObjectMapper();
+        String legacy = """
+                {"mode":"FOCUSED","focused_question_mode":"DEBUGGING","max_questions":10,"duration_seconds":900}
+                """;
+        var focused = mapper.readValue(legacy, EvidenceDtos.Config.class);
+        var inconsistent = mapper.readValue(legacy.replace("FOCUSED", "MIXED"), EvidenceDtos.Config.class);
+        try (var factory = jakarta.validation.Validation.buildDefaultValidatorFactory()) {
+            assertThat(factory.getValidator().validate(focused)).isEmpty();
+            assertThat(factory.getValidator().validate(inconsistent)).isNotEmpty();
+        }
+        var forwarded = mapper.valueToTree(focused);
+        assertThat(forwarded.has("mode")).isFalse();
+        assertThat(forwarded.path("focused_question_mode").asText()).isEqualTo("DEBUGGING");
+        assertThat(forwarded.path("max_questions_per_objective").asInt()).isEqualTo(8);
+    }
+    @Test void interactionModeSurvivesJsonAndOldConfigsDefaultToText() throws Exception {
+        var mapper = new ObjectMapper();
+        String legacy = "{\"mode\":\"MIXED\",\"max_questions\":10,\"duration_seconds\":900,\"max_questions_per_objective\":3}";
+        assertThat(mapper.readValue(legacy, EvidenceDtos.Config.class).interactionMode()).isEqualTo("TEXT");
+        var voice = mapper.readValue(legacy.replace("\"MIXED\"", "\"MIXED\",\"interaction_mode\":\"VOICE\""), EvidenceDtos.Config.class);
+        assertThat(mapper.valueToTree(voice).path("interaction_mode").asText()).isEqualTo("VOICE");
+    }
+    @Test
+    void c2ContextSurvivesJavaRoundtrip() throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        String input = """
+                {"jd_skill_id":"postgresql", "importance_weight":0.8,
+                 "required_proficiency":4, "candidate_proficiency":3,
+                 "semantic_alignment":"PARTIAL", "is_substituted":true,
+                 "jd_reasoning":"diagnose performance", "jd_evidence_spans":["Optimize SQL"],
+                 "job_tasks":[{"description":"Optimize SQL", "required_level":4}],
+                 "c_evidence":0.6, "recency_flag":true, "degraded":true, "flags":["fallback"]}
+                """;
+        var dto = mapper.readValue(input, SkillGapResultDto.class);
+        var output = mapper.valueToTree(dto);
+        assertThat(output.path("importance_weight").asDouble()).isEqualTo(0.8);
+        assertThat(output.path("job_tasks").get(0).path("required_level").asInt()).isEqualTo(4);
+        assertThat(output.path("jd_evidence_spans").get(0).asText()).isEqualTo("Optimize SQL");
+        for (String auditField : List.of(
+                "jd_reasoning", "c_evidence", "recency_flag", "degraded", "flags",
+                "candidate_proficiency", "is_substituted", "gap_magnitude")) {
+            assertThat(output.has(auditField)).isFalse();
+        }
+    }
+
+    @Test void verificationUsesSessionDocumentsForLegacySkillSpans() throws Exception {
+        var session = Session.builder()
+                .resume(Resume.builder().rawText("Java dùng tập hợp.\nBáo cáo hiệu năng.").build())
+                .jobDescription(JobDescription.builder().rawText("Đọc\u00a0kế hoạch thực thi.").build())
+                .build();
+        var skills = new ObjectMapper().readTree("""
+                [{"cv_evidence_spans":["Java dùng tập hợp.","Java dùng báo cáo","java dùng tập hợp.", " "],
+                  "jd_evidence_spans":["Đọc kế hoạch thực thi."]}]
+                """);
+
+        var sources = EvidenceInputs.verificationSources(session, skills);
+
+        assertThat(sources.path("cv").size()).isEqualTo(1);
+        assertThat(sources.path("cv").path("Java dùng tập hợp.").asText()).isEqualTo("Java dùng tập hợp.");
+        assertThat(sources.path("jd").path("Đọc kế hoạch thực thi.").asText()).isEqualTo("Đọc\u00a0kế hoạch thực thi.");
+    }
+}

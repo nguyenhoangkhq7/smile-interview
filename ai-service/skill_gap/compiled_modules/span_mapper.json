@@ -1,0 +1,109 @@
+{
+  "map_spans.predict": {
+    "traces": [],
+    "train": [],
+    "demos": [
+      {
+        "jobs_context": "[job_1] Senior System Engineer (2018-06 - 2020-01):\nTự động hóa cấu hình 100+ server Linux bằng Ansible và thiết kế hệ thống lưu trữ HA.\n[job_2] Junior Sysadmin (2016-06 - 2018-05):\nHỗ trợ quản trị server Linux cơ bản, theo dõi cảnh báo Nagios và xử lý sự cố mạng nội bộ.",
+        "spans_context": "- Tự động hóa cấu hình 100+ server Linux bằng Ansible và thiết kế hệ thống lưu trữ HA.\n- Hỗ trợ quản trị server Linux cơ bản",
+        "reasoning": "1. Span 'Tự động hóa cấu hình 100+ server Linux bằng Ansible và thiết kế hệ thống lưu trữ HA.' thuộc giai đoạn Senior [job_1] -> gán job_id='job_1'.\n2. Span 'Hỗ trợ quản trị server Linux cơ bản' là cụm con nguyên văn nằm trong giai đoạn Junior [job_2] -> gán job_id='job_2'.",
+        "span_mappings": [
+          {
+            "span": "Tự động hóa cấu hình 100+ server Linux bằng Ansible và thiết kế hệ thống lưu trữ HA.",
+            "job_id": "job_1"
+          },
+          {
+            "span": "Hỗ trợ quản trị server Linux cơ bản",
+            "job_id": "job_2"
+          }
+        ]
+      },
+      {
+        "jobs_context": "",
+        "spans_context": "- Docker, K8s, Git\n- Sử dụng Figma cho thiết kế giao diện",
+        "reasoning": "1. jobs_context rỗng vì ứng viên chưa có kinh nghiệm làm việc thực tế (không có JobBlock nào).\n2. Theo quy tắc UNASSIGNED Boundary Rule, toàn bộ các evidence spans đều phải gán job_id='UNASSIGNED' và giữ nguyên văn từng chuỗi span.",
+        "span_mappings": [
+          {
+            "span": "Docker, K8s, Git",
+            "job_id": "UNASSIGNED"
+          },
+          {
+            "span": "Sử dụng Figma cho thiết kế giao diện",
+            "job_id": "UNASSIGNED"
+          }
+        ]
+      },
+      {
+        "jobs_context": "[job_1] DevOps Lead (2024-03 - None):\nThiết kế và vận hành hạ tầng Kubernetes cho 50+ microservices.\n[job_2] DevOps Engineer (2019-06 - 2024-02):\nQuản lý cluster Kubernetes quy mô nhỏ, khoảng 10 services. Viết Terraform để provision hạ tầng AWS.",
+        "spans_context": "- Thiết kế và vận hành hạ tầng Kubernetes cho 50+ microservices.\n- Viết Terraform để provision hạ tầng AWS.\n- Kỹ năng khác: Python, Bash, Ansible, GCP, Photoshop.",
+        "reasoning": "1. Span 'Thiết kế và vận hành hạ tầng Kubernetes cho 50+ microservices.' nằm nguyên văn trong phần mô tả của [job_1] -> gán job_id='job_1'.\n2. Span 'Viết Terraform để provision hạ tầng AWS.' nằm trong phần mô tả của [job_2] -> gán job_id='job_2'.\n3. Span 'Kỹ năng khác: Python, Bash, Ansible, GCP, Photoshop.' là danh sách liệt kê kỹ năng chung, không thuộc [job_1] hay [job_2] -> gán job_id='UNASSIGNED'.",
+        "span_mappings": [
+          {
+            "span": "Thiết kế và vận hành hạ tầng Kubernetes cho 50+ microservices.",
+            "job_id": "job_1"
+          },
+          {
+            "span": "Viết Terraform để provision hạ tầng AWS.",
+            "job_id": "job_2"
+          },
+          {
+            "span": "Kỹ năng khác: Python, Bash, Ansible, GCP, Photoshop.",
+            "job_id": "UNASSIGNED"
+          }
+        ]
+      },
+      {
+        "jobs_context": "[job_1] Senior Backend Developer (2022-01 - 2023-12):\nXây dựng hệ thống thanh toán bằng Python FastAPI và PostgreSQL chịu tải 5,000 TPS. Xây dựng hệ thống message queue với Kafka phục vụ 1M event/ngày.\n[job_2] Part-time Backend Consultant (2022-06 - 2023-06):\nTối ưu hóa truy vấn SQL và xây dựng ETL pipeline bằng Python.",
+        "spans_context": "- Xây dựng hệ thống thanh toán bằng Python FastAPI và PostgreSQL chịu tải 5,000 TPS.\n- Xây dựng hệ thống message queue với Kafka phục vụ 1M event/ngày\n- Tối ưu hóa truy vấn SQL và xây dựng ETL pipeline bằng Python.\n- Proficient in Java Core, Python, Redis",
+        "reasoning": "1. Hai span đầu tiên ('Xây dựng hệ thống thanh toán bằng Python FastAPI...' và 'Xây dựng hệ thống message queue với Kafka...') thuộc mô tả của [job_1] -> gán job_id='job_1'.\n2. Span thứ ba ('Tối ưu hóa truy vấn SQL và xây dựng ETL pipeline bằng Python.') thuộc mô tả của [job_2] -> gán job_id='job_2'.\n3. Span thứ tư ('Proficient in Java Core, Python, Redis') là câu tự nhận xét chung ngoài các job blocks -> gán job_id='UNASSIGNED'.",
+        "span_mappings": [
+          {
+            "span": "Xây dựng hệ thống thanh toán bằng Python FastAPI và PostgreSQL chịu tải 5,000 TPS.",
+            "job_id": "job_1"
+          },
+          {
+            "span": "Xây dựng hệ thống message queue với Kafka phục vụ 1M event/ngày",
+            "job_id": "job_1"
+          },
+          {
+            "span": "Tối ưu hóa truy vấn SQL và xây dựng ETL pipeline bằng Python.",
+            "job_id": "job_2"
+          },
+          {
+            "span": "Proficient in Java Core, Python, Redis",
+            "job_id": "UNASSIGNED"
+          }
+        ]
+      }
+    ],
+    "signature": {
+      "instructions": "Map each extracted skill evidence span from the CV to the exact `job_id` where that skill was practiced.\n\nStrict Attribution Rules:\n1. Complete Verbatim Coverage: Every single evidence span listed in `spans_context` MUST be returned in `span_mappings` with its `span` string preserved character-for-character (do not include the leading bullet prefix '- ').\n2. Job-Contextual Attribution: Assign a span to a `job_id` (e.g., 'job_1', 'job_2') ONLY if the span comes from that specific job block's responsibilities, achievements, or job-specific tech stack.\n3. UNASSIGNED Boundary Rule: If an evidence span comes from a general 'Skills / Kỹ năng khác' section, CV summary header, certifications list, or academic project not belonging to any extracted JobBlock in `jobs_context`, you MUST assign `job_id = 'UNASSIGNED'`. Never guess or force-map a general skill list into a work JobBlock.",
+      "fields": [
+        {
+          "prefix": "Jobs Context:",
+          "description": "Formatted list of extracted JobBlocks with [job_id], title, ISO dates, and raw_text (or empty if no JobBlocks exist)"
+        },
+        {
+          "prefix": "Spans Context:",
+          "description": "Bulleted list of verbatim skill evidence spans extracted from the CV that must all be mapped"
+        },
+        {
+          "prefix": "Reasoning:",
+          "description": "${reasoning}"
+        },
+        {
+          "prefix": "Span Mappings:",
+          "description": "List of SpanMapping items pairing every input span verbatim with its owning job_id or 'UNASSIGNED'"
+        }
+      ]
+    },
+    "lm": null
+  },
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.14",
+      "dspy": "3.4.1",
+      "cloudpickle": "3.1"
+    }
+  }
+}

@@ -1,0 +1,102 @@
+{
+  "model": "openrouter/qwen/qwen3.7-flash",
+  "review_model": "openrouter/qwen/qwen3.7-flash",
+  "cv": "Đã xử lý lỗi tạo đơn hàng trùng khi client gửi lại yêu cầu.",
+  "jd": "Giải thích cách API tạo đơn xử lý việc client gửi lại yêu cầu sau timeout.",
+  "criteria": [
+    {
+      "description": "Nhận diện hai lần gửi của cùng một yêu cầu tạo đơn.",
+      "expected_evidence": "Một định danh ổn định để đối chiếu lần gửi lại với yêu cầu đã lưu.",
+      "below_target": "Dựa trên dữ liệu có thể thay đổi giữa hai lần gửi.",
+      "at_target": "Giữ nguyên định danh khi thử lại và đối chiếu với bản ghi đã lưu.",
+      "above_target": "Giới hạn phạm vi định danh để phân biệt các nguồn gửi."
+    },
+    {
+      "description": "Xử lý lần gửi lại khi yêu cầu gốc đã hoàn tất.",
+      "expected_evidence": "Cách trả lại kết quả của lần xử lý gốc cho yêu cầu trùng.",
+      "below_target": "Tạo thêm một đơn cho yêu cầu đã hoàn tất.",
+      "at_target": "Trả lại kết quả đã lưu của lần xử lý gốc.",
+      "above_target": "Diễn giải được cách giữ nhất quán kết quả qua các lần gửi lại."
+    }
+  ],
+  "question_budget": 3,
+  "target_depth": 2,
+  "prepared_focuses": {
+    "c1": {
+      "cv_excerpt": "Đã xử lý lỗi tạo đơn hàng trùng khi client gửi lại yêu cầu.",
+      "detail_to_verify": "Mô tả cụ thể định danh ổn định nào được sử dụng để đối chiếu và phát hiện trùng lặp yêu cầu.",
+      "jd_excerpt": "Giải thích cách API tạo đơn xử lý việc client gửi lại yêu cầu sau timeout."
+    },
+    "c2": {
+      "cv_excerpt": "Đã xử lý lỗi tạo đơn hàng trùng khi client gửi lại yêu cầu.",
+      "detail_to_verify": "Cơ chế trả về kết quả của lần xử lý gốc khi nhận được yêu cầu trùng lặp đã hoàn tất.",
+      "jd_excerpt": "Giải thích cách API tạo đơn xử lý việc client gửi lại yêu cầu sau timeout."
+    }
+  },
+  "turns": [
+    {
+      "criterion": "c1",
+      "action": "INITIAL",
+      "question": "API tạo đơn hàng nhận được request trùng lặp do client thử lại sau timeout. Bạn sẽ dùng định danh ổn định nào để phát hiện và xử lý tình trạng này?",
+      "answer": "Em kiểm tra trong database.",
+      "observations": [
+        {
+          "criterion_id": "498fa330-2452-5bfa-bc15-01c59ae50a69:c1",
+          "response_excerpt": "",
+          "response_line_range": null,
+          "observation": "UNCLEAR",
+          "performance": "UNDETERMINED",
+          "rationale": "Câu trả lời chung chung, không nêu cụ thể định danh ổn định nào (như idempotency key) để đối chiếu.",
+          "resolves_contradiction": false,
+          "unresolved_aspects": [
+            "Cụ thể định danh ổn định dùng để phát hiện trùng lặp"
+          ]
+        }
+      ]
+    },
+    {
+      "criterion": "c1",
+      "action": "CLARIFY",
+      "question": "Bạn sẽ dùng trường dữ liệu nào trong request để làm định danh ổn định duy nhất cho mỗi yêu cầu tạo đơn?",
+      "answer": "Client giữ nguyên idempotency key khi gửi lại. Server tra khóa đó trong database.",
+      "observations": [
+        {
+          "criterion_id": "498fa330-2452-5bfa-bc15-01c59ae50a69:c1",
+          "response_excerpt": "Client giữ nguyên idempotency key khi gửi lại. Server tra khóa đó trong database.",
+          "response_line_range": null,
+          "observation": "SUPPORTS",
+          "performance": "AT_TARGET",
+          "rationale": "Ứng viên đã nêu đúng cách sử dụng idempotency key làm định danh ổn định để client giữ nguyên khi thử lại và server dùng để tra cứu, đối chiếu với bản ghi đã lưu, phù hợp với tiêu chí at_target.",
+          "resolves_contradiction": false,
+          "unresolved_aspects": []
+        }
+      ]
+    },
+    {
+      "criterion": "c2",
+      "action": "FOLLOW_UP",
+      "question": "Khi API tạo đơn nhận được request trùng lặp do client thử lại sau timeout, và trạng thái đơn hàng gốc đã là 'Hoàn thành', bạn sẽ trả về kết quả nào cho request mới này?",
+      "answer": "Server trả lại mã đơn và phản hồi đã lưu ở lần xử lý gốc.",
+      "observations": [
+        {
+          "criterion_id": "498fa330-2452-5bfa-bc15-01c59ae50a69:c2",
+          "response_excerpt": "Server trả lại mã đơn và phản hồi đã lưu ở lần xử lý gốc.",
+          "response_line_range": null,
+          "observation": "SUPPORTS",
+          "performance": "AT_TARGET",
+          "rationale": "Ứng viên đã nêu đúng hành vi cần thiết là trả lại kết quả (mã đơn và phản hồi) đã được lưu từ lần xử lý ban đầu khi nhận request trùng lặp, thay vì tạo mới đơn hàng. Điều này khớp với tiêu chí at_target.",
+          "resolves_contradiction": false,
+          "unresolved_aspects": []
+        }
+      ]
+    }
+  ],
+  "criteria_assessments": {
+    "c1": "DEMONSTRATED_AT_TARGET",
+    "c2": "DEMONSTRATED_AT_TARGET"
+  },
+  "essential_criteria_asked": {
+    "count": 2,
+    "total": 2
+  }
+}

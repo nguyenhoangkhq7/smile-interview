@@ -1,7 +1,12 @@
 # Local environment files
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.dump
 
 # IDE files
 .idea/
@@ -35,3 +40,22 @@ logs/
 # Docker/Compose
 .docker/
 docker-compose.override.yml
+
+# Node.js dependencies
+node_modules/
+dist/
+.npm
+npm-debug.log*
+
+# Python runtime artifacts
+.venv/
+__pycache__/
+*.py[cod]
+*.pyc
+.pytest_cache/
+/ai-service/.cache/
+
+# Local benchmark artifacts
+/artifacts/
+/ai-service/adaptive_questioning/optimization/results/*_cache.json
+/ai-service/adaptive_questioning/optimization/results/*.jsonl

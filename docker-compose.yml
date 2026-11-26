@@ -1,14 +1,13 @@
 services:
   postgres:
-    image: postgres:17-alpine
-    container_name: postgres_db
+    image: postgres:17
     restart: always
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_DB: ${POSTGRES_DB:-interview_practice_db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "${POSTGRES_PORT}:5432"
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -18,40 +17,78 @@ services:
       retries: 5
       start_period: 10s
 
-  redis:
-    image: redis:7-alpine
-    container_name: redis_cache
-    restart: always
-    ports:
-      - "${REDIS_PORT}:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  matching-service:
+  backend:
     build:
-      context: ./services/matching-service
+      context: ./backend
       dockerfile: Dockerfile
-    container_name: matching_service
     restart: always
-    ports:
-      - "${MATCHING_SERVICE_PORT}:8080"
+    env_file:
+      - ./backend/.env
     environment:
-      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL}
-      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
-      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
-      SPRING_DATA_REDIS_HOST: redis
-      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-interview_practice_db}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      FASTAPI_AI_BASE_URL: http://ai-service:8000
+      APP_AI_RUNTIME_AUTO_PROVISION: "true"
+      AI_RUNTIME_KEY_FILE: /run/smile-ai/ai-runtime.key
+    volumes:
+      - ai_runtime_key:/run/smile-ai
+      - backend_uploads:/app/uploads
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "3", "http://127.0.0.1:8081/actuator/health"]
+      interval: 5s
+      timeout: 4s
+      retries: 10
+      start_period: 40s
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
+
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: ai_service
+    restart: always
+    env_file:
+      - ./ai-service/.env
+    environment:
+      PORT: 8000
+      HF_HOME: /app/.cache/huggingface
+      AI_RUNTIME_BACKEND_URL: http://backend:8081
+      AI_RUNTIME_KEY_FILE: /run/smile-ai/ai-runtime.key
+    ports:
+      - "8000:8000"
+    volumes:
+      - ai_runtime_key:/run/smile-ai:ro
+      - sbert_cache:/app/.cache/huggingface
+      - type: bind
+        source: ${GNN_CHECKPOINT_DIR:-./ai-service/matching_cv/data/checkpoints/paper_aligned_gnn}
+        target: /app/matching_cv/data/checkpoints/paper_aligned_gnn
+        read_only: true
+
+  web-app:
+    build:
+      context: ./web-app
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8081}
+    container_name: web_app
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      BACKEND_INTERNAL_URL: http://backend:8081
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8081}
+    depends_on:
+      backend:
         condition: service_healthy
 
 volumes:
   postgres_data:
-  redis_data:
+  backend_uploads:
+  sbert_cache:
+  ai_runtime_key:

@@ -1,0 +1,829 @@
+[
+  {
+    "sample_id": "xd01",
+    "split": "train",
+    "interaction_mode": "TEXT",
+    "objective": {
+      "skill_id": "rest_api",
+      "target_depth": 2,
+      "extension_depth": null,
+      "claim": "Chọn mã lỗi HTTP cho sai khác payload idempotency",
+      "criteria": [
+        {
+          "criterion_id": "xd01:c1",
+          "description": "Chọn mã 4xx phù hợp khi trùng key nhưng khác payload",
+          "expected_evidence": "Chọn mã 409 hoặc 422 kèm lý do.",
+          "below_target": "Dùng 200 hoặc 500.",
+          "at_target": "Chọn 409 hoặc 422 và giải thích xung đột dữ liệu.",
+          "above_target": "Phân biệt 409 với 400.",
+          "essential": true
+        }
+      ]
+    },
+    "turn": {
+      "turn_id": "xd01-first",
+      "objective_id": "xd01",
+      "skill_id": "rest_api",
+      "mode": "TECHNICAL_EXPLANATION",
+      "action": "INITIAL",
+      "question_depth": 2,
+      "question": {
+        "text": "API nhận lại `Idempotency-Key` cũ nhưng `amount` bị gửi khác đi. Bạn trả về mã trạng thái HTTP nào?",
+        "criterion_ids": [
+          "xd01:c1"
+        ],
+        "evidence_scope": "xd01-case"
+      },
+      "answer": "Em trả về một mã lỗi phía client nhóm 4xx để báo yêu cầu không khớp.",
+      "judgment": null,
+      "introduction": ""
+    },
+    "judgment": {
+      "observations": [
+        {
+          "criterion_id": "xd01:c1",
+          "response_excerpt": "",
+          "response_line_range": null,
+          "observation": "UNCLEAR",
+          "performance": "UNDETERMINED",
+          "rationale": "Chỉ nêu nhóm 4xx chung, chưa chọn mã trạng thái cụ thể.",
+          "resolves_contradiction": false,
+          "unresolved_aspects": [
+            "Mã trạng thái HTTP cụ thể"
+          ]
+        }
+      ],
+      "feedback": "",
+      "explicit_inability": false,
+      "inability_excerpt": "",
+      "feedback_contains_hint": false
+    },
+    "action": "CLARIFY",
+    "next_question": {
+      "text": "Bạn chọn chính xác mã HTTP 4xx nào trong tình huống trùng khóa nhưng sai khác `amount`?",
+      "criterion_ids": [
+        "xd01:c1"
+      ],
+      "mode": "TECHNICAL_EXPLANATION",
+      "depth": 2,
+      "evidence_scope": "xd01-case"
+    }
+  },
+  {
+    "sample_id": "xd02",
+    "split": "train",
+    "interaction_mode": "VOICE",
+    "objective": {
+      "skill_id": "mysql",
+      "target_depth": 3,
+      "extension_depth": 4,
+      "claim": "Đánh đổi chỉ mục khi tải ghi cao",
+      "criteria": [
+        {
+          "criterion_id": "xd02:c1",
+          "description": "Chọn thứ tự cột composite index",
+          "expected_evidence": "Chọn thứ tự lọc trước sắp xếp sau.",
+          "below_target": "Chọn sai thứ tự cột.",
+          "at_target": "Chọn đúng thứ tự composite index.",
+          "above_target": "Phân tích chi phí ghi 10.000 insert/s và hướng cân bằng đọc-ghi.",
+          "essential": true
+        }
+      ]
+    },
+    "turn": {
+      "turn_id": "xd02-first",
+      "objective_id": "xd02",
+      "skill_id": "mysql",
+      "mode": "DESIGN",
+      "action": "INITIAL",
+      "question_depth": 3,
+      "question": {
+        "text": "Bảng đơn hàng lọc theo `merchant_id` và sắp xếp theo `created_at`. Bạn thiết kế chỉ mục thế nào?",
+        "criterion_ids": [
+          "xd02:c1"
+        ],
+        "evidence_scope": "xd02-case"
+      },
+      "answer": "Em đặt composite index với `merchant_id` đứng trước rồi tới `created_at DESC` để lọc đúng nhóm dữ liệu trước rồi đọc theo thứ tự sắp xếp.",
+      "judgment": null,
+      "introduction": ""
+    },
+    "judgment": {
+      "observations": [
+        {
+          "criterion_id": "xd02:c1",
+          "response_excerpt": "composite index với `merchant_id` đứng trước rồi tới `created_at DESC`",
+          "response_line_range": null,
+          "observation": "SUPPORTS",
+          "performance": "AT_TARGET",
+          "rationale": "Đặt đúng thứ tự cột composite index cho lọc và sắp xếp.",
+          "resolves_contradiction": false,
+          "unresolved_aspects": []
+        }
+      ],
+      "feedback": "Bạn đã chọn đúng thứ tự cột cho truy vấn đọc.",
+      "explicit_inability": false,
+      "inability_excerpt": "",
+      "feedback_contains_hint": false
+    },
+    "action": "PROBE_DEEPER",
+    "next_question": {
+      "text": "Nếu bảng đó nhận 10.000 insert mỗi giây và đã có 5 index khác, bạn xử lý chi phí ghi tăng thêm thế nào?",
+      "criterion_ids": [
+        "xd02:c1"
+      ],
+      "mode": "DESIGN",
+      "depth": 4,
+      "evidence_scope": "xd02-case-ext"
+    }
+  },
+  {
+    "sample_id": "xd03",
+    "split": "train",
+    "interaction_mode": "VOICE",
+    "objective": {
+      "skill_id": "python",
+      "target_depth": 2,
+      "extension_depth": null,
+      "claim": "Tránh mutable default argument",
+      "criteria": [
+        {
+          "criterion_id": "xd03:c1",
+          "description": "Khởi tạo tham số mặc định an toàn trong Python",
+          "expected_evidence": "Dùng None và khởi tạo mới trong thân hàm.",
+          "below_target": "Dùng list làm mặc định trực tiếp.",
+          "at_target": "Dùng None làm giá trị mặc định và tạo list mới bên trong hàm.",
+          "above_target": "Giải thích lúc bind giá trị mặc định.",
+          "essential": true
+        }
+      ]
+    },
+    "turn": {
+      "turn_id": "xd03-first",
+      "objective_id": "xd03",
+      "skill_id": "python",
+      "mode": "TECHNICAL_EXPLANATION",
+      "action": "INITIAL",
+      "question_depth": 2,
+      "question": {
+        "text": "Khi định nghĩa hàm Python cần nhận một danh sách tùy chọn, vì sao không nên viết `def add_item(x, items=[])`?",
+        "criterion_ids": [
+          "xd03:c1"
+        ],
+        "evidence_scope": "xd03-case"
+      },
+      "answer": "Dạ phần này em chưa rõ lắm nên chưa trả lời được ạ.",
+      "judgment": null,
+      "introduction": ""
+    },
+    "judgment": {
+      "observations": [
+        {
+          "criterion_id": "xd03:c1",
+          "response_excerpt": "",
+          "response_line_range": null,
+          "observation": "NO_EVIDENCE",
+          "performance": "UNDETERMINED",
+          "rationale": "Ứng viên cho biết chưa trả lời được.",
+          "resolves_contradiction": false,
+          "unresolved_aspects": []
+        }
+      ],
+      "feedback": "Cảm ơn bạn đã chia sẻ.",
+      "explicit_inability": true,
+      "inability_excerpt": "em chưa rõ lắm nên chưa trả lời được ạ.",
+      "feedback_contains_hint": false
+    },
+    "action": "ASK_EASIER",
+    "next_question": {
+      "text": "Trong Python, biểu thức `items=[]` ở dòng `def add_item(x, items=[])` được tạo lại mỗi lần gọi hàm hay chỉ tạo một lần lúc định nghĩa hàm?",
+      "criterion_ids": [
+        "xd03:c1"
+      ],
+      "mode": "TECHNICAL_EXPLANATION",
+      "depth": 1,
+      "evidence_scope": "xd03-case-foundation"
+    }
+  },
+  {
+    "sample_id": "xd04",
+    "split": "train",
+    "interaction_mode": "TEXT",
+    "objective": {
+      "skill_id": "security_auth",
+      "target_depth": 3,
+      "extension_depth": null,
+      "claim": "Nhận diện lỗ hổng XSS khi render HTML thô",
+      "criteria": [
+        {
+          "criterion_id": "xd04:c1",
+          "description": "Chẩn đoán nguy cơ XSS với dangerouslySetInnerHTML",
+          "expected_evidence": "Chỉ ra nguy cơ thực thi script độc hại trong trình duyệt.",
+          "below_target": "Cho rằng chuỗi tự động an toàn.",
+          "at_target": "Xác định đúng XSS và tác động thực thi mã.",
+          "above_target": "Nêu cách làm sạch HTML trước khi hiển thị.",
+          "essential": true
+        }
+      ]
+    },
+    "turn": {
+      "turn_id": "xd04-first",
+      "objective_id": "xd04",
+      "skill_id": "security_auth",
+      "mode": "DEBUGGING",
+      "action": "INITIAL",
+      "question_depth": 3,
+      "question": {
+        "text": "Đoạn `<div dangerouslySetInnerHTML={{ __html: user.bio }} />` có vấn đề bảo mật gì?",
+        "criterion_ids": [
+          "xd04:c1"
+        ],
+        "evidence_scope": "xd04-case"
+      },
+      "answer": "Chỗ này có thể làm vỡ layout hoặc sai font chữ nếu người dùng nhập thẻ HTML lạ vào phần bio.",
+      "judgment": null,
+      "introduction": ""
+    },
+    "judgment": {
+      "observations": [
+        {
+          "criterion_id": "xd04:c1",
+          "response_excerpt": "làm vỡ layout hoặc sai font chữ",
+          "response_line_range": null,
+          "observation": "CONTRADICTS",
+          "performance": "BELOW",
+          "rationale": "Chỉ nhận định ảnh hưởng giao diện, bỏ sót nguy cơ thực thi mã XSS.",
+          "resolves_contradiction": false,
+          "unresolved_aspects": []
+        }
+      ],
+      "feedback": "Đó là tác động phụ về hiển thị, chưa chạm tới rủi ro bảo mật chính.",
+      "explicit_inability": false,
+      "inability_excerpt": "",
+      "feedback_contains_hint": false
+    },
+    "action": "ASK_EASIER",
+    "next_question": {
+      "text": "Nếu kẻ tấn công nhập chuỗi `<img src=x onerror=alert(1)>` vào `user.bio`, trình duyệt người xem trang hồ sơ sẽ thực thi gì?",
+      "criterion_ids": [
+        "xd04:c1"
+      ],
+      "mode": "DEBUGGING",
+      "depth": 2,
+      "evidence_scope": "xd04-case-foundation"
+    }
+  },
+  {
+    "sample_id": "xd05",
+    "split": "train",
+    "interaction_mode": "TEXT",
+    "objective": {
+      "skill_id": "testing_unit",
+      "target_depth": 2,
+      "extension_depth": null,
+      "claim": "Kiểm thử biên phần trăm giảm giá",
+      "criteria": [
+        {
+          "criterion_id": "xd05:c1",
+          "description": "Chọn đầu vào kiểm tra hai phía biên [0, 100]",
+          "expected_evidence": "Nêu đủ cả giá trị hợp lệ tại biên và không hợp lệ sát biên.",
+          "below_target": "Chỉ kiểm tra một giá trị ở giữa.",
+          "at_target": "Kiểm tra sát hai đầu biên hợp lệ và không hợp lệ.",
+          "above_target": "Xét đầu vào không phải số nguyên.",
+          "essential": true
+        }
+      ]
+    },
+    "turn": {
+      "turn_id": "xd05-first",
+      "objective_id": "xd05",
+      "skill_id": "testing_unit",
+      "mode": "TECHNICAL_EXPLANATION",
+      "action": "INITIAL",
+      "question_depth": 2,
+      "question": {
+        "text": "Hàm `apply_discount(price, percent)` nhận `percent` nguyên từ 0 đến 100. Bạn thử giá trị nào để phát hiện lỗi chấp nhận số vượt ngưỡng?",
+        "criterion_ids": [
+          "xd05:c1"
+        ],
+        "evidence_scope": "xd05-case"
+      },
+      "answer": "Em sẽ thử `percent = 101` để đảm bảo hàm từ chối giá trị vượt trần.",
+      "judgment": null,
+      "introduction": ""
+    },
+    "judgment": {
+      "observations": [
+        {
+          "criterion_id": "xd05:c1",
+          "response_excerpt": "",
+          "response_line_range": null,
+          "observation": "UNCLEAR",
+          "performance": "UNDETERMINED",
+          "rationale": "Chọn đúng đầu vào vượt trần 101 nhưng chưa rõ trường hợp biên đúng bằng 100 có được giữ lại không.",
+          "resolves_contradiction": false,
+          "unresolved_aspects": [
+            "Kiểm tra giá trị biên hợp lệ sát trần (100)"
+          ]
+        }
+      ],
+      "feedback": "Giá trị 101 giúp phát hiện lỗi vượt trần.",
+      "explicit_inability": false,
+      "inability_excerpt": "",
+      "feedback_contains_hint": false
+    },
+    "action": "FOLLOW_UP",
+    "next_question": {
+      "text": "Nếu hàm dùng nhầm điều kiện `percent < 100` thay vì `<= 100`, bạn dùng giá trị nào để phát hiện lỗi từ chối nhầm giá trị hợp lệ?",
+      "criterion_ids": [
+        "xd05:c1"
+      ],
+      "mode": "TECHNICAL_EXPLANATION",
+      "depth": 2,
+      "evidence_scope": "xd05-case-lower"
+    }
+  },
+  {
+    "sample_id": "xd06",
+    "split": "train",
+    "interaction_mode": "VOICE",
+    "objective": {
+      "skill_id": "teamwork_incident",
+      "target_depth": 3,
+      "extension_depth": null,
+      "claim": "Giải quyết bất đồng hợp đồng API",
+      "criteria": [
+        {
+          "criterion_id": "xd06:c1",
+          "description": "Nêu hành động thực tế giải quyết bất đồng thiết kế API",
+          "expected_evidence": "Đối chiếu yêu cầu, đánh đổi kỹ thuật và thống nhất giao ước.",
+          "below_target": "Nói chung chung không có dữ kiện.",
+          "at_target": "Trình bày hành động cụ thể dựa trên dữ kiện kỹ thuật.",
+          "above_target": "Bổ sung kiểm tra tự động.",
+          "essential": true
+        }
+      ]
+    },
+    "turn": {
+      "turn_id": "xd06-first",
+      "objective_id": "xd06",
+      "skill_id": "teamwork_incident",
+      "mode": "BEHAVIORAL",
+      "action": "INITIAL",
+      "question_depth": 3,
+      "question": {
+        "text": "Khi bạn và thành viên khác bất đồng về cấu trúc API trước ngày bàn giao, bạn xử lý thế nào?",
+        "criterion_ids": [
+          "xd06:c1"
+        ],
+        "evidence_scope": "xd06-case"
+      },
+      "answer": "Em ngồi trao đổi lại nhẹ nhàng để hai bên hiểu nhau hơn và cùng làm cho kịp tiến độ.",
+      "judgment": null,
+      "introduction": ""
+    },
+    "judgment": {
+      "observations": [
+        {
+          "criterion_id": "xd06:c1",
+          "response_excerpt": "",
+          "response_line_range": null,
+          "observation": "UNCLEAR",
+          "performance": "UNDETERMINED",
+          "rationale": "Chỉ nêu thái độ trao đổi chung chung, thiếu hành động và căn cứ kỹ thuật để chốt phương án.",
+          "resolves_contradiction": false,
+          "unresolved_aspects": [
+            "Căn cứ kỹ thuật dùng để so sánh và chốt cấu trúc API"
+          ]
+        }
+      ],
+      "feedback": "",
+      "explicit_inability": false,
+      "inability_excerpt": "",
+      "feedback_contains_hint": false
+    },
+    "action": "CLARIFY",
+    "next_question": {
+      "text": "Trong cuộc trao đổi đó, bạn đã dùng tiêu chí hoặc ví dụ dữ liệu cụ thể nào để hai bạn chốt được cấu trúc API?",
+      "criterion_ids": [
+        "xd06:c1"
+      ],
+      "mode": "BEHAVIORAL",
+      "depth": 3,
+      "evidence_scope": "xd06-case"
+    }
+  },
+  {
+    "sample_id": "xd07",
+    "split": "dev",
+    "interaction_mode": "VOICE",
+    "objective": {
+      "skill_id": "mongodb",
+      "target_depth": 3,
+      "extension_depth": null,
+      "claim": "Sắp xếp thứ tự trường trong compound index",
+      "criteria": [
+        {
+          "criterion_id": "xd07:c1",
+          "description": "Đặt thứ tự trường tối ưu trong compound index",
+          "expected_evidence": "Đặt lọc bằng trước sắp xếp và range.",
+          "below_target": "Đặt sai thứ tự cột.",
+          "at_target": "Chọn đúng thứ tự trường theo ESR.",
+          "above_target": "Phân tích chi phí bộ nhớ khi sort.",
+          "essential": true
+        }
+      ]
+    },
+    "turn": {
+      "turn_id": "xd07-first",
+      "objective_id": "xd07",
+      "skill_id": "mongodb",
+      "mode": "DEBUGGING",
+      "action": "INITIAL",
+      "question_depth": 3,
+      "question": {
+        "text": "Truy vấn tìm theo `tenant_id`, `status` trong 2 giá trị và sắp xếp theo `issued_at`. Bạn tối ưu thế nào?",
+        "criterion_ids": [
+          "xd07:c1"
+        ],
+        "evidence_scope": "xd07-case"
+      },
+      "answer": "Em tạo một compound index gồm cả 3 trường đó cho collection `invoices`.",
+      "judgment": null,
+      "introduction": ""
+    },
+    "judgment": {
+      "observations": [
+        {
+          "criterion_id": "xd07:c1",
+          "response_excerpt": "",
+          "response_line_range": null,
+          "observation": "UNCLEAR",
+          "performance": "UNDETERMINED",
+          "rationale": "Nêu đúng giải pháp compound index nhưng chưa chỉ rõ thứ tự các trường.",
+          "resolves_contradiction": false,
+          "unresolved_aspects": [
+            "Thứ tự các trường trong compound index"
+          ]
+        }
+      ],
+      "feedback": "",
+      "explicit_inability": false,
+      "inability_excerpt": "",
+      "feedback_contains_hint": false
+    },
+    "action": "CLARIFY",
+    "next_question": {
+      "text": "Bạn đặt thứ tự ba trường `tenant_id`, `status` và `issued_at` trong compound index đó như thế nào?",
+      "criterion_ids": [
+        "xd07:c1"
+      ],
+      "mode": "DEBUGGING",
+      "depth": 3,
+      "evidence_scope": "xd07-case"
+    }
+  },
+  {
+    "sample_id": "xd08",
+    "split": "dev",
+    "interaction_mode": "VOICE",
+    "objective": {
+      "skill_id": "oauth2_oidc",
+      "target_depth": 3,
+      "extension_depth": 4,
+      "claim": "Bảo vệ đổi authorization code cho public client",
+      "criteria": [
+        {
+          "criterion_id": "xd08:c1",
+          "description": "Giải thích kênh backend của Authorization Code flow",
+          "expected_evidence": "Nêu việc đổi code qua backend giữ client_secret an toàn.",
+          "below_target": "Trả token qua URL.",
+          "at_target": "Giải thích đúng kênh server-to-server.",
+          "above_target": "Thiết kế PKCE cho public client không giữ được client_secret.",
+          "essential": true
+        }
+      ]
+    },
+    "turn": {
+      "turn_id": "xd08-first",
+      "objective_id": "xd08",
+      "skill_id": "oauth2_oidc",
+      "mode": "DESIGN",
+      "action": "INITIAL",
+      "question_depth": 3,
+      "question": {
+        "text": "Với ứng dụng web có backend, vì sao nên đổi `authorization_code` qua server thay vì nhận thẳng access token trên URL?",
+        "criterion_ids": [
+          "xd08:c1"
+        ],
+        "evidence_scope": "xd08-case"
+      },
+      "answer": "Vì trình duyệt dễ lộ URL qua lịch sử hay log, nên chỉ trả mã ngắn hạn về trình duyệt rồi server backend dùng `client_secret` đổi lấy token qua kênh riêng an toàn hơn.",
+      "judgment": null,
+      "introduction": ""
+    },
+    "judgment": {
+      "observations": [
+        {
+          "criterion_id": "xd08:c1",
+          "response_excerpt": "chỉ trả mã ngắn hạn về trình duyệt rồi server backend dùng `client_secret` đổi lấy token qua kênh riêng",
+          "response_line_range": null,
+          "observation": "SUPPORTS",
+          "performance": "AT_TARGET",
+          "rationale": "Giải thích đúng việc tránh lộ token trên URL và bảo mật qua client_secret ở backend.",
+          "resolves_contradiction": false,
+          "unresolved_aspects": []
+        }
+      ],
+      "feedback": "Bạn đã giải thích rõ lý do bảo mật ở kênh server-to-server.",
+      "explicit_inability": false,
+      "inability_excerpt": "",
+      "feedback_contains_hint": false
+    },
+    "action": "PROBE_DEEPER",
+    "next_question": {
+      "text": "Nếu chuyển sang ứng dụng di động thuần không thể giữ bí mật `client_secret`, bạn bảo vệ bước đổi `authorization_code` đó thế nào?",
+      "criterion_ids": [
+        "xd08:c1"
+      ],
+      "mode": "DESIGN",
+      "depth": 4,
+      "evidence_scope": "xd08-case-ext"
+    }
+  },
+  {
+    "sample_id": "xd09",
+    "split": "dev",
+    "interaction_mode": "TEXT",
+    "objective": {
+      "skill_id": "typescript",
+      "target_depth": 2,
+      "extension_depth": null,
+      "claim": "Thu hẹp kiểu runtime với union nguyên thủy",
+      "criteria": [
+        {
+          "criterion_id": "xd09:c1",
+          "description": "Kiểm tra kiểu runtime trước khi gọi phương thức chuỗi",
+          "expected_evidence": "Dùng typeof x === 'string' trước khi gọi .toUpperCase().",
+          "below_target": "Dùng ép kiểu bất chấp.",
+          "at_target": "Dùng kiểm tra typeof đúng chuẩn.",
+          "above_target": "Dùng type predicate cho object phức tạp.",
+          "essential": true
+        }
+      ]
+    },
+    "turn": {
+      "turn_id": "xd09-first",
+      "objective_id": "xd09",
+      "skill_id": "typescript",
+      "mode": "TECHNICAL_EXPLANATION",
+      "action": "INITIAL",
+      "question_depth": 2,
+      "question": {
+        "text": "Với tham số `input: string | number`, làm sao thu hẹp kiểu an toàn ở runtime trước khi gọi `.toUpperCase()`?",
+        "criterion_ids": [
+          "xd09:c1"
+        ],
+        "evidence_scope": "xd09-case"
+      },
+      "answer": "Em chưa nhớ rõ cách TypeScript kiểm tra kiểu lúc chạy vì bình thường em hay ép kiểu sang string.",
+      "judgment": null,
+      "introduction": ""
+    },
+    "judgment": {
+      "observations": [
+        {
+          "criterion_id": "xd09:c1",
+          "response_excerpt": "",
+          "response_line_range": null,
+          "observation": "NO_EVIDENCE",
+          "performance": "UNDETERMINED",
+          "rationale": "Chưa nêu được cơ chế kiểm tra kiểu ở runtime.",
+          "resolves_contradiction": false,
+          "unresolved_aspects": []
+        }
+      ],
+      "feedback": "Cảm ơn bạn đã chia sẻ.",
+      "explicit_inability": true,
+      "inability_excerpt": "Em chưa nhớ rõ cách TypeScript kiểm tra kiểu lúc chạy",
+      "feedback_contains_hint": false
+    },
+    "action": "ASK_EASIER",
+    "next_question": {
+      "text": "Trong JavaScript, biểu thức nào trả về `'string'` khi biến `x` là chuỗi văn bản và `'number'` khi `x` là số?",
+      "criterion_ids": [
+        "xd09:c1"
+      ],
+      "mode": "TECHNICAL_EXPLANATION",
+      "depth": 1,
+      "evidence_scope": "xd09-case-foundation"
+    }
+  },
+  {
+    "sample_id": "xd10",
+    "split": "test",
+    "interaction_mode": "TEXT",
+    "objective": {
+      "skill_id": "rabbitmq",
+      "target_depth": 3,
+      "extension_depth": null,
+      "claim": "Cấu hình prefetch tránh dồn ứ message",
+      "criteria": [
+        {
+          "criterion_id": "xd10:c1",
+          "description": "Chọn prefetch_count phù hợp và liên hệ tín hiệu ack",
+          "expected_evidence": "Đặt prefetch=1 và chỉ đẩy tiếp sau khi ack.",
+          "below_target": "Để prefetch không giới hạn.",
+          "at_target": "Nêu rõ giá trị prefetch và vai trò ack.",
+          "above_target": "Đánh đổi với độ trễ mạng.",
+          "essential": true
+        }
+      ]
+    },
+    "turn": {
+      "turn_id": "xd10-first",
+      "objective_id": "xd10",
+      "skill_id": "rabbitmq",
+      "mode": "DEBUGGING",
+      "action": "INITIAL",
+      "question_depth": 3,
+      "question": {
+        "text": "Worker 1 chậm nhưng RabbitMQ vẫn đẩy hết message mới về nó khiến worker 2 và 3 rảnh. Bạn chỉnh thông số nào?",
+        "criterion_ids": [
+          "xd10:c1"
+        ],
+        "evidence_scope": "xd10-case"
+      },
+      "answer": "Em chỉnh lại cấu hình prefetch trên channel của consumer.",
+      "judgment": null,
+      "introduction": ""
+    },
+    "judgment": {
+      "observations": [
+        {
+          "criterion_id": "xd10:c1",
+          "response_excerpt": "",
+          "response_line_range": null,
+          "observation": "UNCLEAR",
+          "performance": "UNDETERMINED",
+          "rationale": "Nêu đúng tên prefetch nhưng chưa nói rõ giá trị đặt và cơ chế broker chờ ack.",
+          "resolves_contradiction": false,
+          "unresolved_aspects": [
+            "Giá trị prefetch cụ thể",
+            "Tín hiệu broker chờ trước khi đẩy thêm"
+          ]
+        }
+      ],
+      "feedback": "",
+      "explicit_inability": false,
+      "inability_excerpt": "",
+      "feedback_contains_hint": false
+    },
+    "action": "CLARIFY",
+    "next_question": {
+      "text": "Bạn đặt giá trị `prefetch_count` bằng bao nhiêu và RabbitMQ chờ tín hiệu gì từ worker trước khi giao message tiếp theo?",
+      "criterion_ids": [
+        "xd10:c1"
+      ],
+      "mode": "DEBUGGING",
+      "depth": 3,
+      "evidence_scope": "xd10-case"
+    }
+  },
+  {
+    "sample_id": "xd11",
+    "split": "test",
+    "interaction_mode": "TEXT",
+    "objective": {
+      "skill_id": "data_pipeline",
+      "target_depth": 3,
+      "extension_depth": 4,
+      "claim": "Thiết kế xử lý data skew khi join",
+      "criteria": [
+        {
+          "criterion_id": "xd11:c1",
+          "description": "Nhận diện data skew khi join khóa phổ biến",
+          "expected_evidence": "Giải thích khóa trùng dồn về một partition.",
+          "below_target": "Cho rằng tăng partition tự hết skew.",
+          "at_target": "Xác định đúng việc một khóa dồn tải về một partition.",
+          "above_target": "Áp dụng salting khóa nóng kèm nhân bản vế dimension và đánh đổi shuffle.",
+          "essential": true
+        }
+      ]
+    },
+    "turn": {
+      "turn_id": "xd11-first",
+      "objective_id": "xd11",
+      "skill_id": "data_pipeline",
+      "mode": "DESIGN",
+      "action": "INITIAL",
+      "question_depth": 3,
+      "question": {
+        "text": "Job Spark join bảng giao dịch 1 tỷ dòng có 40% `user_id = null` bị kẹt 99%. Nguyên nhân do đâu?",
+        "criterion_ids": [
+          "xd11:c1"
+        ],
+        "evidence_scope": "xd11-case"
+      },
+      "answer": "Do tất cả bản ghi có `user_id = null` cùng băm vào đúng một partition, khiến một executor gánh 40% dữ liệu và bị nghẽn hoặc tràn bộ nhớ.",
+      "judgment": null,
+      "introduction": ""
+    },
+    "judgment": {
+      "observations": [
+        {
+          "criterion_id": "xd11:c1",
+          "response_excerpt": "tất cả bản ghi có `user_id = null` cùng băm vào đúng một partition, khiến một executor gánh 40% dữ liệu",
+          "response_line_range": null,
+          "observation": "SUPPORTS",
+          "performance": "AT_TARGET",
+          "rationale": "Chẩn đoán chính xác hiện tượng data skew trên khóa null dồn về một partition.",
+          "resolves_contradiction": false,
+          "unresolved_aspects": []
+        }
+      ],
+      "feedback": "Bạn đã chỉ đúng nguyên nhân nghẽn ở một partition.",
+      "explicit_inability": false,
+      "inability_excerpt": "",
+      "feedback_contains_hint": false
+    },
+    "action": "PROBE_DEEPER",
+    "next_question": {
+      "text": "Nếu 5 mã `merchant_id` hợp lệ chiếm 70% lưu lượng nên không thể lọc bỏ trước khi join, bạn xử lý lệch tải đó thế nào và đánh đổi chi phí gì?",
+      "criterion_ids": [
+        "xd11:c1"
+      ],
+      "mode": "DESIGN",
+      "depth": 4,
+      "evidence_scope": "xd11-case-ext"
+    }
+  },
+  {
+    "sample_id": "xd12",
+    "split": "test",
+    "interaction_mode": "VOICE",
+    "objective": {
+      "skill_id": "nextjs_ssr",
+      "target_depth": 2,
+      "extension_depth": null,
+      "claim": "Chẩn đoán lỗi Hydration mismatch",
+      "criteria": [
+        {
+          "criterion_id": "xd12:c1",
+          "description": "Giải thích lệch dữ liệu giữa SSR và client hydration",
+          "expected_evidence": "Chỉ ra giá trị thay đổi giữa lúc server render và lúc client hydrate.",
+          "below_target": "Cho rằng do lỗi cache file tĩnh.",
+          "at_target": "Giải thích sự lệch giá trị tính toán giữa server và trình duyệt lúc hydrate.",
+          "above_target": "Chuyển phần phụ thuộc thời gian sang sau khi mount.",
+          "essential": true
+        }
+      ]
+    },
+    "turn": {
+      "turn_id": "xd12-first",
+      "objective_id": "xd12",
+      "skill_id": "nextjs_ssr",
+      "mode": "DEBUGGING",
+      "action": "INITIAL",
+      "question_depth": 2,
+      "question": {
+        "text": "Component Next.js hiển thị thẳng `new Date().toLocaleTimeString()` bị lỗi Hydration failed. Vì sao?",
+        "criterion_ids": [
+          "xd12:c1"
+        ],
+        "evidence_scope": "xd12-case"
+      },
+      "answer": "Em nghĩ do trình duyệt giữ cache JS cũ nên giao diện không khớp với server.",
+      "judgment": null,
+      "introduction": ""
+    },
+    "judgment": {
+      "observations": [
+        {
+          "criterion_id": "xd12:c1",
+          "response_excerpt": "do trình duyệt giữ cache JS cũ",
+          "response_line_range": null,
+          "observation": "CONTRADICTS",
+          "performance": "BELOW",
+          "rationale": "Cho rằng nguyên nhân do cache file JS thay vì kết quả new Date() khác nhau giữa lúc SSR và hydrate.",
+          "resolves_contradiction": false,
+          "unresolved_aspects": []
+        }
+      ],
+      "feedback": "Lỗi này xảy ra ngay cả khi trình duyệt tải bản JS mới nhất.",
+      "explicit_inability": false,
+      "inability_excerpt": "",
+      "feedback_contains_hint": false
+    },
+    "action": "ASK_EASIER",
+    "next_question": {
+      "text": "Nếu server render `new Date().toLocaleTimeString()` lúc 10:00:01 và trình duyệt mở trang lúc 10:00:02, hai chuỗi thời gian tạo ra có giống hệt nhau không?",
+      "criterion_ids": [
+        "xd12:c1"
+      ],
+      "mode": "DEBUGGING",
+      "depth": 1,
+      "evidence_scope": "xd12-case-foundation"
+    }
+  }
+]

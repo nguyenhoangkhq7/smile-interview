@@ -1,0 +1,91 @@
+{
+  "model": "openrouter/qwen/qwen3.7-flash",
+  "review_model": "openrouter/qwen/qwen3.7-flash",
+  "cv": "Đã xử lý lỗi tạo đơn hàng trùng khi client gửi lại yêu cầu.",
+  "jd": "Giải thích cách API tạo đơn xử lý việc client gửi lại yêu cầu sau timeout.",
+  "criteria": [
+    {
+      "description": "Nhận diện hai lần gửi của cùng một yêu cầu tạo đơn.",
+      "expected_evidence": "Một định danh ổn định để đối chiếu lần gửi lại với yêu cầu đã lưu.",
+      "below_target": "Dựa trên dữ liệu có thể thay đổi giữa hai lần gửi.",
+      "at_target": "Giữ nguyên định danh khi thử lại và đối chiếu với bản ghi đã lưu.",
+      "above_target": "Giới hạn phạm vi định danh để phân biệt các nguồn gửi."
+    },
+    {
+      "description": "Xử lý lần gửi lại khi yêu cầu gốc đã hoàn tất.",
+      "expected_evidence": "Cách trả lại kết quả của lần xử lý gốc cho yêu cầu trùng.",
+      "below_target": "Tạo thêm một đơn cho yêu cầu đã hoàn tất.",
+      "at_target": "Trả lại kết quả đã lưu của lần xử lý gốc.",
+      "above_target": "Diễn giải được cách giữ nhất quán kết quả qua các lần gửi lại."
+    }
+  ],
+  "question_budget": 3,
+  "target_depth": 2,
+  "turns": [
+    {
+      "criterion": "c1",
+      "action": "INITIAL",
+      "question": "Client gửi yêu cầu tạo đơn hàng nhưng bị timeout nên có thể gửi lại. Bạn sẽ thiết kế trường nào trong request để API nhận diện đây là cùng một yêu cầu và tránh tạo đơn trùng?",
+      "answer": "Em kiểm tra trong database.",
+      "observations": [
+        {
+          "criterion_id": "498fa330-2452-5bfa-bc15-01c59ae50a69:c1",
+          "response_excerpt": "",
+          "response_line_range": null,
+          "observation": "UNCLEAR",
+          "performance": "UNDETERMINED",
+          "rationale": "Câu trả lời chung chung, không nêu rõ định danh ổn định (như idempotency key) để đối chiếu.",
+          "resolves_contradiction": false,
+          "unresolved_aspects": [
+            "Nêu rõ trường định danh ổn định trong request",
+            "Cơ chế đối chiếu với bản ghi đã lưu"
+          ]
+        }
+      ]
+    },
+    {
+      "criterion": "c1",
+      "action": "CLARIFY",
+      "question": "Bạn sẽ đặt trường định danh ổn định nào vào request để API nhận diện đây là cùng một yêu cầu?",
+      "answer": "Client giữ nguyên idempotency key khi gửi lại. Server tra khóa đó trong database.",
+      "observations": [
+        {
+          "criterion_id": "498fa330-2452-5bfa-bc15-01c59ae50a69:c1",
+          "response_excerpt": "Client giữ nguyên idempotency key khi gửi lại. Server tra khóa đó trong database.",
+          "response_line_range": null,
+          "observation": "SUPPORTS",
+          "performance": "AT_TARGET",
+          "rationale": "Ứng viên đã nêu đúng cách sử dụng idempotency key làm định danh ổn định để client giữ nguyên khi thử lại và server đối chiếu với bản ghi đã lưu trong database, đáp ứng đầy đủ tiêu chí at_target.",
+          "resolves_contradiction": false,
+          "unresolved_aspects": []
+        }
+      ]
+    },
+    {
+      "criterion": "c2",
+      "action": "FOLLOW_UP",
+      "question": "Khi client gửi lại yêu cầu tạo đơn hàng do bị timeout và API đã xác định đây là cùng một yêu cầu (qua idempotency key), bạn sẽ trả về phản hồi HTTP nào để thông báo cho client biết kết quả của lần xử lý trước đó?",
+      "answer": "Server trả lại mã đơn và phản hồi đã lưu ở lần xử lý gốc.",
+      "observations": [
+        {
+          "criterion_id": "498fa330-2452-5bfa-bc15-01c59ae50a69:c2",
+          "response_excerpt": "Server trả lại mã đơn và phản hồi đã lưu ở lần xử lý gốc.",
+          "response_line_range": null,
+          "observation": "SUPPORTS",
+          "performance": "AT_TARGET",
+          "rationale": "Ứng viên đã nêu đúng cách trả lại kết quả của lần xử lý gốc cho yêu cầu trùng, phù hợp với tiêu chí at_target. Không có bằng chứng về việc tạo đơn mới hoặc phân tích chi tiết về tính nhất quán để đạt above_target.",
+          "resolves_contradiction": false,
+          "unresolved_aspects": []
+        }
+      ]
+    }
+  ],
+  "criteria_assessments": {
+    "c1": "DEMONSTRATED_AT_TARGET",
+    "c2": "DEMONSTRATED_AT_TARGET"
+  },
+  "essential_criteria_asked": {
+    "count": 2,
+    "total": 2
+  }
+}

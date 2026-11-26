@@ -1,0 +1,3838 @@
+{
+  "run_id": "d5b448ec-8793-4f6f-9751-514301ebba66",
+  "status": "completed",
+  "cv": {
+    "filename": "02_Frontend_CV.pdf",
+    "document_type": "CV",
+    "text_sha256": "74b167911294c128043051cb32af239e05ce0dfc64da221897460d5e0427e30d",
+    "explicit": {
+      "filename": "02_Frontend_CV.pdf",
+      "document_type": "CV",
+      "text_sha256": "74b167911294c128043051cb32af239e05ce0dfc64da221897460d5e0427e30d",
+      "stats": {
+        "total_mentions": 49,
+        "unique_skills": 40,
+        "unresolved_evidences": 0,
+        "kind_conflicts": 0,
+        "non_verbatim_mentions": 0,
+        "header_evidences": 0,
+        "unresolved_mentions": 0,
+        "ambiguous_mentions": 1,
+        "unknown_category_mentions": 5,
+        "invalid_kind_mentions": 0,
+        "quarantined_mentions": 0
+      },
+      "skills": [
+        {
+          "skill_id": "responsive-accessible-web-applications",
+          "surface_forms": [
+            "responsive, accessible web applications"
+          ],
+          "category": "Engineering Practice",
+          "category_raw": "Engineering Practice",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "summary"
+          ],
+          "evidences": [
+            {
+              "surface_form": "responsive, accessible web applications",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Frontend engineer with 3 years building responsive, accessible web applications with React and TypeScript.",
+              "start": 130,
+              "end": 236,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "summary",
+              "category": "Engineering Practice",
+              "category_raw": "Engineering Practice",
+              "mention_start": 170,
+              "mention_end": 209,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "react",
+          "surface_forms": [
+            "React"
+          ],
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "summary",
+            "skills",
+            "experience",
+            "projects"
+          ],
+          "evidences": [
+            {
+              "surface_form": "React",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Frontend engineer with 3 years building responsive, accessible web applications with React and TypeScript.",
+              "start": 130,
+              "end": 236,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "summary",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 215,
+              "mention_end": 220,
+              "mention_ambiguous": false
+            },
+            {
+              "surface_form": "React",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Frameworks/libraries: React, Next.js (App Router), Redux Toolkit, React Query, Tailwind CSS",
+              "start": 461,
+              "end": 552,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "skills",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 483,
+              "mention_end": 488,
+              "mention_ambiguous": true
+            },
+            {
+              "surface_form": "React",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Implemented responsive marketing sites and admin dashboards in React for 6+ client projects.",
+              "start": 1290,
+              "end": 1382,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "experience",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 1353,
+              "mention_end": 1358,
+              "mention_ambiguous": false
+            },
+            {
+              "surface_form": "React",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Personal habit-tracker PWA (React, TypeScript, IndexedDB) — 300+ GitHub stars",
+              "start": 1608,
+              "end": 1685,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "projects",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 1636,
+              "mention_end": 1641,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "typescript",
+          "surface_forms": [
+            "TypeScript"
+          ],
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "summary",
+            "skills",
+            "experience",
+            "projects"
+          ],
+          "evidences": [
+            {
+              "surface_form": "TypeScript",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Frontend engineer with 3 years building responsive, accessible web applications with React and TypeScript.",
+              "start": 130,
+              "end": 236,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "summary",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 225,
+              "mention_end": 235,
+              "mention_ambiguous": false
+            },
+            {
+              "surface_form": "TypeScript",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Languages: TypeScript, JavaScript (ES6+), HTML5, CSS3",
+              "start": 405,
+              "end": 458,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "skills",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 416,
+              "mention_end": 426,
+              "mention_ambiguous": false
+            },
+            {
+              "surface_form": "TypeScript",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Rebuilt the customer-facing storefront in Next.js + TypeScript, improving Lighthouse performance score from 61 to 92.",
+              "start": 836,
+              "end": 953,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "experience",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 888,
+              "mention_end": 898,
+              "mention_ambiguous": false
+            },
+            {
+              "surface_form": "TypeScript",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Personal habit-tracker PWA (React, TypeScript, IndexedDB) — 300+ GitHub stars",
+              "start": 1608,
+              "end": 1685,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "projects",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 1643,
+              "mention_end": 1653,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "component-architecture",
+          "surface_forms": [
+            "component architecture"
+          ],
+          "category": "Technical Concept",
+          "category_raw": "Technical Concept",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "summary"
+          ],
+          "evidences": [
+            {
+              "surface_form": "component architecture",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Focused on component architecture, performance, and design-system consistency.",
+              "start": 237,
+              "end": 315,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "summary",
+              "category": "Technical Concept",
+              "category_raw": "Technical Concept",
+              "mention_start": 248,
+              "mention_end": 270,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "performance",
+          "surface_forms": [
+            "performance"
+          ],
+          "category": "Engineering Practice",
+          "category_raw": "Engineering Practice",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "summary"
+          ],
+          "evidences": [
+            {
+              "surface_form": "performance",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Focused on component architecture, performance, and design-system consistency.",
+              "start": 237,
+              "end": 315,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "summary",
+              "category": "Engineering Practice",
+              "category_raw": "Engineering Practice",
+              "mention_start": 272,
+              "mention_end": 283,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "design-system-consistency",
+          "surface_forms": [
+            "design-system consistency"
+          ],
+          "category": "Engineering Practice",
+          "category_raw": "Engineering Practice",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "summary"
+          ],
+          "evidences": [
+            {
+              "surface_form": "design-system consistency",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Focused on component architecture, performance, and design-system consistency.",
+              "start": 237,
+              "end": 315,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "summary",
+              "category": "Engineering Practice",
+              "category_raw": "Engineering Practice",
+              "mention_start": 289,
+              "mention_end": 314,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "figma",
+          "surface_forms": [
+            "Figma"
+          ],
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "summary",
+            "skills"
+          ],
+          "evidences": [
+            {
+              "surface_form": "Figma",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Experienced working directly with designers in Figma to ship pixel-accurate UI.",
+              "start": 316,
+              "end": 395,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "summary",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 363,
+              "mention_end": 368,
+              "mention_ambiguous": false
+            },
+            {
+              "surface_form": "Figma",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Tooling: Vite, Webpack, ESLint/Prettier, Storybook, Figma",
+              "start": 555,
+              "end": 612,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "skills",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 607,
+              "mention_end": 612,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "pixel-accurate-ui",
+          "surface_forms": [
+            "pixel-accurate UI"
+          ],
+          "category": "Engineering Practice",
+          "category_raw": "Engineering Practice",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "summary"
+          ],
+          "evidences": [
+            {
+              "surface_form": "pixel-accurate UI",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Experienced working directly with designers in Figma to ship pixel-accurate UI.",
+              "start": 316,
+              "end": 395,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "summary",
+              "category": "Engineering Practice",
+              "category_raw": "Engineering Practice",
+              "mention_start": 377,
+              "mention_end": 394,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "javascript-es6",
+          "surface_forms": [
+            "JavaScript (ES6+)"
+          ],
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "skills"
+          ],
+          "evidences": [
+            {
+              "surface_form": "JavaScript (ES6+)",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Languages: TypeScript, JavaScript (ES6+), HTML5, CSS3",
+              "start": 405,
+              "end": 458,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "skills",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 428,
+              "mention_end": 445,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "html5",
+          "surface_forms": [
+            "HTML5"
+          ],
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "skills"
+          ],
+          "evidences": [
+            {
+              "surface_form": "HTML5",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Languages: TypeScript, JavaScript (ES6+), HTML5, CSS3",
+              "start": 405,
+              "end": 458,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "skills",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 447,
+              "mention_end": 452,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "css3",
+          "surface_forms": [
+            "CSS3"
+          ],
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "skills"
+          ],
+          "evidences": [
+            {
+              "surface_form": "CSS3",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Languages: TypeScript, JavaScript (ES6+), HTML5, CSS3",
+              "start": 405,
+              "end": 458,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "skills",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 454,
+              "mention_end": 458,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "next.js-app-router",
+          "surface_forms": [
+            "Next.js (App Router)"
+          ],
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "skills"
+          ],
+          "evidences": [
+            {
+              "surface_form": "Next.js (App Router)",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Frameworks/libraries: React, Next.js (App Router), Redux Toolkit, React Query, Tailwind CSS",
+              "start": 461,
+              "end": 552,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "skills",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 490,
+              "mention_end": 510,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "redux-toolkit",
+          "surface_forms": [
+            "Redux Toolkit"
+          ],
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "skills"
+          ],
+          "evidences": [
+            {
+              "surface_form": "Redux Toolkit",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Frameworks/libraries: React, Next.js (App Router), Redux Toolkit, React Query, Tailwind CSS",
+              "start": 461,
+              "end": 552,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "skills",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 512,
+              "mention_end": 525,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "react-query",
+          "surface_forms": [
+            "React Query"
+          ],
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "skills",
+            "experience"
+          ],
+          "evidences": [
+            {
+              "surface_form": "React Query",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Frameworks/libraries: React, Next.js (App Router), Redux Toolkit, React Query, Tailwind CSS",
+              "start": 461,
+              "end": 552,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "skills",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 527,
+              "mention_end": 538,
+              "mention_ambiguous": false
+            },
+            {
+              "surface_form": "React Query",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Introduced React Query for server-state management, eliminating a class of stale-cache bugs in the cart flow.",
+              "start": 1076,
+              "end": 1185,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "experience",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 1087,
+              "mention_end": 1098,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "tailwind-css",
+          "surface_forms": [
+            "Tailwind CSS"
+          ],
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "skills"
+          ],
+          "evidences": [
+            {
+              "surface_form": "Tailwind CSS",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Frameworks/libraries: React, Next.js (App Router), Redux Toolkit, React Query, Tailwind CSS",
+              "start": 461,
+              "end": 552,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "skills",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 540,
+              "mention_end": 552,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "vite",
+          "surface_forms": [
+            "Vite"
+          ],
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "skills"
+          ],
+          "evidences": [
+            {
+              "surface_form": "Vite",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Tooling: Vite, Webpack, ESLint/Prettier, Storybook, Figma",
+              "start": 555,
+              "end": 612,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "skills",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 564,
+              "mention_end": 568,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "webpack",
+          "surface_forms": [
+            "Webpack"
+          ],
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "skills"
+          ],
+          "evidences": [
+            {
+              "surface_form": "Webpack",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Tooling: Vite, Webpack, ESLint/Prettier, Storybook, Figma",
+              "start": 555,
+              "end": 612,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "skills",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 570,
+              "mention_end": 577,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "eslint-prettier",
+          "surface_forms": [
+            "ESLint/Prettier"
+          ],
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "skills"
+          ],
+          "evidences": [
+            {
+              "surface_form": "ESLint/Prettier",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Tooling: Vite, Webpack, ESLint/Prettier, Storybook, Figma",
+              "start": 555,
+              "end": 612,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "skills",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 579,
+              "mention_end": 594,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "storybook",
+          "surface_forms": [
+            "Storybook"
+          ],
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "skills",
+            "experience"
+          ],
+          "evidences": [
+            {
+              "surface_form": "Storybook",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Tooling: Vite, Webpack, ESLint/Prettier, Storybook, Figma",
+              "start": 555,
+              "end": 612,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "skills",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 596,
+              "mention_end": 605,
+              "mention_ambiguous": false
+            },
+            {
+              "surface_form": "Storybook",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Built a shared component library in Storybook adopted by three product squads, cutting new-screen build time by ~30%.",
+              "start": 956,
+              "end": 1073,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "experience",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 992,
+              "mention_end": 1001,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "jest",
+          "surface_forms": [
+            "Jest"
+          ],
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "skills"
+          ],
+          "evidences": [
+            {
+              "surface_form": "Jest",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Testing: Jest, React Testing Library, Playwright",
+              "start": 615,
+              "end": 663,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "skills",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 624,
+              "mention_end": 628,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "react-testing-library",
+          "surface_forms": [
+            "React Testing Library"
+          ],
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "skills"
+          ],
+          "evidences": [
+            {
+              "surface_form": "React Testing Library",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Testing: Jest, React Testing Library, Playwright",
+              "start": 615,
+              "end": 663,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "skills",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 630,
+              "mention_end": 651,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "playwright",
+          "surface_forms": [
+            "Playwright"
+          ],
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "skills"
+          ],
+          "evidences": [
+            {
+              "surface_form": "Playwright",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Testing: Jest, React Testing Library, Playwright",
+              "start": 615,
+              "end": 663,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "skills",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 653,
+              "mention_end": 663,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "rest-graphql-api-integration",
+          "surface_forms": [
+            "REST/GraphQL API integration"
+          ],
+          "category": "Technical Concept",
+          "category_raw": "Technical Concept",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "skills"
+          ],
+          "evidences": [
+            {
+              "surface_form": "REST/GraphQL API integration",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Other: REST/GraphQL API integration, basic Node.js for BFF endpoints, Git",
+              "start": 666,
+              "end": 739,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "skills",
+              "category": "Technical Concept",
+              "category_raw": "Technical Concept",
+              "mention_start": 673,
+              "mention_end": 701,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "basic-node.js-for-bff-endpoints",
+          "surface_forms": [
+            "basic Node.js for BFF endpoints"
+          ],
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "skills"
+          ],
+          "evidences": [
+            {
+              "surface_form": "basic Node.js for BFF endpoints",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Other: REST/GraphQL API integration, basic Node.js for BFF endpoints, Git",
+              "start": 666,
+              "end": 739,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "skills",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 703,
+              "mention_end": 734,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "git",
+          "surface_forms": [
+            "Git"
+          ],
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "skills"
+          ],
+          "evidences": [
+            {
+              "surface_form": "Git",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Other: REST/GraphQL API integration, basic Node.js for BFF endpoints, Git",
+              "start": 666,
+              "end": 739,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "skills",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 736,
+              "mention_end": 739,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "storefront",
+          "surface_forms": [
+            "storefront"
+          ],
+          "category": null,
+          "category_raw": "Context",
+          "kind": "context",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "experience"
+          ],
+          "evidences": [
+            {
+              "surface_form": "storefront",
+              "kind": "context",
+              "kind_raw": "context",
+              "kind_source": "llm",
+              "sentence": "Rebuilt the customer-facing storefront in Next.js + TypeScript, improving Lighthouse performance score from 61 to 92.",
+              "start": 836,
+              "end": 953,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "experience",
+              "category": null,
+              "category_raw": "Context",
+              "mention_start": 864,
+              "mention_end": 874,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "next.js",
+          "surface_forms": [
+            "Next.js"
+          ],
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "experience"
+          ],
+          "evidences": [
+            {
+              "surface_form": "Next.js",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Rebuilt the customer-facing storefront in Next.js + TypeScript, improving Lighthouse performance score from 61 to 92.",
+              "start": 836,
+              "end": 953,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "experience",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 878,
+              "mention_end": 885,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "lighthouse-performance-score",
+          "surface_forms": [
+            "Lighthouse performance score"
+          ],
+          "category": "Engineering Practice",
+          "category_raw": "Engineering Practice",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "experience"
+          ],
+          "evidences": [
+            {
+              "surface_form": "Lighthouse performance score",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Rebuilt the customer-facing storefront in Next.js + TypeScript, improving Lighthouse performance score from 61 to 92.",
+              "start": 836,
+              "end": 953,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "experience",
+              "category": "Engineering Practice",
+              "category_raw": "Engineering Practice",
+              "mention_start": 910,
+              "mention_end": 938,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "shared-component-library",
+          "surface_forms": [
+            "shared component library"
+          ],
+          "category": null,
+          "category_raw": "Context",
+          "kind": "context",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "experience"
+          ],
+          "evidences": [
+            {
+              "surface_form": "shared component library",
+              "kind": "context",
+              "kind_raw": "context",
+              "kind_source": "llm",
+              "sentence": "Built a shared component library in Storybook adopted by three product squads, cutting new-screen build time by ~30%.",
+              "start": 956,
+              "end": 1073,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "experience",
+              "category": null,
+              "category_raw": "Context",
+              "mention_start": 964,
+              "mention_end": 988,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "new-screen-build-time",
+          "surface_forms": [
+            "new-screen build time"
+          ],
+          "category": "Engineering Practice",
+          "category_raw": "Engineering Practice",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "experience"
+          ],
+          "evidences": [
+            {
+              "surface_form": "new-screen build time",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Built a shared component library in Storybook adopted by three product squads, cutting new-screen build time by ~30%.",
+              "start": 956,
+              "end": 1073,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "experience",
+              "category": "Engineering Practice",
+              "category_raw": "Engineering Practice",
+              "mention_start": 1043,
+              "mention_end": 1064,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "server-state-management",
+          "surface_forms": [
+            "server-state management"
+          ],
+          "category": "Technical Concept",
+          "category_raw": "Technical Concept",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "experience"
+          ],
+          "evidences": [
+            {
+              "surface_form": "server-state management",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Introduced React Query for server-state management, eliminating a class of stale-cache bugs in the cart flow.",
+              "start": 1076,
+              "end": 1185,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "experience",
+              "category": "Technical Concept",
+              "category_raw": "Technical Concept",
+              "mention_start": 1103,
+              "mention_end": 1126,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "stale-cache-bugs",
+          "surface_forms": [
+            "stale-cache bugs"
+          ],
+          "category": "Engineering Practice",
+          "category_raw": "Engineering Practice",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "experience"
+          ],
+          "evidences": [
+            {
+              "surface_form": "stale-cache bugs",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Introduced React Query for server-state management, eliminating a class of stale-cache bugs in the cart flow.",
+              "start": 1076,
+              "end": 1185,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "experience",
+              "category": "Engineering Practice",
+              "category_raw": "Engineering Practice",
+              "mention_start": 1151,
+              "mention_end": 1167,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "cart-flow",
+          "surface_forms": [
+            "cart flow"
+          ],
+          "category": null,
+          "category_raw": "Context",
+          "kind": "context",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "experience"
+          ],
+          "evidences": [
+            {
+              "surface_form": "cart flow",
+              "kind": "context",
+              "kind_raw": "context",
+              "kind_source": "llm",
+              "sentence": "Introduced React Query for server-state management, eliminating a class of stale-cache bugs in the cart flow.",
+              "start": 1076,
+              "end": 1185,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "experience",
+              "category": null,
+              "category_raw": "Context",
+              "mention_start": 1175,
+              "mention_end": 1184,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "responsive-marketing-sites",
+          "surface_forms": [
+            "responsive marketing sites"
+          ],
+          "category": "Engineering Practice",
+          "category_raw": "Engineering Practice",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "experience"
+          ],
+          "evidences": [
+            {
+              "surface_form": "responsive marketing sites",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Implemented responsive marketing sites and admin dashboards in React for 6+ client projects.",
+              "start": 1290,
+              "end": 1382,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "experience",
+              "category": "Engineering Practice",
+              "category_raw": "Engineering Practice",
+              "mention_start": 1302,
+              "mention_end": 1328,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "admin-dashboards",
+          "surface_forms": [
+            "admin dashboards"
+          ],
+          "category": null,
+          "category_raw": "Context",
+          "kind": "context",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "experience"
+          ],
+          "evidences": [
+            {
+              "surface_form": "admin dashboards",
+              "kind": "context",
+              "kind_raw": "context",
+              "kind_source": "llm",
+              "sentence": "Implemented responsive marketing sites and admin dashboards in React for 6+ client projects.",
+              "start": 1290,
+              "end": 1382,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "experience",
+              "category": null,
+              "category_raw": "Context",
+              "mention_start": 1333,
+              "mention_end": 1349,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "figma-files",
+          "surface_forms": [
+            "Figma files"
+          ],
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "experience"
+          ],
+          "evidences": [
+            {
+              "surface_form": "Figma files",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Collaborated with designers to translate Figma files into reusable, accessible components (WCAG AA).",
+              "start": 1385,
+              "end": 1485,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "experience",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 1426,
+              "mention_end": 1437,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "reusable-accessible-components",
+          "surface_forms": [
+            "reusable, accessible components"
+          ],
+          "category": "Engineering Practice",
+          "category_raw": "Engineering Practice",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "experience"
+          ],
+          "evidences": [
+            {
+              "surface_form": "reusable, accessible components",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Collaborated with designers to translate Figma files into reusable, accessible components (WCAG AA).",
+              "start": 1385,
+              "end": 1485,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "experience",
+              "category": "Engineering Practice",
+              "category_raw": "Engineering Practice",
+              "mention_start": 1443,
+              "mention_end": 1474,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "wcag-aa",
+          "surface_forms": [
+            "WCAG AA"
+          ],
+          "category": "Technical Standard",
+          "category_raw": "Technical Standard",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "experience"
+          ],
+          "evidences": [
+            {
+              "surface_form": "WCAG AA",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Collaborated with designers to translate Figma files into reusable, accessible components (WCAG AA).",
+              "start": 1385,
+              "end": 1485,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "experience",
+              "category": "Technical Standard",
+              "category_raw": "Technical Standard",
+              "mention_start": 1476,
+              "mention_end": 1483,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "personal-habit-tracker-pwa",
+          "surface_forms": [
+            "Personal habit-tracker PWA"
+          ],
+          "category": null,
+          "category_raw": "Context",
+          "kind": "context",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "projects"
+          ],
+          "evidences": [
+            {
+              "surface_form": "Personal habit-tracker PWA",
+              "kind": "context",
+              "kind_raw": "context",
+              "kind_source": "llm",
+              "sentence": "Personal habit-tracker PWA (React, TypeScript, IndexedDB) — 300+ GitHub stars",
+              "start": 1608,
+              "end": 1685,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "projects",
+              "category": null,
+              "category_raw": "Context",
+              "mention_start": 1608,
+              "mention_end": 1634,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "indexeddb",
+          "surface_forms": [
+            "IndexedDB"
+          ],
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "projects"
+          ],
+          "evidences": [
+            {
+              "surface_form": "IndexedDB",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Personal habit-tracker PWA (React, TypeScript, IndexedDB) — 300+ GitHub stars",
+              "start": 1608,
+              "end": 1685,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "projects",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 1655,
+              "mention_end": 1664,
+              "mention_ambiguous": false
+            }
+          ]
+        }
+      ],
+      "quarantined": [],
+      "extraction_meta": {
+        "prompt_sha256": "0b3a3b5112b086d35b28274cb7470455e27a022d1d53ce3703ee6b7ade4e4fce",
+        "prompt_variant": "default",
+        "model_configured": "qwen/qwen3.7-flash",
+        "temperature": 0,
+        "schema_version": "1.0.0",
+        "extracted_at": "2026-10-29T09:14:38.352133+00:00"
+      }
+    },
+    "implicit": {
+      "filename": "02_Frontend_CV.pdf",
+      "document_type": "CV",
+      "text_sha256": "74b167911294c128043051cb32af239e05ce0dfc64da221897460d5e0427e30d",
+      "stats": {
+        "total_inferences": 7,
+        "unique_skills": 7,
+        "unknown_category_count": 0,
+        "invalid_basis": 0,
+        "quarantined_mentions": 0,
+        "non_verbatim_evidences": 0,
+        "multi_fragment_evidences": 0,
+        "multi_section_evidences": 0,
+        "ellipsis_snippets": 0,
+        "basis_invalid_for_cv": 0
+      },
+      "skills": [
+        {
+          "skill_id": "performance-optimization",
+          "label": "Performance Optimization",
+          "category": "Engineering Practice",
+          "category_raw": "Engineering Practice",
+          "basis": null,
+          "basis_raw": null,
+          "basis_invalid_for_cv": false,
+          "type": "implicit",
+          "confidence": null,
+          "evidences": [
+            {
+              "inferred_from_raw": "Rebuilt the customer-facing storefront in Next.js + TypeScript, improving Lighthouse performance score from 61 to 92.",
+              "snippets": [
+                {
+                  "text": "Rebuilt the customer-facing storefront in Next.js + TypeScript, improving Lighthouse performance score from 61 to 92.",
+                  "start": 836,
+                  "end": 953,
+                  "section": "experience",
+                  "verbatim_ok": true,
+                  "ellipsis_in_snippet": false
+                }
+              ],
+              "reasoning": "Significantly increasing Lighthouse scores (from 61 to 92) requires deep knowledge of Core Web Vitals, code splitting, lazy loading, image optimization, and render blocking resource management — practices not explicitly listed but demonstrated by the outcome.",
+              "basis": null,
+              "basis_raw": null,
+              "basis_invalid_for_cv": false,
+              "llm_confidence_raw": 0.95
+            }
+          ]
+        },
+        {
+          "skill_id": "component-library-architecture",
+          "label": "Component Library Architecture",
+          "category": "Technical Concept",
+          "category_raw": "Technical Concept",
+          "basis": null,
+          "basis_raw": null,
+          "basis_invalid_for_cv": false,
+          "type": "implicit",
+          "confidence": null,
+          "evidences": [
+            {
+              "inferred_from_raw": "Built a shared component library in Storybook adopted by three product squads, cutting new-screen build time by ~30%.",
+              "snippets": [
+                {
+                  "text": "Built a shared component library in Storybook adopted by three product squads, cutting new-screen build time by ~30%.",
+                  "start": 956,
+                  "end": 1073,
+                  "section": "experience",
+                  "verbatim_ok": true,
+                  "ellipsis_in_snippet": false
+                }
+              ],
+              "reasoning": "Creating a reusable library adopted by multiple teams implies skills in design token management, API consistency for components, versioning strategies, and documentation standards beyond simple component creation.",
+              "basis": null,
+              "basis_raw": null,
+              "basis_invalid_for_cv": false,
+              "llm_confidence_raw": 0.88
+            }
+          ]
+        },
+        {
+          "skill_id": "state-management-strategy",
+          "label": "State Management Strategy",
+          "category": "Technical Concept",
+          "category_raw": "Technical Concept",
+          "basis": null,
+          "basis_raw": null,
+          "basis_invalid_for_cv": false,
+          "type": "implicit",
+          "confidence": null,
+          "evidences": [
+            {
+              "inferred_from_raw": "Introduced React Query for server-state management, eliminating a class of stale-cache bugs in the cart flow.",
+              "snippets": [
+                {
+                  "text": "Introduced React Query for server-state management, eliminating a class of stale-cache bugs in the cart flow.",
+                  "start": 1076,
+                  "end": 1185,
+                  "section": "experience",
+                  "verbatim_ok": true,
+                  "ellipsis_in_snippet": false
+                }
+              ],
+              "reasoning": "Identifying 'stale-cache bugs' and implementing a solution via React Query implies an understanding of cache invalidation strategies, optimistic updates, and the distinction between client-side vs. server-state management patterns.",
+              "basis": null,
+              "basis_raw": null,
+              "basis_invalid_for_cv": false,
+              "llm_confidence_raw": 0.9
+            }
+          ]
+        },
+        {
+          "skill_id": "cross-functional-collaboration",
+          "label": "Cross-Functional Collaboration",
+          "category": "Soft Skill",
+          "category_raw": "Soft Skill",
+          "basis": null,
+          "basis_raw": null,
+          "basis_invalid_for_cv": false,
+          "type": "implicit",
+          "confidence": null,
+          "evidences": [
+            {
+              "inferred_from_raw": "Experienced working directly with designers in Figma to ship pixel-accurate UI.",
+              "snippets": [
+                {
+                  "text": "Experienced working directly with designers in Figma to ship pixel-accurate UI.",
+                  "start": 316,
+                  "end": 395,
+                  "section": "summary",
+                  "verbatim_ok": true,
+                  "ellipsis_in_snippet": false
+                }
+              ],
+              "reasoning": "Working 'directly with designers' to achieve 'pixel-accurate' results implies strong communication skills, ability to interpret design intent, and bridging the gap between design specifications and technical implementation.",
+              "basis": null,
+              "basis_raw": null,
+              "basis_invalid_for_cv": false,
+              "llm_confidence_raw": 0.85
+            }
+          ]
+        },
+        {
+          "skill_id": "accessibility-engineering",
+          "label": "Accessibility Engineering",
+          "category": "Engineering Practice",
+          "category_raw": "Engineering Practice",
+          "basis": null,
+          "basis_raw": null,
+          "basis_invalid_for_cv": false,
+          "type": "implicit",
+          "confidence": null,
+          "evidences": [
+            {
+              "inferred_from_raw": "Collaborated with designers to translate Figma files into reusable, accessible components (WCAG AA).",
+              "snippets": [
+                {
+                  "text": "Collaborated with designers to translate Figma files into reusable, accessible components (WCAG AA).",
+                  "start": 1385,
+                  "end": 1485,
+                  "section": "experience",
+                  "verbatim_ok": true,
+                  "ellipsis_in_snippet": false
+                }
+              ],
+              "reasoning": "Ensuring WCAG AA compliance involves more than just adding ARIA labels; it requires semantic HTML structure, keyboard navigation testing, color contrast analysis, and screen reader compatibility testing — specialized engineering practices.",
+              "basis": null,
+              "basis_raw": null,
+              "basis_invalid_for_cv": false,
+              "llm_confidence_raw": 0.92
+            }
+          ]
+        },
+        {
+          "skill_id": "progressive-web-app-pwa-development",
+          "label": "Progressive Web App (PWA) Development",
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "basis": null,
+          "basis_raw": null,
+          "basis_invalid_for_cv": false,
+          "type": "implicit",
+          "confidence": null,
+          "evidences": [
+            {
+              "inferred_from_raw": "Personal habit-tracker PWA (React, TypeScript, IndexedDB) — 300+ GitHub stars",
+              "snippets": [
+                {
+                  "text": "Personal habit-tracker PWA (React, TypeScript, IndexedDB) — 300+ GitHub stars",
+                  "start": 1608,
+                  "end": 1685,
+                  "section": "projects",
+                  "verbatim_ok": true,
+                  "ellipsis_in_snippet": false
+                }
+              ],
+              "reasoning": "Building a PWA requires implementing service workers, manifest files, offline-first strategies, and background sync capabilities, which are distinct from standard web application development.",
+              "basis": null,
+              "basis_raw": null,
+              "basis_invalid_for_cv": false,
+              "llm_confidence_raw": 0.8
+            }
+          ]
+        },
+        {
+          "skill_id": "local-storage-implementation",
+          "label": "Local Storage Implementation",
+          "category": "Technical Concept",
+          "category_raw": "Technical Concept",
+          "basis": null,
+          "basis_raw": null,
+          "basis_invalid_for_cv": false,
+          "type": "implicit",
+          "confidence": null,
+          "evidences": [
+            {
+              "inferred_from_raw": "Personal habit-tracker PWA (React, TypeScript, IndexedDB)",
+              "snippets": [
+                {
+                  "text": "Personal habit-tracker PWA (React, TypeScript, IndexedDB)",
+                  "start": 1608,
+                  "end": 1665,
+                  "section": "projects",
+                  "verbatim_ok": true,
+                  "ellipsis_in_snippet": false
+                }
+              ],
+              "reasoning": "Using IndexedDB specifically implies handling structured data storage on the client side, managing asynchronous database transactions, and dealing with quota limits, which is more complex than using localStorage or cookies.",
+              "basis": null,
+              "basis_raw": null,
+              "basis_invalid_for_cv": false,
+              "llm_confidence_raw": 0.85
+            }
+          ]
+        }
+      ],
+      "quarantined": [],
+      "extraction_meta": {
+        "prompt_sha256": "1761372bbd812868b09c329782b3892586a66d9440920fd8fd4088f7b4ce66e4",
+        "prompt_variant": "default",
+        "model_configured": "qwen/qwen3.7-flash",
+        "temperature": 0,
+        "schema_version": "1.0.0",
+        "extracted_at": "2026-10-29T09:14:47.043963+00:00",
+        "confidence_calibrated": false,
+        "explicit_source": "extraction_result"
+      }
+    },
+    "validation": {
+      "status": "completed",
+      "validation_origin": "original",
+      "duplicate_implicit_skills": [],
+      "accepted_implicit_skills": [
+        {
+          "skill_id": "performance-optimization",
+          "label": "Performance Optimization",
+          "category": "Engineering Practice",
+          "category_raw": "Engineering Practice",
+          "basis": null,
+          "basis_raw": null,
+          "basis_invalid_for_cv": false,
+          "type": "implicit",
+          "confidence": null,
+          "evidences": [
+            {
+              "inferred_from_raw": "Rebuilt the customer-facing storefront in Next.js + TypeScript, improving Lighthouse performance score from 61 to 92.",
+              "snippets": [
+                {
+                  "text": "Rebuilt the customer-facing storefront in Next.js + TypeScript, improving Lighthouse performance score from 61 to 92.",
+                  "start": 836,
+                  "end": 953,
+                  "section": "experience",
+                  "verbatim_ok": true,
+                  "ellipsis_in_snippet": false
+                }
+              ],
+              "reasoning": "Significantly increasing Lighthouse scores (from 61 to 92) requires deep knowledge of Core Web Vitals, code splitting, lazy loading, image optimization, and render blocking resource management — practices not explicitly listed but demonstrated by the outcome.",
+              "basis": null,
+              "basis_raw": null,
+              "basis_invalid_for_cv": false,
+              "llm_confidence_raw": 0.95
+            }
+          ]
+        },
+        {
+          "skill_id": "component-library-architecture",
+          "label": "Component Library Architecture",
+          "category": "Technical Concept",
+          "category_raw": "Technical Concept",
+          "basis": null,
+          "basis_raw": null,
+          "basis_invalid_for_cv": false,
+          "type": "implicit",
+          "confidence": null,
+          "evidences": [
+            {
+              "inferred_from_raw": "Built a shared component library in Storybook adopted by three product squads, cutting new-screen build time by ~30%.",
+              "snippets": [
+                {
+                  "text": "Built a shared component library in Storybook adopted by three product squads, cutting new-screen build time by ~30%.",
+                  "start": 956,
+                  "end": 1073,
+                  "section": "experience",
+                  "verbatim_ok": true,
+                  "ellipsis_in_snippet": false
+                }
+              ],
+              "reasoning": "Creating a reusable library adopted by multiple teams implies skills in design token management, API consistency for components, versioning strategies, and documentation standards beyond simple component creation.",
+              "basis": null,
+              "basis_raw": null,
+              "basis_invalid_for_cv": false,
+              "llm_confidence_raw": 0.88
+            }
+          ]
+        },
+        {
+          "skill_id": "state-management-strategy",
+          "label": "State Management Strategy",
+          "category": "Technical Concept",
+          "category_raw": "Technical Concept",
+          "basis": null,
+          "basis_raw": null,
+          "basis_invalid_for_cv": false,
+          "type": "implicit",
+          "confidence": null,
+          "evidences": [
+            {
+              "inferred_from_raw": "Introduced React Query for server-state management, eliminating a class of stale-cache bugs in the cart flow.",
+              "snippets": [
+                {
+                  "text": "Introduced React Query for server-state management, eliminating a class of stale-cache bugs in the cart flow.",
+                  "start": 1076,
+                  "end": 1185,
+                  "section": "experience",
+                  "verbatim_ok": true,
+                  "ellipsis_in_snippet": false
+                }
+              ],
+              "reasoning": "Identifying 'stale-cache bugs' and implementing a solution via React Query implies an understanding of cache invalidation strategies, optimistic updates, and the distinction between client-side vs. server-state management patterns.",
+              "basis": null,
+              "basis_raw": null,
+              "basis_invalid_for_cv": false,
+              "llm_confidence_raw": 0.9
+            }
+          ]
+        },
+        {
+          "skill_id": "cross-functional-collaboration",
+          "label": "Cross-Functional Collaboration",
+          "category": "Soft Skill",
+          "category_raw": "Soft Skill",
+          "basis": null,
+          "basis_raw": null,
+          "basis_invalid_for_cv": false,
+          "type": "implicit",
+          "confidence": null,
+          "evidences": [
+            {
+              "inferred_from_raw": "Experienced working directly with designers in Figma to ship pixel-accurate UI.",
+              "snippets": [
+                {
+                  "text": "Experienced working directly with designers in Figma to ship pixel-accurate UI.",
+                  "start": 316,
+                  "end": 395,
+                  "section": "summary",
+                  "verbatim_ok": true,
+                  "ellipsis_in_snippet": false
+                }
+              ],
+              "reasoning": "Working 'directly with designers' to achieve 'pixel-accurate' results implies strong communication skills, ability to interpret design intent, and bridging the gap between design specifications and technical implementation.",
+              "basis": null,
+              "basis_raw": null,
+              "basis_invalid_for_cv": false,
+              "llm_confidence_raw": 0.85
+            }
+          ]
+        },
+        {
+          "skill_id": "accessibility-engineering",
+          "label": "Accessibility Engineering",
+          "category": "Engineering Practice",
+          "category_raw": "Engineering Practice",
+          "basis": null,
+          "basis_raw": null,
+          "basis_invalid_for_cv": false,
+          "type": "implicit",
+          "confidence": null,
+          "evidences": [
+            {
+              "inferred_from_raw": "Collaborated with designers to translate Figma files into reusable, accessible components (WCAG AA).",
+              "snippets": [
+                {
+                  "text": "Collaborated with designers to translate Figma files into reusable, accessible components (WCAG AA).",
+                  "start": 1385,
+                  "end": 1485,
+                  "section": "experience",
+                  "verbatim_ok": true,
+                  "ellipsis_in_snippet": false
+                }
+              ],
+              "reasoning": "Ensuring WCAG AA compliance involves more than just adding ARIA labels; it requires semantic HTML structure, keyboard navigation testing, color contrast analysis, and screen reader compatibility testing — specialized engineering practices.",
+              "basis": null,
+              "basis_raw": null,
+              "basis_invalid_for_cv": false,
+              "llm_confidence_raw": 0.92
+            }
+          ]
+        },
+        {
+          "skill_id": "progressive-web-app-pwa-development",
+          "label": "Progressive Web App (PWA) Development",
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "basis": null,
+          "basis_raw": null,
+          "basis_invalid_for_cv": false,
+          "type": "implicit",
+          "confidence": null,
+          "evidences": [
+            {
+              "inferred_from_raw": "Personal habit-tracker PWA (React, TypeScript, IndexedDB) — 300+ GitHub stars",
+              "snippets": [
+                {
+                  "text": "Personal habit-tracker PWA (React, TypeScript, IndexedDB) — 300+ GitHub stars",
+                  "start": 1608,
+                  "end": 1685,
+                  "section": "projects",
+                  "verbatim_ok": true,
+                  "ellipsis_in_snippet": false
+                }
+              ],
+              "reasoning": "Building a PWA requires implementing service workers, manifest files, offline-first strategies, and background sync capabilities, which are distinct from standard web application development.",
+              "basis": null,
+              "basis_raw": null,
+              "basis_invalid_for_cv": false,
+              "llm_confidence_raw": 0.8
+            }
+          ]
+        },
+        {
+          "skill_id": "local-storage-implementation",
+          "label": "Local Storage Implementation",
+          "category": "Technical Concept",
+          "category_raw": "Technical Concept",
+          "basis": null,
+          "basis_raw": null,
+          "basis_invalid_for_cv": false,
+          "type": "implicit",
+          "confidence": null,
+          "evidences": [
+            {
+              "inferred_from_raw": "Personal habit-tracker PWA (React, TypeScript, IndexedDB)",
+              "snippets": [
+                {
+                  "text": "Personal habit-tracker PWA (React, TypeScript, IndexedDB)",
+                  "start": 1608,
+                  "end": 1665,
+                  "section": "projects",
+                  "verbatim_ok": true,
+                  "ellipsis_in_snippet": false
+                }
+              ],
+              "reasoning": "Using IndexedDB specifically implies handling structured data storage on the client side, managing asynchronous database transactions, and dealing with quota limits, which is more complex than using localStorage or cookies.",
+              "basis": null,
+              "basis_raw": null,
+              "basis_invalid_for_cv": false,
+              "llm_confidence_raw": 0.85
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "jd": {
+    "filename": "02_Frontend_JD.pdf",
+    "document_type": "JD",
+    "text_sha256": "23db6d9849a00e1c6e491beee6cc5b6dfbdb0cbf892a2dded67f62a1b950bd92",
+    "explicit": {
+      "filename": "02_Frontend_JD.pdf",
+      "document_type": "JD",
+      "text_sha256": "23db6d9849a00e1c6e491beee6cc5b6dfbdb0cbf892a2dded67f62a1b950bd92",
+      "stats": {
+        "total_mentions": 41,
+        "unique_skills": 39,
+        "unresolved_evidences": 0,
+        "kind_conflicts": 0,
+        "non_verbatim_mentions": 0,
+        "header_evidences": 0,
+        "unresolved_mentions": 0,
+        "ambiguous_mentions": 0,
+        "unknown_category_mentions": 5,
+        "invalid_kind_mentions": 0,
+        "quarantined_mentions": 0
+      },
+      "skills": [
+        {
+          "skill_id": "patient-scheduling",
+          "surface_forms": [
+            "patient-scheduling"
+          ],
+          "category": "Domain Knowledge",
+          "category_raw": "Domain Knowledge",
+          "kind": "domain",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "about"
+          ],
+          "evidences": [
+            {
+              "surface_form": "patient-scheduling",
+              "kind": "domain",
+              "kind_raw": "domain",
+              "kind_source": "llm",
+              "sentence": "Willow Health builds a patient-scheduling and telehealth platform used by clinics across Southeast Asia.",
+              "start": 126,
+              "end": 230,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "about",
+              "category": "Domain Knowledge",
+              "category_raw": "Domain Knowledge",
+              "mention_start": 149,
+              "mention_end": 167,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "telehealth",
+          "surface_forms": [
+            "telehealth"
+          ],
+          "category": "Domain Knowledge",
+          "category_raw": "Domain Knowledge",
+          "kind": "domain",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "about"
+          ],
+          "evidences": [
+            {
+              "surface_form": "telehealth",
+              "kind": "domain",
+              "kind_raw": "domain",
+              "kind_source": "llm",
+              "sentence": "Willow Health builds a patient-scheduling and telehealth platform used by clinics across Southeast Asia.",
+              "start": 126,
+              "end": 230,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "about",
+              "category": "Domain Knowledge",
+              "category_raw": "Domain Knowledge",
+              "mention_start": 172,
+              "mention_end": 182,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "react",
+          "surface_forms": [
+            "React"
+          ],
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "about",
+            "requirements"
+          ],
+          "evidences": [
+            {
+              "surface_form": "React",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "We're looking for a Frontend Engineer to help modernize our React codebase, improve accessibility, and ship a faster, more consistent UI across web and tablet.",
+              "start": 231,
+              "end": 390,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "about",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 291,
+              "mention_end": 296,
+              "mention_ambiguous": false
+            },
+            {
+              "surface_form": "React",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "2+ years of experience building production web applications with React and TypeScript.",
+              "start": 857,
+              "end": 943,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "requirements",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 922,
+              "mention_end": 927,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "accessibility",
+          "surface_forms": [
+            "accessibility"
+          ],
+          "category": "Engineering Practice",
+          "category_raw": "Engineering Practice",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "about",
+            "requirements"
+          ],
+          "evidences": [
+            {
+              "surface_form": "accessibility",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "We're looking for a Frontend Engineer to help modernize our React codebase, improve accessibility, and ship a faster, more consistent UI across web and tablet.",
+              "start": 231,
+              "end": 390,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "about",
+              "category": "Engineering Practice",
+              "category_raw": "Engineering Practice",
+              "mention_start": 315,
+              "mention_end": 328,
+              "mention_ambiguous": false
+            },
+            {
+              "surface_form": "accessibility",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Attention to accessibility (WCAG) and cross-browser compatibility.",
+              "start": 1198,
+              "end": 1264,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "requirements",
+              "category": "Engineering Practice",
+              "category_raw": "Engineering Practice",
+              "mention_start": 1211,
+              "mention_end": 1224,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "ui",
+          "surface_forms": [
+            "UI"
+          ],
+          "category": "Technical Concept",
+          "category_raw": "Technical Concept",
+          "kind": "context",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "about"
+          ],
+          "evidences": [
+            {
+              "surface_form": "UI",
+              "kind": "context",
+              "kind_raw": "context",
+              "kind_source": "llm",
+              "sentence": "We're looking for a Frontend Engineer to help modernize our React codebase, improve accessibility, and ship a faster, more consistent UI across web and tablet.",
+              "start": 231,
+              "end": 390,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "about",
+              "category": "Technical Concept",
+              "category_raw": "Technical Concept",
+              "mention_start": 365,
+              "mention_end": 367,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "web",
+          "surface_forms": [
+            "web"
+          ],
+          "category": null,
+          "category_raw": "Context",
+          "kind": "context",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "about"
+          ],
+          "evidences": [
+            {
+              "surface_form": "web",
+              "kind": "context",
+              "kind_raw": "context",
+              "kind_source": "llm",
+              "sentence": "We're looking for a Frontend Engineer to help modernize our React codebase, improve accessibility, and ship a faster, more consistent UI across web and tablet.",
+              "start": 231,
+              "end": 390,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "about",
+              "category": null,
+              "category_raw": "Context",
+              "mention_start": 375,
+              "mention_end": 378,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "tablet",
+          "surface_forms": [
+            "tablet"
+          ],
+          "category": null,
+          "category_raw": "Context",
+          "kind": "context",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "about"
+          ],
+          "evidences": [
+            {
+              "surface_form": "tablet",
+              "kind": "context",
+              "kind_raw": "context",
+              "kind_source": "llm",
+              "sentence": "We're looking for a Frontend Engineer to help modernize our React codebase, improve accessibility, and ship a faster, more consistent UI across web and tablet.",
+              "start": 231,
+              "end": 390,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "about",
+              "category": null,
+              "category_raw": "Context",
+              "mention_start": 383,
+              "mention_end": 389,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "react-typescript-application",
+          "surface_forms": [
+            "React + TypeScript application"
+          ],
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "responsibilities"
+          ],
+          "evidences": [
+            {
+              "surface_form": "React + TypeScript application",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Build and maintain features in our React + TypeScript application, working from Figma designs.",
+              "start": 414,
+              "end": 508,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "responsibilities",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 449,
+              "mention_end": 479,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "figma",
+          "surface_forms": [
+            "Figma"
+          ],
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "responsibilities"
+          ],
+          "evidences": [
+            {
+              "surface_form": "Figma",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Build and maintain features in our React + TypeScript application, working from Figma designs.",
+              "start": 414,
+              "end": 508,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "responsibilities",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 494,
+              "mention_end": 499,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "component-reusability",
+          "surface_forms": [
+            "component reusability"
+          ],
+          "category": "Engineering Practice",
+          "category_raw": "Engineering Practice",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "responsibilities"
+          ],
+          "evidences": [
+            {
+              "surface_form": "component reusability",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Improve component reusability and help extend our internal design system.",
+              "start": 511,
+              "end": 584,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "responsibilities",
+              "category": "Engineering Practice",
+              "category_raw": "Engineering Practice",
+              "mention_start": 519,
+              "mention_end": 540,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "design-system",
+          "surface_forms": [
+            "design system"
+          ],
+          "category": "Technical Concept",
+          "category_raw": "Technical Concept",
+          "kind": "context",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "responsibilities"
+          ],
+          "evidences": [
+            {
+              "surface_form": "design system",
+              "kind": "context",
+              "kind_raw": "context",
+              "kind_source": "llm",
+              "sentence": "Improve component reusability and help extend our internal design system.",
+              "start": 511,
+              "end": 584,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "responsibilities",
+              "category": "Technical Concept",
+              "category_raw": "Technical Concept",
+              "mention_start": 570,
+              "mention_end": 583,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "page-load-performance",
+          "surface_forms": [
+            "page load performance"
+          ],
+          "category": "Engineering Practice",
+          "category_raw": "Engineering Practice",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "responsibilities"
+          ],
+          "evidences": [
+            {
+              "surface_form": "page load performance",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Optimize page load performance and Core Web Vitals across the patient and clinician portals.",
+              "start": 587,
+              "end": 679,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "responsibilities",
+              "category": "Engineering Practice",
+              "category_raw": "Engineering Practice",
+              "mention_start": 596,
+              "mention_end": 617,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "core-web-vitals",
+          "surface_forms": [
+            "Core Web Vitals"
+          ],
+          "category": "Technical Concept",
+          "category_raw": "Technical Concept",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "responsibilities"
+          ],
+          "evidences": [
+            {
+              "surface_form": "Core Web Vitals",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Optimize page load performance and Core Web Vitals across the patient and clinician portals.",
+              "start": 587,
+              "end": 679,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "responsibilities",
+              "category": "Technical Concept",
+              "category_raw": "Technical Concept",
+              "mention_start": 622,
+              "mention_end": 637,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "patient-and-clinician-portals",
+          "surface_forms": [
+            "patient and clinician portals"
+          ],
+          "category": null,
+          "category_raw": "Context",
+          "kind": "context",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "responsibilities"
+          ],
+          "evidences": [
+            {
+              "surface_form": "patient and clinician portals",
+              "kind": "context",
+              "kind_raw": "context",
+              "kind_source": "llm",
+              "sentence": "Optimize page load performance and Core Web Vitals across the patient and clinician portals.",
+              "start": 587,
+              "end": 679,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "responsibilities",
+              "category": null,
+              "category_raw": "Context",
+              "mention_start": 649,
+              "mention_end": 678,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "unit-and-end-to-end-tests",
+          "surface_forms": [
+            "unit and end-to-end tests"
+          ],
+          "category": "Engineering Practice",
+          "category_raw": "Engineering Practice",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "responsibilities"
+          ],
+          "evidences": [
+            {
+              "surface_form": "unit and end-to-end tests",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Write unit and end-to-end tests (Jest, Playwright) to protect critical booking flows.",
+              "start": 682,
+              "end": 767,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "responsibilities",
+              "category": "Engineering Practice",
+              "category_raw": "Engineering Practice",
+              "mention_start": 688,
+              "mention_end": 713,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "jest",
+          "surface_forms": [
+            "Jest"
+          ],
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "responsibilities"
+          ],
+          "evidences": [
+            {
+              "surface_form": "Jest",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Write unit and end-to-end tests (Jest, Playwright) to protect critical booking flows.",
+              "start": 682,
+              "end": 767,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "responsibilities",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 715,
+              "mention_end": 719,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "playwright",
+          "surface_forms": [
+            "Playwright"
+          ],
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "responsibilities"
+          ],
+          "evidences": [
+            {
+              "surface_form": "Playwright",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Write unit and end-to-end tests (Jest, Playwright) to protect critical booking flows.",
+              "start": 682,
+              "end": 767,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "responsibilities",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 721,
+              "mention_end": 731,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "booking-flows",
+          "surface_forms": [
+            "booking flows"
+          ],
+          "category": "Domain Knowledge",
+          "category_raw": "Domain Knowledge",
+          "kind": "domain",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "responsibilities"
+          ],
+          "evidences": [
+            {
+              "surface_form": "booking flows",
+              "kind": "domain",
+              "kind_raw": "domain",
+              "kind_source": "llm",
+              "sentence": "Write unit and end-to-end tests (Jest, Playwright) to protect critical booking flows.",
+              "start": 682,
+              "end": 767,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "responsibilities",
+              "category": "Domain Knowledge",
+              "category_raw": "Domain Knowledge",
+              "mention_start": 753,
+              "mention_end": 766,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "backend-engineers",
+          "surface_forms": [
+            "backend engineers"
+          ],
+          "category": null,
+          "category_raw": "Context",
+          "kind": "context",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "responsibilities"
+          ],
+          "evidences": [
+            {
+              "surface_form": "backend engineers",
+              "kind": "context",
+              "kind_raw": "context",
+              "kind_source": "llm",
+              "sentence": "Partner with backend engineers to define and consume REST/GraphQL APIs.",
+              "start": 770,
+              "end": 841,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "responsibilities",
+              "category": null,
+              "category_raw": "Context",
+              "mention_start": 783,
+              "mention_end": 800,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "rest-graphql-apis",
+          "surface_forms": [
+            "REST/GraphQL APIs"
+          ],
+          "category": "Technical Concept",
+          "category_raw": "Technical Concept",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "responsibilities"
+          ],
+          "evidences": [
+            {
+              "surface_form": "REST/GraphQL APIs",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Partner with backend engineers to define and consume REST/GraphQL APIs.",
+              "start": 770,
+              "end": 841,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "responsibilities",
+              "category": "Technical Concept",
+              "category_raw": "Technical Concept",
+              "mention_start": 823,
+              "mention_end": 840,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "production-web-applications",
+          "surface_forms": [
+            "production web applications"
+          ],
+          "category": null,
+          "category_raw": "Context",
+          "kind": "context",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "requirements"
+          ],
+          "evidences": [
+            {
+              "surface_form": "production web applications",
+              "kind": "context",
+              "kind_raw": "context",
+              "kind_source": "llm",
+              "sentence": "2+ years of experience building production web applications with React and TypeScript.",
+              "start": 857,
+              "end": 943,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "requirements",
+              "category": null,
+              "category_raw": "Context",
+              "mention_start": 889,
+              "mention_end": 916,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "typescript",
+          "surface_forms": [
+            "TypeScript"
+          ],
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "requirements"
+          ],
+          "evidences": [
+            {
+              "surface_form": "TypeScript",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "2+ years of experience building production web applications with React and TypeScript.",
+              "start": 857,
+              "end": 943,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "requirements",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 932,
+              "mention_end": 942,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "css-fundamentals",
+          "surface_forms": [
+            "CSS fundamentals"
+          ],
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "requirements"
+          ],
+          "evidences": [
+            {
+              "surface_form": "CSS fundamentals",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Strong CSS fundamentals and experience with a utility-first framework (Tailwind CSS or similar).",
+              "start": 946,
+              "end": 1042,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "requirements",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 953,
+              "mention_end": 969,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "utility-first-framework",
+          "surface_forms": [
+            "utility-first framework"
+          ],
+          "category": "Technical Concept",
+          "category_raw": "Technical Concept",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "requirements"
+          ],
+          "evidences": [
+            {
+              "surface_form": "utility-first framework",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Strong CSS fundamentals and experience with a utility-first framework (Tailwind CSS or similar).",
+              "start": 946,
+              "end": 1042,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "requirements",
+              "category": "Technical Concept",
+              "category_raw": "Technical Concept",
+              "mention_start": 992,
+              "mention_end": 1015,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "tailwind-css",
+          "surface_forms": [
+            "Tailwind CSS"
+          ],
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "requirements"
+          ],
+          "evidences": [
+            {
+              "surface_form": "Tailwind CSS",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Strong CSS fundamentals and experience with a utility-first framework (Tailwind CSS or similar).",
+              "start": 946,
+              "end": 1042,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "requirements",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 1017,
+              "mention_end": 1029,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "state-management-patterns",
+          "surface_forms": [
+            "state management patterns"
+          ],
+          "category": "Technical Concept",
+          "category_raw": "Technical Concept",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "requirements"
+          ],
+          "evidences": [
+            {
+              "surface_form": "state management patterns",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Experience with state management patterns (Redux Toolkit, Zustand, or React Query).",
+              "start": 1045,
+              "end": 1128,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "requirements",
+              "category": "Technical Concept",
+              "category_raw": "Technical Concept",
+              "mention_start": 1061,
+              "mention_end": 1086,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "redux-toolkit",
+          "surface_forms": [
+            "Redux Toolkit"
+          ],
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "requirements"
+          ],
+          "evidences": [
+            {
+              "surface_form": "Redux Toolkit",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Experience with state management patterns (Redux Toolkit, Zustand, or React Query).",
+              "start": 1045,
+              "end": 1128,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "requirements",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 1088,
+              "mention_end": 1101,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "zustand",
+          "surface_forms": [
+            "Zustand"
+          ],
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "requirements"
+          ],
+          "evidences": [
+            {
+              "surface_form": "Zustand",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Experience with state management patterns (Redux Toolkit, Zustand, or React Query).",
+              "start": 1045,
+              "end": 1128,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "requirements",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 1103,
+              "mention_end": 1110,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "react-query",
+          "surface_forms": [
+            "React Query"
+          ],
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "requirements"
+          ],
+          "evidences": [
+            {
+              "surface_form": "React Query",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Experience with state management patterns (Redux Toolkit, Zustand, or React Query).",
+              "start": 1045,
+              "end": 1128,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "requirements",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 1115,
+              "mention_end": 1126,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "git-based-workflows",
+          "surface_forms": [
+            "Git-based workflows"
+          ],
+          "category": "Engineering Practice",
+          "category_raw": "Engineering Practice",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "requirements"
+          ],
+          "evidences": [
+            {
+              "surface_form": "Git-based workflows",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Comfort with Git-based workflows, code review, and CI pipelines.",
+              "start": 1131,
+              "end": 1195,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "requirements",
+              "category": "Engineering Practice",
+              "category_raw": "Engineering Practice",
+              "mention_start": 1144,
+              "mention_end": 1163,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "code-review",
+          "surface_forms": [
+            "code review"
+          ],
+          "category": "Engineering Practice",
+          "category_raw": "Engineering Practice",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "requirements"
+          ],
+          "evidences": [
+            {
+              "surface_form": "code review",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Comfort with Git-based workflows, code review, and CI pipelines.",
+              "start": 1131,
+              "end": 1195,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "requirements",
+              "category": "Engineering Practice",
+              "category_raw": "Engineering Practice",
+              "mention_start": 1165,
+              "mention_end": 1176,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "ci-pipelines",
+          "surface_forms": [
+            "CI pipelines"
+          ],
+          "category": "Engineering Practice",
+          "category_raw": "Engineering Practice",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "requirements"
+          ],
+          "evidences": [
+            {
+              "surface_form": "CI pipelines",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Comfort with Git-based workflows, code review, and CI pipelines.",
+              "start": 1131,
+              "end": 1195,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "requirements",
+              "category": "Engineering Practice",
+              "category_raw": "Engineering Practice",
+              "mention_start": 1182,
+              "mention_end": 1194,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "wcag",
+          "surface_forms": [
+            "WCAG"
+          ],
+          "category": "Technical Standard",
+          "category_raw": "Technical Standard",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "requirements"
+          ],
+          "evidences": [
+            {
+              "surface_form": "WCAG",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Attention to accessibility (WCAG) and cross-browser compatibility.",
+              "start": 1198,
+              "end": 1264,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "requirements",
+              "category": "Technical Standard",
+              "category_raw": "Technical Standard",
+              "mention_start": 1226,
+              "mention_end": 1230,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "cross-browser-compatibility",
+          "surface_forms": [
+            "cross-browser compatibility"
+          ],
+          "category": "Engineering Practice",
+          "category_raw": "Engineering Practice",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "requirements"
+          ],
+          "evidences": [
+            {
+              "surface_form": "cross-browser compatibility",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Attention to accessibility (WCAG) and cross-browser compatibility.",
+              "start": 1198,
+              "end": 1264,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "requirements",
+              "category": "Engineering Practice",
+              "category_raw": "Engineering Practice",
+              "mention_start": 1236,
+              "mention_end": 1263,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "next.js-app-router",
+          "surface_forms": [
+            "Next.js App Router"
+          ],
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "nice_to_have"
+          ],
+          "evidences": [
+            {
+              "surface_form": "Next.js App Router",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Experience with Next.js App Router.",
+              "start": 1280,
+              "end": 1315,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "nice_to_have",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 1296,
+              "mention_end": 1314,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "healthcare",
+          "surface_forms": [
+            "healthcare"
+          ],
+          "category": "Domain Knowledge",
+          "category_raw": "Domain Knowledge",
+          "kind": "domain",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "nice_to_have"
+          ],
+          "evidences": [
+            {
+              "surface_form": "healthcare",
+              "kind": "domain",
+              "kind_raw": "domain",
+              "kind_source": "llm",
+              "sentence": "Familiarity with healthcare or another regulated consumer product.",
+              "start": 1318,
+              "end": 1384,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "nice_to_have",
+              "category": "Domain Knowledge",
+              "category_raw": "Domain Knowledge",
+              "mention_start": 1335,
+              "mention_end": 1345,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "regulated-consumer-product",
+          "surface_forms": [
+            "regulated consumer product"
+          ],
+          "category": "Domain Knowledge",
+          "category_raw": "Domain Knowledge",
+          "kind": "domain",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "nice_to_have"
+          ],
+          "evidences": [
+            {
+              "surface_form": "regulated consumer product",
+              "kind": "domain",
+              "kind_raw": "domain",
+              "kind_source": "llm",
+              "sentence": "Familiarity with healthcare or another regulated consumer product.",
+              "start": 1318,
+              "end": 1384,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "nice_to_have",
+              "category": "Domain Knowledge",
+              "category_raw": "Domain Knowledge",
+              "mention_start": 1357,
+              "mention_end": 1383,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "storybook",
+          "surface_forms": [
+            "Storybook"
+          ],
+          "category": "Technology/Tool",
+          "category_raw": "Technology/Tool",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "nice_to_have"
+          ],
+          "evidences": [
+            {
+              "surface_form": "Storybook",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Storybook or other component-documentation experience.",
+              "start": 1387,
+              "end": 1441,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "nice_to_have",
+              "category": "Technology/Tool",
+              "category_raw": "Technology/Tool",
+              "mention_start": 1387,
+              "mention_end": 1396,
+              "mention_ambiguous": false
+            }
+          ]
+        },
+        {
+          "skill_id": "component-documentation",
+          "surface_forms": [
+            "component-documentation"
+          ],
+          "category": "Engineering Practice",
+          "category_raw": "Engineering Practice",
+          "kind": "skill",
+          "type": "explicit",
+          "confidence": null,
+          "sections": [
+            "nice_to_have"
+          ],
+          "evidences": [
+            {
+              "surface_form": "component-documentation",
+              "kind": "skill",
+              "kind_raw": "skill",
+              "kind_source": "llm",
+              "sentence": "Storybook or other component-documentation experience.",
+              "start": 1387,
+              "end": 1441,
+              "offset_resolved": true,
+              "verbatim_ok": true,
+              "modifier_text": null,
+              "section": "nice_to_have",
+              "category": "Engineering Practice",
+              "category_raw": "Engineering Practice",
+              "mention_start": 1406,
+              "mention_end": 1429,
+              "mention_ambiguous": false
+            }
+          ]
+        }
+      ],
+      "quarantined": [],
+      "extraction_meta": {
+        "prompt_sha256": "0b3a3b5112b086d35b28274cb7470455e27a022d1d53ce3703ee6b7ade4e4fce",
+        "prompt_variant": "default",
+        "model_configured": "qwen/qwen3.7-flash",
+        "temperature": 0,
+        "schema_version": "1.0.0",
+        "extracted_at": "2026-10-29T09:15:03.455967+00:00"
+      }
+    },
+    "implicit": {
+      "filename": "02_Frontend_JD.pdf",
+      "document_type": "JD",
+      "text_sha256": "23db6d9849a00e1c6e491beee6cc5b6dfbdb0cbf892a2dded67f62a1b950bd92",
+      "stats": {
+        "total_inferences": 5,
+        "unique_skills": 5,
+        "unknown_category_count": 0,
+        "invalid_basis": 0,
+        "quarantined_mentions": 0,
+        "non_verbatim_evidences": 1,
+        "multi_fragment_evidences": 2,
+        "multi_section_evidences": 1,
+        "ellipsis_snippets": 0,
+        "basis_invalid_for_cv": 0
+      },
+      "skills": [
+        {
+          "skill_id": "design-system-implementation",
+          "label": "Design System Implementation",
+          "category": "Engineering Practice",
+          "category_raw": "Engineering Practice",
+          "basis": null,
+          "basis_raw": null,
+          "basis_invalid_for_cv": false,
+          "type": "implicit",
+          "confidence": null,
+          "evidences": [
+            {
+              "inferred_from_raw": "Improve component reusability and help extend our internal design system.",
+              "snippets": [
+                {
+                  "text": "Improve component reusability and help extend our internal design system.",
+                  "start": 511,
+                  "end": 584,
+                  "section": "responsibilities",
+                  "verbatim_ok": true,
+                  "ellipsis_in_snippet": false
+                }
+              ],
+              "reasoning": "Extending an internal design system implies the ability to standardize UI components, manage design tokens, and ensure consistency across a product, which goes beyond simple component creation.",
+              "basis": null,
+              "basis_raw": null,
+              "basis_invalid_for_cv": false,
+              "llm_confidence_raw": 0.9
+            }
+          ]
+        },
+        {
+          "skill_id": "cross-functional-collaboration",
+          "label": "Cross-Functional Collaboration",
+          "category": "Soft Skill",
+          "category_raw": "Soft Skill",
+          "basis": null,
+          "basis_raw": null,
+          "basis_invalid_for_cv": false,
+          "type": "implicit",
+          "confidence": null,
+          "evidences": [
+            {
+              "inferred_from_raw": "Partner with backend engineers to define and consume REST/GraphQL APIs.",
+              "snippets": [
+                {
+                  "text": "Partner with backend engineers to define and consume REST/GraphQL APIs.",
+                  "start": 770,
+                  "end": 841,
+                  "section": "responsibilities",
+                  "verbatim_ok": true,
+                  "ellipsis_in_snippet": false
+                }
+              ],
+              "reasoning": "Defining APIs alongside backend engineers requires negotiation, clear communication of constraints, and collaborative problem-solving to align frontend needs with backend capabilities.",
+              "basis": null,
+              "basis_raw": null,
+              "basis_invalid_for_cv": false,
+              "llm_confidence_raw": 0.85
+            }
+          ]
+        },
+        {
+          "skill_id": "healthcare-domain-awareness",
+          "label": "Healthcare Domain Awareness",
+          "category": "Domain Knowledge",
+          "category_raw": "Domain Knowledge",
+          "basis": null,
+          "basis_raw": null,
+          "basis_invalid_for_cv": false,
+          "type": "implicit",
+          "confidence": null,
+          "evidences": [
+            {
+              "inferred_from_raw": "Willow Health builds a patient-scheduling and telehealth platform used by clinics... Familiarity with healthcare or another regulated consumer product.",
+              "snippets": [
+                {
+                  "text": "Willow Health builds a patient-scheduling and telehealth platform used by clinics",
+                  "start": 126,
+                  "end": 207,
+                  "section": "about",
+                  "verbatim_ok": true,
+                  "ellipsis_in_snippet": false
+                },
+                {
+                  "text": "Familiarity with healthcare or another regulated consumer product.",
+                  "start": 1318,
+                  "end": 1384,
+                  "section": "nice_to_have",
+                  "verbatim_ok": true,
+                  "ellipsis_in_snippet": false
+                }
+              ],
+              "reasoning": "Working in a regulated healthcare environment implies an understanding of specific domain constraints such as data privacy (HIPAA/GDPR equivalents), user roles (patient vs. clinician), and workflow criticality that differ from general consumer apps.",
+              "basis": null,
+              "basis_raw": null,
+              "basis_invalid_for_cv": false,
+              "llm_confidence_raw": 0.75
+            }
+          ]
+        },
+        {
+          "skill_id": "responsive-adaptive-ui-development",
+          "label": "Responsive & Adaptive UI Development",
+          "category": "Technical Concept",
+          "category_raw": "Technical Concept",
+          "basis": null,
+          "basis_raw": null,
+          "basis_invalid_for_cv": false,
+          "type": "implicit",
+          "confidence": null,
+          "evidences": [
+            {
+              "inferred_from_raw": "ship a faster, more consistent UI across web and tablet.",
+              "snippets": [
+                {
+                  "text": "ship a faster, more consistent UI across web and tablet.",
+                  "start": 334,
+                  "end": 390,
+                  "section": "about",
+                  "verbatim_ok": true,
+                  "ellipsis_in_snippet": false
+                }
+              ],
+              "reasoning": "Targeting both web and tablet specifically implies handling different viewport sizes, touch interactions, and potentially varying network conditions on mobile devices, requiring adaptive layout strategies beyond standard desktop responsiveness.",
+              "basis": null,
+              "basis_raw": null,
+              "basis_invalid_for_cv": false,
+              "llm_confidence_raw": 0.8
+            }
+          ]
+        },
+        {
+          "skill_id": "accessibility-auditing-remediation",
+          "label": "Accessibility Auditing & Remediation",
+          "category": "Engineering Practice",
+          "category_raw": "Engineering Practice",
+          "basis": null,
+          "basis_raw": null,
+          "basis_invalid_for_cv": false,
+          "type": "implicit",
+          "confidence": null,
+          "evidences": [
+            {
+              "inferred_from_raw": "Attention to accessibility (WCAG)... Improve accessibility",
+              "snippets": [
+                {
+                  "text": "Attention to accessibility (WCAG)",
+                  "start": 1198,
+                  "end": 1231,
+                  "section": "requirements",
+                  "verbatim_ok": true,
+                  "ellipsis_in_snippet": false
+                },
+                {
+                  "text": "Improve accessibility",
+                  "start": null,
+                  "end": null,
+                  "section": null,
+                  "verbatim_ok": false,
+                  "ellipsis_in_snippet": false
+                }
+              ],
+              "reasoning": "Going beyond basic compliance to 'improve' accessibility implies skills in auditing existing code for WCAG violations, refactoring for screen reader compatibility, and implementing keyboard navigation patterns.",
+              "basis": null,
+              "basis_raw": null,
+              "basis_invalid_for_cv": false,
+              "llm_confidence_raw": 0.82
+            }
+          ]
+        }
+      ],
+      "quarantined": [],
+      "extraction_meta": {
+        "prompt_sha256": "1761372bbd812868b09c329782b3892586a66d9440920fd8fd4088f7b4ce66e4",
+        "prompt_variant": "default",
+        "model_configured": "qwen/qwen3.7-flash",
+        "temperature": 0,
+        "schema_version": "1.0.0",
+        "extracted_at": "2026-10-29T09:15:09.107532+00:00",
+        "confidence_calibrated": false,
+        "explicit_source": "extraction_result"
+      }
+    },
+    "validation": {
+      "status": "completed",
+      "validation_origin": "original",
+      "duplicate_implicit_skills": [],
+      "accepted_implicit_skills": [
+        {
+          "skill_id": "design-system-implementation",
+          "label": "Design System Implementation",
+          "category": "Engineering Practice",
+          "category_raw": "Engineering Practice",
+          "basis": null,
+          "basis_raw": null,
+          "basis_invalid_for_cv": false,
+          "type": "implicit",
+          "confidence": null,
+          "evidences": [
+            {
+              "inferred_from_raw": "Improve component reusability and help extend our internal design system.",
+              "snippets": [
+                {
+                  "text": "Improve component reusability and help extend our internal design system.",
+                  "start": 511,
+                  "end": 584,
+                  "section": "responsibilities",
+                  "verbatim_ok": true,
+                  "ellipsis_in_snippet": false
+                }
+              ],
+              "reasoning": "Extending an internal design system implies the ability to standardize UI components, manage design tokens, and ensure consistency across a product, which goes beyond simple component creation.",
+              "basis": null,
+              "basis_raw": null,
+              "basis_invalid_for_cv": false,
+              "llm_confidence_raw": 0.9
+            }
+          ]
+        },
+        {
+          "skill_id": "cross-functional-collaboration",
+          "label": "Cross-Functional Collaboration",
+          "category": "Soft Skill",
+          "category_raw": "Soft Skill",
+          "basis": null,
+          "basis_raw": null,
+          "basis_invalid_for_cv": false,
+          "type": "implicit",
+          "confidence": null,
+          "evidences": [
+            {
+              "inferred_from_raw": "Partner with backend engineers to define and consume REST/GraphQL APIs.",
+              "snippets": [
+                {
+                  "text": "Partner with backend engineers to define and consume REST/GraphQL APIs.",
+                  "start": 770,
+                  "end": 841,
+                  "section": "responsibilities",
+                  "verbatim_ok": true,
+                  "ellipsis_in_snippet": false
+                }
+              ],
+              "reasoning": "Defining APIs alongside backend engineers requires negotiation, clear communication of constraints, and collaborative problem-solving to align frontend needs with backend capabilities.",
+              "basis": null,
+              "basis_raw": null,
+              "basis_invalid_for_cv": false,
+              "llm_confidence_raw": 0.85
+            }
+          ]
+        },
+        {
+          "skill_id": "healthcare-domain-awareness",
+          "label": "Healthcare Domain Awareness",
+          "category": "Domain Knowledge",
+          "category_raw": "Domain Knowledge",
+          "basis": null,
+          "basis_raw": null,
+          "basis_invalid_for_cv": false,
+          "type": "implicit",
+          "confidence": null,
+          "evidences": [
+            {
+              "inferred_from_raw": "Willow Health builds a patient-scheduling and telehealth platform used by clinics... Familiarity with healthcare or another regulated consumer product.",
+              "snippets": [
+                {
+                  "text": "Willow Health builds a patient-scheduling and telehealth platform used by clinics",
+                  "start": 126,
+                  "end": 207,
+                  "section": "about",
+                  "verbatim_ok": true,
+                  "ellipsis_in_snippet": false
+                },
+                {
+                  "text": "Familiarity with healthcare or another regulated consumer product.",
+                  "start": 1318,
+                  "end": 1384,
+                  "section": "nice_to_have",
+                  "verbatim_ok": true,
+                  "ellipsis_in_snippet": false
+                }
+              ],
+              "reasoning": "Working in a regulated healthcare environment implies an understanding of specific domain constraints such as data privacy (HIPAA/GDPR equivalents), user roles (patient vs. clinician), and workflow criticality that differ from general consumer apps.",
+              "basis": null,
+              "basis_raw": null,
+              "basis_invalid_for_cv": false,
+              "llm_confidence_raw": 0.75
+            }
+          ]
+        },
+        {
+          "skill_id": "responsive-adaptive-ui-development",
+          "label": "Responsive & Adaptive UI Development",
+          "category": "Technical Concept",
+          "category_raw": "Technical Concept",
+          "basis": null,
+          "basis_raw": null,
+          "basis_invalid_for_cv": false,
+          "type": "implicit",
+          "confidence": null,
+          "evidences": [
+            {
+              "inferred_from_raw": "ship a faster, more consistent UI across web and tablet.",
+              "snippets": [
+                {
+                  "text": "ship a faster, more consistent UI across web and tablet.",
+                  "start": 334,
+                  "end": 390,
+                  "section": "about",
+                  "verbatim_ok": true,
+                  "ellipsis_in_snippet": false
+                }
+              ],
+              "reasoning": "Targeting both web and tablet specifically implies handling different viewport sizes, touch interactions, and potentially varying network conditions on mobile devices, requiring adaptive layout strategies beyond standard desktop responsiveness.",
+              "basis": null,
+              "basis_raw": null,
+              "basis_invalid_for_cv": false,
+              "llm_confidence_raw": 0.8
+            }
+          ]
+        },
+        {
+          "skill_id": "accessibility-auditing-remediation",
+          "label": "Accessibility Auditing & Remediation",
+          "category": "Engineering Practice",
+          "category_raw": "Engineering Practice",
+          "basis": null,
+          "basis_raw": null,
+          "basis_invalid_for_cv": false,
+          "type": "implicit",
+          "confidence": null,
+          "evidences": [
+            {
+              "inferred_from_raw": "Attention to accessibility (WCAG)... Improve accessibility",
+              "snippets": [
+                {
+                  "text": "Attention to accessibility (WCAG)",
+                  "start": 1198,
+                  "end": 1231,
+                  "section": "requirements",
+                  "verbatim_ok": true,
+                  "ellipsis_in_snippet": false
+                },
+                {
+                  "text": "Improve accessibility",
+                  "start": null,
+                  "end": null,
+                  "section": null,
+                  "verbatim_ok": false,
+                  "ellipsis_in_snippet": false
+                }
+              ],
+              "reasoning": "Going beyond basic compliance to 'improve' accessibility implies skills in auditing existing code for WCAG violations, refactoring for screen reader compatibility, and implementing keyboard navigation patterns.",
+              "basis": null,
+              "basis_raw": null,
+              "basis_invalid_for_cv": false,
+              "llm_confidence_raw": 0.82
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "summary": {
+    "cv_explicit_count": 40,
+    "cv_implicit_count": 7,
+    "jd_explicit_count": 39,
+    "jd_implicit_count": 5,
+    "duplicate_count": 0,
+    "total_unique_skills": 80,
+    "execution_time_ms": 50514.56,
+    "timings_ms": {
+      "parse_cv_ms": 14.22,
+      "cv_explicit_ms": 19748.82,
+      "cv_implicit_ms": 8687.4,
+      "cv_validation_ms": 0.38,
+      "parse_jd_ms": 12.95,
+      "jd_explicit_ms": 16402.28,
+      "jd_implicit_ms": 5647.91,
+      "jd_validation_ms": 0.3,
+      "total_execution_ms": 50514.56
+    }
+  },
+  "errors": []
+}

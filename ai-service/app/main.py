@@ -1,0 +1,100 @@
+from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import Dict
+from dotenv import load_dotenv
+import httpx
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.config import settings
+from app.ai_runtime import runtime_middleware
+from app.ai_runtime_routes import router as runtime_router
+from matching_cv.app.api.v1.endpoints.unified import router as matching_cv_router
+from matching_cv.app.services.gnn_inference_service import gnn_inference_service
+from skill_gap.api.routes import router as skill_gap_router
+from adaptive_questioning.evidence.routes import init_evidence_workflow, router as evidence_router
+from voice.routes import router as voice_router
+
+_ROOT_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(_ROOT_DIR.parent / ".env")
+load_dotenv(_ROOT_DIR / ".env", override=True)
+
+
+@asynccontextmanager
+async def app_lifespan(application: FastAPI):
+    if settings.GNN_REQUIRE_CHECKPOINT:
+        gnn_inference_service.get_model()
+    init_evidence_workflow(application)
+    async with httpx.AsyncClient(timeout=5, trust_env=False) as client:
+        application.state.ai_runtime_http = client
+        yield
+
+
+def create_app() -> FastAPI:
+    application = FastAPI(
+        title="Smile Interview NCKH AI Service",
+        description=(
+            "Unified Scientific Research Pipeline: "
+            "Module 1 (SBERT+GNN Skill Matcher) -> "
+            "Module 2 (Skill-Gap Detection V2.0) -> "
+            "Module 3 (Evidence-based Adaptive Interviewing)"
+        ),
+        version="2.2.0",
+        lifespan=app_lifespan,
+        docs_url="/docs" if settings.DEBUG else None,
+        redoc_url="/redoc" if settings.DEBUG else None,
+        openapi_url="/openapi.json" if settings.DEBUG else None,
+    )
+
+    configured_origins = [
+        origin.strip()
+        for origin in settings.AI_CORS_ALLOWED_ORIGINS.split(",")
+        if origin.strip()
+    ]
+    if configured_origins:
+        application.add_middleware(
+            CORSMiddleware,
+            allow_origins=configured_origins,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+    elif settings.DEBUG:
+        application.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=False,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+
+    application.include_router(matching_cv_router)
+    application.include_router(skill_gap_router)
+    application.include_router(evidence_router)
+    application.include_router(voice_router)
+    application.include_router(runtime_router)
+    application.middleware("http")(runtime_middleware)
+
+    @application.get("/health", tags=["Health"])
+    async def health_check() -> Dict[str, str]:
+        return {
+            "status": "ok",
+            "service": settings.APP_NAME,
+            "version": "2.2.0",
+        }
+
+    @application.get("/", tags=["Health"])
+    async def root() -> Dict[str, str]:
+        return {
+            "message": "Smile Interview NCKH AI Service (Module 1 -> Module 2 -> Module 3). See /docs for OpenAPI."
+        }
+
+    return application
+
+
+app = create_app()
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run("app.main:app", host=settings.HOST, port=settings.PORT, reload=settings.DEBUG)

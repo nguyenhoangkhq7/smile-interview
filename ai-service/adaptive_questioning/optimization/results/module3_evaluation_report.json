@@ -1,0 +1,828 @@
+{
+  "benchmark_name": "Module 3 Paired Ablation (CV Verification + Adaptive Questioning)",
+  "timestamp_utc": "2026-11-20T12:10:00.550889+00:00",
+  "total_paired_cases": 47,
+  "judge_model": "google/gemini-2.5-flash",
+  "blind_randomized_order": true,
+  "scientific_disclosures": [
+    "Synthetic CV-JD pairs and controlled scripted candidate answers are used to isolate workflow behavior; they are NOT real HR expert evaluations.",
+    "Independent cross-family LLM-as-a-Judge (google/gemini-2.5-flash != qwen/qwen3.7-flash) with anonymized randomized A/B/C ordering is used as a proxy evaluation; LLM judges may retain residual length/style biases (Zheng et al., NeurIPS 2023).",
+    "In Condition 2 (`chain_no_verification`), passing `verification_sources=None` causes `EvidenceWorkflow` to omit CV spans and run in JD-only scenario mode, isolating the joint effect of verified CV/JD source grounding + `detail_to_verify` preparation in Condition 3."
+  ],
+  "blind_preference_counts": {
+    "chain_no_verification": 7,
+    "chain_full_verification": 13,
+    "one_shot": 16,
+    "TIE": 11
+  },
+  "blind_preference_rates": {
+    "chain_no_verification": 0.1489,
+    "chain_full_verification": 0.2766,
+    "one_shot": 0.3404,
+    "TIE": 0.234
+  },
+  "prepared_focus_relevance": {
+    "evaluated_focuses": 27,
+    "relevant_rate": 1.0,
+    "ci_95": [
+      0.8754,
+      1.0
+    ]
+  },
+  "conditions": {
+    "one_shot": {
+      "cases_total": 100,
+      "cases_ok": 100,
+      "error_rate": 0.0,
+      "automated_checks": {
+        "single_task_q1_rate": 0.96,
+        "single_task_q1_ci_95": [
+          0.9016,
+          0.9843
+        ],
+        "single_task_q2_rate": 0.5467,
+        "missing_code_error_rate_q1": 0.0,
+        "exact_duplicate_q1_q2_rate": 0.0,
+        "mean_q1_q2_sbert_cosine": 0.7021,
+        "q1_q2_sbert_cosine_by_scenario": {
+          "CONTRADICT_CV": 0.7156,
+          "NO_EXPERIENCE": 0.7415,
+          "SUFFICIENT": 0.6339,
+          "VAGUE": 0.7194
+        },
+        "policy_adaptive_match_rate": 0.71,
+        "policy_adaptive_match_ci_95": [
+          0.6146,
+          0.7899
+        ],
+        "policy_adaptive_by_scenario": {
+          "CONTRADICT_CV": 0.92,
+          "NO_EXPERIENCE": 0.56,
+          "SUFFICIENT": 0.4,
+          "VAGUE": 0.96
+        },
+        "mean_turns_on_c1": 1.73,
+        "mean_question_words": 65.2,
+        "mean_alignment_rejections_per_case": 0.0,
+        "total_alignment_rejections": 0,
+        "total_regen_retries": 25,
+        "mean_prep_seconds": 0.0,
+        "mean_t1_seconds": 1.799,
+        "mean_t2_seconds": 1.755
+      },
+      "verification_telemetry": {
+        "eligible_cv_cases": 75,
+        "prep_success_on_eligible_rate": null,
+        "prep_timeout_count": 0,
+        "prep_batch_fail_count": 0,
+        "jd_fallback_no_focus_count": 0,
+        "jd_fallback_cv_drafts_rejected_count": 0,
+        "cv_source_quotes_exact_rate": null,
+        "cv_source_quotes_count": 0,
+        "jd_source_quotes_exact_rate": null,
+        "jd_source_quotes_count": 0
+      },
+      "blind_independent_judge": {
+        "n_paired": 47,
+        "criteria": {
+          "on_target_skill_gap": {
+            "pass_rate": 0.9787,
+            "ci_95": [
+              0.8889,
+              0.9962
+            ],
+            "mean_score_1_5": 4.894,
+            "std_score": 0.371
+          },
+          "source_grounded_no_hallucination": {
+            "pass_rate": 1.0,
+            "ci_95": [
+              0.9244,
+              1.0
+            ],
+            "mean_score_1_5": 4.936,
+            "std_score": 0.244
+          },
+          "focuses_missing_detail": {
+            "pass_rate": 0.9787,
+            "ci_95": [
+              0.8889,
+              0.9962
+            ],
+            "mean_score_1_5": 4.83,
+            "std_score": 0.429
+          },
+          "clear_answerable_depth_fit": {
+            "pass_rate": 0.6809,
+            "ci_95": [
+              0.5383,
+              0.796
+            ],
+            "mean_score_1_5": 3.894,
+            "std_score": 0.831
+          },
+          "turn2_adapts_to_answer": {
+            "pass_rate": 0.6809,
+            "ci_95": [
+              0.5383,
+              0.796
+            ],
+            "mean_score_1_5": 3.83,
+            "std_score": 1.615
+          },
+          "avoids_repetition_overprobing": {
+            "pass_rate": 0.6809,
+            "ci_95": [
+              0.5383,
+              0.796
+            ],
+            "mean_score_1_5": 3.766,
+            "std_score": 1.653
+          }
+        },
+        "ungrounded_cv_claim_rate": 0.0,
+        "ungrounded_cv_claim_ci_95": [
+          0.0,
+          0.0756
+        ],
+        "unnecessary_repetition_rate": 0.234,
+        "unnecessary_repetition_ci_95": [
+          0.136,
+          0.3722
+        ],
+        "by_evidence_group": {
+          "NO_CV_EVIDENCE": {
+            "on_target_skill_gap": 1.0,
+            "source_grounded_no_hallucination": 1.0,
+            "focuses_missing_detail": 1.0,
+            "clear_answerable_depth_fit": 0.9375,
+            "turn2_adapts_to_answer": 0.875,
+            "avoids_repetition_overprobing": 0.875
+          },
+          "PARTIAL_DETAIL": {
+            "on_target_skill_gap": 0.9545,
+            "source_grounded_no_hallucination": 1.0,
+            "focuses_missing_detail": 0.9545,
+            "clear_answerable_depth_fit": 0.5455,
+            "turn2_adapts_to_answer": 0.6818,
+            "avoids_repetition_overprobing": 0.6818
+          },
+          "STRONG_CONTROL": {
+            "on_target_skill_gap": 1.0,
+            "source_grounded_no_hallucination": 1.0,
+            "focuses_missing_detail": 1.0,
+            "clear_answerable_depth_fit": 0.5556,
+            "turn2_adapts_to_answer": 0.3333,
+            "avoids_repetition_overprobing": 0.3333
+          }
+        },
+        "by_scenario": {
+          "CONTRADICT_CV": {
+            "on_target_skill_gap": 0.8333,
+            "source_grounded_no_hallucination": 1.0,
+            "focuses_missing_detail": 0.8333,
+            "clear_answerable_depth_fit": 0.1667,
+            "turn2_adapts_to_answer": 0.6667,
+            "avoids_repetition_overprobing": 0.6667
+          },
+          "NO_EXPERIENCE": {
+            "on_target_skill_gap": 1.0,
+            "source_grounded_no_hallucination": 1.0,
+            "focuses_missing_detail": 1.0,
+            "clear_answerable_depth_fit": 0.7273,
+            "turn2_adapts_to_answer": 0.7273,
+            "avoids_repetition_overprobing": 0.7273
+          },
+          "SUFFICIENT": {
+            "on_target_skill_gap": 1.0,
+            "source_grounded_no_hallucination": 1.0,
+            "focuses_missing_detail": 1.0,
+            "clear_answerable_depth_fit": 0.8333,
+            "turn2_adapts_to_answer": 0.5,
+            "avoids_repetition_overprobing": 0.5
+          },
+          "VAGUE": {
+            "on_target_skill_gap": 1.0,
+            "source_grounded_no_hallucination": 1.0,
+            "focuses_missing_detail": 1.0,
+            "clear_answerable_depth_fit": 0.6667,
+            "turn2_adapts_to_answer": 0.9167,
+            "avoids_repetition_overprobing": 0.9167
+          }
+        }
+      }
+    },
+    "chain_no_verification": {
+      "cases_total": 100,
+      "cases_ok": 64,
+      "error_rate": 0.36,
+      "automated_checks": {
+        "single_task_q1_rate": 1.0,
+        "single_task_q1_ci_95": [
+          0.9434,
+          1.0
+        ],
+        "single_task_q2_rate": 1.0,
+        "missing_code_error_rate_q1": 0.0,
+        "exact_duplicate_q1_q2_rate": 0.0,
+        "mean_q1_q2_sbert_cosine": 0.7018,
+        "q1_q2_sbert_cosine_by_scenario": {
+          "CONTRADICT_CV": 0.7194,
+          "NO_EXPERIENCE": 0.6836,
+          "SUFFICIENT": 0.7099,
+          "VAGUE": 0.7036
+        },
+        "policy_adaptive_match_rate": 0.8906,
+        "policy_adaptive_match_ci_95": [
+          0.791,
+          0.946
+        ],
+        "policy_adaptive_by_scenario": {
+          "CONTRADICT_CV": 1.0,
+          "NO_EXPERIENCE": 1.0,
+          "SUFFICIENT": 0.6667,
+          "VAGUE": 0.9412
+        },
+        "mean_turns_on_c1": 1.766,
+        "mean_question_words": 38.0,
+        "mean_alignment_rejections_per_case": 0.469,
+        "total_alignment_rejections": 30,
+        "total_regen_retries": 34,
+        "mean_prep_seconds": 0.0,
+        "mean_t1_seconds": 5.013,
+        "mean_t2_seconds": 11.478
+      },
+      "verification_telemetry": {
+        "eligible_cv_cases": 44,
+        "prep_success_on_eligible_rate": null,
+        "prep_timeout_count": 0,
+        "prep_batch_fail_count": 0,
+        "jd_fallback_no_focus_count": 64,
+        "jd_fallback_cv_drafts_rejected_count": 0,
+        "cv_source_quotes_exact_rate": null,
+        "cv_source_quotes_count": 0,
+        "jd_source_quotes_exact_rate": null,
+        "jd_source_quotes_count": 0
+      },
+      "blind_independent_judge": {
+        "n_paired": 47,
+        "criteria": {
+          "on_target_skill_gap": {
+            "pass_rate": 0.9362,
+            "ci_95": [
+              0.8284,
+              0.9781
+            ],
+            "mean_score_1_5": 4.787,
+            "std_score": 0.543
+          },
+          "source_grounded_no_hallucination": {
+            "pass_rate": 0.9362,
+            "ci_95": [
+              0.8284,
+              0.9781
+            ],
+            "mean_score_1_5": 4.745,
+            "std_score": 0.785
+          },
+          "focuses_missing_detail": {
+            "pass_rate": 0.9149,
+            "ci_95": [
+              0.8007,
+              0.9664
+            ],
+            "mean_score_1_5": 4.702,
+            "std_score": 0.616
+          },
+          "clear_answerable_depth_fit": {
+            "pass_rate": 0.9362,
+            "ci_95": [
+              0.8284,
+              0.9781
+            ],
+            "mean_score_1_5": 4.319,
+            "std_score": 0.587
+          },
+          "turn2_adapts_to_answer": {
+            "pass_rate": 0.6596,
+            "ci_95": [
+              0.5167,
+              0.7783
+            ],
+            "mean_score_1_5": 3.745,
+            "std_score": 1.577
+          },
+          "avoids_repetition_overprobing": {
+            "pass_rate": 0.7021,
+            "ci_95": [
+              0.5602,
+              0.8135
+            ],
+            "mean_score_1_5": 3.851,
+            "std_score": 1.557
+          }
+        },
+        "ungrounded_cv_claim_rate": 0.0638,
+        "ungrounded_cv_claim_ci_95": [
+          0.0219,
+          0.1716
+        ],
+        "unnecessary_repetition_rate": 0.234,
+        "unnecessary_repetition_ci_95": [
+          0.136,
+          0.3722
+        ],
+        "by_evidence_group": {
+          "NO_CV_EVIDENCE": {
+            "on_target_skill_gap": 1.0,
+            "source_grounded_no_hallucination": 0.9375,
+            "focuses_missing_detail": 1.0,
+            "clear_answerable_depth_fit": 0.9375,
+            "turn2_adapts_to_answer": 0.5,
+            "avoids_repetition_overprobing": 0.5625
+          },
+          "PARTIAL_DETAIL": {
+            "on_target_skill_gap": 0.9091,
+            "source_grounded_no_hallucination": 0.9091,
+            "focuses_missing_detail": 0.8636,
+            "clear_answerable_depth_fit": 0.9091,
+            "turn2_adapts_to_answer": 0.7273,
+            "avoids_repetition_overprobing": 0.7727
+          },
+          "STRONG_CONTROL": {
+            "on_target_skill_gap": 0.8889,
+            "source_grounded_no_hallucination": 1.0,
+            "focuses_missing_detail": 0.8889,
+            "clear_answerable_depth_fit": 1.0,
+            "turn2_adapts_to_answer": 0.7778,
+            "avoids_repetition_overprobing": 0.7778
+          }
+        },
+        "by_scenario": {
+          "CONTRADICT_CV": {
+            "on_target_skill_gap": 0.6667,
+            "source_grounded_no_hallucination": 0.8333,
+            "focuses_missing_detail": 0.6667,
+            "clear_answerable_depth_fit": 0.8333,
+            "turn2_adapts_to_answer": 0.6667,
+            "avoids_repetition_overprobing": 0.6667
+          },
+          "NO_EXPERIENCE": {
+            "on_target_skill_gap": 1.0,
+            "source_grounded_no_hallucination": 0.9091,
+            "focuses_missing_detail": 1.0,
+            "clear_answerable_depth_fit": 0.9091,
+            "turn2_adapts_to_answer": 0.4545,
+            "avoids_repetition_overprobing": 0.4545
+          },
+          "SUFFICIENT": {
+            "on_target_skill_gap": 1.0,
+            "source_grounded_no_hallucination": 1.0,
+            "focuses_missing_detail": 1.0,
+            "clear_answerable_depth_fit": 1.0,
+            "turn2_adapts_to_answer": 0.6667,
+            "avoids_repetition_overprobing": 0.6667
+          },
+          "VAGUE": {
+            "on_target_skill_gap": 0.9167,
+            "source_grounded_no_hallucination": 0.9167,
+            "focuses_missing_detail": 0.8333,
+            "clear_answerable_depth_fit": 0.9167,
+            "turn2_adapts_to_answer": 0.8333,
+            "avoids_repetition_overprobing": 1.0
+          }
+        }
+      }
+    },
+    "chain_full_verification": {
+      "cases_total": 100,
+      "cases_ok": 68,
+      "error_rate": 0.32,
+      "automated_checks": {
+        "single_task_q1_rate": 1.0,
+        "single_task_q1_ci_95": [
+          0.9465,
+          1.0
+        ],
+        "single_task_q2_rate": 1.0,
+        "missing_code_error_rate_q1": 0.0,
+        "exact_duplicate_q1_q2_rate": 0.0,
+        "mean_q1_q2_sbert_cosine": 0.762,
+        "q1_q2_sbert_cosine_by_scenario": {
+          "CONTRADICT_CV": 0.8444,
+          "NO_EXPERIENCE": 0.7629,
+          "SUFFICIENT": 0.7687,
+          "VAGUE": 0.6824
+        },
+        "policy_adaptive_match_rate": 0.8971,
+        "policy_adaptive_match_ci_95": [
+          0.8024,
+          0.9492
+        ],
+        "policy_adaptive_by_scenario": {
+          "CONTRADICT_CV": 1.0,
+          "NO_EXPERIENCE": 1.0,
+          "SUFFICIENT": 0.7619,
+          "VAGUE": 0.875
+        },
+        "mean_turns_on_c1": 1.691,
+        "mean_question_words": 47.0,
+        "mean_alignment_rejections_per_case": 0.676,
+        "total_alignment_rejections": 46,
+        "total_regen_retries": 60,
+        "mean_prep_seconds": 1.995,
+        "mean_t1_seconds": 6.376,
+        "mean_t2_seconds": 11.036
+      },
+      "verification_telemetry": {
+        "eligible_cv_cases": 49,
+        "prep_success_on_eligible_rate": 0.8776,
+        "prep_timeout_count": 0,
+        "prep_batch_fail_count": 0,
+        "jd_fallback_no_focus_count": 25,
+        "jd_fallback_cv_drafts_rejected_count": 10,
+        "cv_source_quotes_exact_rate": 1.0,
+        "cv_source_quotes_count": 67,
+        "jd_source_quotes_exact_rate": 1.0,
+        "jd_source_quotes_count": 49
+      },
+      "blind_independent_judge": {
+        "n_paired": 47,
+        "criteria": {
+          "on_target_skill_gap": {
+            "pass_rate": 0.9787,
+            "ci_95": [
+              0.8889,
+              0.9962
+            ],
+            "mean_score_1_5": 4.894,
+            "std_score": 0.371
+          },
+          "source_grounded_no_hallucination": {
+            "pass_rate": 0.8936,
+            "ci_95": [
+              0.7741,
+              0.9537
+            ],
+            "mean_score_1_5": 4.681,
+            "std_score": 0.656
+          },
+          "focuses_missing_detail": {
+            "pass_rate": 0.9362,
+            "ci_95": [
+              0.8284,
+              0.9781
+            ],
+            "mean_score_1_5": 4.787,
+            "std_score": 0.543
+          },
+          "clear_answerable_depth_fit": {
+            "pass_rate": 0.9362,
+            "ci_95": [
+              0.8284,
+              0.9781
+            ],
+            "mean_score_1_5": 4.362,
+            "std_score": 0.599
+          },
+          "turn2_adapts_to_answer": {
+            "pass_rate": 0.766,
+            "ci_95": [
+              0.6278,
+              0.864
+            ],
+            "mean_score_1_5": 4.106,
+            "std_score": 1.433
+          },
+          "avoids_repetition_overprobing": {
+            "pass_rate": 0.7872,
+            "ci_95": [
+              0.651,
+              0.8801
+            ],
+            "mean_score_1_5": 4.106,
+            "std_score": 1.447
+          }
+        },
+        "ungrounded_cv_claim_rate": 0.1064,
+        "ungrounded_cv_claim_ci_95": [
+          0.0463,
+          0.2259
+        ],
+        "unnecessary_repetition_rate": 0.1702,
+        "unnecessary_repetition_ci_95": [
+          0.0889,
+          0.3014
+        ],
+        "by_evidence_group": {
+          "NO_CV_EVIDENCE": {
+            "on_target_skill_gap": 0.9375,
+            "source_grounded_no_hallucination": 0.9375,
+            "focuses_missing_detail": 0.9375,
+            "clear_answerable_depth_fit": 0.9375,
+            "turn2_adapts_to_answer": 0.75,
+            "avoids_repetition_overprobing": 0.75
+          },
+          "PARTIAL_DETAIL": {
+            "on_target_skill_gap": 1.0,
+            "source_grounded_no_hallucination": 0.8182,
+            "focuses_missing_detail": 0.9091,
+            "clear_answerable_depth_fit": 0.9091,
+            "turn2_adapts_to_answer": 0.7273,
+            "avoids_repetition_overprobing": 0.7727
+          },
+          "STRONG_CONTROL": {
+            "on_target_skill_gap": 1.0,
+            "source_grounded_no_hallucination": 1.0,
+            "focuses_missing_detail": 1.0,
+            "clear_answerable_depth_fit": 1.0,
+            "turn2_adapts_to_answer": 0.8889,
+            "avoids_repetition_overprobing": 0.8889
+          }
+        },
+        "by_scenario": {
+          "CONTRADICT_CV": {
+            "on_target_skill_gap": 1.0,
+            "source_grounded_no_hallucination": 0.8333,
+            "focuses_missing_detail": 0.8333,
+            "clear_answerable_depth_fit": 0.8333,
+            "turn2_adapts_to_answer": 0.8333,
+            "avoids_repetition_overprobing": 0.8333
+          },
+          "NO_EXPERIENCE": {
+            "on_target_skill_gap": 0.9091,
+            "source_grounded_no_hallucination": 0.9091,
+            "focuses_missing_detail": 0.9091,
+            "clear_answerable_depth_fit": 0.9091,
+            "turn2_adapts_to_answer": 0.5455,
+            "avoids_repetition_overprobing": 0.5455
+          },
+          "SUFFICIENT": {
+            "on_target_skill_gap": 1.0,
+            "source_grounded_no_hallucination": 0.8889,
+            "focuses_missing_detail": 0.9444,
+            "clear_answerable_depth_fit": 1.0,
+            "turn2_adapts_to_answer": 0.8333,
+            "avoids_repetition_overprobing": 0.8333
+          },
+          "VAGUE": {
+            "on_target_skill_gap": 1.0,
+            "source_grounded_no_hallucination": 0.9167,
+            "focuses_missing_detail": 1.0,
+            "clear_answerable_depth_fit": 0.9167,
+            "turn2_adapts_to_answer": 0.8333,
+            "avoids_repetition_overprobing": 0.9167
+          }
+        }
+      }
+    }
+  },
+  "paired_mcnemar_tests": {
+    "chain_no_verification_vs_one_shot": {
+      "single_task_q1": {
+        "n_paired": 47,
+        "a_only_pass": 2,
+        "b_only_pass": 0,
+        "diff_a_minus_b": 0.0426,
+        "p_value": 0.5,
+        "significant_0_05": false
+      },
+      "policy_adaptive_match": {
+        "n_paired": 47,
+        "a_only_pass": 11,
+        "b_only_pass": 4,
+        "diff_a_minus_b": 0.1489,
+        "p_value": 0.11847,
+        "significant_0_05": false
+      },
+      "on_target_skill_gap": {
+        "n_paired": 47,
+        "a_only_pass": 1,
+        "b_only_pass": 3,
+        "diff_a_minus_b": -0.0426,
+        "p_value": 0.625,
+        "significant_0_05": false
+      },
+      "source_grounded_no_hallucination": {
+        "n_paired": 47,
+        "a_only_pass": 0,
+        "b_only_pass": 3,
+        "diff_a_minus_b": -0.0638,
+        "p_value": 0.25,
+        "significant_0_05": false
+      },
+      "focuses_missing_detail": {
+        "n_paired": 47,
+        "a_only_pass": 1,
+        "b_only_pass": 4,
+        "diff_a_minus_b": -0.0638,
+        "p_value": 0.375,
+        "significant_0_05": false
+      },
+      "clear_answerable_depth_fit": {
+        "n_paired": 47,
+        "a_only_pass": 15,
+        "b_only_pass": 3,
+        "diff_a_minus_b": 0.2553,
+        "p_value": 0.00754,
+        "significant_0_05": true
+      },
+      "turn2_adapts_to_answer": {
+        "n_paired": 47,
+        "a_only_pass": 14,
+        "b_only_pass": 15,
+        "diff_a_minus_b": -0.0213,
+        "p_value": 1.0,
+        "significant_0_05": false
+      },
+      "avoids_repetition_overprobing": {
+        "n_paired": 47,
+        "a_only_pass": 14,
+        "b_only_pass": 13,
+        "diff_a_minus_b": 0.0213,
+        "p_value": 1.0,
+        "significant_0_05": false
+      },
+      "no_ungrounded_cv_claim": {
+        "n_paired": 47,
+        "a_only_pass": 0,
+        "b_only_pass": 3,
+        "diff_a_minus_b": -0.0638,
+        "p_value": 0.25,
+        "significant_0_05": false
+      },
+      "no_unnecessary_repetition": {
+        "n_paired": 47,
+        "a_only_pass": 10,
+        "b_only_pass": 10,
+        "diff_a_minus_b": 0.0,
+        "p_value": 1.0,
+        "significant_0_05": false
+      }
+    },
+    "chain_full_vs_chain_no_verification": {
+      "single_task_q1": {
+        "n_paired": 47,
+        "a_only_pass": 0,
+        "b_only_pass": 0,
+        "diff_a_minus_b": 0.0,
+        "p_value": 1.0,
+        "significant_0_05": false
+      },
+      "policy_adaptive_match": {
+        "n_paired": 47,
+        "a_only_pass": 3,
+        "b_only_pass": 1,
+        "diff_a_minus_b": 0.0426,
+        "p_value": 0.625,
+        "significant_0_05": false
+      },
+      "on_target_skill_gap": {
+        "n_paired": 47,
+        "a_only_pass": 3,
+        "b_only_pass": 1,
+        "diff_a_minus_b": 0.0426,
+        "p_value": 0.625,
+        "significant_0_05": false
+      },
+      "source_grounded_no_hallucination": {
+        "n_paired": 47,
+        "a_only_pass": 3,
+        "b_only_pass": 5,
+        "diff_a_minus_b": -0.0426,
+        "p_value": 0.72656,
+        "significant_0_05": false
+      },
+      "focuses_missing_detail": {
+        "n_paired": 47,
+        "a_only_pass": 3,
+        "b_only_pass": 2,
+        "diff_a_minus_b": 0.0213,
+        "p_value": 1.0,
+        "significant_0_05": false
+      },
+      "clear_answerable_depth_fit": {
+        "n_paired": 47,
+        "a_only_pass": 1,
+        "b_only_pass": 1,
+        "diff_a_minus_b": 0.0,
+        "p_value": 1.0,
+        "significant_0_05": false
+      },
+      "turn2_adapts_to_answer": {
+        "n_paired": 47,
+        "a_only_pass": 6,
+        "b_only_pass": 1,
+        "diff_a_minus_b": 0.1064,
+        "p_value": 0.125,
+        "significant_0_05": false
+      },
+      "avoids_repetition_overprobing": {
+        "n_paired": 47,
+        "a_only_pass": 5,
+        "b_only_pass": 1,
+        "diff_a_minus_b": 0.0851,
+        "p_value": 0.21875,
+        "significant_0_05": false
+      },
+      "no_ungrounded_cv_claim": {
+        "n_paired": 47,
+        "a_only_pass": 3,
+        "b_only_pass": 5,
+        "diff_a_minus_b": -0.0426,
+        "p_value": 0.72656,
+        "significant_0_05": false
+      },
+      "no_unnecessary_repetition": {
+        "n_paired": 47,
+        "a_only_pass": 3,
+        "b_only_pass": 0,
+        "diff_a_minus_b": 0.0638,
+        "p_value": 0.25,
+        "significant_0_05": false
+      }
+    },
+    "chain_full_vs_one_shot": {
+      "single_task_q1": {
+        "n_paired": 47,
+        "a_only_pass": 2,
+        "b_only_pass": 0,
+        "diff_a_minus_b": 0.0426,
+        "p_value": 0.5,
+        "significant_0_05": false
+      },
+      "policy_adaptive_match": {
+        "n_paired": 47,
+        "a_only_pass": 12,
+        "b_only_pass": 3,
+        "diff_a_minus_b": 0.1915,
+        "p_value": 0.03516,
+        "significant_0_05": true
+      },
+      "on_target_skill_gap": {
+        "n_paired": 47,
+        "a_only_pass": 1,
+        "b_only_pass": 1,
+        "diff_a_minus_b": 0.0,
+        "p_value": 1.0,
+        "significant_0_05": false
+      },
+      "source_grounded_no_hallucination": {
+        "n_paired": 47,
+        "a_only_pass": 0,
+        "b_only_pass": 5,
+        "diff_a_minus_b": -0.1064,
+        "p_value": 0.0625,
+        "significant_0_05": false
+      },
+      "focuses_missing_detail": {
+        "n_paired": 47,
+        "a_only_pass": 1,
+        "b_only_pass": 3,
+        "diff_a_minus_b": -0.0426,
+        "p_value": 0.625,
+        "significant_0_05": false
+      },
+      "clear_answerable_depth_fit": {
+        "n_paired": 47,
+        "a_only_pass": 15,
+        "b_only_pass": 3,
+        "diff_a_minus_b": 0.2553,
+        "p_value": 0.00754,
+        "significant_0_05": true
+      },
+      "turn2_adapts_to_answer": {
+        "n_paired": 47,
+        "a_only_pass": 15,
+        "b_only_pass": 11,
+        "diff_a_minus_b": 0.0851,
+        "p_value": 0.5572,
+        "significant_0_05": false
+      },
+      "avoids_repetition_overprobing": {
+        "n_paired": 47,
+        "a_only_pass": 15,
+        "b_only_pass": 10,
+        "diff_a_minus_b": 0.1064,
+        "p_value": 0.42436,
+        "significant_0_05": false
+      },
+      "no_ungrounded_cv_claim": {
+        "n_paired": 47,
+        "a_only_pass": 0,
+        "b_only_pass": 5,
+        "diff_a_minus_b": -0.1064,
+        "p_value": 0.0625,
+        "significant_0_05": false
+      },
+      "no_unnecessary_repetition": {
+        "n_paired": 47,
+        "a_only_pass": 11,
+        "b_only_pass": 8,
+        "diff_a_minus_b": 0.0638,
+        "p_value": 0.64761,
+        "significant_0_05": false
+      }
+    }
+  }
+}

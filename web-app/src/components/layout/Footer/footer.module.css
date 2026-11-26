@@ -1,0 +1,87 @@
+.footer {
+  position: relative;
+  width: 100%;
+  margin-top: auto;
+  border-top: 1px solid #eee8dc;
+  background: #f8f3e8;
+  color: #33483b;
+}
+
+.footer::before {
+  position: absolute;
+  top: -1px;
+  right: 0;
+  left: 0;
+  height: 2px;
+  background: #d7e2d6;
+  content: '';
+}
+
+.inner {
+  display: grid;
+  grid-template-columns: minmax(220px, 2fr) repeat(3, minmax(115px, 1fr)) minmax(210px, 1.55fr);
+  gap: 2.25rem;
+  width: min(100% - 3rem, 1360px);
+  margin-inline: auto;
+  padding: 3.5rem 0 2.75rem;
+}
+
+.brandColumn { max-width: 20rem; }
+.brand { display: inline-flex; align-items: center; gap: 0.4rem; color: #113426; text-decoration: none; }
+.logo { display: block; width: 3rem; height: 3rem; object-fit: contain; }
+.brandCopy { display: flex; flex-direction: column; gap: 0.18rem; }
+.brandName { font-family: var(--font-sans); font-size: 1.12rem; line-height: 1; letter-spacing: -0.02em; }
+.tagline { color: #66746a; font-size: 0.5rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+.description { max-width: 20rem; margin-top: 1rem; color: #667168; font-size: 0.78rem; line-height: 1.75; }
+
+.linkColumn, .contactColumn { padding-top: 0.55rem; }
+.columnTitle { margin-bottom: 1rem; color: #24392d; font-size: 0.82rem; font-weight: 700; }
+.linkList { display: flex; flex-direction: column; gap: 0.72rem; margin: 0; padding: 0; list-style: none; }
+.link { display: inline-flex; align-items: center; gap: 0.25rem; color: #68736a; font-size: 0.75rem; line-height: 1.5; text-decoration: none; transition: color 150ms ease; }
+.link svg { opacity: 0; transition: opacity 150ms ease, transform 150ms ease; }
+.link:hover { color: #244f3b; }
+.link:hover svg { opacity: 1; transform: translate(1px, -1px); }
+
+.contactIntro { margin: -0.15rem 0 0.9rem; color: #68736a; font-size: 0.74rem; line-height: 1.65; }
+.contactLink { display: flex; align-items: flex-start; gap: 0.55rem; margin-top: 0.7rem; color: #506056; font-size: 0.73rem; line-height: 1.55; text-decoration: none; }
+.contactLink svg { flex: 0 0 auto; margin-top: 0.08rem; color: #587060; }
+a.contactLink:hover { color: #244f3b; }
+
+.bottom { display: flex; align-items: center; justify-content: space-between; gap: 1rem; width: min(100% - 3rem, 1360px); margin-inline: auto; padding: 1.1rem 0; border-top: 1px solid #e9e4d8; color: #788078; font-size: 0.68rem; }
+.backToTop { display: inline-flex; align-items: center; gap: 0.35rem; color: #66746a; text-decoration: none; }
+.backToTop:hover { color: #244f3b; }
+
+@media (max-width: 1100px) {
+  .inner { grid-template-columns: minmax(220px, 1.6fr) repeat(2, minmax(120px, 1fr)) minmax(210px, 1.5fr); }
+  .contactColumn { grid-column: 2 / -1; }
+}
+
+@media (max-width: 700px) {
+  .inner { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2rem 1.25rem; width: min(100% - 2rem, 1360px); padding: 2.75rem 0 2rem; }
+  .brandColumn, .contactColumn { grid-column: 1 / -1; }
+  .contactColumn { max-width: 24rem; }
+  .bottom { width: min(100% - 2rem, 1360px); font-size: 0.64rem; }
+}
+
+@media screen {
+  :global(.dark) .footer { border-color: var(--border); background: var(--card); color: var(--foreground); }
+  :global(.dark) .footer::before { background: var(--border); }
+  :global(.dark) :is(.brand, .columnTitle) { color: var(--foreground); }
+  :global(.dark) :is(.tagline, .description, .link, .contactIntro, .contactLink, .bottom, .backToTop) { color: var(--muted-foreground); }
+  :global(.dark) :is(.link:hover, a.contactLink:hover, .contactLink svg, .backToTop:hover) { color: #a5d4bb; }
+  :global(.dark) .bottom { border-color: var(--border); }
+}
+
+.bottomActions { display: flex; align-items: center; flex-wrap: wrap; gap: 0.75rem; }
+.systemTheme { display: inline-flex; align-items: center; gap: 0.3rem; min-height: 1.65rem; cursor: pointer; }
+.systemTheme:hover { text-decoration: underline; }
+.systemTheme:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.systemTheme[aria-pressed='true'] { color: var(--foreground); font-weight: 650; }
+
+@media (max-width: 700px) {
+  .bottom { flex-wrap: wrap; }
+}
+
+@media print {
+  .systemTheme { display: none; }
+}

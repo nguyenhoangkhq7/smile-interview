@@ -1,0 +1,246 @@
+"""
+LangGraph StateGraph Orchestrator for Module 2 (Skill-Gap Detection).
+
+Implements parallel Fan-out / Fan-in execution:
+  START ---> [node_segment_cv] ---\
+        ---> [node_parse_jd]   ----+--> [node_estimate_proficiencies (Parallel N skills)]
+                                         --> [node_detect_gaps (Deterministic 0ms)]
+                                         --> END
+"""
+
+from concurrent.futures import ThreadPoolExecutor
+import logging
+from typing import List, Optional, Tuple, TypedDict
+import uuid
+
+from langgraph.graph import END, START, StateGraph
+
+logger = logging.getLogger(__name__)
+
+from skill_gap.adapters.config import AppConfig
+from skill_gap.adapters.llm_client import LLMClient
+from skill_gap.domain.models import (
+    ExtractedCVSkill,
+    ExtractedJDSkill,
+    JDParserOutput,
+    MatchResult,
+    ProficiencyResult,
+    SegmenterOutput,
+    SkillGapReportSummary,
+    SkillGapResult,
+)
+from skill_gap.services.gap_detector import GapDetector
+from skill_gap.services.jd_requirement_parser import JDRequirementParser
+from skill_gap.services.proficiency_estimator import ProficiencyEstimator, ProficiencyEstimating
+from skill_gap.services.resume_segmenter import ResumeSegmenter
+
+
+class SkillGapGraphState(TypedDict, total=False):
+    """State schema passed through the compiled LangGraph StateGraph."""
+
+    analysis_id: str
+    cv_text: str
+    jd_text: str
+    cv_skills: List[ExtractedCVSkill]
+    jd_skills: List[ExtractedJDSkill]
+    match_results: List[MatchResult]
+
+    # Parallel Fan-out intermediate outputs
+    segment_output: SegmenterOutput
+    jd_parser_output: JDParserOutput
+
+    # Parallel Fan-in outputs
+    proficiencies: List[ProficiencyResult]
+    gap_results: List[SkillGapResult]
+
+
+class SkillGapWorkflow:
+    """
+    LangGraph `StateGraph` orchestrating Module 2 (Skill-Gap Detection) with parallel execution.
+    """
+
+    def __init__(
+        self,
+        llm_client: LLMClient,
+        config: Optional[AppConfig] = None,
+        estimator: Optional[ProficiencyEstimating] = None,
+        segmenter: Optional[ResumeSegmenter] = None,
+        jd_parser: Optional[JDRequirementParser] = None,
+        gap_detector: Optional[GapDetector] = None,
+        max_workers: int = 8,
+    ) -> None:
+        self.llm_client = llm_client
+        self.config = config or AppConfig()
+        self.segmenter = segmenter or ResumeSegmenter(self.llm_client, self.config)
+        self.jd_parser = jd_parser or JDRequirementParser(self.llm_client, self.config)
+        self.estimator = estimator or ProficiencyEstimator(self.llm_client, self.config)
+        self.gap_detector = gap_detector or GapDetector(self.llm_client, self.config)
+        self.max_workers = max_workers
+        self.graph = self._build_langgraph()
+
+    def _build_langgraph(self):
+        builder = StateGraph(SkillGapGraphState)
+
+        builder.add_node("segment_cv", self._node_segment_cv)
+        builder.add_node("parse_jd", self._node_parse_jd)
+        builder.add_node("estimate_proficiencies", self._node_estimate_proficiencies)
+        builder.add_node("detect_gaps", self._node_detect_gaps)
+
+        # Fan-out: Run Step 1 (CV Segmentation) and Step 2 (JD Parsing) in parallel
+        builder.add_edge(START, "segment_cv")
+        builder.add_edge(START, "parse_jd")
+
+        # Fan-in: Wait for both branches before running Step 3 (Proficiency Estimation)
+        builder.add_edge(["segment_cv", "parse_jd"], "estimate_proficiencies")
+
+        # Sequential deterministic post-processing (Step 4)
+        builder.add_edge("estimate_proficiencies", "detect_gaps")
+        builder.add_edge("detect_gaps", END)
+
+        return builder.compile()
+
+    def _filter_active_cv_skills(
+        self,
+        cv_skills: List[ExtractedCVSkill],
+        match_results: List[MatchResult],
+    ) -> List[ExtractedCVSkill]:
+        """
+        Target-Driven Active-Skill Pruning:
+        Only retain CV skills that are matched to at least one JD skill with
+        `soft_match >= floor_threshold`. Unreferenced CV skills or rejected MISSING
+        matches (`soft_match < floor_threshold`) do not need span mapping or LLM richness analysis.
+        """
+        if not match_results:
+            return cv_skills
+        floor_tau = self.config.thresholds.floor_threshold
+        active_ids = {
+            m.matched_cv_skill_id
+            for m in match_results
+            if m.soft_match >= floor_tau and m.matched_cv_skill_id
+        }
+        return [s for s in cv_skills if s.skill_id in active_ids]
+
+    def _node_segment_cv(self, state: SkillGapGraphState) -> SkillGapGraphState:
+        logger.info("[LangGraph] Parallel branch 1A: Resume segmentation")
+        active_cv_skills = self._filter_active_cv_skills(
+            state.get("cv_skills", []),
+            state.get("match_results", []),
+        )
+        segment_output = self.segmenter.segment(
+            cv_text=state["cv_text"],
+            cv_skills=active_cv_skills,
+        )
+        return {"segment_output": segment_output}
+
+    def _node_parse_jd(self, state: SkillGapGraphState) -> SkillGapGraphState:
+        logger.info("[LangGraph] Parallel branch 1B: JD requirement parsing")
+        jd_parser_output = self.jd_parser.parse(
+            jd_text=state["jd_text"],
+            jd_skills=state.get("jd_skills", []),
+        )
+        return {"jd_parser_output": jd_parser_output}
+
+    def _node_estimate_proficiencies(self, state: SkillGapGraphState) -> SkillGapGraphState:
+        active_cv_skills = self._filter_active_cv_skills(
+            state.get("cv_skills", []),
+            state.get("match_results", []),
+        )
+        segment_output = state["segment_output"]
+        logger.info(
+            "[LangGraph] Step 2 (Fan-in): Batch proficiency estimation for %d active CV skills",
+            len(active_cv_skills),
+        )
+
+        if not active_cv_skills:
+            return {"proficiencies": []}
+
+        # Use deduplicated single-call batch estimation if supported by estimator
+        if hasattr(self.estimator, "estimate_batch"):
+            proficiencies = self.estimator.estimate_batch(
+                skills=active_cv_skills,
+                mappings=segment_output.span_mappings,
+                job_blocks=segment_output.job_blocks,
+            )
+            return {"proficiencies": proficiencies}
+
+        def _estimate_single(skill: ExtractedCVSkill) -> ProficiencyResult:
+            return self.estimator.estimate(
+                skill=skill,
+                mappings=segment_output.span_mappings,
+                job_blocks=segment_output.job_blocks,
+            )
+
+        if len(active_cv_skills) == 1 or self.max_workers <= 1:
+            proficiencies = [_estimate_single(s) for s in active_cv_skills]
+        else:
+            workers = min(self.max_workers, len(active_cv_skills))
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                proficiencies = list(pool.map(_estimate_single, active_cv_skills))
+
+        return {"proficiencies": proficiencies}
+
+    def _node_detect_gaps(self, state: SkillGapGraphState) -> SkillGapGraphState:
+        logger.info("[LangGraph] Step 3: Deterministic skill-gap quantification")
+        segment_output = state["segment_output"]
+        jd_parser_output = state["jd_parser_output"]
+        proficiencies = state.get("proficiencies", [])
+
+        upstream_degraded = bool(segment_output.degraded or jd_parser_output.degraded)
+        upstream_flags = list(segment_output.flags) + list(jd_parser_output.flags)
+
+        gap_results = self.gap_detector.detect(
+            requirements=jd_parser_output.requirements,
+            proficiencies=proficiencies,
+            matches=state.get("match_results", []),
+            cv_skills=state.get("cv_skills", []),
+            job_blocks=segment_output.job_blocks,
+            span_mappings=segment_output.span_mappings,
+            upstream_degraded=upstream_degraded,
+            upstream_flags=upstream_flags,
+        )
+        jd_skills = {skill.skill_id: skill for skill in state.get("jd_skills", [])}
+        cv_skills = {skill.skill_id: skill for skill in state.get("cv_skills", [])}
+        for result in gap_results:
+            jd_skill = jd_skills.get(result.jd_skill_id)
+            cv_skill = cv_skills.get(result.matched_cv_skill_id)
+            if jd_skill and not result.job_tasks:
+                result.jd_evidence_spans = list(jd_skill.evidence_spans)
+            result.jd_skill_name = jd_skill.skill_name if jd_skill else None
+            result.matched_cv_skill_name = cv_skill.skill_name if cv_skill else None
+        return {"gap_results": gap_results}
+
+    def invoke(
+        self,
+        cv_text: str,
+        jd_text: str,
+        cv_skills: List[ExtractedCVSkill],
+        jd_skills: List[ExtractedJDSkill],
+        match_results: List[MatchResult],
+        analysis_id: Optional[str] = None,
+    ) -> Tuple[List[SkillGapResult], SkillGapReportSummary, SkillGapGraphState]:
+        aid = analysis_id or str(uuid.uuid4())
+        final_state: SkillGapGraphState = self.graph.invoke(
+            {
+                "analysis_id": aid,
+                "cv_text": cv_text,
+                "jd_text": jd_text,
+                "cv_skills": list(cv_skills),
+                "jd_skills": list(jd_skills),
+                "match_results": list(match_results),
+            }
+        )
+        segment_output = final_state.get("segment_output")
+        jd_parser_output = final_state["jd_parser_output"]
+        gap_results = final_state["gap_results"]
+        degraded = bool(
+            (segment_output and segment_output.degraded)
+            or jd_parser_output.degraded
+            or (segment_output and segment_output.flags)
+            or jd_parser_output.flags
+            or any(g.degraded for g in gap_results)
+        )
+        return (
+            gap_results,
+            SkillGapReportSummary(degraded=degraded),
+            final_state,
+        )

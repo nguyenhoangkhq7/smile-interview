@@ -1,0 +1,22 @@
+# Exclude IDE and Git files
+.git/
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+
+# Exclude build directories
+target/
+build/
+bin/
+out/
+
+# Exclude help and log files
+HELP.md
+*.log
+logs/
+
+# Runtime configuration
+**/.env
+**/.env.*

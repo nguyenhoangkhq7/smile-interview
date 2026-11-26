@@ -1,0 +1,115 @@
+{
+  "analyze.predict": {
+    "traces": [],
+    "train": [],
+    "demos": [
+      {
+        "skill_id": "linux",
+        "spans_text": "- Tự động hóa cấu hình 100+ server Linux bằng Ansible và thiết kế hệ thống lưu trữ HA.\n- Tham gia hỗ trợ môi trường server Linux cơ bản cùng team vận hành",
+        "reasoning": "1. Span 'Tự động hóa cấu hình 100+ server Linux bằng Ansible và thiết kế hệ thống lưu trữ HA.' mô tả tác vụ kỹ thuật chuyên sâu và quy mô 100+ server -> RICH_CONTEXT.\n2. Span 'Tham gia hỗ trợ môi trường server Linux cơ bản cùng team vận hành' diễn đạt mơ hồ ('Tham gia hỗ trợ... cơ bản'), không rõ ứng viên trực tiếp làm tác vụ gì -> AMBIGUOUS.",
+        "analyses": [
+          {
+            "span": "Tự động hóa cấu hình 100+ server Linux bằng Ansible và thiết kế hệ thống lưu trữ HA.",
+            "richness_label": "RICH_CONTEXT",
+            "modifier_score": null
+          },
+          {
+            "span": "Tham gia hỗ trợ môi trường server Linux cơ bản cùng team vận hành",
+            "richness_label": "AMBIGUOUS",
+            "modifier_score": null
+          }
+        ]
+      },
+      {
+        "skill_id": "react",
+        "spans_text": "- Phát triển SPA Dashboard bằng React.js và Redux, tối ưu thời gian tải trang giảm 40%.\n- Có tìm hiểu và hỗ trợ chỉnh sửa giao diện React nhỏ lẻ trong thời gian thực tập.\n- Kỹ năng tổng hợp: React, Vue, Angular, Docker",
+        "reasoning": "1. Span 1 mô tả rõ việc phát triển SPA Dashboard bằng React.js/Redux kèm kết quả định lượng (giảm 40% thời gian tải trang) -> RICH_CONTEXT.\n2. Span 2 nêu mức độ tiếp xúc sơ khởi, thụ động ('Có tìm hiểu và hỗ trợ chỉnh sửa... nhỏ lẻ') -> AMBIGUOUS.\n3. Span 3 là danh sách từ khóa tổng hợp cuối CV -> LIST_ONLY.",
+        "analyses": [
+          {
+            "span": "Phát triển SPA Dashboard bằng React.js và Redux, tối ưu thời gian tải trang giảm 40%.",
+            "richness_label": "RICH_CONTEXT",
+            "modifier_score": null
+          },
+          {
+            "span": "Có tìm hiểu và hỗ trợ chỉnh sửa giao diện React nhỏ lẻ trong thời gian thực tập.",
+            "richness_label": "AMBIGUOUS",
+            "modifier_score": null
+          },
+          {
+            "span": "Kỹ năng tổng hợp: React, Vue, Angular, Docker",
+            "richness_label": "LIST_ONLY",
+            "modifier_score": null
+          }
+        ]
+      },
+      {
+        "skill_id": "kubernetes",
+        "spans_text": "- Thiết kế và vận hành hạ tầng Kubernetes cho 50+ microservices.\n- Kỹ năng: Docker, Kubernetes, Helm",
+        "reasoning": "1. Span 'Thiết kế và vận hành hạ tầng Kubernetes cho 50+ microservices.' mô tả hành động kỹ thuật cụ thể ('Thiết kế và vận hành') kèm quy mô hệ thống thực tế ('50+ microservices') -> phân loại RICH_CONTEXT.\n2. Span 'Kỹ năng: Docker, Kubernetes, Helm' chỉ là danh sách từ khóa cách nhau bởi dấu phẩy, không có ngữ cảnh dự án -> phân loại LIST_ONLY.",
+        "analyses": [
+          {
+            "span": "Thiết kế và vận hành hạ tầng Kubernetes cho 50+ microservices.",
+            "richness_label": "RICH_CONTEXT",
+            "modifier_score": null
+          },
+          {
+            "span": "Kỹ năng: Docker, Kubernetes, Helm",
+            "richness_label": "LIST_ONLY",
+            "modifier_score": null
+          }
+        ]
+      },
+      {
+        "skill_id": "kafka",
+        "spans_text": "- Xây dựng hệ thống message queue với Kafka phục vụ 1M event/ngày\n- Xây dựng hệ thống event streaming với Kafka 2 năm\n- Kỹ năng: Kafka, RabbitMQ, Redis",
+        "reasoning": "1. Span 'Xây dựng hệ thống message queue với Kafka phục vụ 1M event/ngày' có hành động xây dựng hệ thống và chỉ số thông lượng sản phẩm thực tế (1M event/ngày) -> RICH_CONTEXT.\n2. Span 'Xây dựng hệ thống event streaming với Kafka 2 năm' nêu rõ ứng dụng thực tế xây dựng event streaming -> RICH_CONTEXT.\n3. Span 'Kỹ năng: Kafka, RabbitMQ, Redis' chỉ liệt kê tên công nghệ -> LIST_ONLY.",
+        "analyses": [
+          {
+            "span": "Xây dựng hệ thống message queue với Kafka phục vụ 1M event/ngày",
+            "richness_label": "RICH_CONTEXT",
+            "modifier_score": null
+          },
+          {
+            "span": "Xây dựng hệ thống event streaming với Kafka 2 năm",
+            "richness_label": "RICH_CONTEXT",
+            "modifier_score": null
+          },
+          {
+            "span": "Kỹ năng: Kafka, RabbitMQ, Redis",
+            "richness_label": "LIST_ONLY",
+            "modifier_score": null
+          }
+        ]
+      }
+    ],
+    "signature": {
+      "instructions": "Analyze each CV evidence span for a given candidate skill (or batch of skills) and classify its contextual richness into `RICH_CONTEXT`, `LIST_ONLY`, or `AMBIGUOUS`.\n\nStrict Classification Rubric:\n1. RICH_CONTEXT:\n   - The span describes concrete project application, real engineering tasks, architectural actions, production scale/metrics, or specific problem-solving using the skill (e.g., 'Thiết kế và vận hành hạ tầng Kubernetes cho 50+ microservices', 'Xây dựng hệ thống event streaming với Kafka 2 năm').\n2. LIST_ONLY:\n   - The span is merely a keyword list (e.g., 'Kỹ năng: Docker, Kubernetes, Helm', 'React, Vue, Angular') OR a generic, ungrounded self-claim without any project/task action (e.g., 'Proficient in Java Core', 'Thành thạo Python').\n3. AMBIGUOUS:\n   - The span mentions the skill in a vague, passive, or peripheral support statement where real hands-on project depth is unclear (e.g., 'Tham gia hỗ trợ môi trường Linux cơ bản', 'Làm quen với quy trình CI/CD của team').\n4. Verbatim Span Preservation:\n   - Return an entry in `analyses` for EVERY input span in `spans_text`, copying the `span` text verbatim without the leading '- ' bullet.",
+      "fields": [
+        {
+          "prefix": "Skill Id:",
+          "description": "Identifier of the candidate skill(s) being evaluated (e.g., 'kubernetes', 'kafka, java')"
+        },
+        {
+          "prefix": "Spans Text:",
+          "description": "Bulleted list of verbatim CV evidence spans to classify"
+        },
+        {
+          "prefix": "Reasoning:",
+          "description": "${reasoning}"
+        },
+        {
+          "prefix": "Analyses:",
+          "description": "List of SpanRichness objects for each input span with richness_label (RICH_CONTEXT, LIST_ONLY, AMBIGUOUS)"
+        }
+      ]
+    },
+    "lm": null
+  },
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.14",
+      "dspy": "3.4.1",
+      "cloudpickle": "3.1"
+    }
+  }
+}

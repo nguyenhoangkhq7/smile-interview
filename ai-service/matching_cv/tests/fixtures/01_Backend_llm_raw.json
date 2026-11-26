@@ -1,0 +1,503 @@
+{
+    "cv": {
+        "filename": "01_Backend_CV.pdf",
+        "file_type": "pdf",
+        "total_pages": 1,
+        "total_extracted": 51,
+        "explicit_skills": [
+            {
+                "mention": "Java",
+                "category": "Technology/Tool",
+                "source_sentence": "Backend engineer with 4 years of experience building and scaling Java/Spring Boot microservices for e-commerce and fintech platforms."
+            },
+            {
+                "mention": "Spring Boot",
+                "category": "Technology/Tool",
+                "source_sentence": "Backend engineer with 4 years of experience building and scaling Java/Spring Boot microservices for e-commerce and fintech platforms."
+            },
+            {
+                "mention": "microservices",
+                "category": "Technical Concept",
+                "source_sentence": "Backend engineer with 4 years of experience building and scaling Java/Spring Boot microservices for e-commerce and fintech platforms."
+            },
+            {
+                "mention": "e-commerce",
+                "category": "Domain Knowledge",
+                "source_sentence": "Backend engineer with 4 years of experience building and scaling Java/Spring Boot microservices for e-commerce and fintech platforms."
+            },
+            {
+                "mention": "fintech",
+                "category": "Domain Knowledge",
+                "source_sentence": "Backend engineer with 4 years of experience building and scaling Java/Spring Boot microservices for e-commerce and fintech platforms."
+            },
+            {
+                "mention": "relational database design",
+                "category": "Technical Concept",
+                "source_sentence": "Strong background in relational database design, REST API development, and message-driven architectures."
+            },
+            {
+                "mention": "REST API development",
+                "category": "Technical Concept",
+                "source_sentence": "Strong background in relational database design, REST API development, and message-driven architectures."
+            },
+            {
+                "mention": "message-driven architectures",
+                "category": "Technical Concept",
+                "source_sentence": "Strong background in relational database design, REST API development, and message-driven architectures."
+            },
+            {
+                "mention": "production monitoring",
+                "category": "Engineering Practice",
+                "source_sentence": "Comfortable owning a service from design through production monitoring."
+            },
+            {
+                "mention": "Java",
+                "category": "Technology/Tool",
+                "source_sentence": "Languages: Java (primary), SQL, some Python for tooling scripts"
+            },
+            {
+                "mention": "SQL",
+                "category": "Technology/Tool",
+                "source_sentence": "Languages: Java (primary), SQL, some Python for tooling scripts"
+            },
+            {
+                "mention": "Python",
+                "category": "Technology/Tool",
+                "source_sentence": "Languages: Java (primary), SQL, some Python for tooling scripts"
+            },
+            {
+                "mention": "Spring Boot",
+                "category": "Technology/Tool",
+                "source_sentence": "Frameworks: Spring Boot, Spring Data JPA, Spring Security, Hibernate"
+            },
+            {
+                "mention": "Spring Data JPA",
+                "category": "Technology/Tool",
+                "source_sentence": "Frameworks: Spring Boot, Spring Data JPA, Spring Security, Hibernate"
+            },
+            {
+                "mention": "Spring Security",
+                "category": "Technology/Tool",
+                "source_sentence": "Frameworks: Spring Boot, Spring Data JPA, Spring Security, Hibernate"
+            },
+            {
+                "mention": "Hibernate",
+                "category": "Technology/Tool",
+                "source_sentence": "Frameworks: Spring Boot, Spring Data JPA, Spring Security, Hibernate"
+            },
+            {
+                "mention": "PostgreSQL",
+                "category": "Technology/Tool",
+                "source_sentence": "Data: PostgreSQL, MySQL, Redis (caching, rate limiting)"
+            },
+            {
+                "mention": "MySQL",
+                "category": "Technology/Tool",
+                "source_sentence": "Data: PostgreSQL, MySQL, Redis (caching, rate limiting)"
+            },
+            {
+                "mention": "Redis",
+                "category": "Technology/Tool",
+                "source_sentence": "Data: PostgreSQL, MySQL, Redis (caching, rate limiting)"
+            },
+            {
+                "mention": "caching",
+                "category": "Technical Concept",
+                "source_sentence": "Data: PostgreSQL, MySQL, Redis (caching, rate limiting)"
+            },
+            {
+                "mention": "rate limiting",
+                "category": "Technical Concept",
+                "source_sentence": "Data: PostgreSQL, MySQL, Redis (caching, rate limiting)"
+            },
+            {
+                "mention": "Apache Kafka",
+                "category": "Technology/Tool",
+                "source_sentence": "Messaging & infra: Apache Kafka, RabbitMQ, Docker, basic Kubernetes"
+            },
+            {
+                "mention": "RabbitMQ",
+                "category": "Technology/Tool",
+                "source_sentence": "Messaging & infra: Apache Kafka, RabbitMQ, Docker, basic Kubernetes"
+            },
+            {
+                "mention": "Docker",
+                "category": "Technology/Tool",
+                "source_sentence": "Messaging & infra: Apache Kafka, RabbitMQ, Docker, basic Kubernetes"
+            },
+            {
+                "mention": "Kubernetes",
+                "category": "Technology/Tool",
+                "source_sentence": "Messaging & infra: Apache Kafka, RabbitMQ, Docker, basic Kubernetes"
+            },
+            {
+                "mention": "JUnit 5",
+                "category": "Technology/Tool",
+                "source_sentence": "Testing & tooling: JUnit 5, Mockito, Testcontainers, Maven, Git, Jenkins"
+            },
+            {
+                "mention": "Mockito",
+                "category": "Technology/Tool",
+                "source_sentence": "Testing & tooling: JUnit 5, Mockito, Testcontainers, Maven, Git, Jenkins"
+            },
+            {
+                "mention": "Testcontainers",
+                "category": "Technology/Tool",
+                "source_sentence": "Testing & tooling: JUnit 5, Mockito, Testcontainers, Maven, Git, Jenkins"
+            },
+            {
+                "mention": "Maven",
+                "category": "Technology/Tool",
+                "source_sentence": "Testing & tooling: JUnit 5, Mockito, Testcontainers, Maven, Git, Jenkins"
+            },
+            {
+                "mention": "Git",
+                "category": "Technology/Tool",
+                "source_sentence": "Testing & tooling: JUnit 5, Mockito, Testcontainers, Maven, Git, Jenkins"
+            },
+            {
+                "mention": "Jenkins",
+                "category": "Technology/Tool",
+                "source_sentence": "Testing & tooling: JUnit 5, Mockito, Testcontainers, Maven, Git, Jenkins"
+            },
+            {
+                "mention": "order-management microservice",
+                "category": "Technical Concept",
+                "source_sentence": "Own the order-management microservice (Spring Boot, PostgreSQL) handling ~120k orders/day; reduced p95 API latency by 38% through query indexing and Redis caching."
+            },
+            {
+                "mention": "Spring Boot",
+                "category": "Technology/Tool",
+                "source_sentence": "Own the order-management microservice (Spring Boot, PostgreSQL) handling ~120k orders/day; reduced p95 API latency by 38% through query indexing and Redis caching."
+            },
+            {
+                "mention": "PostgreSQL",
+                "category": "Technology/Tool",
+                "source_sentence": "Own the order-management microservice (Spring Boot, PostgreSQL) handling ~120k orders/day; reduced p95 API latency by 38% through query indexing and Redis caching."
+            },
+            {
+                "mention": "query indexing",
+                "category": "Engineering Practice",
+                "source_sentence": "Own the order-management microservice (Spring Boot, PostgreSQL) handling ~120k orders/day; reduced p95 API latency by 38% through query indexing and Redis caching."
+            },
+            {
+                "mention": "Redis caching",
+                "category": "Technical Concept",
+                "source_sentence": "Own the order-management microservice (Spring Boot, PostgreSQL) handling ~120k orders/day; reduced p95 API latency by 38% through query indexing and Redis caching."
+            },
+            {
+                "mention": "Kafka-based event pipeline",
+                "category": "Technical Concept",
+                "source_sentence": "Designed and rolled out a Kafka-based event pipeline to decouple inventory updates from checkout, cutting checkout failures during flash sales by roughly 60%."
+            },
+            {
+                "mention": "inventory updates",
+                "category": "Domain Knowledge",
+                "source_sentence": "Designed and rolled out a Kafka-based event pipeline to decouple inventory updates from checkout, cutting checkout failures during flash sales by roughly 60%."
+            },
+            {
+                "mention": "checkout",
+                "category": "Domain Knowledge",
+                "source_sentence": "Designed and rolled out a Kafka-based event pipeline to decouple inventory updates from checkout, cutting checkout failures during flash sales by roughly 60%."
+            },
+            {
+                "mention": "integration tests",
+                "category": "Engineering Practice",
+                "source_sentence": "Wrote integration tests with Testcontainers and raised service test coverage from 46% to 82%; mentored two junior engineers on API design conventions."
+            },
+            {
+                "mention": "Testcontainers",
+                "category": "Technology/Tool",
+                "source_sentence": "Wrote integration tests with Testcontainers and raised service test coverage from 46% to 82%; mentored two junior engineers on API design conventions."
+            },
+            {
+                "mention": "API design conventions",
+                "category": "Engineering Practice",
+                "source_sentence": "Wrote integration tests with Testcontainers and raised service test coverage from 46% to 82%; mentored two junior engineers on API design conventions."
+            },
+            {
+                "mention": "REST APIs",
+                "category": "Technical Concept",
+                "source_sentence": "Built REST APIs for a KYC onboarding flow using Spring Boot and Spring Security (JWT-based auth)."
+            },
+            {
+                "mention": "KYC onboarding flow",
+                "category": "Domain Knowledge",
+                "source_sentence": "Built REST APIs for a KYC onboarding flow using Spring Boot and Spring Security (JWT-based auth)."
+            },
+            {
+                "mention": "Spring Boot",
+                "category": "Technology/Tool",
+                "source_sentence": "Built REST APIs for a KYC onboarding flow using Spring Boot and Spring Security (JWT-based auth)."
+            },
+            {
+                "mention": "Spring Security",
+                "category": "Technology/Tool",
+                "source_sentence": "Built REST APIs for a KYC onboarding flow using Spring Boot and Spring Security (JWT-based auth)."
+            },
+            {
+                "mention": "JWT-based auth",
+                "category": "Technical Concept",
+                "source_sentence": "Built REST APIs for a KYC onboarding flow using Spring Boot and Spring Security (JWT-based auth)."
+            },
+            {
+                "mention": "payment module",
+                "category": "Domain Knowledge",
+                "source_sentence": "Migrated a legacy monolith's payment module to a standalone service, coordinating a zero-downtime cutover."
+            },
+            {
+                "mention": "zero-downtime cutover",
+                "category": "Engineering Practice",
+                "source_sentence": "Migrated a legacy monolith's payment module to a standalone service, coordinating a zero-downtime cutover."
+            },
+            {
+                "mention": "Oracle Certified Professional: Java SE 11 Developer",
+                "category": "Certification",
+                "source_sentence": "• Oracle Certified Professional: Java SE 11 Developer"
+            },
+            {
+                "mention": "AWS Certified Developer – Associate",
+                "category": "Certification",
+                "source_sentence": "• AWS Certified Developer – Associate"
+            }
+        ]
+    },
+    "jd": {
+        "filename": "01_Backend_JD.pdf",
+        "file_type": "pdf",
+        "total_pages": 1,
+        "total_extracted": 46,
+        "explicit_skills": [
+            {
+                "mention": "Java",
+                "category": "Technology/Tool",
+                "source_sentence": "We're hiring a Backend Engineer to design and operate core services on our Java/Spring Boot stack, working closely with product and infra teams to keep the platform fast, correct, and auditable."
+            },
+            {
+                "mention": "Spring Boot",
+                "category": "Technology/Tool",
+                "source_sentence": "We're hiring a Backend Engineer to design and operate core services on our Java/Spring Boot stack, working closely with product and infra teams to keep the platform fast, correct, and auditable."
+            },
+            {
+                "mention": "RESTful microservices",
+                "category": "Technical Concept",
+                "source_sentence": "Design, build, and maintain RESTful microservices in Java (Spring Boot) that power transaction processing and merchant settlement."
+            },
+            {
+                "mention": "transaction processing",
+                "category": "Domain Knowledge",
+                "source_sentence": "Design, build, and maintain RESTful microservices in Java (Spring Boot) that power transaction processing and merchant settlement."
+            },
+            {
+                "mention": "merchant settlement",
+                "category": "Domain Knowledge",
+                "source_sentence": "Design, build, and maintain RESTful microservices in Java (Spring Boot) that power transaction processing and merchant settlement."
+            },
+            {
+                "mention": "data modeling",
+                "category": "Engineering Practice",
+                "source_sentence": "Own data modeling and query performance for PostgreSQL-backed services handling high write throughput."
+            },
+            {
+                "mention": "query performance",
+                "category": "Engineering Practice",
+                "source_sentence": "Own data modeling and query performance for PostgreSQL-backed services handling high write throughput."
+            },
+            {
+                "mention": "PostgreSQL",
+                "category": "Technology/Tool",
+                "source_sentence": "Own data modeling and query performance for PostgreSQL-backed services handling high write throughput."
+            },
+            {
+                "mention": "high write throughput",
+                "category": "Technical Concept",
+                "source_sentence": "Own data modeling and query performance for PostgreSQL-backed services handling high write throughput."
+            },
+            {
+                "mention": "event-driven integrations",
+                "category": "Technical Concept",
+                "source_sentence": "Build event-driven integrations using Kafka to keep downstream ledgers and reporting systems in sync."
+            },
+            {
+                "mention": "Kafka",
+                "category": "Technology/Tool",
+                "source_sentence": "Build event-driven integrations using Kafka to keep downstream ledgers and reporting systems in sync."
+            },
+            {
+                "mention": "reporting systems",
+                "category": "Domain Knowledge",
+                "source_sentence": "Build event-driven integrations using Kafka to keep downstream ledgers and reporting systems in sync."
+            },
+            {
+                "mention": "unit tests",
+                "category": "Engineering Practice",
+                "source_sentence": "Write thorough unit and integration tests; participate in code review and on-call rotation for production services."
+            },
+            {
+                "mention": "integration tests",
+                "category": "Engineering Practice",
+                "source_sentence": "Write thorough unit and integration tests; participate in code review and on-call rotation for production services."
+            },
+            {
+                "mention": "code review",
+                "category": "Engineering Practice",
+                "source_sentence": "Write thorough unit and integration tests; participate in code review and on-call rotation for production services."
+            },
+            {
+                "mention": "on-call rotation",
+                "category": "Engineering Practice",
+                "source_sentence": "Write thorough unit and integration tests; participate in code review and on-call rotation for production services."
+            },
+            {
+                "mention": "production services",
+                "category": "Domain Knowledge",
+                "source_sentence": "Write thorough unit and integration tests; participate in code review and on-call rotation for production services."
+            },
+            {
+                "mention": "compliance requirements",
+                "category": "Domain Knowledge",
+                "source_sentence": "Collaborate with product managers to translate settlement and compliance requirements into technical designs."
+            },
+            {
+                "mention": "technical designs",
+                "category": "Engineering Practice",
+                "source_sentence": "Collaborate with product managers to translate settlement and compliance requirements into technical designs."
+            },
+            {
+                "mention": "Java",
+                "category": "Technology/Tool",
+                "source_sentence": "2+ years of professional experience with Java and Spring Boot in a production environment."
+            },
+            {
+                "mention": "Spring Boot",
+                "category": "Technology/Tool",
+                "source_sentence": "2+ years of professional experience with Java and Spring Boot in a production environment."
+            },
+            {
+                "mention": "production environment",
+                "category": "Domain Knowledge",
+                "source_sentence": "2+ years of professional experience with Java and Spring Boot in a production environment."
+            },
+            {
+                "mention": "relational databases",
+                "category": "Technical Concept",
+                "source_sentence": "Solid understanding of relational databases (PostgreSQL or MySQL), including indexing and query optimization."
+            },
+            {
+                "mention": "PostgreSQL",
+                "category": "Technology/Tool",
+                "source_sentence": "Solid understanding of relational databases (PostgreSQL or MySQL), including indexing and query optimization."
+            },
+            {
+                "mention": "MySQL",
+                "category": "Technology/Tool",
+                "source_sentence": "Solid understanding of relational databases (PostgreSQL or MySQL), including indexing and query optimization."
+            },
+            {
+                "mention": "indexing",
+                "category": "Engineering Practice",
+                "source_sentence": "Solid understanding of relational databases (PostgreSQL or MySQL), including indexing and query optimization."
+            },
+            {
+                "mention": "query optimization",
+                "category": "Engineering Practice",
+                "source_sentence": "Solid understanding of relational databases (PostgreSQL or MySQL), including indexing and query optimization."
+            },
+            {
+                "mention": "REST API design",
+                "category": "Technical Concept",
+                "source_sentence": "Experience with REST API design and at least one message broker (Kafka, RabbitMQ, or similar)."
+            },
+            {
+                "mention": "message broker",
+                "category": "Technical Concept",
+                "source_sentence": "Experience with REST API design and at least one message broker (Kafka, RabbitMQ, or similar)."
+            },
+            {
+                "mention": "Kafka",
+                "category": "Technology/Tool",
+                "source_sentence": "Experience with REST API design and at least one message broker (Kafka, RabbitMQ, or similar)."
+            },
+            {
+                "mention": "RabbitMQ",
+                "category": "Technology/Tool",
+                "source_sentence": "Experience with REST API design and at least one message broker (Kafka, RabbitMQ, or similar)."
+            },
+            {
+                "mention": "Docker",
+                "category": "Technology/Tool",
+                "source_sentence": "Familiarity with Docker and basic containerized deployment workflows."
+            },
+            {
+                "mention": "containerized deployment workflows",
+                "category": "Engineering Practice",
+                "source_sentence": "Familiarity with Docker and basic containerized deployment workflows."
+            },
+            {
+                "mention": "automated tests",
+                "category": "Engineering Practice",
+                "source_sentence": "Comfortable writing automated tests (JUnit, Mockito) and debugging production issues."
+            },
+            {
+                "mention": "JUnit",
+                "category": "Technology/Tool",
+                "source_sentence": "Comfortable writing automated tests (JUnit, Mockito) and debugging production issues."
+            },
+            {
+                "mention": "Mockito",
+                "category": "Technology/Tool",
+                "source_sentence": "Comfortable writing automated tests (JUnit, Mockito) and debugging production issues."
+            },
+            {
+                "mention": "debugging production issues",
+                "category": "Engineering Practice",
+                "source_sentence": "Comfortable writing automated tests (JUnit, Mockito) and debugging production issues."
+            },
+            {
+                "mention": "fintech",
+                "category": "Domain Knowledge",
+                "source_sentence": "Experience in fintech, payments, or another highly regulated domain."
+            },
+            {
+                "mention": "payments",
+                "category": "Domain Knowledge",
+                "source_sentence": "Experience in fintech, payments, or another highly regulated domain."
+            },
+            {
+                "mention": "highly regulated domain",
+                "category": "Domain Knowledge",
+                "source_sentence": "Experience in fintech, payments, or another highly regulated domain."
+            },
+            {
+                "mention": "Kubernetes",
+                "category": "Technology/Tool",
+                "source_sentence": "Exposure to Kubernetes and CI/CD pipelines (Jenkins, GitHub Actions)."
+            },
+            {
+                "mention": "CI/CD pipelines",
+                "category": "Engineering Practice",
+                "source_sentence": "Exposure to Kubernetes and CI/CD pipelines (Jenkins, GitHub Actions)."
+            },
+            {
+                "mention": "Jenkins",
+                "category": "Technology/Tool",
+                "source_sentence": "Exposure to Kubernetes and CI/CD pipelines (Jenkins, GitHub Actions)."
+            },
+            {
+                "mention": "GitHub Actions",
+                "category": "Technology/Tool",
+                "source_sentence": "Exposure to Kubernetes and CI/CD pipelines (Jenkins, GitHub Actions)."
+            },
+            {
+                "mention": "AWS",
+                "category": "Technology/Tool",
+                "source_sentence": "AWS or GCP certification."
+            },
+            {
+                "mention": "GCP",
+                "category": "Technology/Tool",
+                "source_sentence": "AWS or GCP certification."
+            }
+        ]
+    }
+}
