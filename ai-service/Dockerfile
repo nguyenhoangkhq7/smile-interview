@@ -6,7 +6,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     HF_HOME=/app/.cache/huggingface
 
-RUN groupadd --system --gid 1001 appgroup \
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends --only-upgrade libzstd1 \
+ && rm -rf /var/lib/apt/lists/* \
+ && groupadd --system --gid 1001 appgroup \
  && useradd --system --uid 1001 --gid appgroup --create-home appuser \
  && mkdir -p /app/.cache/huggingface \
  && chown -R appuser:appgroup /app
@@ -14,7 +17,8 @@ RUN groupadd --system --gid 1001 appgroup \
 COPY requirements-docker.lock .
 RUN --mount=type=cache,target=/root/.cache/pip \
     python -m pip install --require-hashes --only-binary=:all: -r requirements-docker.lock \
- && python -m pip check
+ && python -m pip check \
+ && python -m pip uninstall --yes pip
 
 COPY --chown=appuser:appgroup . .
 
