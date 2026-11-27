@@ -289,7 +289,12 @@ class EvidenceWorkflow:
         state = snapshot.objectives[turn.objective_id]
         code = request.submitted_code
         if code is not None:
-            if not turn.question.requires_code or not code.strip():
+            accepts_code = (
+                turn.question.requires_code
+                or turn.mode == Mode.CODING
+                or turn.question.coding_spec is not None
+            )
+            if not accepts_code or not code.strip():
                 raise ValueError("Lượt này không nhận mã nguồn hoặc mã đang trống")
             turn.submitted_code, turn.transcript = code, request.candidate_response
             turn.answer = code + ("\n\n" + turn.transcript if turn.transcript.strip() else "")

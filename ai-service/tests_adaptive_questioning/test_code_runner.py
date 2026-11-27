@@ -12,7 +12,7 @@ from adaptive_questioning.evidence.code_runner import (
 from adaptive_questioning.evidence.coding_verification import (
     check_coding_answer, is_sandbox_environment_error, run_sample_code, sanitize_coding_spec,
 )
-from adaptive_questioning.evidence.models import Action, Mode, Question, Turn
+from adaptive_questioning.evidence.models import Action, Mode, Question, TransitionRequest, Turn
 from adaptive_questioning.evidence.routes import router
 from skill_gap.domain.models import JobTask
 from test_evidence_workflow import setup, skill, start
@@ -236,3 +236,38 @@ def test_sandbox_env_errors_do_not_auto_fail_and_emit_dry_run_notice():
     assert checked is not None and checked.passed == 0 and checked.total == 1
     dry_bug = run_sample_code(code="def fn(x): return x + 2", spec=spec, runner=_StubRunner(real_bug))
     assert dry_bug.environment_notice == ""
+
+
+def test_text_coding_turn_accepts_submitted_code_even_when_requires_code_is_false(setup, monkeypatch):
+    provider, engine, _ = setup
+    original_question = provider.question
+
+    def coding_without_requires_code(context):
+        q = original_question(context)
+        q.mode = Mode.CODING
+        q.requires_code = False
+        q.coding_spec = None
+        return q
+
+    monkeypatch.setattr(provider, "question", coding_without_requires_code)
+    task = JobTask(description="Implement a Python Redis cache helper", evidence_spans=["Implement Redis helper"], required_level=2)
+    started = start(
+        engine,
+        [skill("redis", job_tasks=[task])],
+        interaction_mode="TEXT",
+        focused_question_mode="CODING",
+        max_questions=2,
+        duration_seconds=600,
+    )
+    pending = started.public.pending_turn
+    assert pending is not None and pending.mode == Mode.CODING and pending.requires_code is False
+
+    answered = engine.respond(TransitionRequest(
+        snapshot=started.snapshot,
+        expected_state_version=started.snapshot.state_version,
+        turn_id=pending.turn_id,
+        candidate_response="",
+        submitted_code="def save_and_get(k, v):\n    return v\n",
+    ))
+    assert len(answered.public.turns) == 1
+    assert answered.public.turns[0].submitted_code == "def save_and_get(k, v):\n    return v\n"

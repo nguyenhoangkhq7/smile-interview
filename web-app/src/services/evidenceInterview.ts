@@ -237,7 +237,10 @@ export function interviewError(error: unknown): string {
     if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT' || error.response?.status === 504)
       return 'Chuẩn bị phỏng vấn mất quá nhiều thời gian. Vui lòng thử lại; dữ liệu hồ sơ của bạn vẫn được giữ nguyên.';
     if (error.response?.status === 429) return 'Bạn đã hết hạn mức phỏng vấn hôm nay.';
-    if (error.response?.status === 422) return 'Thiết lập vượt giới hạn hoặc chế độ phỏng vấn vừa thay đổi. Tải lại để cập nhật.';
+    if (error.response?.status === 422) {
+      const serverMessage = error.response?.data?.message || error.response?.data?.detail;
+      return serverMessage || 'Thiết lập vượt giới hạn hoặc chế độ phỏng vấn vừa thay đổi. Tải lại để cập nhật.';
+    }
     if (error.response?.status === 409) return 'Phiên đã thay đổi. Hãy tải lại phiên trước khi tiếp tục.';
     return error.response?.data?.message || error.response?.data?.detail || 'Không thể xử lý yêu cầu. Bạn có thể thử lại.';
   }

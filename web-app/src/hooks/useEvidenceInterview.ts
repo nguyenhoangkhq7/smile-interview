@@ -71,7 +71,13 @@ export function useEvidenceInterview(id: string, readOnly = false) {
     ? converse('SUBMIT_INTRODUCTION', response) : run(async () => {
     if (!session?.pending_turn || (!response.trim() && !code?.trim())) throw new Error('Hãy nhập câu trả lời.');
     const previous = retry.current;
-    if (!previous || previous.candidate_response !== response || previous.submitted_code !== code || previous.turn_id !== session.pending_turn.turn_id) {
+    if (
+      !previous
+      || previous.candidate_response !== response
+      || previous.submitted_code !== code
+      || previous.turn_id !== session.pending_turn.turn_id
+      || previous.expected_state_version !== session.state_version
+    ) {
       retry.current = { request_id: crypto.randomUUID(), turn_id: session.pending_turn.turn_id,
         expected_state_version: session.state_version, candidate_response: response, submitted_code: code };
     }
