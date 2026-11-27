@@ -4,7 +4,9 @@ import axiosClient from '@/lib/axiosClient';
 export const questionModes = ['CODING', 'DEBUGGING', 'DESIGN', 'TECHNICAL_EXPLANATION', 'BEHAVIORAL'] as const;
 export type QuestionMode = typeof questionModes[number];
 export type InteractionMode = 'TEXT' | 'VOICE';
+export interface ChecklistRef { taskId: number; checklistItemId: number }
 export interface InterviewStartConfig {
+  recheck?: ChecklistRef;
   interaction_mode: InteractionMode;
   focused_question_mode: QuestionMode | null;
   max_questions: number;
@@ -20,11 +22,13 @@ export const defaultConfig: InterviewStartConfig = {
 };
 export interface PendingTurn {
   turn_id: string; objective_id: string; mode: QuestionMode;
-  question: string; introduction?: string;
+  question: string; introduction?: string; requires_code?: boolean;
 }
 export interface EvidenceTurn {
   turn_id: string; objective_id: string; mode: QuestionMode;
   question: string; answer: string | null; feedback: string | null;
+  submitted_code?: string | null; transcript?: string | null;
+  coding_checks?: { passed: number; total: number } | null;
 }
 export type EvidenceDepthRole = 'TARGET' | 'DIAGNOSTIC' | 'EXTENSION';
 export type EvidenceObservation = 'SUPPORTS' | 'CONTRADICTS' | 'UNCLEAR' | 'NO_EVIDENCE';
@@ -49,9 +53,11 @@ export interface ObjectiveReport {
   stop_reason: string | null;
   strengths: string[]; weaknesses: string[]; study_recommendations?: string[];
   evidence: PublicEvidence[];
-  criteria?: { criterion_id: string; description: string; assessment: Assessment }[];
+  criteria?: { criterion_id: string; description: string; assessment: Assessment; essential?: boolean }[];
 }
 export interface EvidenceReport {
+  turn_reviews?: { turn_id: string; excerpt: string; reason: string; gaps?: string[]; next_step: string }[];
+  recheck_criterion?: { description: string; assessment: Assessment } | null;
   termination_reason: string | null;
   objectives: ObjectiveReport[];
   coaching?: SessionCoaching | null;
@@ -88,7 +94,7 @@ export function voiceTurn(session: EvidenceSession | null) {
   return id ? { turn_id: id, expected_state_version: session.state_version } : null;
 }
 export interface AnswerRequest {
-  request_id: string; turn_id: string; expected_state_version: number; candidate_response: string;
+  request_id: string; turn_id: string; expected_state_version: number; candidate_response: string; submitted_code?: string;
 }
 export interface NextQuestionRequest {
   request_id: string; expected_state_version: number;

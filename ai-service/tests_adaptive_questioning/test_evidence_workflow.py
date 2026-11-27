@@ -386,6 +386,35 @@ def test_report_evidence_points_to_its_actual_turn(setup):
     }
 
 
+@pytest.mark.parametrize("observation,performance,text", [
+    ("SUPPORTS", "AT_TARGET", "EXPLAIN ANALYZE"),
+    ("CONTRADICTS", "BELOW", "Je vais supprimer chaque index."),
+    ("NO_EVIDENCE", "UNDETERMINED", "Em thích chơi cầu lông."),
+    ("NO_EVIDENCE", "UNDETERMINED", "Em chưa biết."),
+])
+def test_turn_review_is_post_session_and_grounds_each_quote(setup, observation, performance, text):
+    from adaptive_questioning.evidence.reporting import report
+    provider, engine, _ = setup
+    provider.criterion_count = 3
+    provider.observation, provider.performance = observation, performance
+    current = answer(engine, start(engine).snapshot, text)
+    assert not current.public.is_finished
+    for live in (current.public.report, report(current.snapshot)):
+        assert not live.turn_reviews
+        assert not any(o.study_recommendations or o.weaknesses or o.strengths for o in live.objectives)
+        assert not any(e.rationale for o in live.objectives for e in o.evidence)
+    finished = engine.stop(current.snapshot)
+    review, = finished.public.report.turn_reviews
+    assert review.turn_id == finished.public.turns[0].turn_id
+    assert review.reason and review.next_step
+    assert not review.excerpt or review.excerpt in text
+    if observation in {"SUPPORTS", "CONTRADICTS"} or text == "Em chưa biết.":
+        assert review.excerpt == text
+    if text == "Em thích chơi cầu lông.":
+        assert "Chưa có bằng chứng" in review.reason
+    assert sum(c.assessment == Assessment.NOT_ASSESSED for c in finished.public.report.objectives[0].criteria) == 2
+
+
 def test_stop_after_deadline_preserves_time_budget_reason(setup):
     _, engine, now = setup
     initial = start(engine)
@@ -393,7 +422,7 @@ def test_stop_after_deadline_preserves_time_budget_reason(setup):
     assert engine.stop(initial.snapshot).public.report.termination_reason == "TIME_BUDGET"
 
 
-def test_hint_cannot_establish_independent_competence(setup, monkeypatch):
+def test_blocked_hint_keeps_next_answer_independent(setup, monkeypatch):
     provider, engine, _ = setup
     provider.observation, provider.performance = "UNCLEAR", "UNDETERMINED"
     original = provider.judge
@@ -410,7 +439,103 @@ def test_hint_cannot_establish_independent_competence(setup, monkeypatch):
                for item in result.public.report.objectives[0].evidence)
     assert result.public.report.objectives[0].assessment == Assessment.INSUFFICIENT
     state = next(iter(result.snapshot.objectives.values()))
-    assert state.assisted_criteria == initial.pending_turn.question.criterion_ids
+    assert not state.assisted_criteria
+    provider.observation, provider.performance = "SUPPORTS", "AT_TARGET"
+    second = answer(engine, result.snapshot)
+    assert second.snapshot.objectives[state.objective.objective_id].evidence_history[-1].independent
+
+
+@pytest.mark.parametrize("channel,code", [("TEXT", None), ("TEXT", "SELECT id FROM events"),
+                                          ("VOICE", None), ("VOICE", "def answer():\n    return 42")])
+def test_checklist_recheck_uses_frozen_optional_criterion_and_records_answer(setup, monkeypatch, channel, code):
+    provider, engine, _ = setup
+    provider.criterion_count = 3
+    first = start(engine)
+    objective = next(iter(first.snapshot.objectives.values())).objective.model_copy(deep=True)
+    criterion = objective.criteria[1]
+    criterion.essential = False
+    original_question = provider.question
+
+    def question(context):
+        draft = original_question(context)
+        if provider.question_number > 2:
+            draft.text = "Một tiến trình bị khóa khi cập nhật tồn kho. Bạn xác định giao dịch gây chờ thế nào?"
+        draft.requires_code = code is not None
+        return draft
+
+    monkeypatch.setattr(provider, "question", question)
+    request = StartRequest(session_id="recheck", skills=[skill()], blueprint=Blueprint(objectives=[objective]),
+        config={"interaction_mode": channel, "max_questions": 3, "duration_seconds": 300,
+                "recheck": {"taskId": 1, "checklistItemId": 2}},
+        prior_attempts={"mastered_skill_ids": [objective.skill_id]},
+        recheck_target={"objective_id": objective.objective_id, "criterion_id": criterion.criterion_id,
+                        "rubric_fingerprint": "same", "source_questions": [first.public.pending_turn.question]})
+    current = engine.start(request)
+    assert provider.question_number == 3  # Only changing the incident number was rejected.
+    assert current.snapshot.pending_turn.question.criterion_ids == [criterion.criterion_id]
+    assert current.public.pending_turn.requires_code == bool(code)
+    assert current.public.pending_turn.question != first.public.pending_turn.question
+    assert not current.public.report.turn_reviews
+    if code and channel == "VOICE":
+        with pytest.raises(ValueError, match="nộp mã"):
+            answer(engine, current.snapshot, "chỉ giải thích")
+    submitted_code = code if channel == "VOICE" else None
+    result = engine.respond(TransitionRequest(snapshot=current.snapshot, expected_state_version=current.snapshot.state_version,
+            turn_id=current.public.pending_turn.turn_id, candidate_response="" if submitted_code else (code or "EXPLAIN ANALYZE"),
+            submitted_code=submitted_code))
+    assert result.public.is_finished
+    assert len(result.public.turns) == 1 and result.public.turns[0].submitted_code == submitted_code
+    assert result.public.report.turn_reviews[0].excerpt == (code or "EXPLAIN ANALYZE")
+    reports = result.public.report.objectives[0].criteria
+    assert [c.assessment for c in reports] == [Assessment.NOT_ASSESSED, Assessment.AT, Assessment.NOT_ASSESSED]
+    assert not reports[1].essential
+    assert result.public.report.recheck_criterion == reports[1]
+    assert result.public.report.coaching is None
+    expired = current.snapshot.model_copy(deep=True)
+    expired.deadline_at -= timedelta(minutes=6)
+    assert engine.stop(expired).public.report.recheck_criterion.assessment == Assessment.INSUFFICIENT
+
+
+@pytest.mark.parametrize("expires", [True, False])
+def test_recheck_clarification_keeps_scope_until_time_or_question_budget(setup, expires):
+    provider, engine, clock = setup
+    provider.criterion_count = 3
+    obj = next(iter(start(engine).snapshot.objectives.values())).objective
+    selected = obj.criteria[1].criterion_id
+    request = StartRequest(session_id="practice", skills=[skill()], blueprint=Blueprint(objectives=[obj]),
+        config={"max_questions": 3, "duration_seconds": 300, "recheck": {"taskId": 1, "checklistItemId": 2}},
+        recheck_target={"objective_id": obj.objective_id, "criterion_id": selected, "rubric_fingerprint": "frozen"})
+    result = engine.start(request)
+    provider.observation, provider.performance = "NO_EVIDENCE", "UNDETERMINED"
+    first_scope = result.snapshot.pending_turn.question.evidence_scope
+    for n in range(3):
+        turn = result.snapshot.pending_turn
+        assert turn.question.criterion_ids == [selected]
+        if n == 1:
+            assert turn.action == Action.CLARIFY and turn.question.evidence_scope == first_scope
+            if expires:
+                clock[0] += timedelta(minutes=5)
+        result = answer(engine, result.snapshot, "Lạc đề")
+        if result.public.is_finished:
+            break
+    assert len(result.public.turns) == (1 if expires else 3)
+    assert result.public.report.termination_reason == ("TIME_BUDGET" if expires else "QUESTION_BUDGET")
+    assert result.public.report.recheck_criterion.assessment == Assessment.INSUFFICIENT
+
+
+def test_two_question_draft_keeps_only_a_reviewed_complete_task(setup, monkeypatch):
+    provider, engine, _ = setup
+    original = provider.question
+    reviewed = []
+    def draft(context):
+        q = original(context)
+        q.text = "Bạn sẽ phân tích sự cố này thế nào? Bạn sẽ viết thêm công cụ nào?"
+        return q
+    monkeypatch.setattr(provider, "question", draft)
+    monkeypatch.setattr(provider, "review_question", lambda ctx: reviewed.append(json.loads(ctx)["question"]) or "ALIGNED")
+    result = start(engine)
+    assert reviewed == [result.public.pending_turn.question]
+    assert result.public.pending_turn.question == "Bạn sẽ phân tích sự cố này thế nào?"
 
 
 def test_api_rejects_incompatible_schema_and_bad_config(setup):

@@ -83,6 +83,13 @@ public class EvidenceStore {
         if (!normalized.hasNonNull("max_questions_per_objective")) {
             normalized.put("max_questions_per_objective", EvidenceDtos.Config.DEFAULT_MAX_PER_OBJECTIVE);
         }
+        if (normalized.get("recheck") instanceof ObjectNode ref) {
+            for (String key : java.util.List.of("taskId", "checklistItemId")) {
+                if (ref.path(key).isIntegralNumber() && ref.path(key).canConvertToLong()) ref.put(key, ref.path(key).longValue());
+            }
+        } else if (!normalized.hasNonNull("recheck")) {
+            normalized.remove("recheck");
+        }
         return normalized;
     }
 
@@ -102,6 +109,12 @@ public class EvidenceStore {
         if (!channel.equals(snapshot.path("config").path("interaction_mode").asText("TEXT"))
                 || !channel.equals(visible.path("config").path("interaction_mode").asText("TEXT"))) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "AI changed the interview interaction mode");
+        }
+        JsonNode target = normalizedConfig(input.config()).path("recheck");
+        if (!target.equals(normalizedConfig(snapshot.path("config")).path("recheck"))
+                || !target.equals(normalizedConfig(visible.path("config")).path("recheck"))
+                || target.isObject() != snapshot.hasNonNull("recheck_target")) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "AI changed the checklist reference");
         }
         boolean awaiting = visible.path("awaiting_question").asBoolean();
         if (snapshot.hasNonNull("next_question_action") != awaiting || (awaiting

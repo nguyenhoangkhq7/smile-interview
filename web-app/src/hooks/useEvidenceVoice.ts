@@ -10,7 +10,7 @@ interface Options {
   id: string; session: EvidenceSession | null; answer: string; busy: boolean; suspended: boolean;
   setAnswer: (text: string) => void;
   videoRef: RefObject<HTMLVideoElement | null>; audioRef: RefObject<HTMLAudioElement | null>;
-  submit: (text: string) => Promise<EvidenceSession | null | undefined>;
+  submit: (text: string, code?: string) => Promise<EvidenceSession | null | undefined>;
   nextConversation?: () => Promise<EvidenceSession | null | undefined>;
 }
 interface VoiceState {
@@ -359,14 +359,14 @@ class VoiceConversation {
   private scheduleSubmit() {
     this.cancelTimer();
     const options = this.current();
-    if (!this.auto || this.paused || options.suspended || options.busy || this.submitting || this.detector.active
+    if (options.session?.pending_turn?.requires_code || !this.auto || this.paused || options.suspended || options.busy || this.submitting || this.detector.active
       || !this.canSubmit() || this.playing || this.speechAbort || !this.draft.trim()) return;
     const generation = this.generation;
     this.emit({ countdown: true });
     this.timer = setTimeout(async () => {
       this.timer = null; this.emit({ countdown: false });
       const latest = this.current();
-      if (this.closed || this.paused || latest.suspended || latest.busy || this.detector.active
+      if (latest.session?.pending_turn?.requires_code || this.closed || this.paused || latest.suspended || latest.busy || this.detector.active
         || !this.canSubmit() || generation !== this.generation) return;
       this.beforeSubmit();
       const next = await latest.submit(this.draft);
@@ -414,10 +414,10 @@ export function useEvidenceVoice(options: Options) {
       setState({ ...initial, error: interviewError(error) });
     } finally { setStarting(false); }
   };
-  const submit = async (response?: string) => {
+  const submit = async (response?: string, code?: string) => {
     if (engine.current && !engine.current.canSubmit()) return;
     engine.current?.beforeSubmit();
-    try { return await latest.current.submit(response ?? latest.current.answer); }
+    try { return await latest.current.submit(response ?? latest.current.answer, code); }
     finally { engine.current?.afterSubmit(); }
   };
   return { ...state, starting, automatic, silenceMs, enable, disable, submit,

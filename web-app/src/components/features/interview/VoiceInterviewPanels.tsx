@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { Check, LoaderCircle, Mic, UserRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MarkdownContent } from '@/components/common/MarkdownContent';
@@ -34,6 +35,16 @@ export function VoiceQuestionPanel({ room }: { room: VoiceInterviewRoom }) {
   </section>;
 }
 
+function VoiceCodeAnswer({ room }: { room: VoiceInterviewRoom }) {
+  const [code, setCode] = useState('');
+  return <div className="space-y-2 p-3"><label htmlFor="voice-code">Mã nguồn</label>
+    <textarea id="voice-code" spellCheck={false} className="min-h-36 w-full rounded border p-2 font-mono"
+      value={code} onChange={event => setCode(event.target.value)} disabled={room.busy} />
+    <div className="flex gap-2"><Button disabled={!code.trim() || room.cannotSubmit} onClick={() => void room.voice.submit(room.interview.answer, code)}>Nộp bài</Button>
+      <Button variant="outline" disabled={room.cannotSubmit} onClick={() => void room.voice.submit('Em chưa biết.')}>Chưa làm được</Button></div>
+  </div>;
+}
+
 export function VoiceAnswerPanel({ room }: { room: VoiceInterviewRoom }) {
   return <section className={styles.textPanel} aria-label="Câu trả lời của bạn">
     <header className={styles.panelHeader}><h2>Câu trả lời của bạn</h2>
@@ -42,5 +53,6 @@ export function VoiceAnswerPanel({ room }: { room: VoiceInterviewRoom }) {
     <div ref={room.captionBox} role="log" aria-live="polite" aria-relevant="text additions" aria-label="Nội dung lời nói" tabIndex={0} className={styles.captions}>
       {room.caption ? <p>{room.caption}</p> : <p className={styles.placeholder}>{room.voice.retryAvailable ? 'Chưa nhận diện được đoạn vừa nói.' : 'Lời bạn nói sẽ hiện ở đây.'}</p>}
     </div>
+    {room.session?.pending_turn?.requires_code && <VoiceCodeAnswer key={room.session.pending_turn.turn_id} room={room} />}
   </section>;
 }

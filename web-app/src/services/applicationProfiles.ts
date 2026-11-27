@@ -9,6 +9,7 @@ export interface CompetencyEvidence {
   rationale: string; performance: string;
 }
 export interface CompetencyCriterion {
+  trend?: 'IMPROVING' | 'DECLINING' | null;
   id: string; description: string; essential: boolean; atTarget?: string; assessment: CompetencyStatus;
   lastAssessment: CompetencySource | null; evidence: CompetencyEvidence[];
 }

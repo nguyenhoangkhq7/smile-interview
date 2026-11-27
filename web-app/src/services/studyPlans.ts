@@ -68,7 +68,19 @@ function toPlanView({ plan, progress, tasks }: PlanResponse): StudyPlanView {
   return { plan, progress, tasks: tasks.map(({ task, checklist, resources }) => ({ ...task, checklist, resources })) };
 }
 
+export interface CriterionAttempt {
+  sessionId: string; assessment: import('./evidenceInterview').Assessment;
+  turns: { question: string; answer: string; code?: string | null; transcript?: string | null }[];
+}
+export interface RecheckResult { checklistItemId: number; before: CriterionAttempt | null; after: CriterionAttempt }
 export const studyPlans = {
+  async recheckPreview(profileId: string, taskId: number, itemId: number, signal?: AbortSignal) {
+    return (await axiosClient.get<{ description: string; before: CriterionAttempt | null }>(
+      `${taskPath(profileId, taskId)}/checklist/${itemId}/recheck`, { signal })).data;
+  },
+  async rechecks(profileId: string, taskId: number, signal: AbortSignal) {
+    return (await axiosClient.get<RecheckResult[]>(`${taskPath(profileId, taskId)}/rechecks`, { signal })).data;
+  },
   async get(profileId: string, signal?: AbortSignal) {
     return toPlanView((await axiosClient.get<PlanResponse>(planPath(profileId), { signal })).data);
   },

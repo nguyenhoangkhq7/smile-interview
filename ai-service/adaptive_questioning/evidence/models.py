@@ -45,11 +45,26 @@ class Action(str, Enum):
     VERIFY = "VERIFY_CONTRADICTION"
 
 
+class ChecklistRef(BaseModel):
+    taskId: int = Field(gt=0)
+    checklistItemId: int = Field(gt=0)
+
+
+class RecheckTarget(BaseModel):
+    objective_id: str
+    criterion_id: str
+    rubric_fingerprint: str
+    source_session_id: str | None = None
+    source_questions: list[str] = Field(default_factory=list)
+    source_scopes: list[str] = Field(default_factory=list)
+
+
 class InterviewConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     interaction_mode: Literal["TEXT", "VOICE"] = "TEXT"
     mode: Literal["MIXED", "FOCUSED"] = "MIXED"
     focused_question_mode: Mode | None = None
+    recheck: ChecklistRef | None = None
     max_questions: int = Field(default=10, ge=1, le=40)
     duration_seconds: int = Field(default=900, ge=60, le=7200)
     max_questions_per_objective: int = Field(default=8, ge=1, le=40)
@@ -210,6 +225,7 @@ class StoredQuestion(BaseModel):
     text: str = Field(min_length=10)
     criterion_ids: list[str] = Field(min_length=1)
     evidence_scope: str = ""
+    requires_code: bool = False
 
 
 class Question(StoredQuestion):
@@ -280,6 +296,11 @@ class VerificationBatchDraft(BaseModel):
     focuses: list[VerificationFocusDraft]
 
 
+class CodingCheckResult(BaseModel):
+    passed: int = Field(ge=0)
+    total: int = Field(gt=0)
+
+
 class Turn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     turn_id: str
@@ -290,6 +311,9 @@ class Turn(BaseModel):
     question_depth: int = Field(ge=1, le=4)
     question: StoredQuestion
     answer: str | None = None
+    submitted_code: str | None = None
+    transcript: str | None = None
+    coding_checks: CodingCheckResult | None = None
     judgment: Judgment | None = None
     introduction: str = ""
 
@@ -301,6 +325,7 @@ class Snapshot(BaseModel):
     state_version: int = 0
     config: InterviewConfig
     policy: InterviewPolicy = Field(default_factory=InterviewPolicy)
+    recheck_target: RecheckTarget | None = None
     skills: list[InterviewSkillContext]
     objectives: dict[str, ObjectiveState]
     queue: list[str]
@@ -357,6 +382,7 @@ class StartRequest(BaseModel):
     blueprint: Blueprint | None = None
     opening: "InterviewOpening | None" = None
     prior_attempts: PriorAttemptContext | None = None
+    recheck_target: RecheckTarget | None = None
     verification_sources: VerificationSources | None = None
 
     @model_validator(mode="before")
@@ -423,8 +449,15 @@ class TransitionRequest(BaseModel):
     snapshot: Snapshot
     turn_id: str
     expected_state_version: int
-    candidate_response: str = Field(min_length=1, max_length=50000)
+    candidate_response: str = Field(max_length=50000)
+    submitted_code: str | None = Field(default=None, max_length=50000)
     defer_question: bool = False
+
+    @model_validator(mode="after")
+    def require_answer(self):
+        if not self.candidate_response.strip() and not (self.submitted_code or "").strip():
+            raise ValueError("An answer or code is required")
+        return self
 
 
 class NextQuestionRequest(BaseModel):
@@ -432,7 +465,16 @@ class NextQuestionRequest(BaseModel):
     expected_state_version: int
 
 
+class TurnReview(BaseModel):
+    turn_id: str
+    excerpt: str
+    reason: str
+    gaps: list[str] = Field(default_factory=list)
+    next_step: str
+
+
 class CriterionReport(BaseModel):
+    essential: bool = True
     criterion_id: str
     description: str
     assessment: Assessment
@@ -454,11 +496,14 @@ class ObjectiveReport(BaseModel):
 
 class Report(BaseModel):
     termination_reason: str | None
+    recheck_criterion: CriterionReport | None = None
+    turn_reviews: list[TurnReview] = Field(default_factory=list)
     objectives: list[ObjectiveReport]
     coaching: SessionCoaching | None = None
 
 
 class PendingTurn(BaseModel):
+    requires_code: bool = False
     turn_id: str
     objective_id: str
     mode: Mode
@@ -467,6 +512,9 @@ class PendingTurn(BaseModel):
 
 
 class PublicTurn(BaseModel):
+    submitted_code: str | None = None
+    transcript: str | None = None
+    coding_checks: CodingCheckResult | None = None
     turn_id: str
     objective_id: str
     mode: Mode

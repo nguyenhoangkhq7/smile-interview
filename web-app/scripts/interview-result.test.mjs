@@ -35,6 +35,16 @@ test('excludes unasked skills, objectives and their findings from this session r
   assert.equal(data.achievedCount, 1);
 });
 
+test('counts distinct checked and passed essential criteria; old reports retain their summary', () => {
+  const labels = ['DEMONSTRATED_AT_TARGET','DEMONSTRATED_ABOVE_TARGET','INSUFFICIENT_EVIDENCE','NOT_ASSESSED','NOT_ASSESSED'];
+  const criteria = labels.map((assessment, i) => ({ criterion_id: String(i), assessment, essential: true }));
+  criteria.push({ criterion_id: 'optional', assessment: 'DEMONSTRATED_AT_TARGET', essential: false });
+  const turns = [turn('a', 'o'), turn('b', 'o')];
+  const data = buildResult(session([objective('o', 'sql', 'INSUFFICIENT_EVIDENCE', { criteria })], turns));
+  assert.deepEqual(plain(data.coverage), { total: 5, checked: 3, passed: 2 });
+  assert.equal(buildResult(session([objective('o', 'sql')], turns)).coverage, null);
+});
+
 test('retains asked skills without a verdict and keeps questions even when an objective report is missing', () => {
   const data = buildResult(session([
     objective('asked', 'java'),

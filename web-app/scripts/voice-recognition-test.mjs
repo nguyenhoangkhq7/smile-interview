@@ -77,6 +77,14 @@ const harness = handler => {
   assert.equal(h.options.answer, 'Em dùng PostgreSQL.'); h.engine.stop();
 }
 {
+  const h = harness(({ phase }) => accepted(phase));
+  h.options.session = { pending_turn: { requires_code: true } };
+  h.engine.setAuto(true);
+  h.feed(0.5); h.feed(1.2, 0); await settled();
+  assert.equal(h.state.countdown, false, 'A written-code turn waits for the explicit submit button');
+  h.engine.stop();
+}
+{
   let release;
   const h = harness(() => new Promise(resolve => { release = resolve; }));
   h.feed(4.5); await settled();

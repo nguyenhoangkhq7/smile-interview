@@ -1,5 +1,7 @@
 package fit.iuh.modules.evidence;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import fit.iuh.modules.auth.entity.User;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -14,41 +16,60 @@ public class EvidenceController {
 
     @GetMapping
     public String read(@PathVariable String sessionId, @AuthenticationPrincipal User user) {
-        return service.read(sessionId, user).toString();
+        return candidateView(service.read(sessionId, user)).toString();
     }
 
     @PostMapping("/start")
     public String start(@PathVariable String sessionId, @AuthenticationPrincipal User user,
                           @Valid @RequestBody EvidenceDtos.Config config) {
-        return service.start(sessionId, user, config).toString();
+        return candidateView(service.start(sessionId, user, config)).toString();
     }
 
     @PostMapping("/respond")
     public String respond(@PathVariable String sessionId, @AuthenticationPrincipal User user,
                             @Valid @RequestBody EvidenceDtos.Answer answer) {
-        return service.respond(sessionId, user, answer).toString();
+        return candidateView(service.respond(sessionId, user, answer)).toString();
     }
 
     @PostMapping("/next-question")
     public String nextQuestion(@PathVariable String sessionId, @AuthenticationPrincipal User user,
                                @Valid @RequestBody EvidenceDtos.NextQuestion command) {
-        return service.nextQuestion(sessionId, user, command).toString();
+        return candidateView(service.nextQuestion(sessionId, user, command)).toString();
     }
 
     @PostMapping("/stop")
     public String stop(@PathVariable String sessionId, @AuthenticationPrincipal User user,
                          @Valid @RequestBody EvidenceDtos.Stop stop) {
-        return service.stop(sessionId, user, stop).toString();
+        return candidateView(service.stop(sessionId, user, stop)).toString();
     }
 
     @PostMapping("/conversation")
     public String converse(@PathVariable String sessionId, @AuthenticationPrincipal User user,
                            @Valid @RequestBody EvidenceDtos.Conversation command) {
-        return service.converse(sessionId, user, command).toString();
+        return candidateView(service.converse(sessionId, user, command)).toString();
     }
 
     @GetMapping("/report")
     public String report(@PathVariable String sessionId, @AuthenticationPrincipal User user) {
-        return service.read(sessionId, user).path("report").toString();
+        return candidateView(service.read(sessionId, user)).path("report").toString();
+    }
+
+    // Older V2 snapshots and command receipts can contain post-interview coaching during a live turn.
+    private JsonNode candidateView(JsonNode session) {
+        if (session.path("is_finished").asBoolean() || !session.path("report").isObject()) return session;
+        JsonNode visible = session.deepCopy();
+        ObjectNode report = (ObjectNode) visible.path("report");
+        report.putArray("turn_reviews");
+        report.putNull("coaching");
+        for (JsonNode entry : report.path("objectives")) {
+            if (!(entry instanceof ObjectNode objective)) continue;
+            objective.putArray("strengths");
+            objective.putArray("weaknesses");
+            objective.putArray("study_recommendations");
+            for (JsonNode evidence : objective.path("evidence")) {
+                if (evidence instanceof ObjectNode item) item.put("rationale", "");
+            }
+        }
+        return visible;
     }
 }

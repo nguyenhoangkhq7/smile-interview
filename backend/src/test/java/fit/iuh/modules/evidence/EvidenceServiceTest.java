@@ -23,7 +23,7 @@ class EvidenceServiceTest {
     private final EvidenceInputs inputs = mock(EvidenceInputs.class);
     private final EvidenceJson json = new EvidenceJson(new ObjectMapper());
     private final EvidenceService service = new EvidenceService(sessions, turns, runs, store, ai, inputs, json,
-            mock(EvidenceAdmission.class));
+            mock(EvidenceAdmission.class), mock(fit.iuh.modules.study.service.StudyPlanService.class));
     private final User owner = User.builder().id(UUID.randomUUID()).build();
 
     private void session() {

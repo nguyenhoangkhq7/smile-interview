@@ -107,6 +107,28 @@ class EvidenceStoreTest {
                 .isInstanceOf(ResponseStatusException.class);
     }
 
+    @Test void checklistReferencesSurviveJsonRoundTripAndRemainLocked() {
+        var config = json.tree(Map.of("recheck", new EvidenceDtos.ChecklistRef(1L, 2L)));
+        var run = existing(1);
+        run.setConfigJson(config.toString());
+        assertThat(store.sameStart(run, config).path("state_version").asInt()).isEqualTo(1);
+
+        var base = commit(1, 2);
+        var result = (com.fasterxml.jackson.databind.node.ObjectNode) base.result();
+        var snapshot = (com.fasterxml.jackson.databind.node.ObjectNode) result.path("snapshot");
+        var visible = (com.fasterxml.jackson.databind.node.ObjectNode) result.path("public");
+        snapshot.set("config", json.read(config.toString()));
+        visible.set("config", json.read(config.toString()));
+        snapshot.putObject("recheck_target").put("criterion_id", "criterion");
+        when(runs.findById("session")).thenReturn(Optional.of(run));
+        var input = new EvidenceStore.Commit("session", 1, null, null, config, result);
+        assertThat(store.commit(input).path("state_version").intValue()).isEqualTo(2);
+        run.setStateVersion(1);
+        visible.set("config", json.tree(Map.of("recheck", new EvidenceDtos.ChecklistRef(1L, 3L))));
+        assertThatThrownBy(() -> store.commit(input)).isInstanceOfSatisfying(ResponseStatusException.class,
+                ex -> assertThat(ex.getStatusCode().value()).isEqualTo(502));
+    }
+
     @Test void aiCannotChangeTheFrozenInteractionMode() {
         when(runs.findById("session")).thenReturn(Optional.of(existing(1)));
         var original = commit(1, 2);

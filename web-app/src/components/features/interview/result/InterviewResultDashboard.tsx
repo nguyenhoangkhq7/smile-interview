@@ -10,7 +10,7 @@ import { applicationProfiles } from '@/services/applicationProfiles';
 import { interviewError, type EvidenceSession } from '@/services/evidenceInterview';
 import type { SessionHistoryItem } from '@/services/historyService';
 import { ResultCoachingSummary, ResultFeedback, ResultQuestions, ResultSkills, ResultStudy, resultPanel } from './ResultBreakdown';
-import { buildResult, percent, resultReasons } from './resultData';
+import { assessmentLabels, buildResult, percent, resultReasons } from './resultData';
 import { ResultNavigation } from './ResultNavigation';
 
 function SkillSummaryCard({ data, reason }: { data: ReturnType<typeof buildResult>; reason: string | null }) {
@@ -38,6 +38,10 @@ function SkillSummaryCard({ data, reason }: { data: ReturnType<typeof buildResul
           <p className="text-sm font-bold text-slate-900 dark:text-foreground">
             {allConclusive ? 'Tỷ lệ nội dung đạt yêu cầu' : 'Kỹ năng đạt yêu cầu'}
           </p>
+          {data.coverage && <p className="text-sm">
+            Đã kiểm tra {data.coverage.checked}/{data.coverage.total} tiêu chí bắt buộc
+            {data.coverage.checked > 0 && ` · Đạt ${data.coverage.passed}/${data.coverage.checked} tiêu chí đã kiểm tra`}
+          </p>}
           <div className="flex flex-wrap gap-1.5 text-xs">
             <span className="rounded-full bg-emerald-100/80 px-2.5 py-0.5 font-semibold text-emerald-900">
               Đạt: {data.strongSkillCount}
@@ -103,6 +107,8 @@ export function InterviewResultDashboard({
           <Link href={backHref} className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#a02707] dark:text-orange-300 hover:underline">
             <ArrowLeft size={15} aria-hidden="true" /> {profileId ? 'Về hồ sơ ứng tuyển' : 'Quay lại lịch sử'}
           </Link>
+          {session.config.recheck && encodedProfile && <Link className="block font-medium text-brand-green"
+            href={`/practice/${encodedProfile}?task=${session.config.recheck.taskId}#checklist-${session.config.recheck.checklistItemId}`}>Về đầu việc</Link>}
           <h1 className="text-2xl font-extrabold tracking-tight wrap-anywhere sm:text-3xl">
             {metadata?.applicationProfileTitle || metadata?.roleTitle || 'Kết quả phỏng vấn'}
           </h1>
@@ -120,7 +126,11 @@ export function InterviewResultDashboard({
 
         <section id="overview" className={cn(resultPanel, 'scroll-mt-(--result-scroll-mt,5rem) space-y-4')}>
           <div className={cn('grid gap-4', data.coaching?.overall_summary && 'lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.35fr)]')}>
-            <SkillSummaryCard data={data} reason={session.report.termination_reason} />
+            {session.report.recheck_criterion ? <div className="rounded-xl border p-4">
+              <h2 className="text-sm font-semibold">Tiêu chí kiểm chứng</h2>
+              <p className="my-2 text-lg">{session.report.recheck_criterion.description}</p>
+              <p className="font-semibold">{assessmentLabels[session.report.recheck_criterion.assessment]}</p>
+            </div> : <SkillSummaryCard data={data} reason={session.report.termination_reason} />}
             {data.coaching?.overall_summary && <ResultCoachingSummary summary={data.coaching.overall_summary} />}
           </div>
           <ResultFeedback data={data} />

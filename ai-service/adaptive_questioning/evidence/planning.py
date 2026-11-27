@@ -294,6 +294,18 @@ def plan(
     return _allocate(ordered, core_skills, config, policy, mastered)
 
 
+def plan_recheck(blueprint: Blueprint, objective_id: str, criterion_id: str) -> tuple[dict[str, ObjectiveState], list[str]]:
+    objective = next((obj for obj in blueprint.objectives if obj.objective_id == objective_id), None)
+    if objective is None:
+        raise ValueError("Mục tiêu kiểm chứng không còn thuộc hồ sơ")
+    index = next((i for i, c in enumerate(objective.criteria) if c.criterion_id == criterion_id), None)
+    modes = [m for m in objective.suitable_modes if not m.criterion_indices or index in m.criterion_indices]
+    if index is None or not modes:
+        raise ValueError("Tiêu chí không có dạng câu hỏi phù hợp")
+    state = ObjectiveState(objective=objective, selected_mode=modes[0].mode, active_criterion_id=criterion_id)
+    return {objective_id: state}, [objective_id]
+
+
 def _fits_session(objective: Objective, config: InterviewConfig) -> bool:
     focused_mode = config.focused_question_mode
     compatible = focused_mode is None or any(item.mode == focused_mode for item in objective.suitable_modes)

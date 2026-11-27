@@ -1,5 +1,6 @@
 """Conservative checks for source framing, single-task questions and missing problem data."""
 import re
+from difflib import SequenceMatcher
 from .models import Question
 
 
@@ -70,6 +71,16 @@ def single_question(text: str) -> bool:
     return sum(_response_request(item) for item in items) < 2
 
 
+def first_question(text: str) -> str | None:
+    """Offer a single complete first task to the normal validators and alignment reviewer."""
+    if "`" in text or "~" in text or text.count("?") != 2:
+        return None
+    first, _, rest = text.partition("?")
+    if not rest.strip() or len(first.split()) < 5 or not rest.lstrip()[0].isupper():
+        return None
+    return first.strip() + "?"
+
+
 def _response_request(item: str) -> bool:
     command = r"(?:hãy|bạn|viết|giải thích|mô tả|nêu|trình bày|write|explain|describe|review)\b"
     if re.match(command, item, re.IGNORECASE):
@@ -122,6 +133,13 @@ def _jd_grounding_errors(jd_excerpt: str, framing: list[str], skill_id: str) -> 
 def question_errors(question: Question, context: dict[str, object]) -> list[str]:
     contract = context["required_question_contract"]
     errors = _grounding_errors(question.text, context)
+    if "recheck_sources" in context:
+        words = re.findall(r"\w+", question.text.casefold())
+        near_source = any(SequenceMatcher(None, words, re.findall(r"\w+", source.casefold()), autojunk=False).ratio() >= 0.87
+                          for source in context["recheck_sources"])
+        scope = " ".join(question.evidence_scope.casefold().split())
+        if near_source or scope in {" ".join(s.casefold().split()) for s in context["source_scopes"] if s}:
+            errors.append("Use a new concrete scenario distinct from the earlier attempt.")
     if question.mode != contract["mode"]:
         errors.append("mode must equal required_question_contract.mode exactly")
     if question.depth != contract["depth"]:

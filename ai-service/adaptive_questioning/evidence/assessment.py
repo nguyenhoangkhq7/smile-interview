@@ -108,8 +108,7 @@ def apply_judgment(state: ObjectiveState, turn: Turn, policy: InterviewPolicy | 
         _record_observation(state, turn, observation)
     record_progress(state, turn)
     state.assessment = assess(state, policy)
-    if judgment.feedback_contains_hint:
-        state.assisted_criteria = sorted(set(state.assisted_criteria) | set(turn.question.criterion_ids))
+    # Candidate-facing feedback suppresses hints. Only delivered assistance taints evidence.
 
 
 def _record_observation(state: ObjectiveState, turn: Turn, observation: Observation) -> None:
@@ -241,7 +240,7 @@ def next_action(state: ObjectiveState, turn: Turn, policy: InterviewPolicy | Non
     unresolved = [key for key in eligible if key in essential and not criterion_resolved(state, key, policy)]
     if not unresolved:
         return None
-    return _criterion_action(state, _choose_criterion(state, unresolved))
+    return criterion_action(state, _choose_criterion(state, unresolved))
 
 
 def _diagnostic_recovery(state: ObjectiveState, turn: Turn, eligible: list[str]) -> Action | None:
@@ -256,8 +255,10 @@ def _diagnostic_recovery(state: ObjectiveState, turn: Turn, eligible: list[str])
     return None
 
 
-def _criterion_action(state: ObjectiveState, key: str) -> Action:
+def criterion_action(state: ObjectiveState, key: str) -> Action:
     progress = progress_for(state, key)
+    if key in state.contradictions:
+        return _probe(state, key, Action.VERIFY, "Resolve conflicting target-level evidence")
     if not progress.turns_spent:
         return _probe(state, key, Action.FOLLOW_UP, "Collect initial evidence for an untested essential criterion")
     evidence = [e for e in state.evidence_history if e.criterion_id == key]

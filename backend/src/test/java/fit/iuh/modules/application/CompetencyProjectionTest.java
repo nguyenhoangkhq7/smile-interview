@@ -121,6 +121,11 @@ class CompetencyProjectionTest {
         var first = attempt(1, Map.of("sql", BELOW), "A");
         var second = attempt(2, Map.of("sql", AT), "B");
         assertThat(sql(view(first, second)).assessment()).isEqualTo(VERIFY);
+        assertThat(sql(view(first, second)).objectives().getFirst().criteria().getFirst().trend()).isEqualTo("IMPROVING");
+        var unknown = attempt(3, Map.of("sql", INSUFFICIENT), "query C");
+        var unconfirmed = sql(view(first, second, unknown)).objectives().getFirst().criteria().getFirst();
+        assertThat(unconfirmed.assessment()).isEqualTo(VERIFY);
+        assertThat(unconfirmed.trend()).isNull();
         var repeated = attempt(3, Map.of("sql", AT), " B  ");
         assertThat(sql(view(first, second, repeated)).assessment()).isEqualTo(VERIFY);
         var confirmation = attempt(4, Map.of("sql", AT), "C");
@@ -132,7 +137,9 @@ class CompetencyProjectionTest {
         var second = attempt(2, Map.of("sql", BELOW), "B");
         var third = attempt(3, Map.of("sql", BELOW), "C");
         assertThat(sql(view(first, second)).assessment()).isEqualTo(VERIFY);
+        assertThat(sql(view(first, second)).objectives().getFirst().criteria().getFirst().trend()).isEqualTo("DECLINING");
         assertThat(sql(view(first, second, third)).assessment()).isEqualTo(BELOW);
+        assertThat(sql(view(first, second, third)).objectives().getFirst().criteria().getFirst().trend()).isNull();
     }
 
     @Test void easierUnmeasuredAndUngroundedEvidenceCannotReplaceVerifiedAbility() {

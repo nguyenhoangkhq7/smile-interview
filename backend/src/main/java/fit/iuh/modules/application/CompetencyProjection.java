@@ -21,7 +21,7 @@ public class CompetencyProjection {
     public record Evidence(Source source, String turnId, String question, String responseExcerpt,
                            String rationale, String performance) {}
     public record Criterion(String id, String description, boolean essential, String atTarget, String assessment,
-                            Source lastAssessment, List<Evidence> evidence) {}
+                            Source lastAssessment, List<Evidence> evidence, String trend) {}
     public record Objective(String id, String claim, String assessment, Source lastChecked,
                             Source lastAssessment, String explanation, List<Criterion> criteria) {}
     public record Skill(String skillId, String baselineAlignment, String assessment, List<Objective> objectives) {}
@@ -33,12 +33,26 @@ public class CompetencyProjection {
         final JsonNode definition;
         final List<Signal> signals = new ArrayList<>();
         final Map<String, Evidence> evidence = new LinkedHashMap<>();
+        Source lastChecked;
         CriterionState(JsonNode definition) { this.definition = definition; }
         Criterion view(boolean checked) {
             Resolution current = resolve(signals);
             return new Criterion(definition.path("criterion_id").asText(), definition.path("description").asText(),
                     definition.path("essential").asBoolean(true), checked ? definition.path("at_target").asText("") : "",
-                    current.assessment(), current.source(), List.copyOf(evidence.values()));
+                    current.assessment(), current.source(), List.copyOf(evidence.values()), trend(current));
+        }
+        private String trend(Resolution current) {
+            if (!VERIFY.equals(current.assessment()) || signals.isEmpty()) return null;
+            if (lastChecked != null && !lastChecked.equals(current.source())) return null;
+            String latest = signals.getLast().assessment();
+            if (VERIFY.equals(latest)) return null;
+            for (int i = signals.size() - 2; i >= 0; i--) {
+                String previous = signals.get(i).assessment();
+                if (VERIFY.equals(previous)) return null;
+                if (positive(previous) != positive(latest))
+                    return positive(latest) ? "IMPROVING" : "DECLINING";
+            }
+            return null;
         }
     }
     private static class ObjectiveState {
@@ -105,7 +119,9 @@ public class CompetencyProjection {
             completed++;
             Source source = new Source(attempt.getId(), attempt.getAttemptNumber(),
                     attempt.getEndedAt() == null ? null : attempt.getEndedAt().toString());
+            JsonNode target = snapshot.path("recheck_target");
             for (var entry : objectives.entrySet()) {
+                if (target.isObject() && !entry.getKey().equals(target.path("objective_id").asText())) continue;
                 ObjectiveState objective = entry.getValue();
                 JsonNode state = snapshot.path("objectives").path(entry.getKey());
                 if (state.isMissingNode()) continue;
@@ -118,10 +134,13 @@ public class CompetencyProjection {
                 boolean hasEvidence = false;
                 for (var criterionEntry : objective.criteria.entrySet()) {
                     String criterionId = criterionEntry.getKey();
+                    if (target.isObject() && !criterionId.equals(target.path("criterion_id").asText())) continue;
                     CriterionState criterion = criterionEntry.getValue();
                     List<JsonNode> accepted = new ArrayList<>();
                     for (JsonNode evidence : state.path("evidence_history")) {
                         JsonNode turn = turns.get(evidence.path("turn_id").asText());
+                        if (turn != null && criterionId.equals(evidence.path("criterion_id").asText())
+                                && entry.getKey().equals(turn.path("objective_id").asText())) criterion.lastChecked = source;
                         if (!validEvidence(evidence, turn, objective.definition, criterionId)) continue;
                         accepted.add(evidence);
                         String context = normalize(evidence.path("evidence_scope").asText());
@@ -132,6 +151,8 @@ public class CompetencyProjection {
                                 evidence.path("rationale").asText(), evidence.path("performance").asText()));
                     }
                     if (accepted.isEmpty()) continue;
+                    if (target.isObject() && !contains(state.path("contradictions"), criterionId)
+                            && !conclusiveCriterion(visible, entry.getKey(), criterionId)) continue;
                     hasEvidence = true;
                     JsonNode finalEvidence = state.path("criterion_results").path(criterionId);
                     JsonNode last = accepted.getLast();
@@ -169,6 +190,16 @@ public class CompetencyProjection {
             skills.add(new Skill(entry.getKey(), entry.getValue().path("semantic_alignment").asText(), status, items));
         }
         return new View(completed, incompatible, skills);
+    }
+
+    private static boolean conclusiveCriterion(JsonNode visible, String objectiveId, String criterionId) {
+        for (JsonNode objective : visible.path("report").path("objectives")) {
+            if (!objectiveId.equals(objective.path("objective_id").asText())) continue;
+            for (JsonNode criterion : objective.path("criteria"))
+                if (criterionId.equals(criterion.path("criterion_id").asText()))
+                    return Set.of(AT, ABOVE, BELOW, NOT_DEMONSTRATED).contains(criterion.path("assessment").asText());
+        }
+        return false;
     }
 
     public static boolean compatible(JsonNode expected, JsonNode actual) {

@@ -256,7 +256,7 @@ export function ResultQuestions({ questions }: { questions: ResultData['question
         )}
       </div>
       <div className="space-y-2.5">
-        {filtered.slice(0, limit).map(({ turn, skillId, index, evidence, badge, depthRole, clarifiedLater }) => {
+        {filtered.slice(0, limit).map(({ turn, reviews, skillId, index, evidence, badge, depthRole, clarifiedLater }) => {
           const rationales = uniqueFindings(evidence.map(item => item.rationale));
           const excerpts = evidence.filter(item =>
             item.response_excerpt.trim() && !normalizeSameText(item.response_excerpt, turn.answer || ''),
@@ -292,9 +292,18 @@ export function ResultQuestions({ questions }: { questions: ResultData['question
                 </div>
                 <div className="space-y-1.5 rounded-lg border border-slate-200/70 dark:border-border/70 bg-card p-3">
                   <p className="text-xs font-semibold text-slate-500 dark:text-muted-foreground uppercase">Câu trả lời của bạn</p>
-                  <AnswerContent content={turn.answer || 'Chưa có câu trả lời.'} mode={turn.mode} />
+                  {turn.submitted_code ? <>
+                    <pre className="overflow-auto whitespace-pre">{turn.submitted_code}</pre>
+                    {turn.transcript && <p>Lời giải thích · {turn.transcript}</p>}
+                  </> : <AnswerContent content={turn.answer || 'Chưa có câu trả lời.'} mode={turn.mode} />}
+                  {turn.coding_checks && <p>Kiểm thử tự động · Đạt {turn.coding_checks.passed}/{turn.coding_checks.total} ca.</p>}
                 </div>
-                {hasEvaluation ? (
+                {reviews.length > 0 ? reviews.map((review, i) => <div key={i} className="space-y-2 rounded-lg bg-sky-50 p-3 dark:bg-muted">
+                  {review.excerpt && <blockquote className="whitespace-pre-wrap border-l-2 pl-3">{review.excerpt}</blockquote>}
+                  <p>{review.reason}</p>
+                  {Boolean(review.gaps?.length) && <p>Phần còn thiếu · {review.gaps?.join(' · ')}</p>}
+                  <p className="font-medium">{review.next_step}</p>
+                </div>) : hasEvaluation ? (
                   <div className="space-y-1.5 rounded-lg border border-sky-200/60 bg-sky-50/70 p-3 text-slate-800 dark:text-foreground">
                     <p className="text-xs font-semibold text-sky-900 uppercase">Đánh giá từ AI</p>
                     {turn.feedback && <MarkdownContent content={turn.feedback} />}

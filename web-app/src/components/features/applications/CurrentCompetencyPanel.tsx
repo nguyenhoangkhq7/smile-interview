@@ -107,6 +107,9 @@ function ObjectiveDetails({
                       <Status value={criterion.assessment} criterion />
                     </div>
                   </div>
+                  {criterion.trend && <p className="text-xs text-muted-foreground">{criterion.trend === 'IMPROVING'
+                    ? 'Lượt này đã đạt; cần thêm một tình huống để xác nhận.'
+                    : 'Lượt này dưới yêu cầu; cần thêm một tình huống để xác nhận.'}</p>}
                   {atTarget && atTarget !== criterion.description.trim() && (
                     <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs leading-relaxed">
                       <span className="font-semibold text-foreground">Đạt khi</span>

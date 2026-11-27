@@ -4,7 +4,7 @@ from typing import Literal
 from .models import (
     Assessment, Criterion, CriterionProgress, CriterionReport, ObjectiveReport,
     ObjectiveState, PendingTurn, PublicEvidence, PublicSession, PublicTurn,
-    RecordedEvidence, Report, SessionCoaching, Snapshot, Turn,
+    RecordedEvidence, Report, SessionCoaching, Snapshot, Turn, TurnReview,
 )
 from .assessment import criterion_resolved
 from .policy_config import InterviewPolicy
@@ -52,7 +52,7 @@ def criterion_report(state: ObjectiveState, criterion: Criterion, policy: Interv
     if criterion_resolved(state, key, active_policy):
         assessment = _positive_assessment(state, key) if result and result.performance in {"AT_TARGET", "ABOVE"} else Assessment.BELOW
     return CriterionReport(
-        criterion_id=key,
+        criterion_id=key, essential=criterion.essential,
         description=criterion.description,
         assessment=assessment,
     )
@@ -176,10 +176,50 @@ def coaching_context(snapshot: Snapshot) -> dict[str, object]:
     }
 
 
+def _turn_reviews(snapshot: Snapshot) -> list[TurnReview]:
+    reviews = []
+    for turn in snapshot.turns:
+        if not turn.judgment or not turn.answer:
+            continue
+        criteria = {c.criterion_id: c for c in snapshot.objectives[turn.objective_id].objective.criteria}
+        for obs in turn.judgment.observations:
+            criterion = criteria.get(obs.criterion_id)
+            if criterion is None:
+                continue
+            excerpt = obs.response_excerpt or turn.judgment.inability_excerpt
+            gaps = [part.strip() for part in obs.unresolved_aspects if part.strip()]
+            if gaps:
+                step = f"Làm lại một bài về {criterion.description}. Tập trung vào {gaps[0].rstrip('.')}."
+            elif obs.performance in {"AT_TARGET", "ABOVE"}:
+                step = f"Thử áp dụng trong tình huống mới: {criterion.description}"
+            else:
+                step = f"Khi trả lời lại, hãy thể hiện: {criterion.at_target}"
+            reason = obs.rationale
+            if obs.observation == "NO_EVIDENCE" and not turn.judgment.explicit_inability:
+                reason = f"Chưa có bằng chứng cho tiêu chí {criterion.description}. {reason}"
+            reviews.append(TurnReview(turn_id=turn.turn_id, excerpt=excerpt if excerpt and excerpt in turn.answer else "",
+                                      reason=reason, gaps=gaps, next_step=step))
+    return reviews
+
+
 def report(snapshot: Snapshot) -> Report:
     objectives = [objective_report(s, snapshot.policy) for s in snapshot.objectives.values()]
+    target = snapshot.recheck_target
+    selected = next((c for o in objectives if target and o.objective_id == target.objective_id
+                     for c in o.criteria if c.criterion_id == target.criterion_id), None)
+    if selected and selected.assessment == Assessment.NOT_ASSESSED and snapshot.termination_reason == "TIME_BUDGET":
+        selected = selected.model_copy(update={"assessment": Assessment.INSUFFICIENT})
+    if not snapshot.is_finished:
+        for objective in objectives:
+            objective.strengths = []
+            objective.weaknesses = []
+            objective.study_recommendations = []
+            for evidence in objective.evidence:
+                evidence.rationale = ""
     return Report(
         termination_reason=snapshot.termination_reason,
+        recheck_criterion=selected,
+        turn_reviews=_turn_reviews(snapshot) if snapshot.is_finished else [],
         objectives=objectives,
         coaching=snapshot.coaching,
     )
@@ -191,7 +231,7 @@ def pending_turn(turn: Turn | None) -> PendingTurn | None:
     return PendingTurn(
         turn_id=turn.turn_id, objective_id=turn.objective_id,
         mode=turn.mode, question=turn.question.text,
-        introduction=turn.introduction,
+        introduction=turn.introduction, requires_code=turn.question.requires_code,
     )
 
 
@@ -200,6 +240,7 @@ def public_turn(turn: Turn) -> PublicTurn:
         turn_id=turn.turn_id, objective_id=turn.objective_id,
         mode=turn.mode, question=turn.question.text, answer=turn.answer,
         feedback=brief_feedback(turn) if turn.judgment else None,
+        submitted_code=turn.submitted_code, transcript=turn.transcript, coding_checks=turn.coding_checks,
     )
 
 

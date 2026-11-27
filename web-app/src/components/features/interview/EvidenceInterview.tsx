@@ -60,7 +60,7 @@ export function EvidenceInterview() {
       {!busy && <Button variant="outline" onClick={() => void interview.loadNextQuestion()}>Thử tải lại câu hỏi</Button>}
     </div>}
     {error && !session?.awaiting_question && <div role="alert" className="rounded border border-red-300 p-4"><p>{error}</p><Button variant="outline" onClick={() => void interview.reload()}>Tải lại phiên</Button></div>}
-    {!session && <EvidenceSetup busy={busy} onStart={config => void interview.start(config)} />}
+    {!session && <EvidenceSetup busy={busy} profileId={interview.metadata?.applicationProfileId} onStart={config => void interview.start(config)} />}
     {session && <>
       {session.is_finished && !conversationVisible ? <InterviewOutcome session={session} metadata={interview.metadata} />
         : session.config.interaction_mode === 'VOICE'

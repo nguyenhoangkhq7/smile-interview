@@ -48,6 +48,7 @@ public class EvidenceService {
     private final EvidenceInputs inputs;
     private final EvidenceJson json;
     private final EvidenceAdmission admission;
+    private final fit.iuh.modules.study.service.StudyPlanService study;
 
     public JsonNode read(String sessionId, User user) {
         owned(sessionId, user);
@@ -107,7 +108,13 @@ public class EvidenceService {
         start.put("skills", enrichedSkills);
         start.put("verification_sources", EvidenceInputs.verificationSources(session, enrichedSkills));
         var profile = session.getApplicationProfile();
-        start.put("opening", openingContext(session, user));
+        if (config.recheck() == null) {
+            start.put("opening", openingContext(session, user));
+        } else {
+            if (profile == null || config.focusedMode() != null || config.maxQuestions() > 3 || config.durationSeconds() > 300)
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Cấu hình kiểm chứng không hợp lệ");
+            start.put("recheck_target", study.recheckTarget(profile.getId(), user, config.recheck()));
+        }
         if (profile != null && profile.getBlueprintJson() != null) {
             start.put("blueprint", EvidenceInputs.leanBlueprint(json.read(profile.getBlueprintJson())));
         }
@@ -132,9 +139,11 @@ public class EvidenceService {
         JsonNode cached = store.replay(sessionId, answer.requestId(), hash);
         if (cached != null) return tryAdvanceNextQuestion(sessionId, answer.requestId(), cached);
         InterviewRun run = current(sessionId, answer.expectedVersion());
-        JsonNode payload = json.tree(Map.of("snapshot", json.read(run.getSnapshotJson()),
+        var command = new java.util.HashMap<String, Object>(Map.of("snapshot", json.read(run.getSnapshotJson()),
                 "turn_id", answer.turnId(), "expected_state_version", answer.expectedVersion(),
                 "candidate_response", answer.response(), "defer_question", true));
+        if (answer.code() != null) command.put("submitted_code", answer.code());
+        JsonNode payload = json.tree(command);
         JsonNode result = ai.compute("respond", payload);
         JsonNode committed = store.commit(new EvidenceStore.Commit(sessionId, run.getStateVersion(), answer.requestId(),
                 hash, json.read(run.getConfigJson()), result));

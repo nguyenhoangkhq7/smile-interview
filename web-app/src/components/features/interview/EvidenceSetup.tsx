@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { ChevronDown, Clock3, LoaderCircle, MessageSquareText, Mic, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { studyPlans } from '@/services/studyPlans';
 import { Input } from '@/components/ui/input';
 import { InterviewLimits, InterviewStartConfig, QuestionMode, defaultConfig, evidenceInterview, questionModes } from '@/services/evidenceInterview';
 
@@ -28,10 +29,27 @@ const interactionOptions = [
 const selectClass =
   'h-10 w-full appearance-none rounded-lg border border-input bg-background px-3 pr-9 text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50';
 
-interface Props { busy: boolean; onStart: (config: InterviewStartConfig) => void }
+interface Props { busy: boolean; profileId?: string | null; onStart: (config: InterviewStartConfig) => void }
 
-export function EvidenceSetup({ busy, onStart }: Props) {
-  const [config, setConfig] = useState(defaultConfig);
+export function EvidenceSetup({ busy, profileId, onStart }: Props) {
+  const [query] = useState(() => new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search));
+  const taskId = Number(query.get('task')), checklistItemId = Number(query.get('item'));
+  const recheck = taskId > 0 && checklistItemId > 0;
+  const [config, setConfig] = useState<InterviewStartConfig>(() => recheck ? {
+    ...defaultConfig, max_questions: 3, max_questions_per_objective: 3, duration_seconds: 300,
+    interaction_mode: query.get('channel') === 'VOICE' ? 'VOICE' : 'TEXT', recheck: { taskId, checklistItemId },
+  } : defaultConfig);
+  const [criterion, setCriterion] = useState('');
+  const [previewError, setPreviewError] = useState('');
+  useEffect(() => {
+    if (!recheck || !profileId) return;
+    const ac = new AbortController();
+    void studyPlans.recheckPreview(profileId, taskId, checklistItemId, ac.signal)
+      .then(result => setCriterion(result.description)).catch(() => {
+        if (!ac.signal.aborted) setPreviewError('Không thể tải tiêu chí. Hãy mở lại đầu việc để kiểm tra nguồn.');
+      });
+    return () => ac.abort();
+  }, [profileId, recheck, taskId, checklistItemId]);
   const [limits, setLimits] = useState<InterviewLimits>();
   const [ready, setReady] = useState(false);
   const maxQuestions = limits?.maxQuestions ?? 40;
@@ -49,7 +67,7 @@ export function EvidenceSetup({ busy, onStart }: Props) {
         interaction_mode: current.voiceEnabled ? previous.interaction_mode : 'TEXT',
         max_questions: Math.min(previous.max_questions, current.maxQuestions),
         duration_seconds: Math.min(previous.duration_seconds, Math.floor(current.durationSeconds / 60) * 60),
-        max_questions_per_objective: current.maxQuestionsPerObjective < 8 ? current.maxQuestionsPerObjective : undefined,
+        max_questions_per_objective: Math.min(previous.max_questions_per_objective ?? 8, current.maxQuestionsPerObjective),
       }));
     }).catch(() => {}).finally(() => {
       if (!request.signal.aborted) setReady(true);
@@ -60,9 +78,9 @@ export function EvidenceSetup({ busy, onStart }: Props) {
   return (
     <section aria-busy={busy} className="space-y-6 rounded-2xl border bg-card p-6 shadow-xs sm:p-8">
       <header className="space-y-1.5 border-b pb-5">
-        <h1 className="text-2xl font-semibold tracking-tight">Chuẩn bị phỏng vấn</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{recheck ? 'Kiểm chứng lại tiêu chí' : 'Chuẩn bị phỏng vấn'}</h1>
         <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-          Câu hỏi được chọn theo JD và kỹ năng cần kiểm chứng. AI sẽ hỏi tiếp khi cần làm rõ trong thời lượng và số câu bạn chọn.
+          {recheck ? `${previewError || criterion || 'Đang tải tiêu chí…'} · Tối đa ${config.max_questions} câu trong ${Math.floor(config.duration_seconds / 60)} phút.` : 'Câu hỏi được chọn theo JD và kỹ năng cần kiểm chứng. AI sẽ hỏi tiếp khi cần làm rõ trong thời lượng và số câu bạn chọn.'}
         </p>
       </header>
 
@@ -102,7 +120,7 @@ export function EvidenceSetup({ busy, onStart }: Props) {
         </div>
       </fieldset>
 
-      <div className="grid gap-4 rounded-xl border bg-muted/25 p-4 sm:grid-cols-12 sm:p-5">
+      {!recheck && <div className="grid gap-4 rounded-xl border bg-muted/25 p-4 sm:grid-cols-12 sm:p-5">
         <label className="grid gap-1.5 sm:col-span-6">
           <span className="text-sm font-medium text-foreground">Dạng phỏng vấn</span>
           <span className="relative">
@@ -146,14 +164,14 @@ export function EvidenceSetup({ busy, onStart }: Props) {
             onChange={e => setConfig({ ...config, max_questions: Number(e.target.value) })}
           />
         </label>
-      </div>
+      </div>}
 
       <footer className="flex flex-wrap items-center justify-between gap-4 border-t pt-5">
         <p role={busy ? 'status' : undefined} className="flex items-center gap-2 text-sm text-muted-foreground">
           <Clock3 size={15} aria-hidden="true" className="shrink-0" />
           Lần phỏng vấn đầu tiên có thể mất vài phút để chuẩn bị câu hỏi.
         </p>
-        <Button size="lg" className="w-full px-5 sm:w-auto" disabled={busy || !ready || invalidLimits} onClick={() => onStart(config)}>
+        <Button size="lg" className="w-full px-5 sm:w-auto" disabled={busy || !ready || invalidLimits || (recheck && !criterion)} onClick={() => onStart(config)}>
           {busy ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Play aria-hidden="true" />}
           {busy ? 'Đang chuẩn bị mục tiêu và câu hỏi…' : 'Bắt đầu phỏng vấn'}
         </Button>

@@ -159,7 +159,7 @@ export function buildResult({ report, turns }: EvidenceSession) {
   const questions = turns.map((turn, index) => {
     const evidence = byTurn.get(turn.turn_id) ?? [];
     const status = evidence.some(item =>
-      item.performance === 'BELOW' || item.observation === 'CONTRADICTS' || item.observation === 'NO_EVIDENCE',
+      item.performance === 'BELOW' || item.observation === 'CONTRADICTS',
     ) ? 'weak'
       : evidence.some(item => item.performance === 'AT_TARGET' || item.performance === 'ABOVE') ? 'strong' : 'partial';
     const depthRole: EvidenceDepthRole = evidence.some(item => item.depth_role === 'EXTENSION') ? 'EXTENSION'
@@ -172,6 +172,7 @@ export function buildResult({ report, turns }: EvidenceSession) {
     const badge = questionBadge({ status, depthRole, evidence, clarifiedLater });
     return {
       turn,
+      reviews: (report.turn_reviews ?? []).filter(review => review.turn_id === turn.turn_id),
       skillId: skillByObjective.get(turn.objective_id) ?? '',
       index,
       evidence,
@@ -191,7 +192,15 @@ export function buildResult({ report, turns }: EvidenceSession) {
       }
     : null;
 
+  const criteria = interviewedObjectives.flatMap(objective => objective.criteria ?? []);
+  const required = criteria.filter(c => c.essential);
+  const checked = required.filter(c => c.assessment !== 'NOT_ASSESSED');
+  const coverage = criteria.length && interviewedObjectives.every(o => o.criteria?.length)
+    && criteria.every(c => typeof c.essential === 'boolean')
+    ? { total: required.length, checked: checked.length, passed: checked.filter(c => assessmentStatus(c.assessment) === 'strong').length }
+    : null;
   return {
+    coverage,
     skills,
     questions,
     coaching,

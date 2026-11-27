@@ -74,7 +74,9 @@ def test_passed_checks_are_evidence_and_unsupported_submissions_use_judge(
         return original(context)
 
     monkeypatch.setattr(provider, "judge", judge)
-    answer(engine, snapshot, code)
+    result = answer(engine, snapshot, code)
+    assert result.public.turns[0].model_dump()["coding_checks"] == expected_cases
+    assert result.snapshot.turns[0].model_dump()["coding_checks"] == expected_cases
     assert len(contexts) == 1
     assert contexts[0].get("coding_checks") == expected_cases
 
