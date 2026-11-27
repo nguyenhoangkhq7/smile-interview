@@ -476,11 +476,11 @@ def test_golden_01_backend_cv_and_jd_extraction():
         filename="01_Backend_CV.pdf",
         document_type="CV",
     )
-    assert cv_result.stats.total_mentions == 51
+    assert cv_result.stats.total_mentions == 52
     assert cv_result.stats.unresolved_evidences == 0
-    assert cv_result.stats.unique_skills == 42
-    assert cv_result.stats.non_skill_count == 2
-    assert len(cv_result.non_skill_entities) == 2
+    assert cv_result.stats.unique_skills == 39
+    assert cv_result.stats.non_skill_count == 5
+    assert len(cv_result.non_skill_entities) == 5
     assert cv_result.stats.header_evidences == 0
     assert cv_result.stats.kind_conflicts == 0
     assert cv_result.stats.non_verbatim_mentions == 0
@@ -494,12 +494,20 @@ def test_golden_01_backend_cv_and_jd_extraction():
     )
     assert jd_result.stats.total_mentions == 46
     assert jd_result.stats.unresolved_evidences == 0
-    assert jd_result.stats.unique_skills == 35
-    assert jd_result.stats.non_skill_count == 7
-    assert len(jd_result.non_skill_entities) == 7
+    assert jd_result.stats.unique_skills == 32
+    assert jd_result.stats.non_skill_count == 10
+    assert len(jd_result.non_skill_entities) == 10
     assert jd_result.stats.header_evidences == 0
     assert jd_result.stats.kind_conflicts == 0
     assert jd_result.stats.non_verbatim_mentions == 1
+
+    assert {"payments", "fintech", "kafka"} <= {skill.skill_id for skill in cv_result.skills}
+    assert {"checkout", "inventory-updates", "kyc-onboarding-flow"} <= {
+        skill.skill_id for skill in cv_result.non_skill_entities
+    }
+    assert {"reporting-system", "compliance-requirements", "highly-regulated-domain"} <= {
+        skill.skill_id for skill in jd_result.non_skill_entities
+    }
 
     # Verify norm-equality invariant for all evidences
     norm = lambda s: re.sub(r"\s+", " ", s).strip()
@@ -510,7 +518,7 @@ def test_golden_01_backend_cv_and_jd_extraction():
             assert ev.offset_resolved is True
             assert norm(cv_cleaned[ev.start:ev.end]) == norm(ev.sentence)
             cv_checked += 1
-    assert cv_checked == 49
+    assert cv_checked == 47
 
     jd_checked = 0
     for s in jd_result.skills:
@@ -518,7 +526,7 @@ def test_golden_01_backend_cv_and_jd_extraction():
             assert ev.offset_resolved is True
             assert norm(jd_cleaned[ev.start:ev.end]) == norm(ev.sentence)
             jd_checked += 1
-    assert jd_checked == 39
+    assert jd_checked == 36
 
     # Assert text_sha256 matches exact cleaned text sha256
     assert cv_result.text_sha256 == hashlib.sha256(cv_cleaned.encode("utf-8")).hexdigest()
@@ -609,7 +617,7 @@ def test_negative_control_altered_source_sentence():
     Negative control test (test of the test):
     Alters a single token ('38%' -> '39%') in one source sentence of frozen CV LLM extractions.
     Asserts that unresolved_evidences equals exactly 5 (the number of mentions sharing that sentence)
-    and that all other 46 mentions still resolve with valid offsets.
+    and that the other mentions, including recovered payments, still resolve with valid offsets.
     """
     from matching_cv.app.services.skill_postprocessor import skill_postprocessor
 
@@ -652,12 +660,12 @@ def test_negative_control_altered_source_sentence():
     non_skill_resolved = sum(1 for s in result.non_skill_entities for ev in s.evidences if ev.offset_resolved)
     non_skill_unresolved = sum(1 for s in result.non_skill_entities for ev in s.evidences if not ev.offset_resolved)
     assert unresolved_count == 4
-    assert resolved_count == 45
+    assert resolved_count == 43
     assert non_skill_unresolved == 1
-    assert non_skill_resolved == 1
+    assert non_skill_resolved == 4
     assert unresolved_count + non_skill_unresolved == 5
-    assert resolved_count + non_skill_resolved == 46
-    assert result.stats.total_mentions == 51
+    assert resolved_count + non_skill_resolved == 47
+    assert result.stats.total_mentions == 52
 
 
 def test_invalid_skill_id_pattern():

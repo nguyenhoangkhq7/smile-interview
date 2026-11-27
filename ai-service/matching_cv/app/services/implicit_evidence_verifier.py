@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 from matching_cv.app.schemas.implicit_skill_extraction import ImplicitEvidenceSnippet, ImplicitExtractedSkill
 from matching_cv.app.schemas.skill_extraction import ExtractionResult
 from matching_cv.app.schemas.unified_skill_extraction import ImplicitEvidenceVerification
+from matching_cv.app.services.competency_extraction_quality import has_unsupported_coverage_analysis
 from matching_cv.app.services.skill_postprocessor import skill_postprocessor
 
 logger = logging.getLogger(__name__)
@@ -885,6 +886,18 @@ class ImplicitEvidenceVerifier:
                     decomposed_from=orig_meta.get("decomposed_from"),
                     decomposed_components=orig_meta.get("all_components"),
                 )
+
+            if doc_type_normalized == "CV" and has_unsupported_coverage_analysis(cand_label_clean, quotes):
+                verifications.append(build_verification(
+                    assessment="unsupported",
+                    support_status="unsupported",
+                    acceptance_decision="rejected",
+                    is_accepted=False,
+                    support_reason="A coverage metric alone does not verify an analysis activity.",
+                    confidence_norm=0.0,
+                ))
+                rejected_skills.append(cand)
+                continue
 
             # 2. Check for empty evidence
             if not quotes and not reasonings:

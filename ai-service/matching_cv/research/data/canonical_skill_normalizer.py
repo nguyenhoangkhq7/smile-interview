@@ -11,8 +11,36 @@ import re
 import unicodedata
 from typing import Any, Iterable, List, Set, Tuple
 
+ENGINEERING_COMPETENCY_ALIASES: dict[str, str] = {
+    "data-modelling": "data-modeling",
+    "data-model-design": "data-modeling",
+    "sql-query-performance": "query-performance",
+    "database-query-performance": "query-performance",
+    "design-systems": "design-system",
+    "core-web-vital": "core-web-vitals",
+    "data-quality-check": "data-quality",
+    "data-quality-checks": "data-quality",
+    "data-quality-assurance": "data-quality",
+    "data-quality-validation": "data-quality",
+    "data-quality-engineering": "data-quality",
+    "ml-model-deployment": "model-deployment",
+    "machine-learning-model-deployment": "model-deployment",
+    "deploying-models-to-production": "model-deployment",
+    "deploying-ml-models-to-production": "model-deployment",
+    "productionizing-ml-models": "model-deployment",
+    "ml-model-serving": "model-serving",
+    "machine-learning-model-serving": "model-serving",
+    "serving-ml-models": "model-serving",
+    "containerised-deployment": "containerized-deployment",
+    "container-based-deployment": "containerized-deployment",
+    "containerized-deployment-workflow": "containerized-deployment",
+    "containerized-deployment-workflows": "containerized-deployment",
+    "containerised-deployment-workflows": "containerized-deployment",
+}
+
 # Comprehensive alias map to authoritative canonical IDs
 CANONICAL_ALIASES: dict[str, str] = {
+    **ENGINEERING_COMPETENCY_ALIASES,
     # Node.js
     "node.js": "nodejs",
     "node-js": "nodejs",

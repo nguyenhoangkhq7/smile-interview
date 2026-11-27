@@ -96,6 +96,51 @@ public class AdminInterviewRepository {
                 .stream().findFirst();
     }
 
+    public Optional<QualityRow> quality(String id) {
+        return jdbc.query("""
+                SELECT coalesce(p.cv_text, cv.raw_text) AS cv,
+                       coalesce(p.jd_text, jd.raw_text) AS jd,
+                       coalesce(p.skill_gap_json, s.skill_gap_json) AS skills_json,
+                       coalesce(p.gap_report_json, s.gap_report_json) AS report_json,
+                       s.interview_type, r.config_json, r.public_json
+                FROM sessions s
+                LEFT JOIN application_profiles p ON p.id = s.application_profile_id
+                LEFT JOIN resumes cv ON cv.id = s.resume_id
+                LEFT JOIN job_descriptions jd ON jd.id = s.jd_id
+                LEFT JOIN interview_runs r ON r.session_id = s.id
+                WHERE s.id = :id
+                """, new MapSqlParameterSource("id", id), (row, index) -> new QualityRow(
+                row.getString("cv"), row.getString("jd"), row.getString("skills_json"), row.getString("report_json"),
+                row.getString("interview_type"), row.getString("config_json"), row.getString("public_json")))
+                .stream().findFirst();
+    }
+
+    public Optional<DocumentsRow> documents(String id) {
+        return jdbc.query("""
+                SELECT coalesce(p.cv_filename, cv.file_name) AS cv_name, coalesce(p.cv_text, cv.raw_text) AS cv_text,
+                       cv.file_url AS cv_file, coalesce(p.jd_title, jd.title) AS jd_title,
+                       coalesce(p.jd_text, jd.raw_text) AS jd_text, jd.file_url AS jd_file
+                FROM sessions s
+                LEFT JOIN application_profiles p ON p.id = s.application_profile_id
+                LEFT JOIN resumes cv ON cv.id = coalesce(p.resume_id, s.resume_id)
+                LEFT JOIN job_descriptions jd ON jd.id = coalesce(p.jd_id, s.jd_id)
+                WHERE s.id = :id
+                """, new MapSqlParameterSource("id", id), (row, index) -> new DocumentsRow(
+                new DocumentRow(row.getString("cv_name"), row.getString("cv_text"), row.getString("cv_file")),
+                new DocumentRow(row.getString("jd_title"), row.getString("jd_text"), row.getString("jd_file"))))
+                .stream().findFirst();
+    }
+
+    public Optional<MatchingRow> matching(String id) {
+        return jdbc.query("""
+                SELECT coalesce(p.skill_gap_json, s.skill_gap_json) AS skills,
+                       coalesce(p.gap_report_json, s.gap_report_json) AS report
+                FROM sessions s LEFT JOIN application_profiles p ON p.id = s.application_profile_id
+                WHERE s.id = :id
+                """, new MapSqlParameterSource("id", id),
+                (row, index) -> new MatchingRow(row.getString("skills"), row.getString("report"))).stream().findFirst();
+    }
+
     private static Row row(ResultSet result) throws SQLException {
         var runStart = result.getObject("run_started_at", OffsetDateTime.class);
         return new Row(result.getString("id"), result.getString("candidate_name"), result.getString("role_title"),
@@ -117,4 +162,13 @@ public class AdminInterviewRepository {
     public record DetailRow(Row session, String cvName, String jdTitle, String company, String gapReport,
                             boolean hasGap, String publicJson, String legacyReport, Integer overallScore,
                             String overallFeedback, String policyJson) {}
+    public record QualityRow(String cv, String jd, String skillsJson, String reportJson,
+                             String interviewType, String configJson, String publicJson) {
+        @Override public String toString() { return "QualityRow[redacted]"; }
+    }
+    public record DocumentsRow(DocumentRow cv, DocumentRow jd) {}
+    public record DocumentRow(String name, String text, String locator) {
+        @Override public String toString() { return "DocumentRow[redacted]"; }
+    }
+    public record MatchingRow(String skillsJson, String reportJson) {}
 }
