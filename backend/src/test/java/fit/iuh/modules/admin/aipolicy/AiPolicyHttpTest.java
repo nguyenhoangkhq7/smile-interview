@@ -19,6 +19,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
+import software.amazon.awssdk.services.s3.S3Client;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -29,6 +30,8 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.containsString;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -45,6 +48,7 @@ class AiPolicyHttpTest {
     @Autowired JwtService tokens;
     @Autowired AiRuntimeKey key;
     @MockitoBean AiPolicySources sources;
+    @MockitoBean S3Client storage;
     @TempDir(cleanup = org.junit.jupiter.api.io.CleanupMode.NEVER) static Path temp;
 
     @DynamicPropertySource
@@ -56,6 +60,35 @@ class AiPolicyHttpTest {
     static void removeRuntimeKey() throws IOException {
         Files.deleteIfExists(temp.resolve("runtime.key"));
         Files.deleteIfExists(temp);
+    }
+
+    @Test
+    void measuresServiceResponsesOnlyOnAdminPost() throws Exception {
+        var mvc = MockMvcBuilders.webAppContextSetup(context)
+                .addFilters(context.getBean("springSecurityFilterChain", Filter.class)).build();
+        var endpoint = ADMIN + "/health";
+        mvc.perform(post(endpoint)).andExpect(status().isUnauthorized());
+        mvc.perform(post(endpoint).header("Authorization", authorization("USER"))).andExpect(status().isForbidden());
+        verifyNoMoreInteractions(sources);
+
+        var admin = authorization("ADMIN");
+        when(sources.reachable()).thenReturn(true);
+        mvc.perform(get(endpoint).header("Authorization", admin)).andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id == 'stt')]").isEmpty());
+        verify(sources).reachable();
+        verify(sources).status();
+        verifyNoMoreInteractions(sources);
+
+        when(sources.measure()).thenReturn(List.of(new Check("voice", "DEGRADED", null, "Voice"),
+                new Check("stt", "UP", 100L, "STT"), new Check("tts", "DOWN", 200L, "TTS")));
+        var measured = mvc.perform(post(endpoint).header("Authorization", admin)).andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andReturn();
+        var checks = json.readValue(measured.getResponse().getContentAsByteArray(), Check[].class);
+        assertThat(checks)
+                .anyMatch(check -> check.id().equals("postgres") && check.status().equals("UP"))
+                .contains(new Check("voice", "DEGRADED", null, "Voice"),
+                        new Check("stt", "UP", 100L, "STT"), new Check("tts", "DOWN", 200L, "TTS"));
     }
 
     @Test

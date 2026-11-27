@@ -146,6 +146,8 @@ class CachedExtractionService:
             cv_doc = json.load(file)
         with open(jd_path, "r", encoding="utf-8") as file:
             jd_doc = json.load(file)
+        if cv_doc.get("text_sha256") != cv_hash or jd_doc.get("text_sha256") != jd_hash:
+            return None, matched_pair_id, None
         if settings.MATCHING_CV_DSPY_EXPLICIT_ENABLED and not all(
             self._cache_version_is_usable(doc) for doc in (cv_doc, jd_doc)
         ):

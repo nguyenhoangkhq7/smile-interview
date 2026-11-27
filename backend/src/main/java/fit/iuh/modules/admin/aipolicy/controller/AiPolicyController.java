@@ -36,5 +36,12 @@ public class AiPolicyController {
     }
 
     @GetMapping("/health")
-    public List<Check> health() { return health.check(); }
+    public ResponseEntity<List<Check>> health() {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(health.check());
+    }
+
+    @PostMapping("/health")
+    public ResponseEntity<List<Check>> measureHealth() {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(health.measure());
+    }
 }

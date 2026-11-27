@@ -4,6 +4,11 @@ import re
 import unicodedata
 from typing import Any, Dict, List, Literal, Optional, Set, Tuple
 
+from matching_cv.app.services.competency_extraction_quality import (
+    has_unsupported_coverage_analysis,
+    is_resume_system_object,
+)
+
 CompetencyGranularity = Literal[
     "atomic_skill",
     "compound_competency",
@@ -96,6 +101,22 @@ def evaluate_competency_retention(
     clean_kind = (kind or "").strip().lower()
     clean_cat = (category or "").strip()
     clean_ev = (evidence or "").strip()
+
+    if side == "CV" and is_resume_system_object(clean_label):
+        return CompetencyRetentionDecision(
+            should_retain=False,
+            reason_code="FILTER_CONTEXT_SYSTEM_OBJECT",
+            decision_source="rule_project_component",
+            granularity="contextual_activity_or_product",
+        )
+
+    if side == "CV" and has_unsupported_coverage_analysis(clean_label, (clean_ev,)):
+        return CompetencyRetentionDecision(
+            should_retain=False,
+            reason_code="FILTER_UNSUPPORTED_COVERAGE_ANALYSIS",
+            decision_source="rule_outcome_is_not_analysis_evidence",
+            granularity="ambiguous_candidate",
+        )
 
     # Rule 1: Named project artifact pattern (e.g. order-management microservice, payment module)
     if NAMED_PROJECT_ARTIFACT_PATTERN.match(clean_label):

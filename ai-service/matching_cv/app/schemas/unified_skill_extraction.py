@@ -1,6 +1,6 @@
 """Pydantic schemas for unified explicit and implicit skill extraction output contract."""
 from typing import Any, Dict, List, Literal, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PrivateAttr
 
 from matching_cv.app.schemas.implicit_skill_extraction import (
     ImplicitExtractedSkill,
@@ -200,6 +200,9 @@ class DocumentUnifiedResult(BaseModel):
         default_factory=DocumentValidationResult,
         description="Explicit/Implicit deduplication and validation outcome",
     )
+    _verified_resume_skills: List[ImplicitExtractedSkill] = PrivateAttr(default_factory=list)
+    _requirement_groups: dict[str, tuple[str, ...]] = PrivateAttr(default_factory=dict)
+    _strict_requirement_group_ids: set[str] = PrivateAttr(default_factory=set)
 
 
 class UnifiedExtractionSummary(BaseModel):

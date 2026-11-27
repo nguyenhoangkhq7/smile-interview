@@ -1,5 +1,7 @@
 """Graph construction stage for the analyze pipeline."""
 from dataclasses import dataclass
+import json
+import logging
 import time
 from typing import Any, Optional, Protocol
 
@@ -9,6 +11,8 @@ from matching_cv.app.schemas.pipeline import PipelineGraphSummary
 from matching_cv.app.schemas.semantic_reasoning import SkillPairReasoningResult
 from matching_cv.app.schemas.semantic_representation import SemanticRepresentationResponse
 from matching_cv.app.schemas.unified_skill_extraction import UnifiedExtractFileResponse
+from matching_cv.app.services.graph_edge_audit import audit_semantic_edge_weights
+from matching_cv.research.data.canonical_skill_normalizer import normalize_canonical_skill
 from matching_cv.research.paper_aligned_gnn.graph_builder import (
     PaperAlignedGraphBuilder,
     verify_paper_aligned_subgraphs,
@@ -98,6 +102,19 @@ class PipelineGraphService:
                 reasoning_results=reasoning_results,
             )
             pyg_data, _, pyg_summary = active_builder.export_to_pyg(graph_data)
+            if getattr(graph_data, "edge_weight_mode", None) == "semantic_importance":
+                audit = audit_semantic_edge_weights(graph_data, pyg_data, skill_importance_output)
+                cv = unified_response.cv
+                verified_ids = {
+                    normalize_canonical_skill(skill.skill_id) for skill in cv._verified_resume_skills
+                } if cv else set()
+                audit["verified_resume_shared_jd_skills"] = sorted(
+                    node.jd_canonical_id for node in graph_data.skill_nodes.values()
+                    if node.membership == "shared" and node.jd_canonical_id in verified_ids
+                )
+                logging.getLogger("uvicorn.error").info(
+                    "Module1 edge weights graph=%s %s", graph_data.graph_id, json.dumps(audit, sort_keys=True)
+                )
             duration_ms = (time.perf_counter() - started_at) * 1000.0
 
             node_counts = dict(integrity_report.node_counts)

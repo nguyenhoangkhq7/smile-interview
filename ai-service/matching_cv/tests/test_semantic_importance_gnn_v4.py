@@ -37,6 +37,7 @@ from matching_cv.app.schemas.unified_skill_extraction import (
     UnifiedExtractFileResponse,
 )
 from matching_cv.app.services.gnn_inference_service import GNNInferenceService
+from matching_cv.app.services.graph_edge_audit import audit_semantic_edge_weights
 from matching_cv.research.paper_aligned_gnn.graph_builder import (
     PaperAlignedGraphBuilder,
     paper_aligned_graph_builder,
@@ -139,6 +140,18 @@ def test_semantic_importance_graph_assigns_jsi_to_jd_and_uniform_one_to_cv():
                 assert edge.tensor_weight == pytest.approx(0.91)
             elif cid == "docker":
                 assert edge.tensor_weight == pytest.approx(1.0)
+
+
+    pyg, _, _ = builder.export_to_pyg(graph)
+    result = audit_semantic_edge_weights(graph, pyg, jsi_payload)
+    assert result["formula_mismatches"] == 0
+    assert result["pyg_mismatch_relations"] == []
+    assert result["jd_unverified_by_jsi_edges"] == 2
+    assert result["prerequisite_cosine_fallback_edges"] == 0
+
+    pyg["job", "requires_skill", "skill"].edge_attr[0] = 0.11
+    result = audit_semantic_edge_weights(graph, pyg, jsi_payload)
+    assert result["pyg_mismatch_relations"] == ["requires_skill"]
 
 
 def test_orchestrator_evaluates_skill_importance_before_stage5_graph_construction():

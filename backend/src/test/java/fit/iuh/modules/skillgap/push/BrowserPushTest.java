@@ -43,6 +43,7 @@ class BrowserPushTest {
         assertThat(http.headers().firstValue("Authorization").orElseThrow()).startsWith("vapid ");
         assertThat(http.headers().firstValue("Content-Encoding")).contains("aes128gcm");
         assertThat(http.bodyPublisher().orElseThrow().contentLength()).isGreaterThan(50);
+        assertThatCode(sender::prepareTestNotification).doesNotThrowAnyException();
     }
 
     @Test void optInAfterCompletionIsIdempotentAndExpiredDevicesAreRemoved() throws Exception {

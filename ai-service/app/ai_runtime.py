@@ -78,9 +78,12 @@ def authorized(token: str | None) -> bool:
 async def runtime_middleware(request, call_next):
     backend = os.getenv("AI_RUNTIME_BACKEND_URL", "").strip().rstrip("/")
     path = request.url.path
-    if path == "/internal/runtime/status" and not authorized(request.headers.get(TOKEN_HEADER)):
+    runtime_paths = ("/internal/runtime/status", "/internal/runtime/probe")
+    internal_path = path.rstrip("/")
+    internal_runtime = internal_path in runtime_paths
+    if (internal_runtime or internal_path == "/internal/runtime/quality") and not authorized(request.headers.get(TOKEN_HEADER)):
         return JSONResponse({"detail": "Unauthorized"}, status_code=401)
-    if not backend or not (path.startswith(("/api/v1/", "/api/v2/")) or path == "/internal/runtime/status"):
+    if not backend or not (path.startswith(("/api/v1/", "/api/v2/")) or internal_runtime):
         return await call_next(request)
     try:
         key = key_bytes()

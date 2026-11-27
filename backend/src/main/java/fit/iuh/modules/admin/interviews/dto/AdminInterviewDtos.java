@@ -14,6 +14,13 @@ public final class AdminInterviewDtos {
     public record Page(List<Summary> sessions, long total, int page, int size, Map<InterviewStatus, Long> counts) {}
     public record Inputs(String cvName, String jdTitle, String company) {}
     public record Matching(Double score, boolean available) {}
+    public enum DocumentKind { CV, JD }
+    public record DocumentView(String name, String text, boolean originalAvailable) {}
+    public record MatchingDetail(Double score, boolean degraded, boolean available, List<MatchingSkill> skills) {}
+    public record MatchingSkill(String id, String name, String alignment, String cvSkill, Double requiredLevel,
+                                Double priority, Double importance, String context, List<String> cvEvidence,
+                                List<String> jdEvidence, List<MatchingTask> tasks) {}
+    public record MatchingTask(String description, String requirement, Double requiredLevel, List<String> evidence) {}
     public record Blueprint(Integer maxQuestions, Integer durationSeconds, Integer maxQuestionsPerObjective,
                             String questionMode, Integer objectiveCount, Policy policy) {}
     public record Policy(Double coreImportance, Double reserveFollowupFraction, Integer fallbackDepth,
@@ -28,4 +35,12 @@ public final class AdminInterviewDtos {
     public record Report(String terminationReason, List<Objective> objectives, Integer overallScore, String feedback) {}
     public record Detail(Summary session, Inputs inputs, Matching matching, Blueprint blueprint,
                          boolean finalized, Transcript transcript, Report report) {}
+    public record QualityInput(String cv, String jd, String skillsJson, String reportJson,
+                               String mode, List<QualityQuestion> questions) {
+        @Override public String toString() { return "QualityInput[redacted]"; }
+    }
+    public record QualityQuestion(String text, String skill) {}
+    public record QualityFinding(String status, String code, String detail, String skill, Integer turn, String excerpt) {}
+    public record QualitySection(int total, List<QualityFinding> findings) {}
+    public record QualityReview(QualitySection matching, QualitySection questions) {}
 }
