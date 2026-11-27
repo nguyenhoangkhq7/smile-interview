@@ -27,6 +27,7 @@ from matching_cv.app.schemas.semantic_representation import (
     SemanticRepresentationResponse,
 )
 from matching_cv.app.services.standardized_output_builder import PublicOutputContext
+from matching_cv.app.services.requirement_grouping import prepare_pipeline_skills
 from matching_cv.app.services.pipeline_validation import (
     PipelineInputValidationError,
     PipelineInputValidator,
@@ -258,6 +259,7 @@ class PipelineOrchestrator:
         # -------------------------------------------------------------
         # STAGE 3: SBERT MULTILINGUAL REPRESENTATION & RETRIEVAL
         # -------------------------------------------------------------
+        unified_response = prepare_pipeline_skills(unified_response, cv_text, jd_text)
         stage3_response: Optional[SemanticRepresentationResponse] = None
         semantic_rep_summary: Optional[PipelineSemanticRepresentation] = None
 

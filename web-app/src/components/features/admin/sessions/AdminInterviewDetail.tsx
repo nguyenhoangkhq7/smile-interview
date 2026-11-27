@@ -2,8 +2,11 @@
 
 import { useState } from 'react';
 import { FileDown, RefreshCw } from 'lucide-react';
-import { percent } from '@/components/features/interview/result/resultData';
+import { useAiQualityReview } from '@/hooks/useAiQualityReview';
+import InterviewAiQuality from './InterviewAiQuality';
 import InterviewEvaluation from './InterviewEvaluation';
+import InterviewInputs from './InterviewInputs';
+import InterviewMatching from './InterviewMatching';
 import InterviewTranscript from './InterviewTranscript';
 import { printInterviewReport } from './printInterviewReport';
 import { dateLabel, durationLabel, modeLabel, statusLabels, statusStyle } from './sessionDisplay';
@@ -15,6 +18,7 @@ const stages = [
   ['blueprint', 'Cấu hình phiên'],
   ['transcript', 'Transcript & Bằng chứng'],
   ['evaluation', 'Đánh giá cuối'],
+  ['quality', 'Chất lượng AI'],
 ] as const;
 type Stage = typeof stages[number][0];
 
@@ -38,18 +42,13 @@ export default function AdminInterviewDetail({ detail, onRefresh }: { detail: In
     detail.finalized || detail.session.status === 'IN_PROGRESS' ? 'transcript' : 'inputs'
   );
   const [printError, setPrintError] = useState(false);
-  const { session, inputs, matching, blueprint } = detail;
-  const score = percent(matching.score);
+  const { session, inputs, blueprint } = detail;
+  const qualityReview = useAiQualityReview(session.id);
   const policy = blueprint?.policy;
   const locked = !detail.finalized && stage === 'evaluation';
   const panels = {
-    inputs: <Fields title="Hồ sơ đầu vào" items={[
-      ['Tên tệp CV', inputs.cvName], ['Tiêu đề mô tả công việc', inputs.jdTitle], ['Công ty', inputs.company],
-    ]} />,
-    matching: <Fields title="Kết quả đối sánh" items={[
-      ['Độ khớp CV–JD', score === null ? null : score + '%'],
-      ['Skill Gap', matching.available ? 'Đã có kết quả phân tích' : 'Chưa có kết quả phân tích'],
-    ]} />,
+    inputs: <InterviewInputs id={session.id} inputs={inputs} />,
+    matching: <InterviewMatching id={session.id} />,
     blueprint: <div className="space-y-4">
       <Fields title="Cấu hình đã lưu của phiên" items={[
         ['Tối đa số câu hỏi', blueprint?.maxQuestions ?? null],
@@ -68,6 +67,7 @@ export default function AdminInterviewDetail({ detail, onRefresh }: { detail: In
     </div>,
     transcript: <InterviewTranscript transcript={detail.transcript} />,
     evaluation: <InterviewEvaluation report={detail.report} />,
+    quality: <InterviewAiQuality {...qualityReview} />,
   };
 
   return (
@@ -101,7 +101,7 @@ export default function AdminInterviewDetail({ detail, onRefresh }: { detail: In
             </button>}
       </section>
       {printError && <p role="alert" className="text-sm text-red-700">Trình duyệt đã chặn cửa sổ báo cáo. Hãy cho phép cửa sổ bật lên và thử lại.</p>}
-      <div role="group" aria-label="Các phần chi tiết phiên" className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+      <div role="group" aria-label="Các phần chi tiết phiên" className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
         {stages.map(([id, label]) => (
           <button type="button" key={id} aria-pressed={stage === id} onClick={() => setStage(id)}
             className={stage === id

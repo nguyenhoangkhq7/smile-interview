@@ -29,6 +29,20 @@ public class AdminInterviewService {
     private final ObjectMapper json;
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public QualityInput qualityInput(String id) {
+        var source = interviews.quality(id).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy phiên phỏng vấn."));
+        var state = read(source.publicJson());
+        var transcript = source.publicJson() != null
+                ? v2Transcript(state, state.path("report").path("objectives"))
+                : legacyTranscript(id);
+        var questions = transcript.turns().stream()
+                .map(turn -> new QualityQuestion(turn.question(), turn.skill())).toList();
+        return new QualityInput(source.cv(), source.jd(), source.skillsJson(), source.reportJson(),
+                interactionMode(read(source.configJson()), source.interviewType()), questions);
+    }
+
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Page list(String search, InterviewStatus status, int page, int size) {
         String query = search.strip();
         if (query.startsWith("#")) query = query.substring(1).stripLeading();
@@ -52,11 +66,8 @@ public class AdminInterviewService {
         boolean finalized = (row.status() == InterviewStatus.COMPLETED || row.status() == InterviewStatus.ANOMALY)
                 && (!isV2 || state.path("is_finished").isBoolean() && state.path("is_finished").asBoolean());
         var gap = read(source.gapReport());
-        var score = gap.path("matching_score");
-        Double matchingScore = score.isNumber() && score.asDouble() >= 0 && score.asDouble() <= 1
-                ? score.asDouble() : null;
         var inputs = new Inputs(source.cvName(), source.jdTitle(), source.company());
-        var matching = new Matching(matchingScore, source.hasGap() || gap.isObject());
+        var matching = new Matching(matchingScore(gap), source.hasGap() || gap.isObject());
         var report = isV2 ? state.path("report") : read(source.legacyReport());
         var objectives = report.path("objectives");
         var blueprint = config.isObject() ? new Blueprint(integer(config, "max_questions"),
@@ -81,6 +92,41 @@ public class AdminInterviewService {
         var result = new Report(termination(row, report), findings, source.overallScore(),
                 feedback == null ? source.overallFeedback() : feedback);
         return new Detail(session, inputs, matching, blueprint, true, transcript, result);
+    }
+
+    public MatchingDetail matching(String id) {
+        var source = interviews.matching(id).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy phiên phỏng vấn."));
+        var report = read(source.reportJson());
+        var skills = new ArrayList<MatchingSkill>();
+        var savedSkills = read(source.skillsJson());
+        if (savedSkills.isArray()) {
+            for (var entry : savedSkills) {
+                if (text(entry, "jd_skill_id") != null) skills.add(matchingSkill(entry));
+            }
+        }
+        return new MatchingDetail(matchingScore(report), report.path("degraded").asBoolean(false),
+                savedSkills.isArray() || report.isObject(), skills);
+    }
+
+    private static MatchingSkill matchingSkill(JsonNode entry) {
+        var tasks = new ArrayList<MatchingTask>();
+        for (var task : entry.path("job_tasks")) {
+            String description = text(task, "description");
+            if (description != null) tasks.add(new MatchingTask(description, text(task, "requirement_kind"),
+                    decimal(task, "required_level"), strings(task.path("evidence_spans"))));
+        }
+        String cvSkill = text(entry, "matched_cv_skill_name");
+        return new MatchingSkill(text(entry, "jd_skill_id"), text(entry, "jd_skill_name"),
+                text(entry, "semantic_alignment"), cvSkill == null ? text(entry, "matched_cv_skill_id") : cvSkill,
+                decimal(entry, "required_proficiency"), decimal(entry, "priority"), decimal(entry, "importance_weight"),
+                text(entry, "context_job"), strings(entry.path("cv_evidence_spans")),
+                strings(entry.path("jd_evidence_spans")), tasks);
+    }
+
+    private static Double matchingScore(JsonNode report) {
+        Double score = decimal(report, "matching_score");
+        return score != null && score >= 0 && score <= 1 ? score : null;
     }
 
     private static Transcript v2Transcript(JsonNode state, JsonNode objectives) {
@@ -132,15 +178,19 @@ public class AdminInterviewService {
     }
 
     private static Summary summary(Row row, JsonNode config) {
-        String mode = config.isObject() ? config.path("interaction_mode").asText("TEXT") : row.interviewType();
-        mode = mode == null ? null : mode.toUpperCase(Locale.ROOT);
-        if (!"VOICE".equals(mode) && !"TEXT".equals(mode)) mode = null;
+        String mode = interactionMode(config, row.interviewType());
         var started = row.runStartedAt();
         if (started == null && (row.status() == InterviewStatus.IN_PROGRESS || row.status() == InterviewStatus.COMPLETED)) {
             started = row.createdAt();
         }
         return new Summary(row.id(), row.candidateName(), row.roleTitle(), row.status(), mode, row.createdAt(),
                 started, row.endedAt(), row.userRating());
+    }
+
+    private static String interactionMode(JsonNode config, String fallback) {
+        String mode = config.isObject() ? config.path("interaction_mode").asText("TEXT") : fallback;
+        String normalized = mode == null ? "" : mode.toUpperCase(Locale.ROOT);
+        return "VOICE".equals(normalized) || "TEXT".equals(normalized) ? normalized : null;
     }
 
     private static Policy policy(JsonNode node) {

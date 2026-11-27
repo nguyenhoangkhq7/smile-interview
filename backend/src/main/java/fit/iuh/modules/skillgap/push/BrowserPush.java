@@ -12,9 +12,11 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.Security;
 import java.time.Duration;
+import java.util.Base64;
 import java.util.Map;
 
 @Component
@@ -35,6 +37,18 @@ public class BrowserPush {
     }
 
     public String publicKey() { return publicKey; }
+
+    public void prepareTestNotification() {
+        // This request is never sent. The configured public key stands in for a test subscription.
+        try {
+            var auth = Base64.getUrlEncoder().withoutPadding().encodeToString(new byte[16]);
+            var sample = new Notification("https://push.example.test/probe", publicKey, auth,
+                    "Smile Interview".getBytes(StandardCharsets.UTF_8));
+            encoder.request(sample);
+        } catch (Exception ex) {
+            throw new IllegalStateException("Unable to prepare a VAPID test notification", ex);
+        }
+    }
 
     static boolean supportedEndpoint(URI uri) {
         String host = uri.getHost();

@@ -1,16 +1,24 @@
 'use client';
 
 import React from 'react';
-import { RefreshCw } from 'lucide-react';
+import { Gauge, RefreshCw } from 'lucide-react';
 
 interface AiPolicyHeaderProps {
-  isCheckingHealth: boolean;
-  onTriggerHealthCheck: () => void;
+  isMeasuring: boolean;
+  isRefreshing: boolean;
+  disabled: boolean;
+  onMeasure: () => void;
+  onRefresh: () => void;
 }
 
+const buttonClass = 'inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold shadow-xs transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-60';
+
 export default function AiPolicyHeader({
-  isCheckingHealth,
-  onTriggerHealthCheck,
+  isMeasuring,
+  isRefreshing,
+  disabled,
+  onMeasure,
+  onRefresh,
 }: AiPolicyHeaderProps) {
   return (
     <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
@@ -23,16 +31,18 @@ export default function AiPolicyHeader({
         </p>
       </div>
 
-      <button
-        type="button"
-        onClick={onTriggerHealthCheck}
-        className="inline-flex items-center gap-2 self-start rounded-lg bg-white dark:bg-card px-3.5 py-2 text-xs font-semibold text-[#141b2c] dark:text-foreground shadow-xs transition-all hover:bg-[#f1f3ff] dark:hover:bg-muted sm:self-auto cursor-pointer"
-      >
-        <RefreshCw
-          className={`size-3.5 text-[#006b2f] dark:text-emerald-300 ${isCheckingHealth ? 'animate-spin' : ''}`}
-        />
-        <span>{isCheckingHealth ? 'Đang kiểm tra...' : 'Kiểm tra dịch vụ'}</span>
-      </button>
+      <div className="flex flex-wrap gap-2 sm:shrink-0">
+        <button type="button" onClick={onRefresh} disabled={disabled}
+          className={`${buttonClass} bg-white text-[#141b2c] hover:bg-[#f1f3ff] dark:bg-card dark:text-foreground dark:hover:bg-muted`}>
+          <RefreshCw aria-hidden="true" className={`size-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+          {isRefreshing ? 'Đang kiểm tra…' : 'Kiểm tra dịch vụ'}
+        </button>
+        <button type="button" onClick={onMeasure} disabled={disabled}
+          className={`${buttonClass} bg-primary text-primary-foreground hover:bg-primary/90`}>
+          <Gauge aria-hidden="true" className="size-3.5" />
+          {isMeasuring ? 'Đang đo phản hồi…' : 'Đo phản hồi'}
+        </button>
+      </div>
     </div>
   );
 }

@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   adminAiPolicy, aiPolicyError, unchangedCredentials,
-  type AiConfiguration, type AiServiceCheck, type AiSettings,
+  type AiConfiguration, type AiSettings,
 } from '@/services/adminAiPolicy';
+import { useAiServiceHealth } from '@/hooks/useAiServiceHealth';
 import AdaptivePolicyForm from './AdaptivePolicyForm';
 import AiModelsForm from './AiModelsForm';
 import AiPolicyHeader from './AiPolicyHeader';
@@ -15,11 +16,9 @@ export default function AiPolicyView() {
   const [configuration, setConfiguration] = useState<AiConfiguration>();
   const [draft, setDraft] = useState<AiSettings>();
   const [credentials, setCredentials] = useState(unchangedCredentials);
-  const [health, setHealth] = useState<AiServiceCheck[]>([]);
-  const [checking, setChecking] = useState(true);
+  const health = useAiServiceHealth();
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [healthError, setHealthError] = useState('');
   const [notice, setNotice] = useState<{ text: string; error?: boolean }>();
 
   const load = useCallback(async (signal?: AbortSignal) => {
@@ -38,27 +37,11 @@ export default function AiPolicyView() {
     }
   }, []);
 
-  const check = useCallback(async (signal?: AbortSignal) => {
-    setChecking(true);
-    setHealthError('');
-    try {
-      setHealth(await adminAiPolicy.health(signal));
-    } catch {
-      if (!signal?.aborted) {
-        setHealth([]);
-        setHealthError('Không thể kiểm tra trạng thái dịch vụ.');
-      }
-    } finally {
-      if (!signal?.aborted) setChecking(false);
-    }
-  }, []);
-
   useEffect(() => {
     const request = new AbortController();
     void load(request.signal);
-    void check(request.signal);
     return () => request.abort();
-  }, [load, check]);
+  }, [load]);
 
   async function update(reset: boolean) {
     if (!configuration || !draft) return;
@@ -76,7 +59,7 @@ export default function AiPolicyView() {
         setConfiguration(undefined);
         setNotice({ text: 'Đã lưu cấu hình. Tải lại để xem phiên bản mới.', error: true });
       }
-      void check();
+      void health.run('status');
     } catch (error) {
       setNotice({ text: aiPolicyError(error), error: true });
     } finally {
@@ -86,9 +69,11 @@ export default function AiPolicyView() {
 
   return (
     <div className="flex w-full flex-col gap-8 pb-8">
-      <AiPolicyHeader isCheckingHealth={checking} onTriggerHealthCheck={() => void check()} />
-      <ServiceHealthGrid services={health} isCheckingHealth={checking} />
-      {healthError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{healthError}</p>}
+      <AiPolicyHeader isMeasuring={health.pending === 'measure'} isRefreshing={health.pending === 'status'}
+        disabled={health.pending !== null || busy} onMeasure={() => void health.run('measure')}
+        onRefresh={() => void health.run('status')} />
+      <ServiceHealthGrid services={health.checks} isCheckingHealth={health.pending !== null} measuredAt={health.measuredAt} />
+      {health.error && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{health.error}</p>}
       {notice && <div role={notice.error ? 'alert' : 'status'}
         className={notice.error ? 'text-sm text-red-700 dark:text-red-300' : 'text-sm text-green-800 dark:text-green-300'}>
         {notice.text}

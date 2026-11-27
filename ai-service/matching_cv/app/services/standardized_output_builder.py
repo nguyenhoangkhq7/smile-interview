@@ -27,6 +27,7 @@ from matching_cv.app.schemas.standardized_output import (
     StandardizedPipelineOutput,
 )
 from matching_cv.app.services.extraction_adapter import ExtractionDataAdapter
+from matching_cv.app.services.resume_evidence_matching import apply_resume_evidence
 from matching_cv.research.data.canonical_skill_normalizer import normalize_canonical_skill
 from matching_cv.research.paper_aligned_gnn.skill_dependency_resolver import (
     resolve_directed_skill_relation,
@@ -584,8 +585,9 @@ def build_skill_gap(
                 ),
             )
         else:  # Priority B: best directed semantic candidate via reverse retrieval argmax
-            best: Optional[Tuple[float, Any, float, str, int, float]] = None
-            # Tuple: (eff_score, cv_node, raw_cos, dir_rel, dir_hops, required_threshold)
+            best: Optional[Tuple[float, Any, float, str, int]] = None
+            rejected: Optional[Tuple[float, Any, float, str, int]] = None
+            # Tuple: (eff_score, cv_node, raw_cos, dir_rel, dir_hops)
             for cn in cv_nodes_sorted:
                 raw_val = pair_cos.get((jn.node_id, cn.node_id))
                 if raw_val is None or not math.isfinite(raw_val):
@@ -609,11 +611,15 @@ def build_skill_gap(
                     if (dir_rel == "cv_is_prerequisite_only" and dir_hops == 1)
                     else float(min_soft_match)
                 )
-                if best is None or eff_val > best[0]:  # strict '>' + sorted iteration -> deterministic tie-break
-                    best = (eff_val, cn, raw_val, dir_rel, dir_hops, cand_thresh)
+                candidate = (eff_val, cn, raw_val, dir_rel, dir_hops)
+                if eff_val >= cand_thresh:
+                    if best is None or eff_val > best[0]:  # Sorted iteration breaks ties by skill ID.
+                        best = candidate
+                elif rejected is None or eff_val > rejected[0]:
+                    rejected = candidate
 
-            if best is not None and best[0] >= best[5]:
-                eff_val, best_cn, raw_val, dir_rel, dir_hops, _ = best
+            if best is not None:
+                eff_val, best_cn, raw_val, dir_rel, dir_hops = best
                 matched, soft = best_cn.cv_canonical_id, eff_val
                 sim_src = "stage3_matrix_directed_dag" if dir_rel != "none" else "stage3_matrix"
                 detail.update(
@@ -627,17 +633,17 @@ def build_skill_gap(
                 detail.update(
                     match_type="no_match",
                     similarity_source="stage3_matrix" if matrix_available else "unavailable",
-                    raw_cosine=round(best[2], 6) if best is not None else None,
-                    directed_relation=best[3] if best is not None else "none",
-                    directed_hops=best[4] if best is not None else 0,
+                    raw_cosine=round(rejected[2], 6) if rejected is not None else None,
+                    directed_relation=rejected[3] if rejected is not None else "none",
+                    directed_hops=rejected[4] if rejected is not None else 0,
                     best_below_threshold=(
                         {
-                            "cv_skill_id": best[1].cv_canonical_id,
-                            "cosine": best[2],
-                            "directed_soft_match": best[0],
-                            "directed_relation": best[3],
+                            "cv_skill_id": rejected[1].cv_canonical_id,
+                            "cosine": rejected[2],
+                            "directed_soft_match": rejected[0],
+                            "directed_relation": rejected[3],
                         }
-                        if best is not None
+                        if rejected is not None
                         else None
                     ),
                 )
@@ -760,8 +766,15 @@ class Module1OutputError(ValueError):
 def _unique_skills(skills: list[ProficiencySkill]) -> dict[str, ProficiencySkill]:
     unique: dict[str, ProficiencySkill] = {}
     for skill in skills:
-        if skill.skill_id not in unique or skill.type == "explicit":
+        existing = unique.get(skill.skill_id)
+        if existing is None:
             unique[skill.skill_id] = skill
+            continue
+        preferred = skill if skill.type == "explicit" else existing
+        spans = {}
+        for span in (*existing.evidence_spans, *skill.evidence_spans):
+            spans.setdefault(" ".join(span.split()), span)
+        unique[skill.skill_id] = preferred.model_copy(update={"evidence_spans": list(spans.values())})
     return unique
 
 
@@ -783,12 +796,14 @@ def _skill_fields(skill: ProficiencySkill) -> _SkillFields:
     }
 
 
-def _build_match(skill: ProficiencySkill, row: Optional[SkillGapRow]) -> MatchResult:
+def _build_match(skill: ProficiencySkill, row: Optional[SkillGapRow], *, verified_identity: bool = False) -> MatchResult:
     weight = row.w_j if row and row.w_j is not None else skill.w_j
     if weight is None:
         raise Module1OutputError(f"Missing JD skill importance for {skill.skill_id}")
     cv_id = row.matched_cv_skill_id if row else None
     score = row.soft_match if row else None
+    if verified_identity and cv_id == skill.skill_id:
+        score = 1.0
     if cv_id is None or score is None or score <= 0:
         cv_id, score = "none", 0.0
     return MatchResult(
@@ -809,18 +824,30 @@ def build_module1_output(ctx: PublicOutputContext) -> Module1Output:
     jd_by_id = _unique_skills(jd_skills)
     if not jd_by_id:
         raise Module1OutputError("No JD skills were retained")
-    rows, _ = build_skill_gap(
+    rows, details = build_skill_gap(
         ctx.graph_data, ctx.stage3_response, list(jd_by_id),
         settings.SKILL_GAP_MIN_SOFT_MATCH, ctx.skill_importance_output,
         eligible_cv_ids=set(cv_by_id),
         reasoning_results=ctx.reasoning_results,
     )
     by_jd_id = {row.jd_skill_id: row for row in rows}
+    canonical_matches = {
+        detail["jd_skill_id"] for detail in details if detail["match_type"] == "verified_identity"
+    }
+    unverified_groups = ctx.unified_response.jd._strict_requirement_group_ids - canonical_matches
+    matches = [
+        _build_match(
+            skill, None if skill.skill_id in unverified_groups else by_jd_id.get(skill.skill_id),
+            verified_identity=skill.skill_id in canonical_matches,
+        )
+        for skill in jd_by_id.values()
+    ]
+    cv_by_id, matches = apply_resume_evidence(ctx.cv_text, cv_by_id, jd_by_id, matches)
     return Module1Output(
         matcher_source="MATCHING_CV",
         cv_skills=[ExtractedCVSkill(**_skill_fields(skill)) for skill in cv_by_id.values()],
         jd_skills=[ExtractedJDSkill(**_skill_fields(skill)) for skill in jd_by_id.values()],
-        match_results=[_build_match(skill, by_jd_id.get(skill.skill_id)) for skill in jd_by_id.values()],
+        match_results=matches,
     )
 
 

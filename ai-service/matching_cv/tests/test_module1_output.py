@@ -67,7 +67,7 @@ def test_module1_output_preserves_evidence_and_retains_unmatched_jd_skills(conte
     assert output.cv_skills[0].confidence == 0.0
     assert [skill.skill_id for skill in output.jd_skills] == ["postgresql", "kafka"]
     assert [match.model_dump() for match in output.match_results] == [
-        dict(jd_skill_id="postgresql", matched_cv_skill_id="postgresql", soft_match=0.93, w_j=0.91),
+        dict(jd_skill_id="postgresql", matched_cv_skill_id="postgresql", soft_match=1.0, w_j=0.91),
         dict(jd_skill_id="kafka", matched_cv_skill_id="none", soft_match=0.0, w_j=0.63),
     ]
 
@@ -91,3 +91,28 @@ def test_module1_keeps_display_name_separate_from_cached_ascii_id(context):
     assert output.jd_skills[0].skill_id == 'postgresql'
     assert output.jd_skills[0].skill_name == 'Phát triển AI Coding Agent'
     assert output.jd_skills[0].evidence_spans == ['Yêu cầu Phát triển AI Coding Agent.']
+
+
+def test_verified_kafka_alias_does_not_depend_on_cosine(context):
+    context.unified_response.cv = document("CV", {"kafka": "Operated Apache Kafka."})
+    context.cv_text = context.unified_response.cv.raw_text
+    alias = context.unified_response.cv.explicit.skills[0]
+    alias.surface_forms = ["Apache Kafka"]
+    alias.evidences[0].surface_form = "Apache Kafka"
+    node = context.graph_data.skill_nodes["shared"]
+    node.cv_canonical_id = "kafka"
+    node.jd_canonical_id = "kafka"
+    node.cosine_similarity_if_shared = 0.81
+    node.merge_decision.merge_reason = "verified_alias_same_canonical_id"
+    context.graph_data.skill_nodes["unmatched"].jd_canonical_id = "postgresql"
+
+    output = build_module1_output(context)
+    scores = {match.jd_skill_id: match.soft_match for match in output.match_results}
+    assert scores == {"postgresql": 0.0, "kafka": 1.0}
+
+
+def test_unverified_merge_keeps_measured_cosine(context):
+    node = context.graph_data.skill_nodes["shared"]
+    node.cosine_similarity_if_shared = 0.81
+    node.merge_decision.merge_reason = "paper_cosine_only"
+    assert build_module1_output(context).match_results[0].soft_match == pytest.approx(0.81)
