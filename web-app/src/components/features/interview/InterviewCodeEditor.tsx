@@ -189,15 +189,28 @@ export function InterviewCodeEditor({
           </div>
 
           {sampleCount > 0 ? (
-            <span className="inline-flex shrink-0 items-center rounded-md bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
-              {sampleCount} ca mẫu
+            <span
+              className="inline-flex min-w-0 items-center gap-1 truncate rounded-md bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300"
+              title={codingSpec?.entry_point
+                ? `${sampleCount} ca thử mẫu · Hàm kỳ vọng: ${codingSpec.entry_point}()`
+                : `${sampleCount} ca thử mẫu`}
+            >
+              <span className="shrink-0">{sampleCount} ca mẫu</span>
+              {codingSpec?.entry_point && (
+                <>
+                  <span aria-hidden="true">·</span>
+                  <code className="truncate font-mono text-[11px]">{codingSpec.entry_point}()</code>
+                </>
+              )}
             </span>
           ) : (
             <span
               className="inline-flex min-w-0 items-center gap-1 truncate rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground"
               title={`Chạy thử tự do · AI chấm ngữ nghĩa. ${langMeta.shortHint}`}
             >
-              <span className="truncate">Tự do · Chấm ngữ nghĩa</span>
+              <span className="truncate">
+                {codingSpec?.entry_point ? `Hàm ${codingSpec.entry_point}()` : 'Tự do · Chấm ngữ nghĩa'}
+              </span>
               <Info size={12} aria-hidden="true" className="hidden shrink-0 opacity-75 sm:inline" />
             </span>
           )}

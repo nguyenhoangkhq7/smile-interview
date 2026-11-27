@@ -168,6 +168,23 @@ def _normalize_output(value: Any) -> Any:
     return value
 
 
+def resolve_entry_point(module: Any, entry_point: str) -> tuple[Any | None, str]:
+    """Resolve the requested entry point, falling back cleanly when strictly one top-level function exists."""
+    exact = getattr(module, entry_point, None)
+    if callable(exact):
+        return exact, ""
+    candidates = [
+        fn for name, fn in inspect.getmembers(module, inspect.isfunction)
+        if getattr(fn, "__module__", None) == getattr(module, "__name__", None) and not name.startswith("_")
+    ]
+    if len(candidates) == 1:
+        return candidates[0], ""
+    if len(candidates) > 1:
+        names = ", ".join(fn.__name__ for fn in candidates[:5])
+        return None, f"Không tìm thấy hàm '{entry_point}' (đang có các hàm: {names})."
+    return None, f"Không tìm thấy hàm '{entry_point}'."
+
+
 def invoke_entry_point(fn: Any, raw_stdin: str) -> str:
     """Invoke a candidate function with JSON positional args, dict kwargs, or plain string fallback."""
     stripped = raw_stdin.strip()

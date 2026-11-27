@@ -53,6 +53,28 @@ def test_execute_python_multi_arg_list_dict_bytes_and_sql():
     assert sql_res.json()["passed"] == 1 and sql_res.json()["total"] == 1
 
 
+def test_single_function_fallback_and_multi_function_error_hint():
+    single = client.post("/execute", json={
+        "language": "python",
+        "code": "def save_and_get_user(user_id, data):\n    return f'{user_id}:{data}'\n",
+        "entry_point": "save_and_get",
+        "cases": [{"name": "fallback_ok", "input_data": '["u1", "Alice"]', "expected_output": '"u1:Alice"'}],
+    })
+    assert single.status_code == 200
+    assert single.json()["passed"] == 1 and single.json()["total"] == 1
+
+    ambiguous = client.post("/execute", json={
+        "language": "python",
+        "code": "def helper_a(x): return x\ndef helper_b(x): return x\n",
+        "entry_point": "save_and_get",
+        "cases": [{"name": "multi", "input_data": "1", "expected_output": "1"}],
+    })
+    assert ambiguous.status_code == 200
+    assert ambiguous.json()["passed"] == 0
+    assert "helper_a" in ambiguous.json()["results"][0]["error"]
+    assert "helper_b" in ambiguous.json()["results"][0]["error"]
+
+
 @pytest.mark.skipif(not HAS_FAKEREDIS, reason="redis/fakeredis not installed in host test env")
 def test_execute_redis_in_memory_shim_and_isolation():
     code = (

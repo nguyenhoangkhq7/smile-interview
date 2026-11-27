@@ -127,6 +127,14 @@ def test_python_local_runner_supports_dict_kwargs_and_bytes():
     )
     assert res.passed == 2 and res.total == 2
 
+    fallback = runner.execute(
+        language="python",
+        code="def save_and_get_user(user_id, data):\n    return f'{user_id}:{data}'\n",
+        entry_point="save_and_get",
+        cases=cases,
+    )
+    assert fallback.passed == 2 and fallback.total == 2
+
 
 def test_sanitize_coding_spec_keeps_curated_and_strips_unsupported():
     def make_q(spec: CodingSpec) -> Question:
