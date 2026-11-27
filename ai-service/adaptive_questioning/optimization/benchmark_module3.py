@@ -318,6 +318,7 @@ def _run_chain_condition(
     t2_info: Dict[str, Any] = {}
     t1_judgment: Optional[Dict[str, Any]] = None
 
+    stage = "start"
     try:
         request = StartRequest.model_validate(req_payload)
         t0 = perf_counter()
@@ -356,6 +357,7 @@ def _run_chain_condition(
         # Turn 2: Submit frozen scripted answer, judge, and generate Q2 if not finished
         proxy.reset_counters()
         t_resp0 = perf_counter()
+        stage = "judge"
         resp_res = workflow.respond(
             TransitionRequest(
                 snapshot=snap1,
@@ -373,6 +375,7 @@ def _run_chain_condition(
         next_action = snap_after_judge.next_question_action
         q2_turn = None
         if next_action is not None:
+            stage = "next_question"
             nq_res = workflow.next_question(
                 NextQuestionRequest(
                     snapshot=snap_after_judge,
@@ -444,6 +447,7 @@ def _run_chain_condition(
         "scenario": case["scenario"],
         "status": "FAILED" if err_msg else "OK",
         "error_message": err_msg,
+        "failure_stage": stage if err_msg else None,
         "prepared_focuses": prepared_focuses,
         "prep_seconds": round(prep_sec, 3),
         "turn1": t1_info,
@@ -531,9 +535,17 @@ def run_benchmark(
     t_start = perf_counter()
 
     def _run_job(case: Dict[str, Any], cond: str) -> Dict[str, Any]:
+        started = perf_counter()
         if cond == "one_shot":
-            return _run_one_shot(case, oa_client, student_model_raw)
-        return _run_chain_condition(case, cond, proxy, capture)
+            result = _run_one_shot(case, oa_client, student_model_raw)
+        else:
+            result = _run_chain_condition(case, cond, proxy, capture)
+        result["elapsed_seconds"] = round(perf_counter() - started, 3)
+        if result.get("error_message"):
+            stage, kind, *_ = result["error_message"].split(":", 2)
+            result.setdefault("failure_stage", stage)
+            result["error_type"] = kind
+        return result
 
     try:
         with open(runs_out, "a", encoding="utf-8") as fout:
