@@ -12,18 +12,20 @@ from uuid import uuid4
 from pydantic import ValidationError
 
 from .assessment import (TERMINAL, apply_judgment, criterion_action, criterion_resolved, eligible_criteria,
-                         next_action, standalone_inability, validate_judgment)
+                         mode_for_criterion, next_action, standalone_inability, validate_judgment)
 from .code_runner import CodeExecutionProvider, default_code_runner
 from .coding_verification import check_coding_answer, run_sample_code
 from .errors import JudgmentUnavailableError, QuestionUnavailableError
 from .models import (
-    Action, Blueprint, BlueprintRequest, CodingCheckResult, ConversationRequest, InterviewConfig, InterviewSkillContext,
-    InterviewVerification, Judgment, Mode,
+    Action, Blueprint, BlueprintRequest, ClarifyRequest, CodingCheckResult, ConversationRequest, InterviewConfig,
+    InterviewSkillContext, InterviewVerification, Judgment, Mode,
     NextQuestionRequest, ObjectiveState, Question, RunCodeRequest, RunCodeResponse, SessionCoaching, Snapshot,
-    StartRequest, StoredQuestion, TransitionRequest, TransitionResult, Turn,
+    StartRequest, StoredQuestion, TransitionRequest, TransitionResult, Turn, TurnClarification,
 )
 from . import lifecycle
-from .planning import ALL_COMPATIBLE_SKILLS_MASTERED, BlueprintBuilder, plan, plan_recheck, select_mode
+from .planning import (
+    ALL_COMPATIBLE_SKILLS_MASTERED, BEHAVIORAL_FALLBACK_SKILL_ID, BlueprintBuilder, plan, plan_recheck, select_mode,
+)
 from .depth import DEPTH_DEFINITIONS, question_depth
 from .policy_config import InterviewPolicy
 from .criterion_progress import CRITERION_SOFT_LIMIT, progress_for
@@ -40,6 +42,9 @@ logger = logging.getLogger(__name__)
 GENERATION_ATTEMPTS = 3
 DIAGNOSTIC_SOFT_REPAIR_LIMIT = 2
 JUDGMENT_ATTEMPTS = 2
+MAX_CLARIFICATIONS_PER_TURN = 2
+MAX_HINTS_PER_TURN = 1
+_ASSESSMENT_CLARIFY_MODES = frozenset({Mode.DESIGN, Mode.CODING, Mode.DEBUGGING})
 PREWARM_TTL_SECONDS = 600
 PREWARM_MAX_ENTRIES = 64
 MAX_CANDIDATE_BACKGROUND_CHARS = 400
@@ -130,7 +135,9 @@ class EvidenceWorkflow:
         if target:
             objectives, queue = plan_recheck(blueprint, target.objective_id, target.criterion_id)
         else:
-            objectives, queue = plan(blueprint, request.skills, request.config, policy, request.prior_attempts)
+            objectives, queue = plan(
+                blueprint, request.skills, request.config, policy, request.prior_attempts, opening=request.opening,
+            )
         event("preparation.planned", objectives=len(objectives), queued=len(queue))
         if not target and queue and request.opening is not None and not parallel_opening:
             opening_text = self._generate_opening(request)
@@ -151,6 +158,12 @@ class EvidenceWorkflow:
             )
             for skill in request.skills
         ]
+        if (any(state.objective.skill_id == BEHAVIORAL_FALLBACK_SKILL_ID for state in objectives.values())
+                and not any(s.jd_skill_id == BEHAVIORAL_FALLBACK_SKILL_ID for s in skills)):
+            skills.append(InterviewSkillContext(
+                jd_skill_id=BEHAVIORAL_FALLBACK_SKILL_ID,
+                jd_skill_name="Kinh nghiệm & Ứng xử (STAR)",
+            ))
         prior_stems = [
             stem.strip()[:MAX_PRIOR_STEM_CHARS]
             for stem in (request.prior_attempts.prior_question_stems if request.prior_attempts else [])
@@ -323,6 +336,66 @@ class EvidenceWorkflow:
                 snapshot.conversation.introduction, snapshot.skills,
             )
 
+    def clarify(self, request: ClarifyRequest) -> TransitionResult:
+        snapshot = request.snapshot.model_copy(deep=True)
+        if snapshot.conversation and snapshot.conversation.phase != "INTERVIEW":
+            raise ValueError("Phiên phỏng vấn chưa ở giai đoạn trao đổi chuyên môn")
+        if snapshot.is_finished or snapshot.pending_turn is None:
+            raise ValueError("Không có câu hỏi đang mở để làm rõ")
+        if snapshot.state_version != request.expected_state_version:
+            raise ValueError("Stale state version")
+        if snapshot.pending_turn.turn_id != request.turn_id:
+            raise ValueError("Stale turn identifier")
+        if self.clock() >= snapshot.deadline_at:
+            return self._result(self._finish(snapshot, "TIME_BUDGET"))
+        turn = snapshot.pending_turn
+        if len(turn.clarifications) >= MAX_CLARIFICATIONS_PER_TURN:
+            raise ValueError("Bạn đã dùng hết lượt hỏi làm rõ cho câu hỏi này")
+        if request.kind == "HINT":
+            if snapshot.config.session_purpose != "PRACTICE":
+                raise ValueError("Gợi ý chỉ hỗ trợ ở chế độ Luyện tập")
+            if sum(1 for c in turn.clarifications if c.kind == "HINT") >= MAX_HINTS_PER_TURN:
+                raise ValueError("Bạn đã dùng gợi ý cho câu hỏi này rồi")
+        else:
+            if not request.candidate_question.strip():
+                raise ValueError("Hãy nhập nội dung cần làm rõ đề bài")
+            if snapshot.config.session_purpose != "PRACTICE" and turn.mode not in _ASSESSMENT_CLARIFY_MODES:
+                raise ValueError("Trong chế độ Đánh giá, chỉ hỗ trợ hỏi rõ yêu cầu với câu Lập trình, Gỡ lỗi hoặc Thiết kế")
+        reply_text = self._generate_clarification(snapshot, turn, request.kind, request.candidate_question.strip())
+        turn.clarifications.append(TurnClarification(
+            kind=request.kind,
+            question=request.candidate_question.strip(),
+            answer=reply_text,
+        ))
+        event("question.clarified", turn_id=turn.turn_id, kind=request.kind, count=len(turn.clarifications))
+        return self._result(snapshot)
+
+    def _generate_clarification(self, snapshot: Snapshot, turn: Turn, kind: str, question_text: str) -> str:
+        state = snapshot.objectives[turn.objective_id]
+        criteria = [c.description for c in state.objective.criteria if c.criterion_id in turn.question.criterion_ids]
+        payload = {
+            "kind": kind,
+            "mode": turn.mode.value,
+            "current_question": turn.question.text,
+            "criterion_focus": criteria[0] if criteria else state.objective.claim,
+            "candidate_question": question_text,
+            "prior_clarifications": [c.model_dump(mode="json") for c in turn.clarifications],
+        }
+        generator = getattr(self.provider, "clarify_prompt", None)
+        if callable(generator):
+            try:
+                generated = generator(encode_context(payload))
+                raw = generated.text if hasattr(generated, "text") else str(generated)
+                cleaned = " ".join(raw.split())[:600]
+                if len(cleaned) >= 10:
+                    return cleaned
+            except Exception as exc:
+                logger.warning("Falling back to deterministic clarification (%s): %s", type(exc).__name__, exc)
+        if kind == "HINT":
+            focus = criteria[0] if criteria else state.objective.claim
+            return f"Gợi ý hướng tiếp cận: hãy bám sát ràng buộc chính của đề và phân tích từng bước cho tiêu chí \"{focus}\" trước khi kết luận."
+        return "Bạn có thể giả định đầu vào hợp lệ theo mô tả đề bài, đồng thời nêu rõ giả định của mình với các ca biên (dữ liệu rỗng, tải cao hoặc giá trị trùng lặp)."
+
     def run_code(self, request: RunCodeRequest) -> RunCodeResponse:
         snapshot = request.snapshot
         if snapshot.is_finished or snapshot.pending_turn is None:
@@ -383,6 +456,8 @@ class EvidenceWorkflow:
         }
         if coding_check is not None:
             context["coding_checks"] = {"passed": coding_check.passed, "total": coding_check.total}
+        if turn.clarifications:
+            context["turn_clarifications"] = [c.model_dump(mode="json") for c in turn.clarifications]
         last_error = None
         judge_started = monotonic()
         for attempt in range(JUDGMENT_ATTEMPTS):
@@ -449,8 +524,9 @@ class EvidenceWorkflow:
                 snapshot.next_question_action = criterion_action(state, target.criterion_id)
             return
         capped = state.turns_spent >= snapshot.config.max_questions_per_objective
+        allow_mode_switch = snapshot.config.mode == "MIXED"
         # Budgets are checked before routing can request another model generation.
-        action = None if capped else next_action(state, turn, snapshot.policy)
+        action = None if capped else next_action(state, turn, snapshot.policy, allow_mode_switch=allow_mode_switch)
         sufficient = state.assessment in TERMINAL
         if action is None:
             reason = "LOCAL_BUDGET" if capped else self._criterion_stop_reason(state)
@@ -468,7 +544,7 @@ class EvidenceWorkflow:
             selected = snapshot.objectives[snapshot.queue[0]]
             if action == Action.INITIAL and selected.turns_spent:
                 previous = next(t for t in reversed(snapshot.turns) if t.objective_id == selected.objective.objective_id)
-                action = next_action(selected, previous, snapshot.policy)
+                action = next_action(selected, previous, snapshot.policy, allow_mode_switch=allow_mode_switch)
                 if action is None:
                     raise ValueError("Paused objective has no remaining probe")
             snapshot.next_question_action = action
@@ -513,9 +589,10 @@ class EvidenceWorkflow:
             self._finish(snapshot, "TIME_BUDGET")
             return
         assert question.depth is not None
+        turn_mode = question.mode or state.selected_mode
         snapshot.pending_turn = Turn(
             turn_id=str(uuid4()), objective_id=state.objective.objective_id,
-            skill_id=state.objective.skill_id, mode=state.selected_mode,
+            skill_id=state.objective.skill_id, mode=turn_mode,
             action=action, question_depth=question.depth,
             question=StoredQuestion(
                 text=question.text, criterion_ids=question.criterion_ids, evidence_scope=question.evidence_scope,
@@ -524,7 +601,7 @@ class EvidenceWorkflow:
             ),
         )
         snapshot.pending_turn.introduction = turn_introduction(snapshot, snapshot.pending_turn)
-        event("question.ready", turn_id=snapshot.pending_turn.turn_id, mode=state.selected_mode.value)
+        event("question.ready", turn_id=snapshot.pending_turn.turn_id, mode=turn_mode.value)
 
     @staticmethod
     def _candidate_background(snapshot: Snapshot, skill: InterviewSkillContext | None) -> str | None:
@@ -560,9 +637,11 @@ class EvidenceWorkflow:
     def _question_context(self, snapshot: Snapshot, action: Action) -> dict[str, object]:
         state = snapshot.objectives[snapshot.queue[0]]
         skill = next(s for s in snapshot.skills if s.jd_skill_id == state.objective.skill_id)
-        targets = self._targets(state)
+        allow_mode_switch = snapshot.config.mode == "MIXED"
+        targets = self._targets(state, allow_mode_switch=allow_mode_switch)
         if not targets:
             raise ValueError("No independent criteria available for question generation")
+        turn_mode = mode_for_criterion(state, targets[0], allow_mode_switch=allow_mode_switch)
         objective = self._prompt_objective(state, targets)
         # Keep the full probing chain without Turn.judgment bloat.
         history_turns = [turn for turn in snapshot.turns
@@ -576,7 +655,7 @@ class EvidenceWorkflow:
         ]
         for stem in snapshot.prior_question_stems:
             other_questions.append({"question": stem[:MAX_PRIOR_STEM_CHARS], "truncated": False})
-        contract = {"mode": state.selected_mode, "depth": question_depth(state, action), "criterion_ids": targets}
+        contract = {"mode": turn_mode, "depth": question_depth(state, action), "criterion_ids": targets}
         if action == Action.CLARIFY and history_turns:
             previous = history_turns[-1]
             contract["evidence_scope"] = previous.question.evidence_scope
@@ -870,8 +949,8 @@ class EvidenceWorkflow:
         return objective
 
     @staticmethod
-    def _targets(state: ObjectiveState) -> list[str]:
-        eligible = eligible_criteria(state)
+    def _targets(state: ObjectiveState, *, allow_mode_switch: bool = False) -> list[str]:
+        eligible = eligible_criteria(state, allow_mode_switch=allow_mode_switch)
         if state.active_criterion_id in eligible:
             return [state.active_criterion_id]
         essential = [c.criterion_id for c in state.objective.criteria if c.essential and c.criterion_id in eligible]

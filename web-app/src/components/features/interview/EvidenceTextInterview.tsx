@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, Clock3, History, LoaderCircle, Send } from 'lucide-react';
+import { Check, Clock3, HelpCircle, History, Lightbulb, LoaderCircle, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MarkdownContent } from '@/components/common/MarkdownContent';
 import type { useEvidenceInterview } from '@/hooks/useEvidenceInterview';
@@ -25,7 +26,23 @@ export function EvidenceTextInterview({ interview, onHistory, onStop }: {
   const { displayedText, isRevealing, complete } = useProgressiveText(conversation.text || '', shouldReveal);
   const pendingTurn = session?.pending_turn ?? null;
   const [codeState, setCodeState] = useState<{ turnId: string; code: string }>({ turnId: '', code: '' });
+  const [clarifyOpen, setClarifyOpen] = useState(false);
+  const [clarifyQuestion, setClarifyQuestion] = useState('');
   if (!session) return null;
+
+  const isPractice = session.config.session_purpose === 'PRACTICE';
+  const clarifications = pendingTurn?.clarifications ?? [];
+  const remainingClarifications = Math.max(0, 2 - clarifications.length);
+  const canClarifyPrompt = Boolean(
+    !conversation.introducing && !conversation.closing && !awaiting && pendingTurn
+    && remainingClarifications > 0
+    && (isPractice || ['DESIGN', 'CODING', 'DEBUGGING'].includes(pendingTurn.mode)),
+  );
+  const canRequestHint = Boolean(
+    isPractice && !conversation.introducing && !conversation.closing && !awaiting && pendingTurn
+    && remainingClarifications > 0
+    && !clarifications.some(item => item.kind === 'HINT'),
+  );
 
   const showCodeEditor = Boolean(
     !conversation.introducing
@@ -130,6 +147,78 @@ export function EvidenceTextInterview({ interview, onHistory, onStop }: {
             <>
               <MarkdownContent content={displayedText} />
               {isRevealing && <span className="mt-1 inline-block h-4 w-1.5 animate-pulse rounded-xs bg-brand-orange/70 align-middle" aria-hidden="true" />}
+              {clarifications.length > 0 && (
+                <div className="mt-4 space-y-2 border-t pt-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase">Trao đổi làm rõ đề bài</p>
+                  {clarifications.map((item, idx) => (
+                    <div key={idx} className="space-y-1 rounded-xl border bg-muted/25 p-3 text-xs leading-relaxed">
+                      <p className="font-semibold text-foreground">
+                        {item.kind === 'HINT' ? 'Gợi ý hướng tiếp cận' : `Câu hỏi của bạn: ${item.question}`}
+                      </p>
+                      <p className="text-muted-foreground">{item.answer}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {(canClarifyPrompt || canRequestHint) && (
+                <div className="mt-4 space-y-2 border-t pt-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {canClarifyPrompt && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        disabled={busy}
+                        onClick={() => setClarifyOpen(open => !open)}
+                      >
+                        <HelpCircle size={13} aria-hidden="true" />
+                        Hỏi làm rõ đề bài (còn {remainingClarifications}/2)
+                      </Button>
+                    )}
+                    {canRequestHint && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs text-brand-green"
+                        disabled={busy}
+                        onClick={() => void interview.clarify('HINT')}
+                      >
+                        <Lightbulb size={13} aria-hidden="true" />
+                        Xin gợi ý nhỏ
+                      </Button>
+                    )}
+                  </div>
+                  {clarifyOpen && canClarifyPrompt && (
+                    <form
+                      className="flex flex-wrap gap-2"
+                      onSubmit={event => {
+                        event.preventDefault();
+                        if (!clarifyQuestion.trim() || busy) return;
+                        void interview.clarify('CLARIFY_PROMPT', clarifyQuestion).then(updated => {
+                          if (updated) {
+                            setClarifyQuestion('');
+                            setClarifyOpen(false);
+                          }
+                        });
+                      }}
+                    >
+                      <Input
+                        aria-label="Nội dung cần làm rõ đề bài"
+                        className="h-8 min-w-48 flex-1 text-xs"
+                        placeholder="VD: Input có thể rỗng không? Tải dự kiến bao nhiêu QPS?"
+                        value={clarifyQuestion}
+                        disabled={busy}
+                        onChange={e => setClarifyQuestion(e.target.value)}
+                      />
+                      <Button type="submit" size="sm" className="h-8 text-xs" disabled={busy || !clarifyQuestion.trim()}>
+                        Gửi câu hỏi
+                      </Button>
+                    </form>
+                  )}
+                </div>
+              )}
             </>
           )}
         </div>

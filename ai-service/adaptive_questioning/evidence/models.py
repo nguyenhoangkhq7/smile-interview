@@ -63,6 +63,8 @@ class RecheckTarget(BaseModel):
 class InterviewConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     interaction_mode: Literal["TEXT", "VOICE"] = "TEXT"
+    session_purpose: Literal["ASSESSMENT", "PRACTICE"] = "ASSESSMENT"
+    include_mastered_skills: bool = False
     mode: Literal["MIXED", "FOCUSED"] = "MIXED"
     focused_question_mode: Mode | None = None
     recheck: ChecklistRef | None = None
@@ -196,6 +198,8 @@ class SessionCoaching(BaseModel):
     top_strengths: list[str] = Field(default_factory=list, max_length=6)
     priority_gaps: list[str] = Field(default_factory=list, max_length=6)
     actionable_study_steps: list[str] = Field(default_factory=list, max_length=6)
+    introduction_feedback: str = Field(default="", max_length=600)
+    turn_reference_answers: dict[str, str] = Field(default_factory=dict)
 
 
 class PriorAttemptContext(BaseModel):
@@ -306,6 +310,13 @@ class CodingCheckResult(BaseModel):
     sample_results: list[CodingCaseResult] = Field(default_factory=list)
 
 
+class TurnClarification(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["CLARIFY_PROMPT", "HINT"] = "CLARIFY_PROMPT"
+    question: str = Field(default="", max_length=1500)
+    answer: str = Field(min_length=3, max_length=1500)
+
+
 class Turn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     turn_id: str
@@ -315,6 +326,7 @@ class Turn(BaseModel):
     action: Action
     question_depth: int = Field(ge=1, le=4)
     question: StoredQuestion
+    clarifications: list[TurnClarification] = Field(default_factory=list)
     answer: str | None = None
     submitted_code: str | None = None
     transcript: str | None = None
@@ -486,12 +498,22 @@ class RunCodeResponse(BaseModel):
     results: list[CodingCaseResult] = Field(default_factory=list)
 
 
+class ClarifyRequest(BaseModel):
+    snapshot: Snapshot
+    turn_id: str
+    expected_state_version: int
+    kind: Literal["CLARIFY_PROMPT", "HINT"] = "CLARIFY_PROMPT"
+    candidate_question: str = Field(default="", max_length=1500)
+
+
 class TurnReview(BaseModel):
     turn_id: str
     excerpt: str
     reason: str
     gaps: list[str] = Field(default_factory=list)
     next_step: str
+    reference_answer: str = ""
+    delivery_notes: list[str] = Field(default_factory=list)
 
 
 class CriterionReport(BaseModel):
@@ -526,6 +548,7 @@ class Report(BaseModel):
 class PendingTurn(BaseModel):
     requires_code: bool = False
     coding_spec: PublicCodingSpec | None = None
+    clarifications: list[TurnClarification] = Field(default_factory=list)
     turn_id: str
     objective_id: str
     mode: Mode
@@ -537,6 +560,7 @@ class PublicTurn(BaseModel):
     submitted_code: str | None = None
     transcript: str | None = None
     coding_checks: CodingCheckResult | None = None
+    clarifications: list[TurnClarification] = Field(default_factory=list)
     turn_id: str
     objective_id: str
     mode: Mode

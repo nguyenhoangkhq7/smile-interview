@@ -4,10 +4,19 @@ import axiosClient from '@/lib/axiosClient';
 export const questionModes = ['CODING', 'DEBUGGING', 'DESIGN', 'TECHNICAL_EXPLANATION', 'BEHAVIORAL'] as const;
 export type QuestionMode = typeof questionModes[number];
 export type InteractionMode = 'TEXT' | 'VOICE';
+export type SessionPurpose = 'ASSESSMENT' | 'PRACTICE';
+export type ClarifyKind = 'CLARIFY_PROMPT' | 'HINT';
+export interface TurnClarification {
+  kind: ClarifyKind;
+  question: string;
+  answer: string;
+}
 export interface ChecklistRef { taskId: number; checklistItemId: number }
 export interface InterviewStartConfig {
   recheck?: ChecklistRef;
   interaction_mode: InteractionMode;
+  session_purpose?: SessionPurpose;
+  include_mastered_skills?: boolean;
   focused_question_mode: QuestionMode | null;
   max_questions: number;
   duration_seconds: number;
@@ -53,11 +62,13 @@ export interface PendingTurn {
   turn_id: string; objective_id: string; mode: QuestionMode;
   question: string; introduction?: string; requires_code?: boolean;
   coding_spec?: PublicCodingSpec | null;
+  clarifications?: TurnClarification[];
 }
 export interface EvidenceTurn {
   turn_id: string; objective_id: string; mode: QuestionMode;
   question: string; answer: string | null; feedback: string | null;
   submitted_code?: string | null; transcript?: string | null;
+  clarifications?: TurnClarification[];
   coding_checks?: {
     passed: number; total: number; language?: string; compile_error?: string;
     sample_results?: CodingCaseResult[];
@@ -77,6 +88,7 @@ export interface SessionCoaching {
   top_strengths: string[];
   priority_gaps: string[];
   actionable_study_steps: string[];
+  introduction_feedback?: string;
 }
 export type Assessment = 'NOT_ASSESSED' | 'INSUFFICIENT_EVIDENCE' | 'NOT_DEMONSTRATED'
   | 'DEMONSTRATED_BELOW_TARGET' | 'DEMONSTRATED_AT_TARGET' | 'DEMONSTRATED_ABOVE_TARGET';
@@ -88,8 +100,17 @@ export interface ObjectiveReport {
   evidence: PublicEvidence[];
   criteria?: { criterion_id: string; description: string; assessment: Assessment; essential?: boolean }[];
 }
+export interface TurnReview {
+  turn_id: string;
+  excerpt: string;
+  reason: string;
+  gaps?: string[];
+  next_step: string;
+  reference_answer?: string;
+  delivery_notes?: string[];
+}
 export interface EvidenceReport {
-  turn_reviews?: { turn_id: string; excerpt: string; reason: string; gaps?: string[]; next_step: string }[];
+  turn_reviews?: TurnReview[];
   recheck_criterion?: { description: string; assessment: Assessment } | null;
   termination_reason: string | null;
   objectives: ObjectiveReport[];
@@ -131,6 +152,10 @@ export interface AnswerRequest {
 }
 export interface NextQuestionRequest {
   request_id: string; expected_state_version: number;
+}
+export interface ClarifyRequest {
+  request_id: string; turn_id: string; expected_state_version: number;
+  kind: ClarifyKind; candidate_question?: string;
 }
 
 function endpoint(id: string, operation = '') {
@@ -192,6 +217,9 @@ export const evidenceInterview = {
   },
   async runCode(id: string, payload: { turn_id: string; code: string; language?: CodingLanguage }): Promise<RunCodeResult> {
     return (await axiosClient.post<RunCodeResult>(endpoint(id, 'run-code'), payload)).data;
+  },
+  async clarify(id: string, request: ClarifyRequest): Promise<EvidenceSession> {
+    return (await axiosClient.post<EvidenceSession>(endpoint(id, 'clarify'), request)).data;
   },
   async stop(session: EvidenceSession, requestId: string): Promise<EvidenceSession> {
     return (await axiosClient.post<EvidenceSession>(endpoint(session.session_id, 'stop'), {

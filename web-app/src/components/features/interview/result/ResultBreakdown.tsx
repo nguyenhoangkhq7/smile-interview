@@ -51,13 +51,21 @@ export function FindingList({ items, empty, preview = 3 }: { items: readonly str
   );
 }
 
-export function ResultCoachingSummary({ summary }: { summary: string }) {
+export function ResultCoachingSummary({ summary, introFeedback }: { summary: string; introFeedback?: string }) {
   return (
-    <div className="space-y-2 rounded-xl border border-indigo-200/70 bg-indigo-50/70 p-4 text-indigo-950">
-      <h2 className="flex items-center gap-1.5 text-sm font-bold">
-        <MessageSquare size={16} className="text-indigo-700" /> Nhận xét & Coaching tổng hợp
-      </h2>
-      <p className="text-sm leading-relaxed text-slate-800 dark:text-foreground">{summary}</p>
+    <div className="space-y-3 rounded-xl border border-indigo-200/70 bg-indigo-50/70 p-4 text-indigo-950 dark:border-indigo-500/30 dark:bg-indigo-950/30 dark:text-foreground">
+      <div className="space-y-1.5">
+        <h2 className="flex items-center gap-1.5 text-sm font-bold">
+          <MessageSquare size={16} className="text-indigo-700 dark:text-indigo-300" /> Nhận xét & Coaching tổng hợp
+        </h2>
+        <p className="text-sm leading-relaxed text-slate-800 dark:text-foreground">{summary}</p>
+      </div>
+      {introFeedback && (
+        <div className="border-t border-indigo-200/60 pt-2.5 dark:border-indigo-500/30">
+          <p className="text-xs font-semibold text-indigo-800 dark:text-indigo-300">Nhận xét phần tự giới thiệu</p>
+          <p className="mt-1 text-xs leading-relaxed text-slate-700 dark:text-muted-foreground">{introFeedback}</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -302,7 +310,20 @@ export function ResultQuestions({ questions }: { questions: ResultData['question
                   {review.excerpt && <blockquote className="whitespace-pre-wrap border-l-2 pl-3">{review.excerpt}</blockquote>}
                   <p>{review.reason}</p>
                   {Boolean(review.gaps?.length) && <p>Phần còn thiếu · {review.gaps?.join(' · ')}</p>}
+                  {Boolean(review.delivery_notes?.length) && (
+                    <ul className="space-y-1 rounded-md border border-sky-200/70 bg-white/70 p-2 text-xs text-slate-700 dark:border-border dark:bg-card dark:text-muted-foreground">
+                      {review.delivery_notes?.map((note, idx) => <li key={idx}>• {note}</li>)}
+                    </ul>
+                  )}
                   <p className="font-medium">{review.next_step}</p>
+                  {review.reference_answer && (
+                    <details className="rounded-md border border-emerald-200/70 bg-emerald-50/70 p-2.5 text-xs dark:border-emerald-500/30 dark:bg-emerald-950/30">
+                      <summary className="cursor-pointer font-semibold text-emerald-900 dark:text-emerald-300">
+                        Gợi ý khung trả lời chuẩn
+                      </summary>
+                      <p className="mt-1.5 leading-relaxed text-slate-800 dark:text-foreground">{review.reference_answer}</p>
+                    </details>
+                  )}
                 </div>) : hasEvaluation ? (
                   <div className="space-y-1.5 rounded-lg border border-sky-200/60 bg-sky-50/70 p-3 text-slate-800 dark:text-foreground">
                     <p className="text-xs font-semibold text-sky-900 uppercase">Đánh giá từ AI</p>

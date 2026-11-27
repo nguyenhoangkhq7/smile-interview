@@ -55,6 +55,12 @@ public class EvidenceController {
         return service.runCode(sessionId, user, command).toString();
     }
 
+    @PostMapping("/clarify")
+    public String clarify(@PathVariable String sessionId, @AuthenticationPrincipal User user,
+                          @Valid @RequestBody EvidenceDtos.Clarify command) {
+        return candidateView(service.clarify(sessionId, user, command)).toString();
+    }
+
     @GetMapping("/report")
     public String report(@PathVariable String sessionId, @AuthenticationPrincipal User user) {
         return candidateView(service.read(sessionId, user)).path("report").toString();

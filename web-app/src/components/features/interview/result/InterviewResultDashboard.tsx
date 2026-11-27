@@ -131,7 +131,12 @@ export function InterviewResultDashboard({
               <p className="my-2 text-lg">{session.report.recheck_criterion.description}</p>
               <p className="font-semibold">{assessmentLabels[session.report.recheck_criterion.assessment]}</p>
             </div> : <SkillSummaryCard data={data} reason={session.report.termination_reason} />}
-            {data.coaching?.overall_summary && <ResultCoachingSummary summary={data.coaching.overall_summary} />}
+            {data.coaching?.overall_summary && (
+              <ResultCoachingSummary
+                summary={data.coaching.overall_summary}
+                introFeedback={data.coaching.introduction_feedback}
+              />
+            )}
           </div>
           <ResultFeedback data={data} />
         </section>

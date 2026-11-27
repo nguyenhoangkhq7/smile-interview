@@ -83,6 +83,8 @@ public class EvidenceStore {
         if (!normalized.hasNonNull("max_questions_per_objective")) {
             normalized.put("max_questions_per_objective", EvidenceDtos.Config.DEFAULT_MAX_PER_OBJECTIVE);
         }
+        if (!normalized.hasNonNull("session_purpose")) normalized.put("session_purpose", "ASSESSMENT");
+        if (!normalized.hasNonNull("include_mastered_skills")) normalized.put("include_mastered_skills", false);
         if (normalized.get("recheck") instanceof ObjectNode ref) {
             for (String key : java.util.List.of("taskId", "checklistItemId")) {
                 if (ref.path(key).isIntegralNumber() && ref.path(key).canConvertToLong()) ref.put(key, ref.path(key).longValue());

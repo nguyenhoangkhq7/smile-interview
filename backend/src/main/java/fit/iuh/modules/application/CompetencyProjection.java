@@ -113,6 +113,7 @@ public class CompetencyProjection {
             if (run == null) continue;
             JsonNode snapshot = json.read(run.getSnapshotJson()), visible = json.read(run.getPublicJson());
             if (!snapshot.path("is_finished").asBoolean() || !visible.path("is_finished").asBoolean()) continue;
+            if ("PRACTICE".equals(snapshot.path("config").path("session_purpose").asText("ASSESSMENT"))) continue;
             Map<String, JsonNode> turns = new HashMap<>();
             for (JsonNode turn : snapshot.path("turns")) turns.put(turn.path("turn_id").asText(), turn);
             if (turns.values().stream().noneMatch(turn -> !turn.path("answer").asText("").isBlank())) continue;

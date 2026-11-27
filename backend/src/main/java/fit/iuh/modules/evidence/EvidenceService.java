@@ -166,6 +166,24 @@ public class EvidenceService {
                 hash, json.read(run.getConfigJson()), result));
     }
 
+    public JsonNode clarify(String sessionId, User user, EvidenceDtos.Clarify command) {
+        owned(sessionId, user);
+        String hash = json.hash(command);
+        JsonNode cached = store.replay(sessionId, command.requestId(), hash);
+        if (cached != null) return cached;
+        InterviewRun run = current(sessionId, command.expectedVersion());
+        var payload = Map.of(
+                "snapshot", json.read(run.getSnapshotJson()),
+                "turn_id", command.turnId(),
+                "expected_state_version", command.expectedVersion(),
+                "kind", command.kind(),
+                "candidate_question", command.candidateQuestion()
+        );
+        JsonNode result = ai.compute("clarify", payload);
+        return store.commit(new EvidenceStore.Commit(
+                sessionId, run.getStateVersion(), command.requestId(), hash, json.read(run.getConfigJson()), result));
+    }
+
     public JsonNode runCode(String sessionId, User user, EvidenceDtos.RunCode request) {
         owned(sessionId, user);
         InterviewRun run = run(sessionId);

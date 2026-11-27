@@ -189,6 +189,7 @@ export function buildResult({ report, turns }: EvidenceSession) {
         top_strengths: uniqueFindings(report.coaching.top_strengths ?? []),
         priority_gaps: uniqueFindings(report.coaching.priority_gaps ?? []),
         actionable_study_steps: uniqueFindings((report.coaching.actionable_study_steps ?? []).map(cleanStudyRecommendation)),
+        introduction_feedback: report.coaching.introduction_feedback?.trim() || undefined,
       }
     : null;
 

@@ -10,8 +10,8 @@ from app.ai_runtime import active
 
 from ..optimization.compiler import DEFAULT_COMPILED_DIR
 from .models import (
-    Blueprint, BlueprintRequest, ConversationRequest, NextQuestionRequest, RunCodeRequest, RunCodeResponse,
-    Snapshot, StartRequest, TransitionRequest, TransitionResult,
+    Blueprint, BlueprintRequest, ClarifyRequest, ConversationRequest, NextQuestionRequest, RunCodeRequest,
+    RunCodeResponse, Snapshot, StartRequest, TransitionRequest, TransitionResult,
 )
 from .provider import DSPyAssessmentProvider
 from .policy_config import configured_policy
@@ -126,3 +126,8 @@ def converse(payload: ConversationRequest, request: Request):
 @router.post("/run-code", response_model=RunCodeResponse)
 def run_code(payload: RunCodeRequest, request: Request):
     return execute(workflow(request).run_code, payload)
+
+
+@router.post("/clarify", response_model=TransitionResult)
+def clarify(payload: ClarifyRequest, request: Request):
+    return execute(workflow(request).clarify, payload)
