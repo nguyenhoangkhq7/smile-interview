@@ -39,6 +39,8 @@ try {
     const send = (body, status = 200) => request.respond({ status, headers: { 'content-type': 'application/json',
       'access-control-allow-origin': base, 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' }, body: JSON.stringify(body) });
     if (request.method() === 'OPTIONS') return send({});
+    if (url.pathname.endsWith('/rechecks')) return send([]);
+    if (url.pathname.endsWith('/limits')) return send({ voiceEnabled: true });
     if (url.pathname.endsWith('/knowledge-gaps')) return send({ completedAttempts: phase, weak: [], needsVerification: [],
       notAssessedSkillIds: [], objectiveSuggestions: [objective()] });
     if (url.pathname.endsWith('/tasks') && request.method() === 'POST') {

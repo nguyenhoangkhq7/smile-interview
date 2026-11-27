@@ -2,6 +2,27 @@ x-logging: &app-logging
   driver: local
 
 services:
+  code-runner:
+    build:
+      context: ../code-runner
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    logging: *app-logging
+    mem_limit: 384m
+    cpus: "0.5"
+    pids_limit: 64
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=48m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    expose:
+      - "8090"
+    networks:
+      - internal
+
   ai-service:
     build:
       context: ../ai-service
@@ -18,6 +39,7 @@ services:
       ENVIRONMENT: production
       HF_HOME: /app/.cache/huggingface
       GNN_REQUIRE_CHECKPOINT: ${GNN_REQUIRE_CHECKPOINT:-true}
+      CODE_RUNNER_URL: ${CODE_RUNNER_URL:-http://code-runner:8090}
       OMP_NUM_THREADS: "2"
       MKL_NUM_THREADS: "2"
       OPENBLAS_NUM_THREADS: "2"

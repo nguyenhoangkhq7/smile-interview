@@ -90,6 +90,13 @@ export const evidenceDepthLabels: Record<EvidenceDepthRole, string> = {
   EXTENSION: 'Câu hỏi mở rộng nâng cao',
 };
 
+export const depthLevelLabels: Record<number, string> = {
+  1: 'L1 · Nền tảng',
+  2: 'L2 · Ứng dụng',
+  3: 'L3 · Phân tích',
+  4: 'L4 · Thiết kế',
+};
+
 export function questionBadge(item: {
   status: 'strong' | 'weak' | 'partial';
   depthRole?: EvidenceDepthRole;
@@ -159,7 +166,7 @@ export function buildResult({ report, turns }: EvidenceSession) {
   const questions = turns.map((turn, index) => {
     const evidence = byTurn.get(turn.turn_id) ?? [];
     const status = evidence.some(item =>
-      item.performance === 'BELOW' || item.observation === 'CONTRADICTS' || item.observation === 'NO_EVIDENCE',
+      item.performance === 'BELOW' || item.observation === 'CONTRADICTS',
     ) ? 'weak'
       : evidence.some(item => item.performance === 'AT_TARGET' || item.performance === 'ABOVE') ? 'strong' : 'partial';
     const depthRole: EvidenceDepthRole = evidence.some(item => item.depth_role === 'EXTENSION') ? 'EXTENSION'
@@ -172,6 +179,7 @@ export function buildResult({ report, turns }: EvidenceSession) {
     const badge = questionBadge({ status, depthRole, evidence, clarifiedLater });
     return {
       turn,
+      reviews: (report.turn_reviews ?? []).filter(review => review.turn_id === turn.turn_id),
       skillId: skillByObjective.get(turn.objective_id) ?? '',
       index,
       evidence,
@@ -188,10 +196,40 @@ export function buildResult({ report, turns }: EvidenceSession) {
         top_strengths: uniqueFindings(report.coaching.top_strengths ?? []),
         priority_gaps: uniqueFindings(report.coaching.priority_gaps ?? []),
         actionable_study_steps: uniqueFindings((report.coaching.actionable_study_steps ?? []).map(cleanStudyRecommendation)),
+        introduction_feedback: report.coaching.introduction_feedback?.trim() || undefined,
       }
     : null;
 
+  const criteria = interviewedObjectives.flatMap(objective => objective.criteria ?? []);
+  const required = criteria.filter(c => c.essential);
+  const checked = required.filter(c => c.assessment !== 'NOT_ASSESSED');
+  const coverage = criteria.length && interviewedObjectives.every(o => o.criteria?.length)
+    && criteria.every(c => typeof c.essential === 'boolean')
+    ? { total: required.length, checked: checked.length, passed: checked.filter(c => assessmentStatus(c.assessment) === 'strong').length }
+    : null;
+
+  let weightedMet = 0, weightedTotal = 0, coreTotal = 0, coreMet = 0;
+  for (const objective of interviewedObjectives) {
+    const isCore = Boolean(objective.is_core || (objective.importance_weight ?? 0) >= 0.7);
+    const weight = isCore ? 2 : 1;
+    const status = assessmentStatus(objective.assessment);
+    if (isCore) {
+      coreTotal++;
+      if (status === 'strong') coreMet++;
+    }
+    weightedTotal += weight;
+    if (status === 'strong') weightedMet += weight;
+  }
+  const weightedReadiness = {
+    percent: weightedTotal > 0 ? Math.round((weightedMet / weightedTotal) * 100) : null,
+    coreTotal,
+    coreMet,
+    hasCoreWeight: interviewedObjectives.some(o => typeof o.is_core === 'boolean' || typeof o.importance_weight === 'number'),
+  };
+
   return {
+    coverage,
+    weightedReadiness,
     skills,
     questions,
     coaching,

@@ -1,12 +1,15 @@
 'use client';
 
-import { Check, Clock3, History, LoaderCircle, Send } from 'lucide-react';
+import { useState } from 'react';
+import { Check, Clock3, HelpCircle, History, Lightbulb, LoaderCircle, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MarkdownContent } from '@/components/common/MarkdownContent';
 import type { useEvidenceInterview } from '@/hooks/useEvidenceInterview';
 import { skillLabel } from '@/components/features/applications/applicationUi';
 import { modeLabels } from './EvidenceSetup';
+import { InterviewCodeEditor } from './InterviewCodeEditor';
 import { turnSkillId } from '@/services/evidenceInterview';
 import { useTextInterviewConversation } from '@/hooks/useTextInterviewConversation';
 import { useProgressiveText } from '@/hooks/useProgressiveText';
@@ -21,7 +24,42 @@ export function EvidenceTextInterview({ interview, onHistory, onStop }: {
   const awaiting = Boolean(session?.awaiting_question);
   const shouldReveal = Boolean(session) && !awaiting && !conversation.closing && Boolean(conversation.text);
   const { displayedText, isRevealing, complete } = useProgressiveText(conversation.text || '', shouldReveal);
+  const pendingTurn = session?.pending_turn ?? null;
+  const [codeState, setCodeState] = useState<{ turnId: string; code: string }>({ turnId: '', code: '' });
+  const [clarifyOpen, setClarifyOpen] = useState(false);
+  const [clarifyQuestion, setClarifyQuestion] = useState('');
   if (!session) return null;
+
+  const isPractice = session.config.session_purpose === 'PRACTICE';
+  const clarifications = pendingTurn?.clarifications ?? [];
+  const remainingClarifications = Math.max(0, 2 - clarifications.length);
+  const canClarifyPrompt = Boolean(
+    !conversation.introducing && !conversation.closing && !awaiting && pendingTurn
+    && remainingClarifications > 0
+    && (isPractice || ['DESIGN', 'CODING', 'DEBUGGING'].includes(pendingTurn.mode)),
+  );
+  const canRequestHint = Boolean(
+    isPractice && !conversation.introducing && !conversation.closing && !awaiting && pendingTurn
+    && remainingClarifications > 0
+    && !clarifications.some(item => item.kind === 'HINT'),
+  );
+
+  const showCodeEditor = Boolean(
+    !conversation.introducing
+    && !conversation.closing
+    && !awaiting
+    && pendingTurn
+    && (pendingTurn.mode === 'CODING' || pendingTurn.requires_code || pendingTurn.coding_spec),
+  );
+  const activeCode = pendingTurn && codeState.turnId === pendingTurn.turn_id
+    ? codeState.code
+    : (pendingTurn?.coding_spec?.starter_code ?? '');
+  const setActiveCode = (next: string) => {
+    if (!pendingTurn) return;
+    if (isRevealing) complete();
+    setCodeState({ turnId: pendingTurn.turn_id, code: next });
+  };
+  const canSubmit = Boolean(interview.answer.trim() || (showCodeEditor && activeCode.trim()));
 
   const readOnlyAnswer = conversation.closing || awaiting;
   const isSubmitting = busy && !awaiting;
@@ -109,13 +147,87 @@ export function EvidenceTextInterview({ interview, onHistory, onStop }: {
             <>
               <MarkdownContent content={displayedText} />
               {isRevealing && <span className="mt-1 inline-block h-4 w-1.5 animate-pulse rounded-xs bg-brand-orange/70 align-middle" aria-hidden="true" />}
+              {clarifications.length > 0 && (
+                <div className="mt-4 space-y-2 border-t pt-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase">Trao đổi làm rõ đề bài</p>
+                  {clarifications.map((item, idx) => (
+                    <div key={idx} className="space-y-1 rounded-xl border bg-muted/25 p-3 text-xs leading-relaxed">
+                      <p className="font-semibold text-foreground">
+                        {item.kind === 'HINT' ? 'Gợi ý hướng tiếp cận' : `Câu hỏi của bạn: ${item.question}`}
+                      </p>
+                      <p className="text-muted-foreground">{item.answer}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {(canClarifyPrompt || canRequestHint) && (
+                <div className="mt-4 space-y-2 border-t pt-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {canClarifyPrompt && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        disabled={busy}
+                        onClick={() => setClarifyOpen(open => !open)}
+                      >
+                        <HelpCircle size={13} aria-hidden="true" />
+                        Hỏi làm rõ đề bài (còn {remainingClarifications}/2)
+                      </Button>
+                    )}
+                    {canRequestHint && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs text-brand-green"
+                        disabled={busy}
+                        onClick={() => void interview.clarify('HINT')}
+                      >
+                        <Lightbulb size={13} aria-hidden="true" />
+                        Xin gợi ý nhỏ
+                      </Button>
+                    )}
+                  </div>
+                  {clarifyOpen && canClarifyPrompt && (
+                    <form
+                      className="flex flex-wrap gap-2"
+                      onSubmit={event => {
+                        event.preventDefault();
+                        if (!clarifyQuestion.trim() || busy) return;
+                        void interview.clarify('CLARIFY_PROMPT', clarifyQuestion).then(updated => {
+                          if (updated) {
+                            setClarifyQuestion('');
+                            setClarifyOpen(false);
+                          }
+                        });
+                      }}
+                    >
+                      <Input
+                        aria-label="Nội dung cần làm rõ đề bài"
+                        className="h-8 min-w-48 flex-1 text-xs"
+                        placeholder="VD: Input có thể rỗng không? Tải dự kiến bao nhiêu QPS?"
+                        value={clarifyQuestion}
+                        disabled={busy}
+                        onChange={e => setClarifyQuestion(e.target.value)}
+                      />
+                      <Button type="submit" size="sm" className="h-8 text-xs" disabled={busy || !clarifyQuestion.trim()}>
+                        Gửi câu hỏi
+                      </Button>
+                    </form>
+                  )}
+                </div>
+              )}
             </>
           )}
         </div>
       </div>
       <div className="flex min-h-0 min-w-0 flex-col gap-3 rounded-2xl border bg-card p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <label htmlFor="interview-answer" className="font-semibold">{answerLabel}</label>
+          {showCodeEditor
+            ? <p className="font-semibold">{answerLabel}</p>
+            : <label htmlFor="interview-answer" className="font-semibold">{answerLabel}</label>}
           {awaiting && (
             <span className="inline-flex items-center gap-1 rounded-full bg-brand-green-light px-2.5 py-0.5 text-xs font-medium text-brand-green">
               <Check size={12} aria-hidden="true" />
@@ -129,18 +241,53 @@ export function EvidenceTextInterview({ interview, onHistory, onStop }: {
             </span>
           )}
         </div>
-        <textarea id="interview-answer" aria-label="Câu trả lời" className={`h-40 min-h-32 w-full resize-none overflow-y-auto rounded-xl border p-4 text-sm leading-relaxed transition-colors focus-visible:outline-2 focus-visible:outline-brand-orange lg:h-auto lg:flex-1 ${readOnlyAnswer ? 'bg-muted/40 text-muted-foreground' : 'bg-background'} ${session.pending_turn?.mode === 'CODING' ? 'font-mono' : ''}`}
-          maxLength={conversation.introducing ? 10000 : 50000} value={answerValue} readOnly={readOnlyAnswer}
-          onChange={e => { if (isRevealing) complete(); interview.setAnswer(e.target.value); }} disabled={busy || (!conversation.introducing && !session.pending_turn)}
-          placeholder={answerPlaceholder} />
-        <div className="flex flex-wrap items-center gap-3">{conversation.closing
+        {showCodeEditor && pendingTurn && (
+          <InterviewCodeEditor
+            key={pendingTurn.turn_id}
+            sessionId={session.session_id}
+            turnId={pendingTurn.turn_id}
+            value={activeCode}
+            onChange={setActiveCode}
+            codingSpec={pendingTurn.coding_spec}
+            questionHint={`${turnSkillId(session, pendingTurn)} ${pendingTurn.question}`}
+            disabled={busy}
+            readOnly={readOnlyAnswer}
+            defaultAutocomplete={isPractice}
+          />
+        )}
+        {showCodeEditor ? (
+          <div className="space-y-1">
+            <label htmlFor="interview-answer" className="text-xs font-medium text-muted-foreground">
+              Giải thích ngắn hoặc độ phức tạp (tuỳ chọn)
+            </label>
+            <textarea
+              id="interview-answer"
+              aria-label="Câu trả lời"
+              className={`h-16 min-h-14 w-full resize-none overflow-y-auto rounded-xl border border-border/80 px-3.5 py-2 text-sm leading-relaxed transition-colors focus-visible:bg-background focus-visible:outline-2 focus-visible:outline-brand-orange ${readOnlyAnswer ? 'bg-muted/40 text-muted-foreground' : 'bg-muted/20'}`}
+              maxLength={50000}
+              value={answerValue}
+              readOnly={readOnlyAnswer}
+              onChange={e => { if (isRevealing) complete(); interview.setAnswer(e.target.value); }}
+              disabled={busy || !session.pending_turn}
+              placeholder="VD: Dùng TTL 3600s để tự hết hạn cache, độ phức tạp O(1)…"
+            />
+          </div>
+        ) : (
+          <textarea id="interview-answer" aria-label="Câu trả lời" className={`h-40 min-h-32 w-full resize-none overflow-y-auto rounded-xl border p-4 text-sm leading-relaxed transition-colors focus-visible:outline-2 focus-visible:outline-brand-orange lg:h-auto lg:flex-1 ${readOnlyAnswer ? 'bg-muted/40 text-muted-foreground' : 'bg-background'} ${session.pending_turn?.mode === 'CODING' ? 'font-mono' : ''}`}
+            maxLength={conversation.introducing ? 10000 : 50000} value={answerValue} readOnly={readOnlyAnswer}
+            onChange={e => { if (isRevealing) complete(); interview.setAnswer(e.target.value); }} disabled={busy || (!conversation.introducing && !session.pending_turn)}
+            placeholder={answerPlaceholder} />
+        )}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3">{conversation.closing
           ? <Button disabled={busy} onClick={() => void interview.converse('NEXT')}>Xem kết quả</Button>
-          : <>{!awaiting && <Button disabled={busy || !interview.answer.trim()} onClick={() => void interview.submit()}>{isSubmitting
-              ? <><LoaderCircle size={15} className="animate-spin" />{conversation.introducing ? 'Đang gửi giới thiệu…' : 'Đang đánh giá…'}</>
-              : <><Send size={15} />Gửi câu trả lời</>}</Button>}
-            <Button variant="outline" disabled={busy} onClick={onStop}>Kết thúc phiên</Button>
-            {conversation.introducing && <Button variant="ghost" disabled={busy} onClick={() => void interview.converse('SKIP_INTRODUCTION')}>Bỏ qua giới thiệu</Button>}
-            {isLoadingQuestion && <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground"><LoaderCircle size={14} className="animate-spin text-brand-orange" aria-hidden="true" />Đang chuyển tiếp…</span>}</>}
+          : <><div className="flex flex-wrap items-center gap-2">
+              {!awaiting && <Button disabled={busy || !canSubmit} onClick={() => void interview.submit(interview.answer, showCodeEditor && activeCode.trim() ? activeCode : undefined)}>{isSubmitting
+                ? <><LoaderCircle size={15} className="animate-spin" />{conversation.introducing ? 'Đang gửi giới thiệu…' : 'Đang đánh giá…'}</>
+                : <><Send size={15} />Gửi câu trả lời</>}</Button>}
+              {conversation.introducing && <Button variant="ghost" disabled={busy} onClick={() => void interview.converse('SKIP_INTRODUCTION')}>Bỏ qua giới thiệu</Button>}
+              {isLoadingQuestion && <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground"><LoaderCircle size={14} className="animate-spin text-brand-orange" aria-hidden="true" />Đang chuyển tiếp…</span>}
+            </div>
+            <Button variant="outline" size="sm" disabled={busy} onClick={onStop}>Kết thúc phiên</Button></>}
         </div>
       </div>
     </section>

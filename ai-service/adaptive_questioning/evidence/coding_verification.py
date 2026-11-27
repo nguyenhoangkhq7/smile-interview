@@ -1,216 +1,284 @@
-"""Run server-owned cases against a bounded subset of Python collection code."""
+"""Generic server-side code verification driven by Question.coding_spec and CodeExecutionProvider."""
+from __future__ import annotations
 
 import ast
-from copy import deepcopy
 from dataclasses import dataclass
+import logging
 import re
-from textwrap import dedent
+import sqlite3
+import sys
 
-from .models import Judgment, Mode, Observation, Turn
-
-
-_FUNCTION = "deduplicate_events"
-_FENCE = re.compile(r"^```(?:python|py)?[ \t]*\n(.*?)^```[ \t]*$", re.I | re.M | re.S)
-_STARTER = re.compile(r"\b(?:viết|triển khai|write|implement)\b[^.!?\n]*\bdeduplicate_events\s*\(\s*events\s*\)")
-_FIRST_RECORD = re.compile(r"(?:xuất hiện đầu tiên|giữ (?:lại )?bản ghi đầu tiên|first (?:occurrence|record|event))")
-_ORIGINAL_ORDER = re.compile(r"(?:thứ tự (?:ban đầu|gốc|xuất hiện)|original order|insertion order|input order)")
-_CASES = (
-    ([], []),
-    ([{"event_id": "B", "value": 10}, {"event_id": "A", "value": 20}], [0, 1]),
-    ([{"event_id": "B", "value": 10}, {"event_id": "A", "value": 20},
-      {"event_id": "B", "value": 30}, {"event_id": "C", "value": 40}, {"event_id": "A", "value": 50}], [0, 1, 3]),
+from .code_runner import (
+    CodeExecutionProvider,
+    CodingCaseResult,
+    CodingSpec,
+    ExecutionResult,
+    SupportedLanguage,
+    default_code_runner,
+    extract_code_snippet,
 )
-_MAX_SOURCE = 4096
-_MAX_AST_NODES = 160
-_MAX_STEPS = 800
-_BUILTINS = {"dict": dict, "list": list, "set": set}
-_COLLECTION_METHODS = {
-    list: {"append": list.append},
-    set: {"add": set.add},
-    dict: {"get": dict.get, "setdefault": dict.setdefault, "values": dict.values},
-}
+from .models import CodingCheckResult, Judgment, Mode, Observation, Question, Turn
+from .telemetry import event
+
+logger = logging.getLogger(__name__)
+_FENCE_SPAN = re.compile(r"^```(?:[a-zA-Z0-9_+#.-]+)?[ \t]*\n(.*?)^```[ \t]*$", re.MULTILINE | re.DOTALL)
+_FORBIDDEN_SQL = re.compile(r"\b(?:ATTACH|DETACH|PRAGMA|VACUUM|LOAD_EXTENSION)\b", re.IGNORECASE)
+_PY_IMPORT_RE = re.compile(r"^\s*(?:from\s+([a-zA-Z_][\w]*)|import\s+([a-zA-Z_][\w]*))", re.MULTILINE)
+_JS_IMPORT_RE = re.compile(
+    r"""(?:require\s*\(\s*['"]([^'"]+)['"]\s*\)|import\s+(?:[^'"]+\s+from\s+)?['"]([^'"]+)['"])"""
+)
+_SANDBOX_ENV_ERROR_RE = re.compile(
+    r"(?:ModuleNotFoundError:\s*No module named '(?!solution')[^']+'|"
+    r"Cannot find module\s+['\"]|ERR_MODULE_NOT_FOUND|"
+    r"ConnectionRefusedError|ECONNREFUSED|"
+    r"redis\.exceptions\.ConnectionError|ServerSelectionTimeoutError|"
+    r"Temporary failure in name resolution|Name or service not known|socket\.gaierror)",
+    re.IGNORECASE,
+)
+
+SANDBOX_PYTHON_CURATED_PACKAGES = frozenset({
+    "redis",
+    "fakeredis",
+    "pymongo",
+    "mongomock",
+    "pydantic",
+    "httpx",
+    "fastapi",
+    "sortedcontainers",
+})
+SANDBOX_PYTHON_ALLOWED_MODULES = SANDBOX_PYTHON_CURATED_PACKAGES | frozenset(sys.stdlib_module_names)
+SANDBOX_NODE_BUILTINS = frozenset({
+    "assert", "buffer", "crypto", "events", "fs", "http", "https", "os", "path",
+    "querystring", "stream", "string_decoder", "timers", "url", "util", "zlib",
+})
+SANDBOX_ENV_NOTICE = (
+    "Môi trường chạy thử cô lập không cài sẵn thư viện hoặc dịch vụ mạng mà đoạn mã đang dùng "
+    "(hỗ trợ Python chuẩn, Redis/MongoDB giả lập trong RAM, FastAPI/Pydantic, Node.js chuẩn và SQLite). "
+    "Bạn vẫn có thể bấm Gửi câu trả lời — hệ thống sẽ chấm điểm theo logic mã nguồn của bạn."
+)
 
 
-class _UnsupportedCode(Exception):
-    pass
+def _extract_python_imports(source: str) -> set[str]:
+    if not source.strip():
+        return set()
+    try:
+        tree = ast.parse(source)
+        found: set[str] = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    found.add(alias.name.split(".", 1)[0])
+            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                found.add(node.module.split(".", 1)[0])
+        return found
+    except SyntaxError:
+        found = set()
+        for m in _PY_IMPORT_RE.finditer(source):
+            name = m.group(1) or m.group(2)
+            if name:
+                found.add(name)
+        return found
 
 
-class _Return(Exception):
-    def __init__(self, value: object):
-        self.value = value
+def _extract_js_imports(source: str) -> set[str]:
+    modules: set[str] = set()
+    for match in _JS_IMPORT_RE.finditer(source):
+        raw = (match.group(1) or match.group(2) or "").strip()
+        if not raw or raw.startswith("."):
+            continue
+        cleaned = raw[5:] if raw.startswith("node:") else raw
+        modules.add(cleaned.split("/", 1)[0])
+    return modules
+
+
+def _sqlite_setup_valid(setup_sql: str) -> bool:
+    if not setup_sql.strip():
+        return True
+    if _FORBIDDEN_SQL.search(setup_sql):
+        return False
+    conn = sqlite3.connect(":memory:")
+    try:
+        conn.executescript(setup_sql)
+        return True
+    except sqlite3.Error:
+        return False
+    finally:
+        conn.close()
+
+
+def sanitize_coding_spec(question: Question) -> Question:
+    """Strip coding_spec when starter_code/setup_sql relies on runtimes unsupported by the isolated sandbox."""
+    spec = question.coding_spec
+    if spec is None:
+        return question
+    reason = ""
+    if spec.language == "python":
+        disallowed = sorted(
+            mod for mod in _extract_python_imports(spec.starter_code)
+            if mod not in SANDBOX_PYTHON_ALLOWED_MODULES
+        )
+        if disallowed:
+            reason = f"unsupported_python_imports:{','.join(disallowed[:3])}"
+    elif spec.language == "javascript":
+        disallowed = sorted(
+            mod for mod in _extract_js_imports(spec.starter_code)
+            if mod not in SANDBOX_NODE_BUILTINS
+        )
+        if disallowed:
+            reason = f"unsupported_js_imports:{','.join(disallowed[:3])}"
+    elif spec.language == "sql" and not _sqlite_setup_valid(spec.setup_sql):
+        reason = "invalid_sqlite_setup_sql"
+
+    if not reason:
+        return question
+    logger.info("Stripping non-runnable coding_spec (%s) for language=%s", reason, spec.language)
+    event("coding_spec.stripped", language=spec.language, reason=reason)
+    return question.model_copy(update={"coding_spec": None})
+
+
+def is_sandbox_environment_error(outcome: ExecutionResult) -> bool:
+    """Return True when execution failed due to missing third-party packages or isolated network limits."""
+    if outcome.compile_error and _SANDBOX_ENV_ERROR_RE.search(outcome.compile_error):
+        return True
+    return any(
+        (not item.passed) and bool(item.error) and bool(_SANDBOX_ENV_ERROR_RE.search(item.error))
+        for item in outcome.results
+    )
 
 
 @dataclass(frozen=True)
 class CodingCheck:
     line_range: tuple[int, int]
+    language: str
     total: int
     passed: int
+    compile_error: str = ""
+    sample_results: tuple[CodingCaseResult, ...] = ()
+
+    def to_result(self) -> CodingCheckResult:
+        return CodingCheckResult(
+            passed=self.passed,
+            total=self.total,
+            language=self.language,
+            compile_error=self.compile_error,
+            sample_results=list(self.sample_results),
+        )
 
     def failure_judgment(self, turn: Turn) -> Judgment:
-        return Judgment(feedback="", observations=[Observation(
-            criterion_id=turn.question.criterion_ids[0], response_line_range=self.line_range,
-            observation="CONTRADICTS", performance="BELOW",
-            rationale=(f"Hàm không đạt {self.total - self.passed}/{self.total} ca đối chứng. "
-                       "Kết quả phải giữ bản ghi xuất hiện đầu tiên của mỗi event_id theo thứ tự đầu vào."),
-        )])
+        if self.compile_error:
+            detail = f"Mã nguồn {self.language} bị lỗi biên dịch/thực thi: {self.compile_error[:240]}"
+        else:
+            failed_count = self.total - self.passed
+            first_fail = next((item for item in self.sample_results if not item.passed), None)
+            hint = ""
+            if first_fail and first_fail.error:
+                hint = f" Lỗi ở ca `{first_fail.name}`: {first_fail.error[:180]}."
+            elif first_fail:
+                hint = (
+                    f" Ở ca `{first_fail.name}`, kết quả thực tế là `{first_fail.actual_output[:100]}` "
+                    f"khác kỳ vọng `{first_fail.expected_output[:100]}`."
+                )
+            detail = f"Mã nguồn chưa đạt {failed_count}/{self.total} ca kiểm thử tự động.{hint}"
+        return Judgment(
+            feedback="",
+            observations=[Observation(
+                criterion_id=turn.question.criterion_ids[0],
+                response_line_range=self.line_range,
+                observation="CONTRADICTS",
+                performance="BELOW",
+                rationale=detail,
+            )],
+        )
 
 
-def check_coding_answer(turn: Turn, interaction_mode: str) -> CodingCheck | None:
-    """A mismatch can disprove correctness. No result means use the regular Judge."""
-    text = turn.question.text.casefold()
-    if (interaction_mode != "TEXT" or turn.mode != Mode.CODING or len(turn.question.criterion_ids) != 1
-            or not re.search(r"\bevent_id\b", text) or not _STARTER.search(text)
-            or not _FIRST_RECORD.search(text) or not _ORIGINAL_ORDER.search(text)):
-        return None
-    try:
-        function, line_range = _function_from_answer(turn.answer or "")
-        passed = sum(_run_case(function, rows) == [rows[index] for index in first] for rows, first in _CASES)
-    except (_UnsupportedCode, SyntaxError, TypeError, ValueError, KeyError, IndexError, RecursionError):
-        return None
-    return CodingCheck(line_range, len(_CASES), passed)
-
-
-def _function_from_answer(answer: str) -> tuple[ast.FunctionDef, tuple[int, int]]:
-    if len(answer) > _MAX_SOURCE:
-        raise _UnsupportedCode
-    answer = answer.replace("\r\n", "\n").replace("\r", "\n")
-    code, start = _code_block(answer)
-    tree = ast.parse(dedent(code))
-    if len(tree.body) != 1 or sum(1 for _ in ast.walk(tree)) > _MAX_AST_NODES:
-        raise _UnsupportedCode
-    function = tree.body[0]
-    if not isinstance(function, ast.FunctionDef) or function.name != _FUNCTION or function.decorator_list:
-        raise _UnsupportedCode
-    args = function.args
-    if len(args.posonlyargs + args.args) != 1 or args.vararg or args.kwonlyargs or args.kwarg or args.defaults:
-        raise _UnsupportedCode
-    return function, (start + function.lineno, start + function.end_lineno)
-
-
-def _code_block(answer: str) -> tuple[str, int]:
-    blocks = list(_FENCE.finditer(answer))
+def _code_line_range(answer: str) -> tuple[int, int]:
+    normalized = answer.replace("\r\n", "\n").replace("\r", "\n")
+    blocks = list(_FENCE_SPAN.finditer(normalized))
     if len(blocks) == 1:
-        return blocks[0][1], answer.count("\n", 0, blocks[0].start(1))
-    if blocks:
-        raise _UnsupportedCode
-    # Plain-text interviews often put a short explanation after the submitted function.
-    prose = re.search(r"(?m)^\s*\n(?:Em|Tôi|Mình|I|This) [^\n]+", answer)
-    if prose and not re.search(r"(?m)^(?:def |```)", answer[prose.end():]):
-        return answer[:prose.start()], 0
-    return answer, 0
+        start_line = normalized.count("\n", 0, blocks[0].start(1)) + 1
+        body_lines = max(1, len(blocks[0].group(1).rstrip("\n").splitlines()))
+        return (start_line, start_line + body_lines - 1)
+    extracted = extract_code_snippet(normalized)
+    lines = extracted.splitlines()
+    non_empty = [idx for idx, line in enumerate(lines, start=1) if line.strip()]
+    if not non_empty:
+        return (1, 1)
+    return (non_empty[0], non_empty[-1])
 
 
-def _run_case(function: ast.FunctionDef, rows: list[dict]) -> object:
-    parameter, = function.args.posonlyargs + function.args.args
-    runner = _CollectionCode({parameter.arg: deepcopy(rows)})
+def check_coding_answer(
+    turn: Turn,
+    interaction_mode: str,
+    runner: CodeExecutionProvider | None = None,
+) -> CodingCheck | None:
+    """Execute generic test cases from Turn.question.coding_spec via the configured sandbox runner."""
+    spec: CodingSpec | None = turn.question.coding_spec
+    if spec is None or len(turn.question.criterion_ids) != 1:
+        return None
+    if interaction_mode != "TEXT" and not turn.submitted_code:
+        return None
+    if turn.mode not in {Mode.CODING, Mode.DEBUGGING} and not turn.question.requires_code:
+        return None
+    all_cases = [*spec.sample_tests, *spec.hidden_tests]
+    if not all_cases:
+        return None
+    raw_source = turn.submitted_code if turn.submitted_code else (turn.answer or "")
+    code = extract_code_snippet(raw_source).strip()
+    if not code:
+        return None
+    active_runner = runner or default_code_runner()
     try:
-        runner.block(function.body)
-    except _Return as result:
-        return result.value
-    return None
+        outcome = active_runner.execute(
+            language=spec.language,
+            code=code,
+            entry_point=spec.entry_point,
+            setup_sql=spec.setup_sql,
+            cases=all_cases,
+        )
+    except Exception as exc:
+        logger.warning("Code runner execution failed for turn %s (%s): %s", turn.turn_id, type(exc).__name__, exc)
+        return None
+    total = outcome.total or len(all_cases)
+    if outcome.passed < total and is_sandbox_environment_error(outcome):
+        logger.warning(
+            "Code runner hit sandbox environment limit for turn %s (language=%s); delegating to semantic judge.",
+            turn.turn_id,
+            outcome.language,
+        )
+        event("coding.sandbox_env_fallback", turn_id=turn.turn_id, language=outcome.language)
+        return None
+    sample_count = len(spec.sample_tests)
+    return CodingCheck(
+        line_range=_code_line_range(raw_source),
+        language=outcome.language,
+        total=total,
+        passed=outcome.passed,
+        compile_error=outcome.compile_error,
+        sample_results=tuple(outcome.results[:sample_count]),
+    )
 
 
-class _CollectionCode:
-    """Interpret local collection operations. Candidate AST never becomes Python bytecode."""
-
-    def __init__(self, variables: dict[str, object], budget: list[int] | None = None):
-        self.variables = variables
-        self.budget = [_MAX_STEPS] if budget is None else budget
-
-    def tick(self) -> None:
-        self.budget[0] -= 1
-        if self.budget[0] < 0:
-            raise _UnsupportedCode
-
-    def block(self, statements: list[ast.stmt]) -> None:
-        for node in statements:
-            self.tick()
-            match node:
-                case ast.Assign(targets=[target], value=value):
-                    self.assign(target, self.expression(value))
-                case ast.Return(value=value):
-                    raise _Return(self.expression(value) if value is not None else None)
-                case ast.Expr(value=value):
-                    self.expression(value)
-                case ast.If(test=test, body=body, orelse=other):
-                    self.block(body if self.expression(test) else other)
-                case ast.For(target=ast.Name(id=name), iter=source, body=body, orelse=[]):
-                    for value in self.expression(source):
-                        self.tick()
-                        self.variables[name] = value
-                        self.block(body)
-                case _:
-                    raise _UnsupportedCode
-
-    def assign(self, target: ast.expr, value: object) -> None:
-        match target:
-            case ast.Name(id=name):
-                self.variables[name] = value
-            case ast.Subscript(value=owner, slice=key):
-                collection = self.expression(owner)
-                if type(collection) is not dict:
-                    raise _UnsupportedCode
-                collection[self.expression(key)] = value
-            case _:
-                raise _UnsupportedCode
-
-    def expression(self, node: ast.expr) -> object:
-        self.tick()
-        match node:
-            case ast.Name(id=name):
-                return self.variables[name]
-            case ast.Constant(value=value) if type(value) in {str, int, bool, type(None)}:
-                return value
-            case ast.List(elts=items):
-                return [self.expression(item) for item in items]
-            case ast.Dict(keys=[], values=[]):
-                return {}
-            case ast.Subscript(value=owner, slice=key):
-                return self.expression(owner)[self.expression(key)]
-            case ast.UnaryOp(op=ast.Not(), operand=value):
-                return not self.expression(value)
-            case ast.Compare(left=value, ops=[op], comparators=[other]):
-                return self.compare(op, self.expression(value), self.expression(other))
-            case ast.Call(keywords=[]):
-                return self.call(node)
-            case ast.DictComp(generators=[generator]):
-                return self.dict_comprehension(node, generator)
-            case _:
-                raise _UnsupportedCode
-
-    @staticmethod
-    def compare(op: ast.cmpop, left: object, right: object) -> bool:
-        match op:
-            case ast.In():
-                return left in right
-            case ast.NotIn():
-                return left not in right
-            case ast.Eq():
-                return left == right
-            case _:
-                raise _UnsupportedCode
-
-    def call(self, node: ast.Call) -> object:
-        match node.func:
-            case ast.Name(id=name) if name not in self.variables and name in _BUILTINS:
-                function = _BUILTINS[name]
-                return function(*(self.expression(argument) for argument in node.args))
-            case ast.Attribute(value=owner, attr=name):
-                collection = self.expression(owner)
-                method = _COLLECTION_METHODS.get(type(collection), {}).get(name)
-                if method is not None:
-                    return method(collection, *(self.expression(argument) for argument in node.args))
-        raise _UnsupportedCode
-
-    def dict_comprehension(self, node: ast.DictComp, generator: ast.comprehension) -> dict:
-        if generator.is_async or not isinstance(generator.target, ast.Name):
-            raise _UnsupportedCode
-        scope = _CollectionCode(self.variables.copy(), self.budget)
-        result = {}
-        for value in self.expression(generator.iter):
-            self.tick()
-            scope.variables[generator.target.id] = value
-            if all(scope.expression(condition) for condition in generator.ifs):
-                key = scope.expression(node.key)
-                result[key] = scope.expression(node.value)
-        return result
+def run_sample_code(
+    *,
+    code: str,
+    spec: CodingSpec | None,
+    language_override: SupportedLanguage | None = None,
+    runner: CodeExecutionProvider | None = None,
+) -> ExecutionResult:
+    """Dry-run candidate code against public sample_tests only (or free-run if no sample tests exist)."""
+    active_runner = runner or default_code_runner()
+    language: SupportedLanguage = language_override or (spec.language if spec else "python")
+    entry_point = spec.entry_point if (spec and spec.language == language) else ""
+    setup_sql = spec.setup_sql if (spec and spec.language == language) else ""
+    cases = list(spec.sample_tests) if (spec and spec.language == language) else []
+    cleaned = extract_code_snippet(code)
+    result = active_runner.execute(
+        language=language,
+        code=cleaned,
+        entry_point=entry_point,
+        setup_sql=setup_sql,
+        cases=cases,
+    )
+    if is_sandbox_environment_error(result):
+        return result.model_copy(update={"environment_notice": SANDBOX_ENV_NOTICE})
+    return result

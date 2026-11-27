@@ -215,6 +215,8 @@ def test_two_rejected_cv_questions_trigger_jd_only_last_attempt(monkeypatch, cap
     assert provider.questions[-1]["verification_context"] == {"jd_excerpt": JD}
     assert provider.reviews[-1]["verification_context"] == {"jd_excerpt": JD}
     assert "rejected_draft" not in provider.questions[-1]
+    assert "observable evidence" in provider.questions[-1]["validation_error"]
+    assert CV not in provider.questions[-1]["validation_error"]
     assert result.snapshot.pending_turn.question.criterion_ids == provider.questions[0]["required_question_contract"]["criterion_ids"]
     assert CV not in caplog.text
 

@@ -69,6 +69,7 @@ def test_correct_metadata_cannot_bypass_criterion_review(setup, monkeypatch, rep
     def inspect(context):
         data = json.loads(context)
         assert data["criterion"]["description"] == criterion
+        assert data["skill_id"] == "postgresql"
         reviewed.append(data["question"])
         return review.review_question(context)
 
@@ -81,6 +82,30 @@ def test_correct_metadata_cannot_bypass_criterion_review(setup, monkeypatch, rep
         with pytest.raises(QuestionUnavailableError):
             start(engine)
     assert reviewed == ([wrong, focused] if repair else [wrong])
+
+
+def test_easier_review_gets_previous_depth_and_criterion_specific_diagnostic_instructions(setup, monkeypatch):
+    provider, engine, _ = setup
+    lm = dspy.utils.DummyLM([{"review": {"verdict": "ALIGNED", "reason": ""}}])
+    lm.adapter = dspy.JSONAdapter()
+    reviewer = DSPyAssessmentProvider(lm=lm, compiled_dir=str(DEFAULT_COMPILED_DIR))
+    first = start(engine)
+    prior = first.snapshot.pending_turn
+    contexts = []
+
+    def review(context):
+        contexts.append(json.loads(context))
+        return reviewer.review_question(context)
+
+    monkeypatch.setattr(provider, "review_question", review)
+    provider.observation, provider.performance = "CONTRADICTS", "BELOW"
+    second = answer(engine, first.snapshot)
+    diagnostic, = contexts
+    assert second.snapshot.pending_turn.action.value == diagnostic["action"] == "ASK_EASIER"
+    assert diagnostic["history"][-1]["question"] == prior.question.text
+    assert diagnostic["history"][-1]["depth"] == prior.question_depth > diagnostic["question_depth"]
+    assert diagnostic["criterion"]["criterion_id"] == prior.question.criterion_ids[0]
+    assert "Reject an unrelated decision" in str(lm.history[-1]["messages"])
 
 
 def test_ambiguous_debugging_spec_is_repaired_before_delivery(setup, monkeypatch):

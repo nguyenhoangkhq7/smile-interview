@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { historyService, SessionHistoryItem } from '@/services/historyService';
-import { AnswerRequest, ConversationAction, ConversationRequest, EvidenceSession, InterviewStartConfig, NextQuestionRequest, conversationPhase, evidenceInterview, interviewError } from '@/services/evidenceInterview';
+import { AnswerRequest, ClarifyKind, ConversationAction, ConversationRequest, EvidenceSession, InterviewStartConfig, NextQuestionRequest, conversationPhase, evidenceInterview, interviewError } from '@/services/evidenceInterview';
 
 const EXPIRY_RETRY_DELAY_MS = 5000;
 
@@ -67,13 +67,19 @@ export function useEvidenceInterview(id: string, readOnly = false) {
     conversationRetry.current = null; setAnswer('');
     return next;
   }), [id, run, session]);
-  const submit = (response = answer) => conversationPhase(session) === 'SELF_INTRODUCTION'
+  const submit = (response = answer, code?: string) => conversationPhase(session) === 'SELF_INTRODUCTION'
     ? converse('SUBMIT_INTRODUCTION', response) : run(async () => {
-    if (!session?.pending_turn || !response.trim()) throw new Error('Hãy nhập câu trả lời.');
+    if (!session?.pending_turn || (!response.trim() && !code?.trim())) throw new Error('Hãy nhập câu trả lời.');
     const previous = retry.current;
-    if (!previous || previous.candidate_response !== response || previous.turn_id !== session.pending_turn.turn_id) {
+    if (
+      !previous
+      || previous.candidate_response !== response
+      || previous.submitted_code !== code
+      || previous.turn_id !== session.pending_turn.turn_id
+      || previous.expected_state_version !== session.state_version
+    ) {
       retry.current = { request_id: crypto.randomUUID(), turn_id: session.pending_turn.turn_id,
-        expected_state_version: session.state_version, candidate_response: response };
+        expected_state_version: session.state_version, candidate_response: response, submitted_code: code };
     }
     const next = await evidenceInterview.answer(id, retry.current!);
     retry.current = null; setAnswer('');
@@ -154,5 +160,16 @@ export function useEvidenceInterview(id: string, readOnly = false) {
     };
   }, [session, stop, converse, readOnly]);
 
-  return { session, metadata, loading, legacy, busy, error, answer, setAnswer, secondsLeft, reload, start, submit, stop, converse, loadNextQuestion };
+  const clarify = useCallback((kind: ClarifyKind, candidateQuestion = '') => run(async () => {
+    if (!session?.pending_turn) throw new Error('Không có câu hỏi đang mở để làm rõ.');
+    return evidenceInterview.clarify(id, {
+      request_id: crypto.randomUUID(),
+      turn_id: session.pending_turn.turn_id,
+      expected_state_version: session.state_version,
+      kind,
+      candidate_question: candidateQuestion.trim(),
+    });
+  }), [id, run, session]);
+
+  return { session, metadata, loading, legacy, busy, error, answer, setAnswer, secondsLeft, reload, start, submit, stop, converse, clarify, loadNextQuestion };
 }

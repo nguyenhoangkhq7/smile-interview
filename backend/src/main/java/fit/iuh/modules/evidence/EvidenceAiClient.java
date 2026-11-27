@@ -78,6 +78,36 @@ public class EvidenceAiClient {
         }
     }
 
+    public JsonNode runCode(Object payload) {
+        JsonNode request = json.tree(payload);
+        String sessionId = request.path("snapshot").path("session_id").asText("-");
+        long started = System.nanoTime();
+        try {
+            String body = client.post().uri("/api/v2/interview/run-code")
+                    .contentType(MediaType.APPLICATION_JSON).body(request.toString())
+                    .retrieve().body(String.class);
+            JsonNode result = body == null ? null : json.read(body);
+            if (result == null || !result.has("language")) {
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Invalid AI code execution response");
+            }
+            log.info("Interview AI run-code completed session_id={} elapsed_ms={}",
+                    sessionId, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
+            return result;
+        } catch (RestClientResponseException ex) {
+            HttpStatus status = ex.getStatusCode().value() == 422
+                    ? HttpStatus.UNPROCESSABLE_ENTITY : HttpStatus.BAD_GATEWAY;
+            String detail = "Không thể chạy thử mã nguồn. Vui lòng thử lại.";
+            try {
+                JsonNode error = json.read(ex.getResponseBodyAsString());
+                if (error != null && error.path("detail").isTextual()) detail = error.path("detail").asText();
+            } catch (IllegalStateException ignored) {}
+            throw new ResponseStatusException(status, detail);
+        } catch (RestClientException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "Không thể kết nối dịch vụ chạy thử mã nguồn.", ex);
+        }
+    }
+
     public JsonNode blueprint(Object payload) {
         JsonNode request = json.tree(payload);
         long started = System.nanoTime();

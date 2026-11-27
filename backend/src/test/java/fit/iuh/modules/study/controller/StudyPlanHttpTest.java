@@ -200,6 +200,32 @@ class StudyPlanHttpTest {
         assertThat(item.path("sourceCriterionId").asText()).isEqualTo("sql-c1");
         assertThat(item.path("sourceSessionId").asText()).isEqualTo(sessionId);
         var path = "/tasks/" + task.path("id").asLong() + "/checklist/" + item.path("id").asLong();
+        var preview = body(send("GET", path + "/recheck", owner, null), 200);
+        assertThat(preview.path("description").asText()).isEqualTo("Inspect execution plan");
+        assertThat(preview.at("/before/turns/0/answer").asText()).isEqualTo("I do not know");
+        assertThat(send("GET", path + "/recheck", stranger, null).statusCode()).isEqualTo(403);
+        body(send("PUT", "", owner, Map.of("title", "Plan", "targetCompletionPercent", 80, "sourceSessionId", sessionId)), 200);
+        var later = applicationService.newAttempt(profileId, owner);
+        var recheck = new InterviewRun();
+        recheck.setSessionId(later.id());
+        recheck.setStateVersion(2L);
+        recheck.setConfigJson(json.tree(Map.of("recheck", Map.of("taskId", task.get("id"), "checklistItemId", item.get("id")))).toString());
+        var sourceRun = runs.findById(sessionId).orElseThrow();
+        var snapshot = (com.fasterxml.jackson.databind.node.ObjectNode) json.read(sourceRun.getSnapshotJson());
+        snapshot.putObject("recheck_target").put("source_session_id", sessionId).put("objective_id", "sql-task").put("criterion_id", "sql-c1");
+        ((com.fasterxml.jackson.databind.node.ObjectNode) snapshot.at("/turns/0")).put("answer", "EXPLAIN ANALYZE");
+        recheck.setSnapshotJson(snapshot.toString());
+        recheck.setPublicJson(json.tree(Map.of("is_finished", true, "report", Map.of("objectives", java.util.List.of(
+                Map.of("objective_id", "sql-task", "criteria", java.util.List.of(Map.of("criterion_id", "sql-c1",
+                        "assessment", "DEMONSTRATED_AT_TARGET"))))))).toString());
+        runs.save(recheck);
+        String resultsPath = "/tasks/" + task.path("id").asLong() + "/rechecks";
+        var comparison = body(send("GET", resultsPath, owner, null), 200);
+        assertThat(comparison.at("/0/before/turns/0/answer").asText()).isEqualTo("I do not know");
+        assertThat(comparison.at("/0/after/turns/0/answer").asText()).isEqualTo("EXPLAIN ANALYZE");
+        assertThat(comparison.at("/0/after/assessment").asText()).isEqualTo("DEMONSTRATED_AT_TARGET");
+        assertThat(send("GET", resultsPath, stranger, null).statusCode()).isEqualTo(403);
+        assertThat(body(send("GET", "", owner, null), 200).at("/tasks/0/checklist/0/isCompleted").asBoolean()).isFalse();
         body(send("PUT", path, owner, Map.of("content", "Nội dung đã sửa", "isCompleted", true)), 200);
         assertThat(body(send("GET", "", owner, null), 200).at("/tasks/0/checklist/0/sourceCriterionId").asText()).isEqualTo("sql-c1");
         input.put("checklist", java.util.List.of(Map.of("content", "Invalid criterion", "sourceCriterionId", "foreign")));
@@ -208,6 +234,10 @@ class StudyPlanHttpTest {
         body(send("POST", "/tasks", owner, input), 400);
         input.put("gapOrigin", Map.of("skillId", "sql", "objectiveId", "foreign"));
         body(send("POST", "/tasks", owner, input), 400);
+        var profile = profiles.findById(profileId).orElseThrow();
+        profile.setBlueprintJson(profile.getBlueprintJson().replace("sql-v1", "sql-v2"));
+        profiles.save(profile);
+        assertThat(send("GET", path + "/recheck", owner, null).statusCode()).isEqualTo(409);
     }
 
     @Test void simultaneousFirstTasksShareOneActivePlan() throws Exception {
@@ -280,7 +310,7 @@ class StudyPlanHttpTest {
         String snapshot = """
                 {"is_finished":%s,
                  "turns":[{"turn_id":"sql-turn","objective_id":"sql-task","answer":"I do not know",
-                   "question":{"text":"How do you inspect a slow SQL query?"}}],
+                   "question":{"text":"How do you inspect a slow SQL query?","criterion_ids":["sql-c1"],"evidence_scope":"query-A"}}],
                  "objectives":{"sql-task":{
                    "objective":%s,"assessment":"DEMONSTRATED_BELOW_TARGET","lifecycle":"CLOSED","turns_spent":1,
                    "contradictions":[],

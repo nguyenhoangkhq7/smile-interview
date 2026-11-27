@@ -188,7 +188,8 @@ def test_feedback_hint_is_not_mistaken_for_independent_followup(audit):
     first = answer(engine, start(engine, [task_skill()]).snapshot, "irrelevant")
     assert not first.public.report.objectives[0].evidence
     assert first.public.report.objectives[0].assessment == Assessment.INSUFFICIENT
-    assert first.public.is_finished
+    assert first.public.pending_turn is not None
+    assert not current(first).assisted_criteria
 
 
 def test_negative_and_positive_evidence_survive_contradiction(audit):
@@ -536,7 +537,7 @@ def test_api_carries_action_depth_evidence_and_recovery_through_response(audit):
         pending = updated["snapshot"]["pending_turn"]
         assert (pending["action"], pending["question_depth"]) == ("ASK_EASIER", 1)
         assert pending["mode"] == initial["snapshot"]["pending_turn"]["mode"]
-        assert set(pending["question"]) == {"text", "criterion_ids", "evidence_scope"}
+        assert set(pending["question"]) == {"text", "criterion_ids", "evidence_scope", "requires_code", "coding_spec"}
         restored = Snapshot.model_validate(updated["snapshot"])
         state = next(iter(restored.objectives.values()))
         assert state.objective.target_depth == 2

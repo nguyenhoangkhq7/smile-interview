@@ -259,7 +259,8 @@ export function PracticePlanBoard({ profile, initialPlan }: {
   profile: ApplicationProfile;
   initialPlan: StudyPlanView;
 }) {
-  const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<number | null>(() =>
+    typeof window === 'undefined' ? null : Number(new URLSearchParams(window.location.search).get('task')) || null);
   const [gapDraft, setGapDraft] = useState<{ objective: ObjectiveSuggestion; status: StudyTaskStatus } | null>(null);
   const gapSource = useRef<StudyGap | null>(null);
   const gapsDetailsRef = useRef<HTMLDetailsElement>(null);
@@ -483,7 +484,7 @@ export function PracticePlanBoard({ profile, initialPlan }: {
     return Boolean(result);
   }
 
-  const inspector = selectedTask && <PracticeTaskInspector key={selectedTask.id} task={selectedTask}
+  const inspector = selectedTask && <PracticeTaskInspector key={selectedTask.id} task={selectedTask} profileId={profile.id}
     disabled={disabled} skillIds={skillIds} onUpdate={(update) => updateTask(selectedTask, update)}
     onDelete={() => deleteTask(selectedTask)}
     checklist={{

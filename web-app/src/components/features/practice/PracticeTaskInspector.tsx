@@ -13,6 +13,7 @@ import { TaskModalSidebar } from './TaskModalSidebar';
 import { TaskNotesSection } from './TaskNotesSection';
 
 interface PracticeTaskInspectorProps {
+  profileId: string;
   task: StudyTask;
   className?: string;
   disabled: boolean;
@@ -25,7 +26,7 @@ interface PracticeTaskInspectorProps {
 }
 
 export function PracticeTaskInspector({
-  task,
+  task, profileId,
   className,
   disabled,
   skillIds,
@@ -117,7 +118,7 @@ export function PracticeTaskInspector({
                 <TaskNotesSection task={task} disabled={disabled} onUpdate={onUpdate} />
 
                 <StudyTaskChecklist
-                  items={task.checklist}
+                  items={task.checklist} profileId={profileId} taskId={task.id}
                   actions={checklist}
                   disabled={disabled}
                   inputRef={checklistInputRef}

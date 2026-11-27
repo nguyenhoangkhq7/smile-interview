@@ -74,7 +74,8 @@ def candidate():
     if deployment["projectId"] != ENV["VERCEL_PROJECT_ID"] or deployment["readyState"] != "READY":
         raise RuntimeError("Staged web deployment is not ready in the expected project")
     manifest = dict(sha=sha, release=release, web=deployment["id"], backend=ENV["BACKEND_IMAGE"],
-                    ai=ENV["AI_IMAGE"], checkpoint=Path("deploy/gnn-v4.sha256").read_text().split()[0])
+                    ai=ENV["AI_IMAGE"], code_runner=ENV["CODE_RUNNER_IMAGE"],
+                    checkpoint=Path("deploy/gnn-v4.sha256").read_text().split()[0])
     Path("manifest.json").write_text(json.dumps(manifest))
     bundle = "release.tar.gz"
     subprocess.run(["tar", "-czf", bundle, "manifest.json", "deploy/docker-compose.staging.yml",

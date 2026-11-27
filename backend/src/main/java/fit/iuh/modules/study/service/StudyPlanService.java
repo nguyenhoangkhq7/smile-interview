@@ -5,6 +5,9 @@ import fit.iuh.modules.application.ApplicationProfileRepository;
 import fit.iuh.modules.application.CompetencyProjection;
 import fit.iuh.modules.auth.entity.User;
 import fit.iuh.modules.evidence.EvidenceJson;
+import fit.iuh.modules.evidence.EvidenceDtos.ChecklistRef;
+import fit.iuh.modules.evidence.InterviewRun;
+import com.fasterxml.jackson.databind.JsonNode;
 import fit.iuh.modules.evidence.InterviewRunRepository;
 import fit.iuh.modules.session.entity.Session;
 import fit.iuh.modules.session.repository.SessionRepository;
@@ -26,6 +29,8 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.LinkedHashSet;
 import java.util.Objects;
@@ -86,6 +91,112 @@ public class StudyPlanService {
                 result.skills().stream().filter(skill -> "NOT_ASSESSED".equals(skill.assessment()))
                         .map(CompetencyProjection.Skill::skillId).toList(),
                 suggestions.project(profile, result, attempts, savedRuns));
+    }
+
+    public record RecheckTurn(String question, String answer, String code, String transcript) {}
+    public record CriterionAttempt(String sessionId, String assessment, List<RecheckTurn> turns) {}
+    public record RecheckResult(long checklistItemId, CriterionAttempt before, CriterionAttempt after) {}
+    public record RecheckPreview(String description, CriterionAttempt before) {}
+
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public RecheckPreview recheckPreview(UUID profileId, User user, ChecklistRef ref) {
+        var target = recheckTarget(profileId, user, ref);
+        String source = target.path("source_session_id").asText(null);
+        var before = source == null ? null : runs.findById(source)
+                .map(run -> criterionAttempt(run, target.path("objective_id").asText(), target.path("criterion_id").asText()))
+                .orElse(null);
+        return new RecheckPreview(target.path("description").asText(), before);
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode recheckTarget(UUID profileId, User user, ChecklistRef ref) {
+        var profile = ownedProfile(profileId, user, false);
+        var plan = requirePlan(profileId);
+        var task = repository.tasks(plan.id()).stream().filter(t -> t.id() == ref.taskId()).findFirst()
+                .orElseThrow(() -> notFound("Không tìm thấy đầu việc"));
+        var item = repository.checklist(plan.id()).stream()
+                .filter(i -> i.taskId() == task.id() && i.id() == ref.checklistItemId()).findFirst()
+                .orElseThrow(() -> notFound("Không tìm thấy mục checklist"));
+        if (item.sourceCriterionId() == null || task.gapSourceObjectiveId() == null)
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Mục này chưa liên kết với tiêu chí");
+        var definition = objectiveDefinition(profile, task.gapSourceObjectiveId());
+        var criterion = java.util.stream.StreamSupport.stream(definition.path("criteria").spliterator(), false)
+                .filter(c -> item.sourceCriterionId().equals(c.path("criterion_id").asText())).findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "Tiêu chí nguồn đã thay đổi"));
+        String sourceId = item.sourceSessionId() == null ? task.gapSourceSessionId() : item.sourceSessionId();
+        var questions = new ArrayList<String>();
+        var scopes = new LinkedHashSet<String>();
+        if (sourceId != null) {
+            interviewAttempts(profile, sourceId);
+            var source = runs.findById(sourceId).orElseThrow(() -> notFound("Không tìm thấy phiên nguồn"));
+            var snapshot = json.read(source.getSnapshotJson());
+            var original = snapshot.path("objectives").path(task.gapSourceObjectiveId()).path("objective");
+            if (!snapshot.path("is_finished").asBoolean() || !CompetencyProjection.compatible(definition, original))
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Chuẩn đánh giá đã thay đổi so với phiên nguồn");
+            for (var turn : snapshot.path("turns")) {
+                if (!matchesCriterion(turn, task.gapSourceObjectiveId(), item.sourceCriterionId())) continue;
+                questions.add(turn.path("question").path("text").asText());
+                scopes.add(turn.path("question").path("evidence_scope").asText());
+            }
+        }
+        var target = new LinkedHashMap<String, Object>();
+        target.put("source_session_id", sourceId);
+        target.put("criterion_id", item.sourceCriterionId());
+        target.put("description", criterion.path("description").asText());
+        target.put("objective_id", task.gapSourceObjectiveId());
+        target.put("rubric_fingerprint", definition.path("rubric_fingerprint").asText(json.hash(definition)));
+        target.put("source_questions", questions);
+        target.put("source_scopes", scopes);
+        return json.tree(target);
+    }
+
+    private static boolean matchesCriterion(JsonNode turn, String objective, String criterion) {
+        if (!objective.equals(turn.path("objective_id").asText())) return false;
+        for (var id : turn.path("question").path("criterion_ids")) if (criterion.equals(id.asText())) return true;
+        return false;
+    }
+
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public List<RecheckResult> rechecks(UUID profileId, User user, long taskId) {
+        var profile = ownedProfile(profileId, user, false);
+        if (!repository.hasTask(requirePlan(profileId).id(), taskId)) throw notFound("Không tìm thấy đầu việc");
+        var attempts = interviewAttempts(profile, null);
+        var byId = runs.findAllById(attempts.stream().map(Session::getId).toList()).stream()
+                .collect(Collectors.toMap(r -> r.getSessionId(), r -> r));
+        var results = new ArrayList<RecheckResult>();
+        for (var attempt : attempts) {
+            var run = byId.get(attempt.getId());
+            if (run == null) continue;
+            var config = json.read(run.getConfigJson()).path("recheck");
+            if (config.path("taskId").asLong() != taskId) continue;
+            var snapshot = json.read(run.getSnapshotJson());
+            if (!snapshot.path("is_finished").asBoolean()) continue;
+            var target = snapshot.path("recheck_target");
+            String obj = target.path("objective_id").asText(), criterion = target.path("criterion_id").asText();
+            var source = byId.get(target.path("source_session_id").asText(""));
+            var before = source == null ? null : criterionAttempt(source, obj, criterion);
+            results.add(new RecheckResult(config.path("checklistItemId").asLong(), before, criterionAttempt(run, obj, criterion)));
+        }
+        return results;
+    }
+
+    private CriterionAttempt criterionAttempt(InterviewRun run, String objective, String criterion) {
+        var visible = json.read(run.getPublicJson());
+        var answers = new ArrayList<RecheckTurn>();
+        for (var t : json.read(run.getSnapshotJson()).path("turns")) {
+            if (matchesCriterion(t, objective, criterion) && t.hasNonNull("answer"))
+                answers.add(new RecheckTurn(t.path("question").path("text").asText(), t.path("answer").asText(),
+                        t.path("submitted_code").asText(null), t.path("transcript").asText(null)));
+        }
+        String status = answers.isEmpty() ? "NOT_ASSESSED" : "INSUFFICIENT_EVIDENCE";
+        for (var obj : visible.path("report").path("objectives")) {
+            if (!objective.equals(obj.path("objective_id").asText())) continue;
+            for (var c : obj.path("criteria")) if (criterion.equals(c.path("criterion_id").asText()))
+                status = c.path("assessment").asText(status);
+        }
+        var selected = visible.path("report").path("recheck_criterion");
+        if (criterion.equals(selected.path("criterion_id").asText())) status = selected.path("assessment").asText(status);
+        return new CriterionAttempt(run.getSessionId(), status, answers);
     }
 
     public StudyTask createTask(UUID profileId, User user, CreateTaskInput input) {

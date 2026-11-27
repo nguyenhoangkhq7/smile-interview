@@ -121,6 +121,11 @@ class CompetencyProjectionTest {
         var first = attempt(1, Map.of("sql", BELOW), "A");
         var second = attempt(2, Map.of("sql", AT), "B");
         assertThat(sql(view(first, second)).assessment()).isEqualTo(VERIFY);
+        assertThat(sql(view(first, second)).objectives().getFirst().criteria().getFirst().trend()).isEqualTo("IMPROVING");
+        var unknown = attempt(3, Map.of("sql", INSUFFICIENT), "query C");
+        var unconfirmed = sql(view(first, second, unknown)).objectives().getFirst().criteria().getFirst();
+        assertThat(unconfirmed.assessment()).isEqualTo(VERIFY);
+        assertThat(unconfirmed.trend()).isNull();
         var repeated = attempt(3, Map.of("sql", AT), " B  ");
         assertThat(sql(view(first, second, repeated)).assessment()).isEqualTo(VERIFY);
         var confirmation = attempt(4, Map.of("sql", AT), "C");
@@ -132,7 +137,9 @@ class CompetencyProjectionTest {
         var second = attempt(2, Map.of("sql", BELOW), "B");
         var third = attempt(3, Map.of("sql", BELOW), "C");
         assertThat(sql(view(first, second)).assessment()).isEqualTo(VERIFY);
+        assertThat(sql(view(first, second)).objectives().getFirst().criteria().getFirst().trend()).isEqualTo("DECLINING");
         assertThat(sql(view(first, second, third)).assessment()).isEqualTo(BELOW);
+        assertThat(sql(view(first, second, third)).objectives().getFirst().criteria().getFirst().trend()).isNull();
     }
 
     @Test void easierUnmeasuredAndUngroundedEvidenceCannotReplaceVerifiedAbility() {
@@ -244,5 +251,22 @@ class CompetencyProjectionTest {
         View result = view(currentRun);
         assertThat(result.incompatibleAssessments()).isZero();
         assertThat(sql(result).assessment()).isEqualTo(AT);
+    }
+
+    @Test void practiceSessionsAreIsolatedAndTimelineTracksWeightedProgression() {
+        profile.setSkillGapJson("[{\"jd_skill_id\":\"sql\",\"semantic_alignment\":\"MISSING\",\"importance_weight\":0.9},"
+                + "{\"jd_skill_id\":\"java\",\"semantic_alignment\":\"MATCH\",\"importance_weight\":0.4}]");
+        var practice = attempt(1, Map.of("sql", AT), "P1");
+        practice.snapshot().putObject("config").put("session_purpose", "PRACTICE");
+        var assess1 = attempt(2, Map.of("java", AT), "A1");
+        var assess2 = attempt(3, Map.of("sql", AT), "A2");
+
+        View result = view(practice, assess1, assess2);
+        assertThat(result.practiceAttempts()).isEqualTo(1);
+        assertThat(result.completedAttempts()).isEqualTo(2);
+        assertThat(result.timeline()).hasSize(2);
+        assertThat(result.timeline().get(0).weightedReadinessPercent()).isEqualTo(33);
+        assertThat(result.timeline().get(1).weightedReadinessPercent()).isEqualTo(100);
+        assertThat(result.timeline().get(1).essentialCriteriaMet()).isEqualTo(2);
     }
 }

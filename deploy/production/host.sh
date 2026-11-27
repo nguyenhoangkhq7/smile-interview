@@ -5,10 +5,11 @@ umask 077
 cd "$(dirname "$0")/../.."
 source /etc/smile/production.conf
 export AWS_DEFAULT_REGION AWS_PAGER=""
-export BACKEND_IMAGE AI_IMAGE GNN_CHECKPOINT_DIR RDS_CA_BUNDLE
+export BACKEND_IMAGE AI_IMAGE CODE_RUNNER_IMAGE GNN_CHECKPOINT_DIR RDS_CA_BUNDLE
 export APP_CORS_ALLOWED_ORIGINS RDS_ENDPOINT RDS_DB_NAME
 BACKEND_IMAGE=$(jq -er .backend manifest.json)
 AI_IMAGE=$(jq -er .ai manifest.json)
+CODE_RUNNER_IMAGE=$(jq -er .code_runner manifest.json)
 checksum=$(awk '{print $1}' deploy/gnn-v4.sha256)
 filename=$(awk '{print $2}' deploy/gnn-v4.sha256)
 [[ $checksum == "$(jq -er .checkpoint manifest.json)" ]]

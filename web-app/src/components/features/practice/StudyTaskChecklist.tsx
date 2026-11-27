@@ -1,6 +1,12 @@
 'use client';
 
-import { useState, type FormEvent, type RefObject } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
+import { useRouter } from 'next/navigation';
+import axios from 'axios';
+import { applicationProfiles } from '@/services/applicationProfiles';
+import { evidenceInterview, interviewError, type InteractionMode } from '@/services/evidenceInterview';
+import { studyPlans, type CriterionAttempt, type RecheckResult } from '@/services/studyPlans';
+import { assessmentLabels } from '@/components/features/interview/result/resultData';
 import Link from 'next/link';
 import { Check, CheckCircle2, ListChecks, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -15,7 +21,20 @@ export interface StudyTaskChecklistActions {
   remove: (item: StudyChecklistItem) => void;
 }
 
-export function StudyTaskChecklist({ items, actions, disabled, inputRef }: {
+function AttemptEvidence({ attempt, label }: { attempt: CriterionAttempt; label: string }) {
+  return <section className="my-2 rounded border p-2">
+    <strong>{label} · {assessmentLabels[attempt.assessment]}</strong>
+    {attempt.turns.map((turn, index) => <div key={index} className="my-2">
+      <p>{turn.question}</p>
+      {turn.code && <pre className="overflow-auto">{turn.code}</pre>}
+      <p className="whitespace-pre-wrap">{turn.code ? turn.transcript : turn.answer}</p>
+    </div>)}
+    <Link className="underline" href={`/interview/session/${encodeURIComponent(attempt.sessionId)}/result`}>Xem lượt phỏng vấn</Link>
+  </section>;
+}
+
+export function StudyTaskChecklist({ items, actions, disabled, inputRef, profileId, taskId }: {
+  profileId: string; taskId: number;
   items: readonly StudyChecklistItem[];
   actions: StudyTaskChecklistActions;
   disabled: boolean;
@@ -23,6 +42,43 @@ export function StudyTaskChecklist({ items, actions, disabled, inputRef }: {
 }) {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [addingOpen, setAddingOpen] = useState(false);
+  const router = useRouter();
+  const [results, setResults] = useState<RecheckResult[] | null>(null);
+  const [error, setError] = useState('');
+  const [sources, setSources] = useState<Record<number, CriterionAttempt | null>>({});
+  const [active, setActive] = useState('');
+  const [starting, setStarting] = useState(false);
+  const startingRef = useRef(false);
+  const [voice, setVoice] = useState(false);
+  const hasCriteria = items.some(item => item.sourceCriterionId);
+  useEffect(() => {
+    if (!results || !window.location.hash.startsWith('#checklist-')) return;
+    document.getElementById(window.location.hash.slice(1))?.focus();
+  }, [results]);
+  useEffect(() => {
+    if (!hasCriteria) return;
+    const ac = new AbortController();
+    void studyPlans.rechecks(profileId, taskId, ac.signal).then(setResults)
+      .catch(cause => { if (!ac.signal.aborted) setError(interviewError(cause)); });
+    void evidenceInterview.limits(ac.signal).then(limits => setVoice(limits.voiceEnabled)).catch(() => {});
+    return () => ac.abort();
+  }, [profileId, taskId, hasCriteria]);
+  async function start(item: StudyChecklistItem, channel: InteractionMode) {
+    if (startingRef.current) return;
+    startingRef.current = true;
+    setStarting(true); setError(''); setActive('');
+    try {
+      const attempt = await applicationProfiles.newAttempt(profileId);
+      const query = new URLSearchParams({ task: String(taskId), item: String(item.id), channel });
+      router.push(`/interview/session/${encodeURIComponent(attempt.id)}?${query}`);
+    } catch (cause) {
+      setError(interviewError(cause));
+      if (axios.isAxiosError(cause) && cause.response?.status === 409) {
+        const profile = await applicationProfiles.get(profileId).catch(() => null);
+        setActive(profile?.attempts.find(a => a.status === 'In progress')?.id ?? '');
+      }
+    } finally { startingRef.current = false; setStarting(false); }
+  }
   const count = items.filter((item) => item.isCompleted).length;
   const percent = items.length > 0 ? Math.round((count / items.length) * 100) : 0;
   const allDone = items.length > 0 && count === items.length;
@@ -99,7 +155,7 @@ export function StudyTaskChecklist({ items, actions, disabled, inputRef }: {
       {items.length > 0 ? (
         <ul className="space-y-1">
           {items.map((item) => (
-            <li key={item.id} className="group rounded-xl p-2 transition-colors hover:bg-(--practice-pale)/70">
+            <li key={item.id} id={`checklist-${item.id}`} tabIndex={-1} className="group rounded-xl p-2 transition-colors hover:bg-(--practice-pale)/70">
               {editingId === item.id ? (
                 <form className="space-y-2" onSubmit={(event) => void submit(event, item)}>
                   <Input
@@ -169,6 +225,29 @@ export function StudyTaskChecklist({ items, actions, disabled, inputRef }: {
                   </div>
                 </div>
               )}
+              {item.sourceCriterionId && results && <div className="ml-7 space-y-2 py-1 text-sm">
+                {!results.some(r => r.checklistItemId === item.id) && <details onToggle={async event => {
+                  if (!event.currentTarget.open || item.id in sources) return;
+                  try {
+                    const preview = await studyPlans.recheckPreview(profileId, taskId, item.id);
+                    setSources(previous => ({ ...previous, [item.id]: preview.before }));
+                  } catch (cause) { setError(interviewError(cause)); }
+                }}>
+                  <summary className="cursor-pointer">Bằng chứng ban đầu</summary>
+                  {!(item.id in sources) ? 'Đang tải bằng chứng…' : !sources[item.id]?.turns.length
+                    ? 'Lần kiểm tra đầu tiên' : <AttemptEvidence attempt={sources[item.id]!} label="Trước khi ôn" />}
+                </details>}
+                <div className="flex flex-wrap items-center gap-2"><span>Kiểm chứng lại</span>
+                  <Button size="sm" variant="outline" disabled={starting || disabled} onClick={() => void start(item, 'TEXT')}>Văn bản</Button>
+                  {voice && <Button size="sm" variant="outline" disabled={starting || disabled} onClick={() => void start(item, 'VOICE')}>Giọng nói</Button>}
+                </div>
+                {results.filter(r => r.checklistItemId === item.id).map(r => (
+                  <details key={r.after.sessionId}><summary className="cursor-pointer">Kết quả kiểm chứng · {assessmentLabels[r.after.assessment]}</summary>
+                    {!r.before?.turns.length && <p>Lần kiểm tra đầu tiên</p>}
+                    {r.before && <AttemptEvidence attempt={r.before} label="Trước khi ôn" />}
+                    <AttemptEvidence attempt={r.after} label="Sau khi ôn" />
+                  </details>))}
+              </div>}
               {item.sourceSessionId && (
                 <Link
                   href={`/interview/session/${encodeURIComponent(item.sourceSessionId)}/result`}
@@ -184,6 +263,7 @@ export function StudyTaskChecklist({ items, actions, disabled, inputRef }: {
         <p className="text-xs text-(--practice-muted)">Chưa có mục kiểm tra.</p>
       )}
 
+      {error && <p role="alert">{error} {active && <Link className="underline" href={`/interview/session/${encodeURIComponent(active)}`}>Tiếp tục phiên đang mở</Link>}</p>}
       {(addingOpen || items.length === 0) && (
         <form className="flex flex-wrap items-center gap-2 pt-1" onSubmit={(event) => void submit(event)}>
           <Input

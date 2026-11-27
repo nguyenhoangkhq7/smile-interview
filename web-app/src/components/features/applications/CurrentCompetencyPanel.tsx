@@ -14,6 +14,7 @@ import {
 } from '@/services/applicationProfiles';
 import { interviewError } from '@/services/evidenceInterview';
 import type { SkillGapResult } from '@/services/cvJdMatching';
+import { CompetencyProgressTimeline } from './CompetencyProgressTimeline';
 import { searchText, skillLabel } from './applicationUi';
 
 const groupOrder = ['verify', 'review', 'incomplete', 'unassessed', 'met'] as const;
@@ -107,6 +108,9 @@ function ObjectiveDetails({
                       <Status value={criterion.assessment} criterion />
                     </div>
                   </div>
+                  {criterion.trend && <p className="text-xs text-muted-foreground">{criterion.trend === 'IMPROVING'
+                    ? 'Lượt này đã đạt; cần thêm một tình huống để xác nhận.'
+                    : 'Lượt này dưới yêu cầu; cần thêm một tình huống để xác nhận.'}</p>}
                   {atTarget && atTarget !== criterion.description.trim() && (
                     <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs leading-relaxed">
                       <span className="font-semibold text-foreground">Đạt khi</span>
@@ -285,10 +289,15 @@ export function CurrentCompetencyPanel({
                 <div aria-hidden="true" className="h-full rounded-full bg-brand-green" style={{ width: `${checkedCount / summary.totalSkills * 100}%` }} />
               </div>
               {data.completedAttempts > 0 ? (
-                <a href="#history" className={linkClass}>
-                  Từ {data.completedAttempts} lượt có câu trả lời
-                  <ArrowUpRight size={13} className="shrink-0" aria-hidden="true" />
-                </a>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <a href="#history" className={linkClass}>
+                    Từ {data.completedAttempts} lượt đánh giá chính thức
+                    <ArrowUpRight size={13} className="shrink-0" aria-hidden="true" />
+                  </a>
+                  {Boolean(data.practiceAttempts) && (
+                    <span className="text-xs text-muted-foreground">· {data.practiceAttempts} lượt luyện tập</span>
+                  )}
+                </div>
               ) : <p className="text-xs text-muted-foreground">Chưa có lượt phỏng vấn có câu trả lời.</p>}
             </>
           ) : <p className="text-sm text-muted-foreground">Hồ sơ chưa có kỹ năng theo JD.</p>)}
@@ -306,6 +315,7 @@ export function CurrentCompetencyPanel({
 
       {data && (
         <>
+          {Boolean(data.timeline?.length) && <CompetencyProgressTimeline timeline={data.timeline!} />}
           {data.incompatibleAssessments > 0 && (
             <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900 dark:bg-amber-500/15 dark:text-amber-200">
               {data.incompatibleAssessments} đánh giá có bộ tiêu chí khác nên chưa được gộp vào kết quả hiện tại.

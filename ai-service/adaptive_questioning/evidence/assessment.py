@@ -1,7 +1,7 @@
 """Grounded evidence ledger and deterministic sufficiency; CV priors never decide results."""
 import re
 import unicodedata
-from .models import Action, Assessment, Judgment, ObjectiveState, Observation, RecordedEvidence, Turn
+from .models import Action, Assessment, Judgment, Mode, ObjectiveState, Observation, RecordedEvidence, Turn
 from .policy_config import InterviewPolicy
 from .criterion_progress import CRITERION_SOFT_LIMIT, progress_for, record_progress
 from .conversation import ACKNOWLEDGMENT, INABILITY_ACKNOWLEDGMENT, MAX_FEEDBACK_LENGTH
@@ -108,8 +108,7 @@ def apply_judgment(state: ObjectiveState, turn: Turn, policy: InterviewPolicy | 
         _record_observation(state, turn, observation)
     record_progress(state, turn)
     state.assessment = assess(state, policy)
-    if judgment.feedback_contains_hint:
-        state.assisted_criteria = sorted(set(state.assisted_criteria) | set(turn.question.criterion_ids))
+    # Candidate-facing feedback suppresses hints. Only delivered assistance taints evidence.
 
 
 def _record_observation(state: ObjectiveState, turn: Turn, observation: Observation) -> None:
@@ -226,9 +225,18 @@ def _above_target(state: ObjectiveState, required: list[str]) -> bool:
     return True
 
 
-def next_action(state: ObjectiveState, turn: Turn, policy: InterviewPolicy | None = None) -> Action | None:
+def next_action(
+    state: ObjectiveState,
+    turn: Turn,
+    policy: InterviewPolicy | None = None,
+    *,
+    allow_mode_switch: bool = False,
+) -> Action | None:
     policy = policy or InterviewPolicy()
-    eligible = [key for key in eligible_criteria(state) if not progress_for(state, key).stop_reason]
+    eligible = [
+        key for key in eligible_criteria(state, allow_mode_switch=allow_mode_switch)
+        if not progress_for(state, key).stop_reason
+    ]
     contradictions = [key for key in state.contradictions if key in eligible]
     if contradictions:
         return _probe(state, contradictions[0], Action.VERIFY, "Resolve conflicting target-level evidence")
@@ -241,7 +249,7 @@ def next_action(state: ObjectiveState, turn: Turn, policy: InterviewPolicy | Non
     unresolved = [key for key in eligible if key in essential and not criterion_resolved(state, key, policy)]
     if not unresolved:
         return None
-    return _criterion_action(state, _choose_criterion(state, unresolved))
+    return criterion_action(state, _choose_criterion(state, unresolved))
 
 
 def _diagnostic_recovery(state: ObjectiveState, turn: Turn, eligible: list[str]) -> Action | None:
@@ -256,8 +264,10 @@ def _diagnostic_recovery(state: ObjectiveState, turn: Turn, eligible: list[str])
     return None
 
 
-def _criterion_action(state: ObjectiveState, key: str) -> Action:
+def criterion_action(state: ObjectiveState, key: str) -> Action:
     progress = progress_for(state, key)
+    if key in state.contradictions:
+        return _probe(state, key, Action.VERIFY, "Resolve conflicting target-level evidence")
     if not progress.turns_spent:
         return _probe(state, key, Action.FOLLOW_UP, "Collect initial evidence for an untested essential criterion")
     evidence = [e for e in state.evidence_history if e.criterion_id == key]
@@ -300,8 +310,38 @@ def _extension_action(state: ObjectiveState, eligible: list[str], policy: Interv
     return None
 
 
-def eligible_criteria(state: ObjectiveState) -> list[str]:
-    mode = next((item for item in state.objective.suitable_modes if item.mode == state.selected_mode), None)
-    indices = mode.criterion_indices if mode and mode.criterion_indices else range(len(state.objective.criteria))
+def _indices_for_mode(state: ObjectiveState, mode_item) -> list[int]:
+    if mode_item is None:
+        return []
+    return list(mode_item.criterion_indices) if mode_item.criterion_indices else list(range(len(state.objective.criteria)))
+
+
+def mode_for_criterion(state: ObjectiveState, criterion_id: str, *, allow_mode_switch: bool = False) -> Mode:
+    assert state.selected_mode is not None
+    index = next((i for i, c in enumerate(state.objective.criteria) if c.criterion_id == criterion_id), None)
+    if index is None:
+        return state.selected_mode
+    primary = next((item for item in state.objective.suitable_modes if item.mode == state.selected_mode), None)
+    if index in _indices_for_mode(state, primary) or not allow_mode_switch:
+        return state.selected_mode
+    for item in state.objective.suitable_modes:
+        if index in _indices_for_mode(state, item):
+            return item.mode
+    return state.selected_mode
+
+
+def eligible_criteria(state: ObjectiveState, *, allow_mode_switch: bool = False) -> list[str]:
+    primary = next((item for item in state.objective.suitable_modes if item.mode == state.selected_mode), None)
+    if primary is None:
+        indices = list(range(len(state.objective.criteria)))
+    else:
+        indices = _indices_for_mode(state, primary)
+        if allow_mode_switch:
+            seen = set(indices)
+            for item in state.objective.suitable_modes:
+                for idx in _indices_for_mode(state, item):
+                    if idx not in seen:
+                        indices.append(idx)
+                        seen.add(idx)
     return [state.objective.criteria[index].criterion_id for index in indices
             if state.objective.criteria[index].criterion_id not in state.assisted_criteria]

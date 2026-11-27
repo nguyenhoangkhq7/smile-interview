@@ -12,8 +12,8 @@ from time import monotonic
 from pydantic import ValidationError
 
 from .models import (
-    Blueprint, GroundedRequirement, InterviewConfig, InterviewOpening, InterviewSkill,
-    Mode, Objective, ObjectiveState, PriorAttemptContext,
+    Blueprint, Criterion, GroundedRequirement, InterviewConfig, InterviewOpening, InterviewSkill,
+    Mode, Objective, ObjectiveState, PriorAttemptContext, SuitableMode,
 )
 from .depth import DEPTH_DEFINITIONS, ground_depth
 from .policy_config import InterviewPolicy
@@ -263,19 +263,103 @@ class BlueprintBuilder:
                 raise ValueError("Extension must have a distinct higher standard")
 
 
+BEHAVIORAL_FALLBACK_SKILL_ID = "behavioral_competency"
+
+
+def synthesize_behavioral_objectives(opening: InterviewOpening | None = None) -> list[Objective]:
+    """Synthesize grounded STAR behavioral objectives when a technical JD has no explicit behavioral tasks."""
+    role = (opening.role_title.strip() if opening and opening.role_title else "") or "vị trí ứng tuyển"
+    templates = [
+        (
+            "incident_pressure",
+            f"Xử lý sự cố kỹ thuật hoặc áp lực tiến độ trong vai trò {role}",
+            "Trình bày một tình huống sự cố hoặc áp lực cụ thể và hành động xử lý trực tiếp của bản thân theo khung STAR",
+            "Nêu rõ bối cảnh (Situation/Task), hành động cá nhân cụ thể (Action) và kết quả đo được hoặc bài học rút ra (Result).",
+            "Chỉ trả lời chung chung không có tình huống thật hoặc chỉ nêu việc nhóm làm mà không rõ vai trò cá nhân.",
+            "Nêu đủ tình huống cụ thể, hành động trực tiếp của bản thân và kết quả đạt được.",
+            "Đánh giá rõ nguyên nhân gốc, tác động đo lường được và biện pháp phòng ngừa tái diễn.",
+        ),
+        (
+            "team_collaboration",
+            f"Phối hợp nhóm và giải quyết bất đồng quan điểm kỹ thuật cho vai trò {role}",
+            "Mô tả một lần bất đồng giải pháp hoặc phối hợp chéo nhóm và cách thống nhất phương án cuối cùng",
+            "Nêu rõ mâu thuẫn/ràng buộc, cách lắng nghe và lập luận của bản thân, cùng kết quả thống nhất của nhóm.",
+            "Né tránh mâu thuẫn, đổ lỗi cho đồng đội hoặc không nêu cách giải quyết cụ thể.",
+            "Trình bày khách quan hai phía, cách trao đổi dựa trên dữ kiện và kết quả tích cực.",
+            "Chủ động xây dựng thỏa thuận đánh đổi rõ ràng và cải thiện quy trình làm việc của nhóm.",
+        ),
+        (
+            "ownership_learning",
+            f"Chủ động sở hữu đầu việc và học nhanh công nghệ mới cho vai trò {role}",
+            "Kể một ví dụ tự nhận trách nhiệm cho đầu việc khó hoặc công nghệ mới để hoàn thành mục tiêu",
+            "Trình bày mục tiêu ban đầu, các bước tự tìm hiểu/triển khai và kết quả thực tế bàn giao.",
+            "Chỉ làm theo hướng dẫn từng bước, thiếu dẫn chứng hành động chủ động hoặc kết quả cụ thể.",
+            "Thể hiện rõ tính chủ động, kế hoạch xử lý và kết quả bàn giao cụ thể.",
+            "Chủ động phát hiện rủi ro sớm, chia sẻ tài liệu hoặc nâng chất lượng cho cả nhóm.",
+        ),
+    ]
+    objectives: list[Objective] = []
+    for slug, claim, desc, expected, below, at_target, above in templates:
+        req_id = f"{BEHAVIORAL_FALLBACK_SKILL_ID}:{slug}"
+        obj_id = str(uuid5(NAMESPACE_URL, req_id))
+        objectives.append(Objective(
+            requirement_id=req_id,
+            objective_id=obj_id,
+            skill_id=BEHAVIORAL_FALLBACK_SKILL_ID,
+            claim=claim,
+            target_depth=2,
+            depth_basis="CONFIGURED_FALLBACK",
+            depth_rationale="Mục tiêu hành vi chuẩn STAR bổ sung khi JD không nêu rõ nhiệm vụ ứng xử.",
+            requirement_kind="UNSPECIFIED",
+            jd_evidence_spans=[claim],
+            criteria=[Criterion(
+                criterion_id=f"{obj_id}:c1",
+                description=desc,
+                expected_evidence=expected,
+                below_target=below,
+                at_target=at_target,
+                above_target=above,
+                essential=True,
+            )],
+            suitable_modes=[SuitableMode(mode=Mode.BEHAVIORAL, criterion_indices=[0])],
+            estimated_seconds=180,
+        ))
+    return objectives
+
+
 def plan(
     blueprint: Blueprint,
     skills: list[InterviewSkill],
     config: InterviewConfig,
     policy: InterviewPolicy | None = None,
     prior_attempts: PriorAttemptContext | None = None,
+    opening: InterviewOpening | None = None,
 ) -> tuple[dict[str, ObjectiveState], list[str]]:
     policy = policy or InterviewPolicy()
     by_skill = {skill.jd_skill_id: skill for skill in skills}
     prior_map = prior_attempts.objective_assessments if prior_attempts else {}
-    mastered = prior_attempts.mastered_skill_ids if prior_attempts else set()
+    mastered = set() if config.include_mastered_skills else (
+        prior_attempts.mastered_skill_ids if prior_attempts else set()
+    )
+    source_objectives = list(blueprint.objectives)
+    if (
+        config.focused_question_mode == Mode.BEHAVIORAL
+        and not any(any(m.mode == Mode.BEHAVIORAL for m in obj.suitable_modes) for obj in source_objectives)
+    ):
+        synthesized = synthesize_behavioral_objectives(opening)
+        source_objectives.extend(synthesized)
+        by_skill.setdefault(
+            BEHAVIORAL_FALLBACK_SKILL_ID,
+            InterviewSkill(
+                jd_skill_id=BEHAVIORAL_FALLBACK_SKILL_ID,
+                jd_skill_name="Kinh nghiệm & Ứng xử (STAR)",
+                required_proficiency=2.0,
+                priority=0.8,
+                importance_weight=0.8,
+            ),
+        )
     ranked = sorted(
-        blueprint.objectives,
+        source_objectives,
         key=lambda obj: _rank(obj, by_skill[obj.skill_id], prior_map),
     )
     first, additional, seen = [], [], set()
@@ -292,6 +376,18 @@ def plan(
     # Stable grouping preserves the first pass across skills within each group.
     ordered = sorted(first + additional, key=lambda obj: obj.skill_id not in core_skills)
     return _allocate(ordered, core_skills, config, policy, mastered)
+
+
+def plan_recheck(blueprint: Blueprint, objective_id: str, criterion_id: str) -> tuple[dict[str, ObjectiveState], list[str]]:
+    objective = next((obj for obj in blueprint.objectives if obj.objective_id == objective_id), None)
+    if objective is None:
+        raise ValueError("Mục tiêu kiểm chứng không còn thuộc hồ sơ")
+    index = next((i for i, c in enumerate(objective.criteria) if c.criterion_id == criterion_id), None)
+    modes = [m for m in objective.suitable_modes if not m.criterion_indices or index in m.criterion_indices]
+    if index is None or not modes:
+        raise ValueError("Tiêu chí không có dạng câu hỏi phù hợp")
+    state = ObjectiveState(objective=objective, selected_mode=modes[0].mode, active_criterion_id=criterion_id)
+    return {objective_id: state}, [objective_id]
 
 
 def _fits_session(objective: Objective, config: InterviewConfig) -> bool:

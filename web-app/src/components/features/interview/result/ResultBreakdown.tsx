@@ -8,7 +8,7 @@ import { MarkdownContent } from '@/components/common/MarkdownContent';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
-  assessmentLabels, assessmentStatus, cleanStudyRecommendation, evidenceDepthLabels,
+  assessmentLabels, assessmentStatus, cleanStudyRecommendation, depthLevelLabels, evidenceDepthLabels,
   isBoilerplateClaim, looksLikeRawCode, normalizeSameText, questionBadge, resultReasons,
   skillStatuses, uniqueFindings, type ResultData,
 } from './resultData';
@@ -51,13 +51,21 @@ export function FindingList({ items, empty, preview = 3 }: { items: readonly str
   );
 }
 
-export function ResultCoachingSummary({ summary }: { summary: string }) {
+export function ResultCoachingSummary({ summary, introFeedback }: { summary: string; introFeedback?: string }) {
   return (
-    <div className="space-y-2 rounded-xl border border-indigo-200/70 bg-indigo-50/70 p-4 text-indigo-950">
-      <h2 className="flex items-center gap-1.5 text-sm font-bold">
-        <MessageSquare size={16} className="text-indigo-700" /> Nhận xét & Coaching tổng hợp
-      </h2>
-      <p className="text-sm leading-relaxed text-slate-800 dark:text-foreground">{summary}</p>
+    <div className="space-y-3 rounded-xl border border-indigo-200/70 bg-indigo-50/70 p-4 text-indigo-950 dark:border-indigo-500/30 dark:bg-indigo-950/30 dark:text-foreground">
+      <div className="space-y-1.5">
+        <h2 className="flex items-center gap-1.5 text-sm font-bold">
+          <MessageSquare size={16} className="text-indigo-700 dark:text-indigo-300" /> Nhận xét & Coaching tổng hợp
+        </h2>
+        <p className="text-sm leading-relaxed text-slate-800 dark:text-foreground">{summary}</p>
+      </div>
+      {introFeedback && (
+        <div className="border-t border-indigo-200/60 pt-2.5 dark:border-indigo-500/30">
+          <p className="text-xs font-semibold text-indigo-800 dark:text-indigo-300">Nhận xét phần tự giới thiệu</p>
+          <p className="mt-1 text-xs leading-relaxed text-slate-700 dark:text-muted-foreground">{introFeedback}</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -117,7 +125,11 @@ function FilterBar<T extends string>({ filters, value, onChange, label }: {
 function SkillCard({ skill }: { skill: ResultData['skills'][number] }) {
   const status = skillStatuses[skill.status];
   const allCriteria = skill.objectives.flatMap(objective => objective.criteria ?? []);
-  const passedCount = allCriteria.filter(c => c.assessment === 'DEMONSTRATED_AT_TARGET' || c.assessment === 'DEMONSTRATED_ABOVE_TARGET').length;
+  const hasEssentialMeta = allCriteria.length > 0 && allCriteria.every(c => typeof c.essential === 'boolean');
+  const countedCriteria = hasEssentialMeta ? allCriteria.filter(c => c.essential) : allCriteria;
+  const passedCount = countedCriteria.filter(c => c.assessment === 'DEMONSTRATED_AT_TARGET' || c.assessment === 'DEMONSTRATED_ABOVE_TARGET').length;
+  const isCore = skill.objectives.some(objective => objective.is_core || (objective.importance_weight ?? 0) >= 0.7);
+  const depths = [...new Set(skill.objectives.map(o => o.target_depth).filter((d): d is number => typeof d === 'number' && d in depthLevelLabels))];
   const meaningfulClaims = skill.objectives
     .map(objective => objective.claim)
     .filter(claim => !isBoilerplateClaim(claim, skill.id));
@@ -131,16 +143,28 @@ function SkillCard({ skill }: { skill: ResultData['skills'][number] }) {
     <article className={cn(resultPanel, 'flex flex-col justify-between gap-3')}>
       <div className="space-y-2">
         <div className="flex flex-wrap items-start justify-between gap-2">
-          <h3 className="min-w-0 text-base font-bold wrap-anywhere">
-            {skillLabel(skill.id, null, skill.objectives.flatMap(objective => objective.jd_evidence_spans))}
-          </h3>
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <h3 className="min-w-0 text-base font-bold wrap-anywhere">
+              {skillLabel(skill.id, null, skill.objectives.flatMap(objective => objective.jd_evidence_spans))}
+            </h3>
+            {isCore && (
+              <span className="rounded-md bg-orange-100/90 px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-orange-900 uppercase dark:bg-orange-500/20 dark:text-orange-200">
+                Cốt lõi
+              </span>
+            )}
+            {depths.map(depth => (
+              <span key={depth} className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-muted dark:text-muted-foreground">
+                {depthLevelLabels[depth]}
+              </span>
+            ))}
+          </div>
           <span className={cn('rounded-full border px-2.5 py-0.5 text-xs font-semibold', status.tone)}>
             {status.label}
           </span>
         </div>
         <p className="text-xs text-slate-600 dark:text-muted-foreground">
           {skill.questionCount} câu hỏi
-          {allCriteria.length > 0 && ` · Đạt ${passedCount}/${allCriteria.length} tiêu chí`}
+          {countedCriteria.length > 0 && ` · Đạt ${passedCount}/${countedCriteria.length} ${hasEssentialMeta ? 'tiêu chí bắt buộc' : 'tiêu chí'}`}
         </p>
         {meaningfulClaims.length > 0 && (
           <p className="line-clamp-2 text-sm text-slate-700 dark:text-foreground">{meaningfulClaims.join('; ')}</p>
@@ -256,7 +280,7 @@ export function ResultQuestions({ questions }: { questions: ResultData['question
         )}
       </div>
       <div className="space-y-2.5">
-        {filtered.slice(0, limit).map(({ turn, skillId, index, evidence, badge, depthRole, clarifiedLater }) => {
+        {filtered.slice(0, limit).map(({ turn, reviews, skillId, index, evidence, badge, depthRole, clarifiedLater }) => {
           const rationales = uniqueFindings(evidence.map(item => item.rationale));
           const excerpts = evidence.filter(item =>
             item.response_excerpt.trim() && !normalizeSameText(item.response_excerpt, turn.answer || ''),
@@ -292,9 +316,31 @@ export function ResultQuestions({ questions }: { questions: ResultData['question
                 </div>
                 <div className="space-y-1.5 rounded-lg border border-slate-200/70 dark:border-border/70 bg-card p-3">
                   <p className="text-xs font-semibold text-slate-500 dark:text-muted-foreground uppercase">Câu trả lời của bạn</p>
-                  <AnswerContent content={turn.answer || 'Chưa có câu trả lời.'} mode={turn.mode} />
+                  {turn.submitted_code ? <>
+                    <pre className="overflow-auto whitespace-pre">{turn.submitted_code}</pre>
+                    {turn.transcript && <p>Lời giải thích · {turn.transcript}</p>}
+                  </> : <AnswerContent content={turn.answer || 'Chưa có câu trả lời.'} mode={turn.mode} />}
+                  {turn.coding_checks && <p>Kiểm thử tự động · Đạt {turn.coding_checks.passed}/{turn.coding_checks.total} ca.</p>}
                 </div>
-                {hasEvaluation ? (
+                {reviews.length > 0 ? reviews.map((review, i) => <div key={i} className="space-y-2 rounded-lg bg-sky-50 p-3 dark:bg-muted">
+                  {review.excerpt && <blockquote className="whitespace-pre-wrap border-l-2 pl-3">{review.excerpt}</blockquote>}
+                  <p>{review.reason}</p>
+                  {Boolean(review.gaps?.length) && <p>Phần còn thiếu · {review.gaps?.join(' · ')}</p>}
+                  {Boolean(review.delivery_notes?.length) && (
+                    <ul className="space-y-1 rounded-md border border-sky-200/70 bg-white/70 p-2 text-xs text-slate-700 dark:border-border dark:bg-card dark:text-muted-foreground">
+                      {review.delivery_notes?.map((note, idx) => <li key={idx}>• {note}</li>)}
+                    </ul>
+                  )}
+                  <p className="font-medium">{review.next_step}</p>
+                  {review.reference_answer && (
+                    <details className="rounded-md border border-emerald-200/70 bg-emerald-50/70 p-2.5 text-xs dark:border-emerald-500/30 dark:bg-emerald-950/30">
+                      <summary className="cursor-pointer font-semibold text-emerald-900 dark:text-emerald-300">
+                        Gợi ý khung trả lời chuẩn
+                      </summary>
+                      <p className="mt-1.5 leading-relaxed text-slate-800 dark:text-foreground">{review.reference_answer}</p>
+                    </details>
+                  )}
+                </div>) : hasEvaluation ? (
                   <div className="space-y-1.5 rounded-lg border border-sky-200/60 bg-sky-50/70 p-3 text-slate-800 dark:text-foreground">
                     <p className="text-xs font-semibold text-sky-900 uppercase">Đánh giá từ AI</p>
                     {turn.feedback && <MarkdownContent content={turn.feedback} />}

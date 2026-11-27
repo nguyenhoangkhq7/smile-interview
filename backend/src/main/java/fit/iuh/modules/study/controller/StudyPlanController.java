@@ -54,6 +54,19 @@ public class StudyPlanController {
         return service.gaps(profileId, user);
     }
 
+    @GetMapping(PLAN + "/tasks/{taskId}/checklist/{itemId}/recheck")
+    public StudyPlanService.RecheckPreview recheckPreview(@PathVariable UUID profileId, @PathVariable long taskId,
+            @PathVariable long itemId, @AuthenticationPrincipal User user) {
+        var ref = new fit.iuh.modules.evidence.EvidenceDtos.ChecklistRef(taskId, itemId);
+        return service.recheckPreview(profileId, user, ref);
+    }
+
+    @GetMapping(PLAN + "/tasks/{taskId}/rechecks")
+    public List<StudyPlanService.RecheckResult> rechecks(@PathVariable UUID profileId, @PathVariable long taskId,
+            @AuthenticationPrincipal User user) {
+        return service.rechecks(profileId, user, taskId);
+    }
+
     @PostMapping(PLAN + "/tasks")
     @ResponseStatus(HttpStatus.CREATED)
     public StudyTask createTask(@PathVariable UUID profileId, @AuthenticationPrincipal User user,

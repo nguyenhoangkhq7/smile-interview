@@ -9,6 +9,7 @@ export interface CompetencyEvidence {
   rationale: string; performance: string;
 }
 export interface CompetencyCriterion {
+  trend?: 'IMPROVING' | 'DECLINING' | null;
   id: string; description: string; essential: boolean; atTarget?: string; assessment: CompetencyStatus;
   lastAssessment: CompetencySource | null; evidence: CompetencyEvidence[];
 }
@@ -20,8 +21,19 @@ export interface CompetencySkill {
   skillId: string; baselineAlignment: string; assessment: CompetencyStatus;
   objectives: CompetencyObjective[];
 }
+export interface ProgressPoint {
+  sessionId: string;
+  attemptNumber: number;
+  assessedAt: string | null;
+  kind: 'ASSESSMENT' | 'RECHECK';
+  essentialCriteriaMet: number;
+  essentialCriteriaTotal: number;
+  weightedReadinessPercent: number;
+}
 export interface CurrentCompetency {
   completedAttempts: number; incompatibleAssessments: number;
+  practiceAttempts?: number;
+  timeline?: ProgressPoint[];
   skills: CompetencySkill[];
 }
 export function newerSource(a: CompetencySource | null, b: CompetencySource | null): CompetencySource | null {

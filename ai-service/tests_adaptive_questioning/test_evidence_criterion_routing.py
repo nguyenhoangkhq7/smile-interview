@@ -167,9 +167,13 @@ def test_bundled_question_is_rejected_and_regenerated(setup, monkeypatch, kind):
     monkeypatch.setattr(provider, "question", question)
     initial = start(engine)
     assert initial.public.pending_turn
-    assert len(calls) == 2
-    assert calls[1]["validation_error"]
-    assert len(calls[1]["required_question_contract"]["criterion_ids"]) == 1
+    if kind == "multiple_questions":
+        assert initial.public.pending_turn.question == "Bạn sẽ viết prompt gì?"
+        assert len(calls) == 1
+    else:
+        assert len(calls) == 2
+        assert calls[1]["validation_error"]
+        assert len(calls[1]["required_question_contract"]["criterion_ids"]) == 1
 
 
 def test_public_projection_does_not_modify_snapshot(setup):
