@@ -1,10 +1,22 @@
 """Conservative checks for source framing, single-task questions and missing problem data."""
+from dataclasses import dataclass
 import re
 from difflib import SequenceMatcher
 from .models import Question
 
 
 VOICE_MAX_WORDS = 90
+VOICE_SOFT_MAX_WORDS = 120
+
+
+@dataclass(frozen=True)
+class ValidationOutcome:
+    hard_errors: list[str]
+    soft_errors: list[str]
+
+    @property
+    def all_errors(self) -> list[str]:
+        return [*self.hard_errors, *self.soft_errors]
 _DIRECTIVE = r"(?:hãy|(?:bạn|em)\s+(?:sẽ|cần)|please)"
 _TASK_VERB = (r"(?:phân tích|chẩn đoán|xác định|chỉ ra|nêu|liệt kê|xác minh|giải thích|mô tả|trình bày|đề xuất|viết|triển khai|"
               r"thiết kế|sửa|so sánh|kiểm thử|analy[sz]e|diagnose|identify|explain|describe|propose|"
@@ -130,9 +142,9 @@ def _jd_grounding_errors(jd_excerpt: str, framing: list[str], skill_id: str) -> 
     return []
 
 
-def question_errors(question: Question, context: dict[str, object]) -> list[str]:
+def _hard_contract_errors(question: Question, context: dict[str, object]) -> list[str]:
     contract = context["required_question_contract"]
-    errors = _grounding_errors(question.text, context)
+    errors: list[str] = []
     if "recheck_sources" in context:
         words = re.findall(r"\w+", question.text.casefold())
         near_source = any(SequenceMatcher(None, words, re.findall(r"\w+", source.casefold()), autojunk=False).ratio() >= 0.87
@@ -150,8 +162,6 @@ def question_errors(question: Question, context: dict[str, object]) -> list[str]
         errors.append("CLARIFY must preserve required_question_contract.evidence_scope exactly")
     if len(question.criterion_ids) != 1 or question.criterion_ids != contract["criterion_ids"]:
         errors.append("criterion_ids must equal required_question_contract.criterion_ids exactly, with ONE criterion")
-    if not single_question(question.text):
-        errors.append("Ask exactly ONE response task; remove independent subquestions or numbered requests")
     if _missing_referenced_code(question.text):
         errors.append("The question refers to a missing code snippet. Include the actual code inline in a Markdown "
                       "code block for TEXT, or describe its exact behavior and inputs aloud for VOICE without "
@@ -159,10 +169,36 @@ def question_errors(question: Question, context: dict[str, object]) -> list[str]
     if re.search(r"\b(?:hãy|bạn cần)\s+(?:thử\s+)?(?:dùng|sử dụng|mở|truy cập)\s+ChatGPT\b",
                  question.text, re.IGNORECASE):
         errors.append("Provide any needed AI output in the question and ask one task answerable directly here")
-    if context.get("interaction_mode") == "VOICE" and len(question.text.split()) > VOICE_MAX_WORDS:
+    if context.get("interaction_mode") == "VOICE" and len(question.text.split()) > VOICE_SOFT_MAX_WORDS:
         errors.append(
             f"VOICE question must use at most {VOICE_MAX_WORDS} whitespace-separated words including scenario; "
             "rewrite concisely with ONE focused response task, preserving essential problem data, "
             "target criterion, evidence_scope and required depth. Do not truncate the question."
         )
     return errors
+
+
+def _soft_quality_errors(question: Question, context: dict[str, object]) -> list[str]:
+    errors = _grounding_errors(question.text, context)
+    if not single_question(question.text):
+        errors.append("Ask exactly ONE response task; remove independent subquestions or numbered requests")
+    if context.get("interaction_mode") == "VOICE":
+        word_count = len(question.text.split())
+        if VOICE_MAX_WORDS < word_count <= VOICE_SOFT_MAX_WORDS:
+            errors.append(
+                f"VOICE question must use at most {VOICE_MAX_WORDS} whitespace-separated words including scenario; "
+                "rewrite concisely with ONE focused response task, preserving essential problem data, "
+                "target criterion, evidence_scope and required depth. Do not truncate the question."
+            )
+    return errors
+
+
+def validate_question(question: Question, context: dict[str, object]) -> ValidationOutcome:
+    return ValidationOutcome(
+        hard_errors=_hard_contract_errors(question, context),
+        soft_errors=_soft_quality_errors(question, context),
+    )
+
+
+def question_errors(question: Question, context: dict[str, object]) -> list[str]:
+    return validate_question(question, context).all_errors

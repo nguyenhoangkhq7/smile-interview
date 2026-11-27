@@ -27,7 +27,7 @@ from .depth import DEPTH_DEFINITIONS, question_depth
 from .policy_config import InterviewPolicy
 from .criterion_progress import CRITERION_SOFT_LIMIT, progress_for
 from .conversation import turn_introduction
-from .question_validation import first_question, question_errors
+from .question_validation import first_question, question_errors, validate_question
 from .provider import AlignmentReview, AssessmentProvider, encode_context
 from .reporting import coaching_context, fallback_session_coaching, public_session
 from .preparation_cache import PreparationCache
@@ -37,11 +37,17 @@ from .verification import prepare_verification
 logger = logging.getLogger(__name__)
 
 GENERATION_ATTEMPTS = 3
+DIAGNOSTIC_SOFT_REPAIR_LIMIT = 2
 JUDGMENT_ATTEMPTS = 2
 PREWARM_TTL_SECONDS = 600
 PREWARM_MAX_ENTRIES = 64
 MAX_CANDIDATE_BACKGROUND_CHARS = 400
 MAX_PRIOR_STEM_CHARS = 200
+_HARD_ALIGNMENT_VERDICTS = frozenset({"GIVES_SOLUTION", "UNANSWERABLE", "WRONG_SKILL"})
+_DIAGNOSTIC_ACTIONS = frozenset({Action.EASIER, Action.CLARIFY})
+_PENALTY_DIAGNOSTIC_SOFT_REVIEW = 1
+_PENALTY_STANDARD_SOFT_REVIEW = 2
+_PENALTY_SOFT_VALIDATION = 3
 
 ALIGNMENT_REPAIRS = {
     "WRONG_SKILL": "Ask the candidate to perform the behavior in the selected criterion. Remove the substitute task.",
@@ -352,6 +358,7 @@ class EvidenceWorkflow:
         if coding_check is not None:
             context["coding_checks"] = {"passed": coding_check.passed, "total": coding_check.total}
         last_error = None
+        judge_started = monotonic()
         for attempt in range(JUDGMENT_ATTEMPTS):
             if attempt and self.clock() >= snapshot.deadline_at:
                 break
@@ -359,6 +366,8 @@ class EvidenceWorkflow:
             try:
                 judgment = self.provider.judge(encode_context(context))
                 validate_judgment(judgment, turn)
+                event("judge.completed", turn_id=turn.turn_id, attempts=attempt + 1,
+                      elapsed_seconds=round(monotonic() - judge_started, 3))
                 return judgment
             except (ValidationError, ValueError) as exc:
                 last_error = exc
@@ -622,6 +631,40 @@ class EvidenceWorkflow:
     def _normalize_question_text(text: str) -> str:
         return " ".join(text.casefold().split())
 
+    @staticmethod
+    def _prefer_fallback(
+        current: tuple[int, Question, str, bool] | None,
+        penalty: int,
+        question: Question,
+        reason: str,
+        reviewed: bool,
+    ) -> tuple[int, Question, str, bool]:
+        if current is None or penalty <= current[0]:
+            return (penalty, question, reason, reviewed)
+        return current
+
+    def _safe_soft_fallback(
+        self,
+        context: dict[str, object],
+        snapshot: Snapshot,
+        candidate: tuple[int, Question, str, bool] | None,
+    ) -> Question | None:
+        if candidate is None or self.clock() >= snapshot.deadline_at:
+            return None
+        penalty, question, reason, reviewed = candidate
+        if not reviewed:
+            try:
+                verdict, _ = self._review_question(context, question)
+            except (ValidationError, ValueError):
+                return None
+            if verdict in _HARD_ALIGNMENT_VERDICTS:
+                return None
+            reason = f"{reason}:{verdict}"
+        action = context.get("action")
+        action_name = action.value if isinstance(action, Action) else str(action)
+        event("question.soft_fallback", action=action_name, penalty=penalty, reason=reason)
+        return question
+
     def _generate_valid_question(self, context: dict[str, object], snapshot: Snapshot) -> Question | None:
         prior_seen = {self._normalize_question_text(turn.question.text) for turn in snapshot.turns}
         prior_seen.update(
@@ -630,6 +673,11 @@ class EvidenceWorkflow:
         rejected_seen: set[str] = set()
         last_review_error: str | None = None
         last_verdict: str | None = None
+        best_fallback: tuple[int, Question, str, bool] | None = None
+        action = context.get("action")
+        is_diagnostic = action in _DIAGNOSTIC_ACTIONS
+        gen_seconds = 0.0
+        review_seconds = 0.0
         for attempt in range(GENERATION_ATTEMPTS):
             if self.clock() >= snapshot.deadline_at:
                 return None
@@ -638,24 +686,39 @@ class EvidenceWorkflow:
                 # Retain the corrective instruction, without carrying CV text into the JD-only draft.
                 if last_verdict in ALIGNMENT_REPAIRS:
                     context["validation_error"] += " " + ALIGNMENT_REPAIRS[last_verdict]
-            question, errors, repeated = self._question_attempt(context, prior_seen, rejected_seen)
+            gen_start = monotonic()
+            question, hard_errors, soft_errors, repeated = self._question_attempt(context, prior_seen, rejected_seen)
+            gen_seconds += monotonic() - gen_start
+            errors = [*hard_errors, *soft_errors]
             failure = None
             if not errors:
                 if self.clock() >= snapshot.deadline_at:
                     return None
+                review_start = monotonic()
                 try:
                     verdict, reason = self._review_question(context, question)
                 except (ValidationError, ValueError) as exc:
+                    review_seconds += monotonic() - review_start
                     context["validation_error"] = f"Alignment reviewer error: {exc}"
                     logger.warning(
                         "Alignment review failed for session %s (attempt %s/%s): %s",
                         snapshot.session_id, attempt + 1, GENERATION_ATTEMPTS, type(exc).__name__,
                     )
                     continue
+                review_seconds += monotonic() - review_start
                 if verdict == "ALIGNED":
+                    event("question.generated", attempts=attempt + 1,
+                          gen_seconds=round(gen_seconds, 3), review_seconds=round(review_seconds, 3))
                     return question
                 failure = verdict
                 last_verdict = verdict
+                if verdict not in _HARD_ALIGNMENT_VERDICTS and question is not None:
+                    penalty = _PENALTY_DIAGNOSTIC_SOFT_REVIEW if is_diagnostic else _PENALTY_STANDARD_SOFT_REVIEW
+                    best_fallback = self._prefer_fallback(best_fallback, penalty, question, verdict, True)
+                    if is_diagnostic and attempt + 1 >= DIAGNOSTIC_SOFT_REPAIR_LIMIT:
+                        event("question.generated", attempts=attempt + 1,
+                              gen_seconds=round(gen_seconds, 3), review_seconds=round(review_seconds, 3))
+                        return self._safe_soft_fallback(context, snapshot, best_fallback)
                 context["rejected_draft"] = question.text
                 rejected_seen.add(self._normalize_question_text(question.text))
                 base_repair = ALIGNMENT_REPAIRS.get(
@@ -666,6 +729,10 @@ class EvidenceWorkflow:
                 errors = [last_review_error]
             else:
                 if question is not None:
+                    if not hard_errors and soft_errors and not repeated:
+                        best_fallback = self._prefer_fallback(
+                            best_fallback, _PENALTY_SOFT_VALIDATION, question, "soft_validation", False,
+                        )
                     rejected_seen.add(self._normalize_question_text(question.text))
                     context["rejected_draft"] = question.text
                 if repeated and last_review_error:
@@ -673,6 +740,11 @@ class EvidenceWorkflow:
             context["validation_error"] = "; ".join(errors)
             logger.warning("Invalid question for session %s (attempt %s/%s): %s", snapshot.session_id,
                            attempt + 1, GENERATION_ATTEMPTS, failure or context["validation_error"])
+        fallback = self._safe_soft_fallback(context, snapshot, best_fallback)
+        if fallback is not None:
+            event("question.generated", attempts=GENERATION_ATTEMPTS,
+                  gen_seconds=round(gen_seconds, 3), review_seconds=round(review_seconds, 3))
+            return fallback
         raise QuestionUnavailableError("AI chưa tạo được câu hỏi phù hợp. Dữ liệu đã lưu được giữ nguyên; vui lòng thử lại.")
 
     @staticmethod
@@ -737,31 +809,33 @@ class EvidenceWorkflow:
         context: dict[str, object],
         prior_seen: set[str],
         rejected_seen: set[str] | None = None,
-    ) -> tuple[Question | None, list[str], bool]:
+    ) -> tuple[Question | None, list[str], list[str], bool]:
         try:
             question = self.provider.question(encode_context(context))
         except ValidationError as exc:
             errors = [f"Invalid Question schema at {item['loc']}: {item['type']}"
                       for item in exc.errors(include_input=False, include_url=False)]
-            return None, errors, False
+            return None, errors, [], False
         except ValueError as exc:
-            return None, [str(exc)], False
-        errors = question_errors(question, context)
-        if any(message.startswith("Ask exactly ONE response task") for message in errors):
+            return None, [str(exc)], [], False
+        outcome = validate_question(question, context)
+        hard_errors, soft_errors = list(outcome.hard_errors), list(outcome.soft_errors)
+        if any(message.startswith("Ask exactly ONE response task") for message in soft_errors):
             first = first_question(question.text)
             if first:
                 candidate = question.model_copy(update={"text": first})
-                if not question_errors(candidate, context):
-                    question, errors = candidate, []
+                trimmed = validate_question(candidate, context)
+                if not trimmed.all_errors:
+                    question, hard_errors, soft_errors = candidate, [], []
         normalized = self._normalize_question_text(question.text)
         repeated = False
         if normalized in prior_seen:
-            errors.append("The question repeats a prior turn; use a new focused question instead")
+            hard_errors.append("The question repeats a prior turn; use a new focused question instead")
             repeated = True
         elif rejected_seen and normalized in rejected_seen:
-            errors.append("The draft repeats a previously rejected question; write a substantially revised question instead")
+            hard_errors.append("The draft repeats a previously rejected question; write a substantially revised question instead")
             repeated = True
-        return question, errors, repeated
+        return question, hard_errors, soft_errors, repeated
 
     @staticmethod
     def _prompt_objective(state: ObjectiveState, target_ids: list[str]) -> dict[str, object]:

@@ -269,7 +269,11 @@ class DSPyAssessmentProvider:
         self.question_retry_lm = _copy_lm(
             self.lm, max_tokens=MAX_TOKENS_QUESTION, temperature=QUESTION_RETRY_TEMPERATURE,
         )
-        self.judge_lm = _copy_lm(self.lm, max_tokens=MAX_TOKENS_JUDGE)
+        self.judge_lm = _copy_lm(
+            self.lm,
+            max_tokens=MAX_TOKENS_JUDGE,
+            extra_body={"reasoning": {"effort": _judge_reasoning_effort()}},
+        )
         self.alignment_lm = _copy_lm(self.fast_lm, max_tokens=MAX_TOKENS_ALIGNMENT)
         self.conversation_lm = _copy_lm(
             self.fast_lm, temperature=CONVERSATION_TEMPERATURE, max_tokens=MAX_TOKENS_DIALOGUE,
@@ -323,7 +327,10 @@ class DSPyAssessmentProvider:
             extra += ("\nFor this diagnostic, compare the draft with the last question and its depth in history. "
                       "Identify the concrete prerequisite decision it measures at question_depth. "
                       "Accept a focused prerequisite of that same criterion without demanding the entire "
-                      "target_depth deliverable. Reject an unrelated decision even if it mentions the same technology.")
+                      "target_depth deliverable or a fresh full scenario. Reject an unrelated decision even if it mentions the same technology.")
+        elif data.get("action") == "CLARIFY":
+            extra += ("\nFor CLARIFY, the candidate already answered the base scenario. Accept a short, direct "
+                      "question asking for ONE unresolved detail in that same scenario without demanding a brand-new problem.")
         signature = None
         if extra:
             base = self.alignment_module.signature
@@ -383,6 +390,14 @@ class DSPyAssessmentProvider:
             "coaching", self.coaching_module, context, lm=self.coaching_lm, runtime=live_runtime, retries=0,
         )
         return SessionCoaching.model_validate(result.coaching)
+
+
+_VALID_REASONING_EFFORTS = frozenset({"none", "minimal", "low", "medium", "high"})
+
+
+def _judge_reasoning_effort() -> str:
+    raw = os.environ.get("OPENROUTER_JUDGE_REASONING_EFFORT", "none").strip().lower()
+    return raw if raw in _VALID_REASONING_EFFORTS else "none"
 
 
 def _build_openrouter_lm(model: str) -> dspy.LM:
