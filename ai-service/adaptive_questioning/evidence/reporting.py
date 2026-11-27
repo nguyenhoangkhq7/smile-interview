@@ -72,9 +72,14 @@ def _positive_assessment(state: ObjectiveState, key: str) -> Assessment:
     return Assessment.AT
 
 
-def objective_report(state: ObjectiveState, policy: InterviewPolicy | None = None) -> ObjectiveReport:
+def objective_report(
+    state: ObjectiveState,
+    policy: InterviewPolicy | None = None,
+    skill_weights: dict[str, float] | None = None,
+) -> ObjectiveReport:
     active_policy = policy or InterviewPolicy()
     obj = state.objective
+    weight = skill_weights.get(obj.skill_id, 0.5) if skill_weights else 0.5
     history = state.evidence_history
     evidence = [
         PublicEvidence(
@@ -101,6 +106,9 @@ def objective_report(state: ObjectiveState, policy: InterviewPolicy | None = Non
     return ObjectiveReport(
         objective_id=obj.objective_id, skill_id=obj.skill_id, claim=obj.claim,
         jd_evidence_spans=obj.jd_evidence_spans,
+        target_depth=obj.target_depth,
+        importance_weight=weight,
+        is_core=weight >= active_policy.core_importance,
         assessment=state.assessment,
         stop_reason=state.stop_reason,
         strengths=[e.rationale for e in target_results if e.performance in {"AT_TARGET", "ABOVE"} and e.criterion_id not in state.contradictions],
@@ -301,7 +309,8 @@ def _turn_reviews(snapshot: Snapshot) -> list[TurnReview]:
 
 
 def report(snapshot: Snapshot) -> Report:
-    objectives = [objective_report(s, snapshot.policy) for s in snapshot.objectives.values()]
+    skill_weights = {s.jd_skill_id: s.importance_weight for s in snapshot.skills}
+    objectives = [objective_report(s, snapshot.policy, skill_weights) for s in snapshot.objectives.values()]
     target = snapshot.recheck_target
     selected = next((c for o in objectives if target and o.objective_id == target.objective_id
                      for c in o.criteria if c.criterion_id == target.criterion_id), None)

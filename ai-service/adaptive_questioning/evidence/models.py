@@ -97,6 +97,7 @@ class InterviewSkillContext(BaseModel):
     semantic_alignment: str = Field(default="", max_length=60)
     context_job: str = Field(default="", max_length=300)
     cv_evidence_spans: list[str] = Field(default_factory=list)
+    importance_weight: float = Field(default=0.5, ge=0.0, le=1.0)
 
     @model_validator(mode="before")
     @classmethod
@@ -528,6 +529,9 @@ class ObjectiveReport(BaseModel):
     skill_id: str
     claim: str
     jd_evidence_spans: list[str]
+    target_depth: int = Field(default=2, ge=1, le=4)
+    importance_weight: float = Field(default=0.5, ge=0.0, le=1.0)
+    is_core: bool = False
     assessment: Assessment
     stop_reason: str | None
     strengths: list[str]

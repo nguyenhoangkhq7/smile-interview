@@ -229,6 +229,7 @@ def test_snapshot_roundtrip_and_stale_turn(setup, monkeypatch):
         "semantic_alignment": "",
         "context_job": "",
         "cv_evidence_spans": spans,
+        "importance_weight": input_skill.importance_weight,
     }]
     dumped_initial = initial.model_dump(mode="json")
     assert dumped_initial["skills"] == expected_skills

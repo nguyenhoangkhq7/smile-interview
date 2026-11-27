@@ -155,6 +155,7 @@ class EvidenceWorkflow:
                 semantic_alignment=skill.semantic_alignment,
                 context_job=skill.context_job,
                 cv_evidence_spans=skill.cv_evidence_spans,
+                importance_weight=skill.importance_weight,
             )
             for skill in request.skills
         ]
@@ -163,6 +164,7 @@ class EvidenceWorkflow:
             skills.append(InterviewSkillContext(
                 jd_skill_id=BEHAVIORAL_FALLBACK_SKILL_ID,
                 jd_skill_name="Kinh nghiệm & Ứng xử (STAR)",
+                importance_weight=0.8,
             ))
         prior_stems = [
             stem.strip()[:MAX_PRIOR_STEM_CHARS]

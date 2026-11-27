@@ -16,10 +16,14 @@ import { ResultNavigation } from './ResultNavigation';
 function SkillSummaryCard({ data, reason }: { data: ReturnType<typeof buildResult>; reason: string | null }) {
   const totalSkills = data.skills.length;
   const allConclusive = totalSkills > 0 && data.partialSkillCount === 0;
-  const attainment = percent(data.assessedCount ? data.achievedCount / data.assessedCount : null);
+  const attainment = data.weightedReadiness.hasCoreWeight && data.weightedReadiness.percent !== null
+    ? data.weightedReadiness.percent
+    : percent(data.assessedCount ? data.achievedCount / data.assessedCount : null);
   const ringPercent = allConclusive
     ? (attainment ?? 0)
-    : totalSkills > 0 ? Math.round((data.strongSkillCount / totalSkills) * 100) : 0;
+    : data.weightedReadiness.hasCoreWeight && data.weightedReadiness.percent !== null
+      ? data.weightedReadiness.percent
+      : totalSkills > 0 ? Math.round((data.strongSkillCount / totalSkills) * 100) : 0;
 
   return (
     <div className="flex flex-col justify-between gap-4 rounded-xl border border-slate-200/70 dark:border-border/70 bg-slate-50/70 p-4">
@@ -27,7 +31,7 @@ function SkillSummaryCard({ data, reason }: { data: ReturnType<typeof buildResul
         <div className="grid size-24 shrink-0 place-items-center rounded-full"
           style={{ background: `conic-gradient(#059669 ${ringPercent}%, #e2e8f0 0)` }}>
           <div className="grid size-19 place-items-center rounded-full bg-white dark:bg-card text-center">
-            {allConclusive ? (
+            {allConclusive || data.weightedReadiness.hasCoreWeight ? (
               <span className="text-xl font-extrabold tabular-nums text-slate-900 dark:text-foreground">{attainment === null ? '—' : `${attainment}%`}</span>
             ) : (
               <span className="text-xl font-extrabold tabular-nums text-slate-900 dark:text-foreground">{data.strongSkillCount}/{totalSkills}</span>
@@ -36,9 +40,16 @@ function SkillSummaryCard({ data, reason }: { data: ReturnType<typeof buildResul
         </div>
         <div className="min-w-0 space-y-1.5">
           <p className="text-sm font-bold text-slate-900 dark:text-foreground">
-            {allConclusive ? 'Tỷ lệ nội dung đạt yêu cầu' : 'Kỹ năng đạt yêu cầu'}
+            {data.weightedReadiness.hasCoreWeight
+              ? 'Mức độ sẵn sàng (có trọng số Core)'
+              : allConclusive ? 'Tỷ lệ nội dung đạt yêu cầu' : 'Kỹ năng đạt yêu cầu'}
           </p>
-          {data.coverage && <p className="text-sm">
+          {data.weightedReadiness.coreTotal > 0 && (
+            <p className="text-xs font-medium text-slate-700 dark:text-muted-foreground">
+              Kỹ năng cốt lõi đạt: <strong className="text-foreground">{data.weightedReadiness.coreMet}/{data.weightedReadiness.coreTotal}</strong>
+            </p>
+          )}
+          {data.coverage && <p className="text-xs text-slate-700 dark:text-muted-foreground">
             Đã kiểm tra {data.coverage.checked}/{data.coverage.total} tiêu chí bắt buộc
             {data.coverage.checked > 0 && ` · Đạt ${data.coverage.passed}/${data.coverage.checked} tiêu chí đã kiểm tra`}
           </p>}
@@ -121,6 +132,11 @@ export function InterviewResultDashboard({
             )}
             <span>{session.turns.length} câu đã trả lời</span>
             <span>{data.skills.length} kỹ năng</span>
+            {session.config.session_purpose === 'PRACTICE' && (
+              <span className="rounded-full bg-brand-green/10 px-2 py-0.5 font-semibold text-brand-green">
+                Chế độ Luyện tập (không ảnh hưởng hồ sơ năng lực chính thức)
+              </span>
+            )}
           </div>
         </div>
 

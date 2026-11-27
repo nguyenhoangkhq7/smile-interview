@@ -8,7 +8,7 @@ import { MarkdownContent } from '@/components/common/MarkdownContent';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
-  assessmentLabels, assessmentStatus, cleanStudyRecommendation, evidenceDepthLabels,
+  assessmentLabels, assessmentStatus, cleanStudyRecommendation, depthLevelLabels, evidenceDepthLabels,
   isBoilerplateClaim, looksLikeRawCode, normalizeSameText, questionBadge, resultReasons,
   skillStatuses, uniqueFindings, type ResultData,
 } from './resultData';
@@ -125,7 +125,11 @@ function FilterBar<T extends string>({ filters, value, onChange, label }: {
 function SkillCard({ skill }: { skill: ResultData['skills'][number] }) {
   const status = skillStatuses[skill.status];
   const allCriteria = skill.objectives.flatMap(objective => objective.criteria ?? []);
-  const passedCount = allCriteria.filter(c => c.assessment === 'DEMONSTRATED_AT_TARGET' || c.assessment === 'DEMONSTRATED_ABOVE_TARGET').length;
+  const hasEssentialMeta = allCriteria.length > 0 && allCriteria.every(c => typeof c.essential === 'boolean');
+  const countedCriteria = hasEssentialMeta ? allCriteria.filter(c => c.essential) : allCriteria;
+  const passedCount = countedCriteria.filter(c => c.assessment === 'DEMONSTRATED_AT_TARGET' || c.assessment === 'DEMONSTRATED_ABOVE_TARGET').length;
+  const isCore = skill.objectives.some(objective => objective.is_core || (objective.importance_weight ?? 0) >= 0.7);
+  const depths = [...new Set(skill.objectives.map(o => o.target_depth).filter((d): d is number => typeof d === 'number' && d in depthLevelLabels))];
   const meaningfulClaims = skill.objectives
     .map(objective => objective.claim)
     .filter(claim => !isBoilerplateClaim(claim, skill.id));
@@ -139,16 +143,28 @@ function SkillCard({ skill }: { skill: ResultData['skills'][number] }) {
     <article className={cn(resultPanel, 'flex flex-col justify-between gap-3')}>
       <div className="space-y-2">
         <div className="flex flex-wrap items-start justify-between gap-2">
-          <h3 className="min-w-0 text-base font-bold wrap-anywhere">
-            {skillLabel(skill.id, null, skill.objectives.flatMap(objective => objective.jd_evidence_spans))}
-          </h3>
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <h3 className="min-w-0 text-base font-bold wrap-anywhere">
+              {skillLabel(skill.id, null, skill.objectives.flatMap(objective => objective.jd_evidence_spans))}
+            </h3>
+            {isCore && (
+              <span className="rounded-md bg-orange-100/90 px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-orange-900 uppercase dark:bg-orange-500/20 dark:text-orange-200">
+                Cốt lõi
+              </span>
+            )}
+            {depths.map(depth => (
+              <span key={depth} className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-muted dark:text-muted-foreground">
+                {depthLevelLabels[depth]}
+              </span>
+            ))}
+          </div>
           <span className={cn('rounded-full border px-2.5 py-0.5 text-xs font-semibold', status.tone)}>
             {status.label}
           </span>
         </div>
         <p className="text-xs text-slate-600 dark:text-muted-foreground">
           {skill.questionCount} câu hỏi
-          {allCriteria.length > 0 && ` · Đạt ${passedCount}/${allCriteria.length} tiêu chí`}
+          {countedCriteria.length > 0 && ` · Đạt ${passedCount}/${countedCriteria.length} ${hasEssentialMeta ? 'tiêu chí bắt buộc' : 'tiêu chí'}`}
         </p>
         {meaningfulClaims.length > 0 && (
           <p className="line-clamp-2 text-sm text-slate-700 dark:text-foreground">{meaningfulClaims.join('; ')}</p>

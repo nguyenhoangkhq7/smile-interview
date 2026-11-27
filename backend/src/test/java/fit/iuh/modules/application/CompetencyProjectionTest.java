@@ -252,4 +252,21 @@ class CompetencyProjectionTest {
         assertThat(result.incompatibleAssessments()).isZero();
         assertThat(sql(result).assessment()).isEqualTo(AT);
     }
+
+    @Test void practiceSessionsAreIsolatedAndTimelineTracksWeightedProgression() {
+        profile.setSkillGapJson("[{\"jd_skill_id\":\"sql\",\"semantic_alignment\":\"MISSING\",\"importance_weight\":0.9},"
+                + "{\"jd_skill_id\":\"java\",\"semantic_alignment\":\"MATCH\",\"importance_weight\":0.4}]");
+        var practice = attempt(1, Map.of("sql", AT), "P1");
+        practice.snapshot().putObject("config").put("session_purpose", "PRACTICE");
+        var assess1 = attempt(2, Map.of("java", AT), "A1");
+        var assess2 = attempt(3, Map.of("sql", AT), "A2");
+
+        View result = view(practice, assess1, assess2);
+        assertThat(result.practiceAttempts()).isEqualTo(1);
+        assertThat(result.completedAttempts()).isEqualTo(2);
+        assertThat(result.timeline()).hasSize(2);
+        assertThat(result.timeline().get(0).weightedReadinessPercent()).isEqualTo(33);
+        assertThat(result.timeline().get(1).weightedReadinessPercent()).isEqualTo(100);
+        assertThat(result.timeline().get(1).essentialCriteriaMet()).isEqualTo(2);
+    }
 }

@@ -24,8 +24,15 @@ public class CompetencyProjection {
                             Source lastAssessment, List<Evidence> evidence, String trend) {}
     public record Objective(String id, String claim, String assessment, Source lastChecked,
                             Source lastAssessment, String explanation, List<Criterion> criteria) {}
+    public record ProgressPoint(String sessionId, int attemptNumber, String assessedAt, String kind,
+                                int essentialCriteriaMet, int essentialCriteriaTotal, int weightedReadinessPercent) {}
     public record Skill(String skillId, String baselineAlignment, String assessment, List<Objective> objectives) {}
-    public record View(int completedAttempts, int incompatibleAssessments, List<Skill> skills) {}
+    public record View(int completedAttempts, int incompatibleAssessments, List<Skill> skills,
+                       int practiceAttempts, List<ProgressPoint> timeline) {
+        public View(int completedAttempts, int incompatibleAssessments, List<Skill> skills) {
+            this(completedAttempts, incompatibleAssessments, skills, 0, List.of());
+        }
+    }
 
     private record Signal(String assessment, Source source, Set<String> contexts) {}
     private record Resolution(String assessment, Source source) {}
@@ -107,16 +114,20 @@ public class CompetencyProjection {
         }
         Map<String, InterviewRun> runs = new HashMap<>();
         savedRuns.forEach(run -> runs.put(run.getSessionId(), run));
-        int completed = 0, incompatible = 0;
+        int completed = 0, incompatible = 0, practice = 0;
+        List<ProgressPoint> timeline = new ArrayList<>();
         for (Session attempt : attempts.stream().sorted(Comparator.comparingInt(s -> s.getAttemptNumber())).toList()) {
             InterviewRun run = runs.get(attempt.getId());
             if (run == null) continue;
             JsonNode snapshot = json.read(run.getSnapshotJson()), visible = json.read(run.getPublicJson());
             if (!snapshot.path("is_finished").asBoolean() || !visible.path("is_finished").asBoolean()) continue;
-            if ("PRACTICE".equals(snapshot.path("config").path("session_purpose").asText("ASSESSMENT"))) continue;
             Map<String, JsonNode> turns = new HashMap<>();
             for (JsonNode turn : snapshot.path("turns")) turns.put(turn.path("turn_id").asText(), turn);
             if (turns.values().stream().noneMatch(turn -> !turn.path("answer").asText("").isBlank())) continue;
+            if ("PRACTICE".equals(snapshot.path("config").path("session_purpose").asText("ASSESSMENT"))) {
+                practice++;
+                continue;
+            }
             completed++;
             Source source = new Source(attempt.getId(), attempt.getAttemptNumber(),
                     attempt.getEndedAt() == null ? null : attempt.getEndedAt().toString());
@@ -182,6 +193,7 @@ public class CompetencyProjection {
                         objective.signals.add(new Signal(assessment, source, contexts));
                 }
             }
+            timeline.add(snapshotProgress(source, target.isObject() ? "RECHECK" : "ASSESSMENT", baseline, objectives));
         }
         List<Skill> skills = new ArrayList<>();
         for (var entry : baseline.entrySet()) {
@@ -190,7 +202,29 @@ public class CompetencyProjection {
             String status = skillAssessment(items);
             skills.add(new Skill(entry.getKey(), entry.getValue().path("semantic_alignment").asText(), status, items));
         }
-        return new View(completed, incompatible, skills);
+        return new View(completed, incompatible, skills, practice, List.copyOf(timeline));
+    }
+
+    private static ProgressPoint snapshotProgress(
+            Source source, String kind, Map<String, JsonNode> baseline, Map<String, ObjectiveState> objectives) {
+        int met = 0, total = 0, weightedMet = 0, weightedTotal = 0;
+        for (ObjectiveState objective : objectives.values()) {
+            String skillId = objective.definition.path("skill_id").asText("");
+            double importance = baseline.containsKey(skillId)
+                    ? baseline.get(skillId).path("importance_weight").asDouble(0.5) : 0.5;
+            int weight = importance >= 0.7 ? 2 : 1;
+            for (CriterionState criterion : objective.criteria.values()) {
+                if (!criterion.definition.path("essential").asBoolean(true)) continue;
+                total++;
+                weightedTotal += weight;
+                if (positive(resolve(criterion.signals).assessment())) {
+                    met++;
+                    weightedMet += weight;
+                }
+            }
+        }
+        int readiness = weightedTotal == 0 ? 0 : (int) Math.round((weightedMet * 100.0) / weightedTotal);
+        return new ProgressPoint(source.sessionId(), source.attemptNumber(), source.assessedAt(), kind, met, total, readiness);
     }
 
     private static boolean conclusiveCriterion(JsonNode visible, String objectiveId, String criterionId) {

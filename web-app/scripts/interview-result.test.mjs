@@ -167,3 +167,27 @@ test('distinguishes diagnostic, target and extension question badges and normali
   assert.deepEqual(plain(data.coaching?.top_strengths), ['Phân tích execution plan rõ ràng']);
   assert.deepEqual(plain(data.coaching?.actionable_study_steps), ['Luyện thêm partitioning']);
 });
+
+test('computes weighted readiness giving Core objectives double weight over non-core objectives', () => {
+  const data = buildResult(session([
+    objective('core-java', 'java', 'DEMONSTRATED_BELOW_TARGET', {
+      is_core: true,
+      importance_weight: 0.9,
+      target_depth: 3,
+    }),
+    objective('aux-git', 'git', 'DEMONSTRATED_AT_TARGET', {
+      is_core: false,
+      importance_weight: 0.4,
+      target_depth: 2,
+    }),
+  ], [
+    turn('t1', 'core-java'),
+    turn('t2', 'aux-git'),
+  ]));
+
+  // Core weight = 2 (failed), aux weight = 1 (passed) => 1 / 3 = 33%, NOT inflated 50%
+  assert.equal(data.weightedReadiness.hasCoreWeight, true);
+  assert.equal(data.weightedReadiness.coreTotal, 1);
+  assert.equal(data.weightedReadiness.coreMet, 0);
+  assert.equal(data.weightedReadiness.percent, 33);
+});

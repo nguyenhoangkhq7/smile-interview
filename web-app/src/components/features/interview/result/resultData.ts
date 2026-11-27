@@ -90,6 +90,13 @@ export const evidenceDepthLabels: Record<EvidenceDepthRole, string> = {
   EXTENSION: 'Câu hỏi mở rộng nâng cao',
 };
 
+export const depthLevelLabels: Record<number, string> = {
+  1: 'L1 · Nền tảng',
+  2: 'L2 · Ứng dụng',
+  3: 'L3 · Phân tích',
+  4: 'L4 · Thiết kế',
+};
+
 export function questionBadge(item: {
   status: 'strong' | 'weak' | 'partial';
   depthRole?: EvidenceDepthRole;
@@ -200,8 +207,29 @@ export function buildResult({ report, turns }: EvidenceSession) {
     && criteria.every(c => typeof c.essential === 'boolean')
     ? { total: required.length, checked: checked.length, passed: checked.filter(c => assessmentStatus(c.assessment) === 'strong').length }
     : null;
+
+  let weightedMet = 0, weightedTotal = 0, coreTotal = 0, coreMet = 0;
+  for (const objective of interviewedObjectives) {
+    const isCore = Boolean(objective.is_core || (objective.importance_weight ?? 0) >= 0.7);
+    const weight = isCore ? 2 : 1;
+    const status = assessmentStatus(objective.assessment);
+    if (isCore) {
+      coreTotal++;
+      if (status === 'strong') coreMet++;
+    }
+    weightedTotal += weight;
+    if (status === 'strong') weightedMet += weight;
+  }
+  const weightedReadiness = {
+    percent: weightedTotal > 0 ? Math.round((weightedMet / weightedTotal) * 100) : null,
+    coreTotal,
+    coreMet,
+    hasCoreWeight: interviewedObjectives.some(o => typeof o.is_core === 'boolean' || typeof o.importance_weight === 'number'),
+  };
+
   return {
     coverage,
+    weightedReadiness,
     skills,
     questions,
     coaching,

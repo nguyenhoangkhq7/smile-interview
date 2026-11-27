@@ -95,6 +95,9 @@ export type Assessment = 'NOT_ASSESSED' | 'INSUFFICIENT_EVIDENCE' | 'NOT_DEMONST
 export interface ObjectiveReport {
   objective_id: string; skill_id: string; claim: string; assessment: Assessment;
   jd_evidence_spans: string[];
+  target_depth?: number;
+  importance_weight?: number;
+  is_core?: boolean;
   stop_reason: string | null;
   strengths: string[]; weaknesses: string[]; study_recommendations?: string[];
   evidence: PublicEvidence[];
