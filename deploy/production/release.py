@@ -7,6 +7,7 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
+from urllib.error import HTTPError
 from urllib.parse import urlencode, urlsplit
 from urllib.request import Request, urlopen
 
@@ -46,12 +47,20 @@ def vercel(*args):
     return result.stdout.strip()
 
 
-def vercel_api(path):
+def vercel_api(path, *, data=None):
     query = urlencode({"teamId": ENV["VERCEL_ORG_ID"]}) if ENV["VERCEL_ORG_ID"].startswith("team_") else ""
-    req = Request(f"https://api.vercel.com/{path}?{query}",
+    req = Request(f"https://api.vercel.com/{path}?{query}", data=data,
                   headers={"Authorization": "Bearer " + ENV["VERCEL_TOKEN"]})
+    if data is not None:
+        req.add_header("Content-Type", "application/json")
     with urlopen(req, timeout=30) as response:
-        return json.load(response)
+        if data is None:
+            return json.load(response)
+
+
+def promote(deployment_id):
+    project = ENV["VERCEL_PROJECT_ID"]
+    vercel_api(f"v10/projects/{project}/promote/{deployment_id}", data=b"{}")
 
 
 def candidate():
@@ -131,9 +140,19 @@ def api_check():
 
 
 def web_check(expected_id):
-    alias = vercel_api("v4/aliases/" + urlsplit(ENV["WEB_ORIGIN"]).hostname)
-    if alias["deploymentId"] != expected_id:
-        raise RuntimeError("Production domain points to an unexpected deployment")
+    alias_path = "v4/aliases/" + urlsplit(ENV["WEB_ORIGIN"]).hostname
+    for _ in range(36):
+        try:
+            alias = vercel_api(alias_path)
+        except HTTPError as error:
+            if error.code != 404:
+                raise
+        else:
+            if alias["deploymentId"] == expected_id:
+                break
+        time.sleep(5)
+    else:
+        raise RuntimeError(f"Production domain did not point to {expected_id} within 3 minutes")
     subprocess.run(["curl", "-fsSL", "--retry", "4", "--retry-all-errors", "--max-time", "30",
                     ENV["WEB_ORIGIN"], "-o", "/dev/null"], check=True)
 
@@ -159,7 +178,7 @@ def main():
         remote(target, "activate")
         api_check()
         promotion_attempted = True
-        vercel("promote", target["web"], "--yes")
+        promote(target["web"])
         web_check(target["web"])
     except TimeoutError:
         raise
@@ -168,7 +187,7 @@ def main():
             remote(old, "activate")
             api_check()
             if promotion_attempted:
-                vercel("promote", old["web"], "--yes")
+                promote(old["web"])
             web_check(old["web"])
             saved["pending"] = None
             put("production/state.json", saved)

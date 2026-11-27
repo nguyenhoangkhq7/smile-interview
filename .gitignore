@@ -59,3 +59,5 @@ __pycache__/
 /artifacts/
 /ai-service/adaptive_questioning/optimization/results/*_cache.json
 /ai-service/adaptive_questioning/optimization/results/*.jsonl
+.vercel
+.env*
