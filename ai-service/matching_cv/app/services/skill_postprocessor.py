@@ -18,8 +18,14 @@ from matching_cv.app.schemas.skill_extraction import (
     RawSkillMention,
     check_verbatim_mention,
 )
+from matching_cv.app.services.competency_extraction_quality import (
+    INTEGRATION_TEST_SKILL_ID,
+    INTEGRATION_TEST_VARIANTS,
+    refine_competency_entities,
+)
 from matching_cv.app.services.section_tagger import find_section_spans, section_at
 from matching_cv.app.services.text_locator import locate_mention_in_sentence, locate_sentence
+from matching_cv.research.data.canonical_skill_normalizer import ENGINEERING_COMPETENCY_ALIASES
 
 
 
@@ -179,6 +185,8 @@ NON_SKILL_PHRASE_PATTERN = re.compile(
 
 # Unconditional canonical skill_id normalization map (preserves surface_forms and evidences)
 CANONICAL_SKILL_ID_MAP: Dict[str, str] = {
+    **dict.fromkeys(INTEGRATION_TEST_VARIANTS, INTEGRATION_TEST_SKILL_ID),
+    **ENGINEERING_COMPETENCY_ALIASES,
     "javascript-es6": "javascript",
     "javascript-es6+": "javascript",
     "es6": "javascript",
@@ -195,7 +203,10 @@ CANONICAL_SKILL_ID_MAP: Dict[str, str] = {
     "next.js-pages-router": "next.js",
     "graphql-api": "graphql",
     "graphql-apis": "graphql",
-    "restful-apis": "rest-apis",
+    "restful-apis": "rest-api",
+    "rest-apis": "rest-api",
+    "rest-api-development": "rest-api",
+    "apache-kafka": "kafka",
     "restful-api": "rest-api",
     "express.js": "express",
 }
@@ -604,7 +615,7 @@ class SkillPostprocessor:
     ) -> ExtractionResult:
         skills: List[ExtractedSkill] = []
         non_skill_entities: List[ExtractedSkill] = []
-        for entity in entities:
+        for entity in refine_competency_entities(entities, text, document_type):
             if cls.is_retained_skill_entity(entity):
                 skills.append(entity)
             else:
@@ -725,6 +736,22 @@ class SkillPostprocessor:
             skill_clusters=skill_clusters,
             topic_group_hint=topic_group_hint,
             certification_hint_pairs=certification_hint_pairs,
+        )
+
+    def refine_cached_extraction(
+        self, result: ExtractionResult, text: str, side: Literal["CV", "JD"]
+    ) -> ExtractionResult:
+        """Apply current extraction rules to previous outputs tied to this document."""
+        snapshot = result.model_copy(deep=True)
+        compact = bool(snapshot.extraction_meta and snapshot.extraction_meta.schema_version == "explicit_compact_v1")
+        return self._route_and_build_result(
+            entities=snapshot.skills + snapshot.non_skill_entities,
+            quarantined=snapshot.quarantined,
+            text=text,
+            filename=snapshot.filename,
+            document_type=side,
+            extraction_meta=snapshot.extraction_meta,
+            is_compact=compact,
         )
 
     def process_extraction(

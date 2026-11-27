@@ -4,7 +4,9 @@ import os
 from fastapi import APIRouter, HTTPException, Request
 
 from adaptive_questioning.evidence.policy_config import configured_policy
+from app.ai_quality import QualityReview, ReviewInput, review_quality
 from app.ai_runtime import TOKEN_HEADER, authorized, credential, model_value, policy_value
+from app.ai_runtime_probes import measure_runtime
 from matching_cv.app.core.config import settings as matching
 from matching_cv.app.core.model_loader import model_loader
 from skill_gap.adapters.config import load_config
@@ -66,3 +68,17 @@ def _configuration(request: Request) -> dict:
 
 router.add_api_route("/defaults", _configuration, methods=["GET"])
 router.add_api_route("/status", _configuration, methods=["GET"])
+
+
+@router.post("/probe")
+async def probe(request: Request):
+    if not authorized(request.headers.get(TOKEN_HEADER)):
+        raise HTTPException(status_code=401)
+    return await measure_runtime()
+
+
+@router.post("/quality")
+def quality(request: Request, payload: ReviewInput) -> QualityReview:
+    if not authorized(request.headers.get(TOKEN_HEADER)):
+        raise HTTPException(status_code=401)
+    return review_quality(payload)

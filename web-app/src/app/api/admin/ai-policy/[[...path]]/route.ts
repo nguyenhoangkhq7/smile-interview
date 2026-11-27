@@ -23,5 +23,6 @@ export async function PUT(request: NextRequest, { params }: Context) {
 export async function POST(request: NextRequest, { params }: Context) {
   const { path = [] } = await params;
   if (path.length === 1 && path[0] === 'reset') return proxyBackend(request, base + '/reset');
+  if (path.length === 1 && path[0] === 'health') return proxyBackend(request, base + '/health');
   return notFound();
 }

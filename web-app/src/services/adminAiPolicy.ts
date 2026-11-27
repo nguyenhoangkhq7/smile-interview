@@ -63,6 +63,9 @@ export const adminAiPolicy = {
   async health(signal?: AbortSignal) {
     return (await axiosClient.get<AiServiceCheck[]>(path + '/health', { ...config, signal })).data;
   },
+  async measureHealth(signal?: AbortSignal) {
+    return (await axiosClient.post<AiServiceCheck[]>(path + '/health', undefined, { ...config, signal })).data;
+  },
   async save(revision: number, settings: AiSettings, credentials: AiCredentials) {
     await axiosClient.put(path, { revision, settings, credentials }, config);
   },
@@ -70,6 +73,13 @@ export const adminAiPolicy = {
     await axiosClient.post(path + '/reset', { revision }, config);
   },
 };
+
+export function aiHealthError(error: unknown, measuring: boolean) {
+  if (axios.isAxiosError(error) && error.response?.status === 429) {
+    return 'Đang có một lượt đo phản hồi. Vui lòng thử lại sau.';
+  }
+  return measuring ? 'Không thể đo phản hồi dịch vụ. Vui lòng thử lại.' : 'Không thể kiểm tra trạng thái dịch vụ.';
+}
 
 export function aiPolicyError(error: unknown) {
   if (axios.isAxiosError(error)) {

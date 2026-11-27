@@ -71,3 +71,58 @@ export interface InterviewDetail {
     overallScore: number | null; feedback: string | null;
   } | null;
 }
+
+export interface AiQualityFinding {
+  status: 'REVIEW' | 'INSUFFICIENT';
+  code: string;
+  detail: string;
+  skill: string | null;
+  turn: number | null;
+  excerpt: string | null;
+}
+
+export interface AiQualitySection {
+  total: number;
+  findings: AiQualityFinding[];
+}
+
+export interface AiQualityReview {
+  matching: AiQualitySection;
+  questions: AiQualitySection;
+}
+
+export type InterviewDocumentKind = 'CV' | 'JD';
+
+export interface InterviewDocument {
+  name: string;
+  text: string;
+  originalAvailable: boolean;
+}
+
+export interface InterviewMatchingTask {
+  description: string;
+  requirement: string | null;
+  requiredLevel: number | null;
+  evidence: string[];
+}
+
+export interface InterviewMatchingSkill {
+  id: string;
+  name: string | null;
+  alignment: string | null;
+  cvSkill: string | null;
+  requiredLevel: number | null;
+  priority: number | null;
+  importance: number | null;
+  context: string | null;
+  cvEvidence: string[];
+  jdEvidence: string[];
+  tasks: InterviewMatchingTask[];
+}
+
+export interface InterviewMatchingDetail {
+  score: number | null;
+  degraded: boolean;
+  available: boolean;
+  skills: InterviewMatchingSkill[];
+}

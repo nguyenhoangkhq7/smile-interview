@@ -119,6 +119,26 @@ def _jd_grounding_errors(jd_excerpt: str, framing: list[str], skill_id: str) -> 
     return []
 
 
+def question_form_errors(text: str, interaction_mode: str | None) -> dict[str, str]:
+    errors = {}
+    if not single_question(text):
+        errors["MULTIPLE_TASKS"] = "Ask exactly ONE response task; remove independent subquestions or numbered requests"
+    if _missing_referenced_code(text):
+        errors["MISSING_CODE"] = ("The question refers to a missing code snippet. Include the actual code inline in a Markdown "
+                                  "code block for TEXT, or describe its exact behavior and inputs aloud for VOICE without "
+                                  "referring to an absent snippet.")
+    if re.search(r"\b(?:hãy|bạn cần)\s+(?:thử\s+)?(?:dùng|sử dụng|mở|truy cập)\s+ChatGPT\b",
+                 text, re.IGNORECASE):
+        errors["EXTERNAL_TOOL"] = "Provide any needed AI output in the question and ask one task answerable directly here"
+    if interaction_mode == "VOICE" and len(text.split()) > VOICE_MAX_WORDS:
+        errors["LONG_VOICE_QUESTION"] = (
+            f"VOICE question must use at most {VOICE_MAX_WORDS} whitespace-separated words including scenario; "
+            "rewrite concisely with ONE focused response task, preserving essential problem data, "
+            "target criterion, evidence_scope and required depth. Do not truncate the question."
+        )
+    return errors
+
+
 def question_errors(question: Question, context: dict[str, object]) -> list[str]:
     contract = context["required_question_contract"]
     errors = _grounding_errors(question.text, context)
@@ -132,19 +152,5 @@ def question_errors(question: Question, context: dict[str, object]) -> list[str]
         errors.append("CLARIFY must preserve required_question_contract.evidence_scope exactly")
     if len(question.criterion_ids) != 1 or question.criterion_ids != contract["criterion_ids"]:
         errors.append("criterion_ids must equal required_question_contract.criterion_ids exactly, with ONE criterion")
-    if not single_question(question.text):
-        errors.append("Ask exactly ONE response task; remove independent subquestions or numbered requests")
-    if _missing_referenced_code(question.text):
-        errors.append("The question refers to a missing code snippet. Include the actual code inline in a Markdown "
-                      "code block for TEXT, or describe its exact behavior and inputs aloud for VOICE without "
-                      "referring to an absent snippet.")
-    if re.search(r"\b(?:hãy|bạn cần)\s+(?:thử\s+)?(?:dùng|sử dụng|mở|truy cập)\s+ChatGPT\b",
-                 question.text, re.IGNORECASE):
-        errors.append("Provide any needed AI output in the question and ask one task answerable directly here")
-    if context.get("interaction_mode") == "VOICE" and len(question.text.split()) > VOICE_MAX_WORDS:
-        errors.append(
-            f"VOICE question must use at most {VOICE_MAX_WORDS} whitespace-separated words including scenario; "
-            "rewrite concisely with ONE focused response task, preserving essential problem data, "
-            "target criterion, evidence_scope and required depth. Do not truncate the question."
-        )
+    errors.extend(question_form_errors(question.text, context.get("interaction_mode")).values())
     return errors

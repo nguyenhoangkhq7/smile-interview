@@ -654,9 +654,11 @@ class ExtractionDataAdapter:
                     )
                 )
 
-        # 2. Process accepted implicit skills with collision-resistant namespace
-        if effective_val and effective_val.accepted_implicit_skills:
-            for idx, imp in enumerate(effective_val.accepted_implicit_skills):
+        # 2. Include pipeline-verified CV evidence alongside upstream accepted inferences.
+        accepted_implicit = effective_val.accepted_implicit_skills if effective_val else []
+        verified_resume = doc_result._verified_resume_skills if doc_type == "CV" else []
+        if accepted_implicit or verified_resume:
+            for idx, imp in enumerate([*accepted_implicit, *verified_resume]):
                 if not any(c.isalpha() for c in imp.skill_id):
                     continue
                 occ_id = f"occ_{doc_ns}_implicit_{imp.skill_id}_{idx}"
