@@ -7,8 +7,12 @@ from fastapi.testclient import TestClient
 import pytest
 
 from adaptive_questioning.evidence.code_runner import (
-    CodingSpec, CodingTestCase, LocalSubprocessCodeRunner,
+    CodingCaseResult, CodingSpec, CodingTestCase, ExecutionResult, LocalSubprocessCodeRunner,
 )
+from adaptive_questioning.evidence.coding_verification import (
+    check_coding_answer, is_sandbox_environment_error, run_sample_code, sanitize_coding_spec,
+)
+from adaptive_questioning.evidence.models import Action, Mode, Question, Turn
 from adaptive_questioning.evidence.routes import router
 from skill_gap.domain.models import JobTask
 from test_evidence_workflow import setup, skill, start
@@ -107,3 +111,128 @@ def test_run_code_endpoint_hides_hidden_tests_and_preserves_state_version(setup,
             "code": "def double(n):\n    return n * 2\n",
         })
         assert wrong_turn.status_code == 422
+
+
+def test_python_local_runner_supports_dict_kwargs_and_bytes():
+    runner = LocalSubprocessCodeRunner()
+    cases = [
+        CodingTestCase(name="dict_input", input_data='{"user_id": "u9", "data": "Nam"}', expected_output='"u9:Nam"'),
+        CodingTestCase(name="list_input", input_data='["u1", "An"]', expected_output='"u1:An"'),
+    ]
+    res = runner.execute(
+        language="python",
+        code="def format_user(user_id, data):\n    return f'{user_id}:{data}'.encode('utf-8')\n",
+        entry_point="format_user",
+        cases=cases,
+    )
+    assert res.passed == 2 and res.total == 2
+
+
+def test_sanitize_coding_spec_keeps_curated_and_strips_unsupported():
+    def make_q(spec: CodingSpec) -> Question:
+        return Question(
+            text="Hãy viết hàm xử lý dữ liệu theo yêu cầu.",
+            criterion_ids=["c1"],
+            mode=Mode.CODING,
+            depth=2,
+            evidence_scope="cache",
+            coding_spec=spec,
+        )
+
+    redis_q = make_q(CodingSpec(
+        language="python",
+        entry_point="save_user",
+        starter_code="import redis\ndef save_user(uid, data):\n    pass\n",
+        sample_tests=[CodingTestCase(name="c1", input_data='["1","a"]', expected_output='"a"')],
+    ))
+    assert sanitize_coding_spec(redis_q).coding_spec is not None
+
+    psycopg_q = make_q(CodingSpec(
+        language="python",
+        entry_point="fetch_user",
+        starter_code="import psycopg2\ndef fetch_user(uid):\n    pass\n",
+        sample_tests=[CodingTestCase(name="c1", input_data="1", expected_output="null")],
+    ))
+    assert sanitize_coding_spec(psycopg_q).coding_spec is None
+
+    express_q = make_q(CodingSpec(
+        language="javascript",
+        entry_point="handler",
+        starter_code="const express = require('express');\nfunction handler(req) { return req; }\n",
+        sample_tests=[CodingTestCase(name="c1", input_data="{}", expected_output="{}")],
+    ))
+    assert sanitize_coding_spec(express_q).coding_spec is None
+
+    pg_sql_q = make_q(CodingSpec(
+        language="sql",
+        setup_sql="CREATE EXTENSION IF NOT EXISTS pg_trgm; CREATE TABLE t(id SERIAL PRIMARY KEY);",
+        sample_tests=[CodingTestCase(name="c1", input_data="", expected_output="[]")],
+    ))
+    assert sanitize_coding_spec(pg_sql_q).coding_spec is None
+
+    sqlite_q = make_q(CodingSpec(
+        language="sql",
+        setup_sql="CREATE TABLE t(id INT); INSERT INTO t VALUES (1);",
+        sample_tests=[CodingTestCase(name="c1", input_data="", expected_output="[[1]]")],
+    ))
+    assert sanitize_coding_spec(sqlite_q).coding_spec is not None
+
+
+def test_sandbox_env_errors_do_not_auto_fail_and_emit_dry_run_notice():
+    class _StubRunner:
+        def __init__(self, outcome: ExecutionResult):
+            self.outcome = outcome
+
+        def execute(self, **_kwargs) -> ExecutionResult:
+            return self.outcome
+
+    spec = CodingSpec(
+        language="python",
+        entry_point="fn",
+        sample_tests=[CodingTestCase(name="t1", input_data="1", expected_output="2")],
+    )
+    q = Question(
+        text="Viết hàm fn(x).",
+        criterion_ids=["c1"],
+        mode=Mode.CODING,
+        depth=2,
+        evidence_scope="fn",
+        coding_spec=spec,
+    )
+    turn = Turn(
+        turn_id="t1",
+        objective_id="obj1",
+        skill_id="python",
+        action=Action.INITIAL,
+        mode=Mode.CODING,
+        question_depth=2,
+        question=q,
+        answer="import some_external_sdk\ndef fn(x): return x + 1\n",
+    )
+
+    missing_mod = ExecutionResult(
+        language="python",
+        passed=0,
+        total=1,
+        results=[CodingCaseResult(
+            name="t1", passed=False,
+            error="ModuleNotFoundError: No module named 'some_external_sdk'",
+        )],
+    )
+    assert is_sandbox_environment_error(missing_mod) is True
+    assert check_coding_answer(turn, "TEXT", runner=_StubRunner(missing_mod)) is None
+
+    dry_run = run_sample_code(code=turn.answer or "", spec=spec, runner=_StubRunner(missing_mod))
+    assert "Môi trường chạy thử cô lập" in dry_run.environment_notice
+
+    real_bug = ExecutionResult(
+        language="python",
+        passed=0,
+        total=1,
+        results=[CodingCaseResult(name="t1", passed=False, actual_output="3", expected_output="2")],
+    )
+    assert is_sandbox_environment_error(real_bug) is False
+    checked = check_coding_answer(turn, "TEXT", runner=_StubRunner(real_bug))
+    assert checked is not None and checked.passed == 0 and checked.total == 1
+    dry_bug = run_sample_code(code="def fn(x): return x + 2", spec=spec, runner=_StubRunner(real_bug))
+    assert dry_bug.environment_notice == ""

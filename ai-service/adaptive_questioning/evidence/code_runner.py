@@ -69,6 +69,7 @@ class ExecutionResult(BaseModel):
     compile_error: str = ""
     stdout: str = ""
     results: list[CodingCaseResult] = Field(default_factory=list)
+    environment_notice: str = ""
 
 
 class CodeExecutionProvider(Protocol):
@@ -164,20 +165,65 @@ def _run_subprocess(cmd: list[str], cwd: str, stdin_text: str, timeout: float) -
         return -1, "", f"Hết thời gian thực thi ({timeout:.1f}s).", int((perf_counter() - started) * 1000)
 
 
+_OPTIONAL_SHIM_PRELUDE = """
+try:
+    import fakeredis as _fr, redis as _r, redis.client as _rc
+    _srv = _fr.FakeServer()
+    _orig_init = _r.Redis.__init__
+    class _SR:
+        __init__ = _orig_init
+        def __new__(cls, *a, **kw):
+            return _fr.FakeRedis(server=_srv, db=int(kw.get('db', 0) or 0), decode_responses=bool(kw.get('decode_responses', False)))
+        @classmethod
+        def from_url(cls, url, **kw):
+            return _fr.FakeRedis(server=_srv, db=int(kw.get('db', 0) or 0), decode_responses=bool(kw.get('decode_responses', False)))
+    _r.Redis = _r.StrictRedis = _rc.Redis = _rc.StrictRedis = _SR
+    _r.from_url = _SR.from_url
+except Exception:
+    pass
+try:
+    import mongomock as _mm, pymongo as _pm
+    _mc = _mm.MongoClient()
+    class _SM:
+        def __new__(cls, *a, **kw):
+            return _mc
+    _pm.MongoClient = _SM
+except Exception:
+    pass
+"""
+
+
 def _python_harness(entry_point: str) -> str:
     return (
-        "import inspect, json, sys\nimport solution\n"
+        "import inspect, json, sys\n"
+        + _OPTIONAL_SHIM_PRELUDE
+        + "import solution\n"
         f"fn = getattr(solution, {entry_point!r}, None)\n"
         f"if not callable(fn): sys.stderr.write('Không tìm thấy hàm ' + {entry_point!r}); sys.exit(2)\n"
-        "raw = sys.stdin.read()\n"
-        "arg = json.loads(raw) if raw.strip() else None\n"
-        "params = [p for p in inspect.signature(fn).parameters.values() "
-        "if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)]\n"
-        "if len(params) == 0: out = fn()\n"
+        "raw = sys.stdin.read().strip()\n"
+        "if raw:\n"
+        "    try: arg = json.loads(raw)\n"
+        "    except ValueError: arg = raw\n"
+        "else:\n"
+        "    arg = None\n"
+        "sig = inspect.signature(fn)\n"
+        "params = [p for p in sig.parameters.values() if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)]\n"
+        "kw_names = {p.name for p in sig.parameters.values() if p.kind in (p.POSITIONAL_OR_KEYWORD, p.KEYWORD_ONLY)}\n"
+        "req_pos = [p for p in params if p.default is inspect.Parameter.empty]\n"
+        "req_kw = {p.name for p in sig.parameters.values() if p.kind in (p.POSITIONAL_OR_KEYWORD, p.KEYWORD_ONLY) and p.default is inspect.Parameter.empty}\n"
+        "has_kwonly = any(p.kind == p.KEYWORD_ONLY for p in sig.parameters.values())\n"
+        "has_varkw = any(p.kind == p.VAR_KEYWORD for p in sig.parameters.values())\n"
+        "if len(params) == 0 and not kw_names and not has_varkw: out = fn()\n"
+        "elif isinstance(arg, dict) and (len(params) > 1 or has_kwonly or (len(params) == 0 and has_varkw)) and (has_varkw or set(arg.keys()).issubset(kw_names)) and req_kw.issubset(arg.keys()): out = fn(**arg)\n"
         "elif len(params) == 1: out = fn(arg)\n"
-        "elif isinstance(arg, list) and len(arg) == len(params): out = fn(*arg)\n"
+        "elif isinstance(arg, list) and len(req_pos) <= len(arg) <= len(params): out = fn(*arg)\n"
         "else: out = fn(arg)\n"
-        "sys.stdout.write(json.dumps(out, ensure_ascii=False))\n"
+        "def _norm(v):\n"
+        "    if isinstance(v, bytes): return v.decode('utf-8', errors='replace')\n"
+        "    if isinstance(v, (tuple, set, list)): return [_norm(x) for x in v]\n"
+        "    if isinstance(v, dict): return {(k.decode('utf-8', errors='replace') if isinstance(k, bytes) else k): _norm(val) for k, val in v.items()}\n"
+        "    return v\n"
+        "sys.stdout.write(json.dumps(_norm(out), ensure_ascii=False, default=str))\n"
     )
 
 
@@ -188,7 +234,8 @@ def _node_harness(entry_point: str) -> str:
         "const fn = typeof mod === 'function' ? mod : (mod && mod[name]);\n"
         "if (typeof fn !== 'function') { process.stderr.write('Không tìm thấy hàm ' + name); process.exit(2); }\n"
         "const raw = fs.readFileSync(0, 'utf8');\n"
-        "const arg = raw.trim() ? JSON.parse(raw) : undefined;\n"
+        "let arg;\n"
+        "if (raw.trim()) { try { arg = JSON.parse(raw); } catch { arg = raw.trim(); } }\n"
         "let out;\n"
         "if (fn.length === 0) out = fn();\n"
         "else if (fn.length === 1) out = fn(arg);\n"

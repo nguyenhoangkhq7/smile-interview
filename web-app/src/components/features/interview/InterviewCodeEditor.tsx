@@ -105,7 +105,19 @@ export function InterviewCodeEditor({
             <span className="text-muted-foreground">
               {codingSpec.sample_tests.length} ca thử mẫu
             </span>
-          ) : null}
+          ) : (
+            <span className="text-muted-foreground">
+              Chạy thử tự do · AI chấm ngữ nghĩa
+            </span>
+          )}
+          {language === 'python' && (
+            <span
+              className="hidden rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground sm:inline"
+              title="Hỗ trợ thư viện chuẩn Python, Pydantic, FastAPI/HTTPX và giả lập Redis/MongoDB trong RAM"
+            >
+              Stdlib · Redis/Mongo (RAM)
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-1.5">
           {codingSpec?.starter_code && !readOnly && (
@@ -175,6 +187,14 @@ export function InterviewCodeEditor({
               </span>
             )}
           </div>
+          {runResult.environment_notice && (
+            <p
+              role="note"
+              className="rounded-lg border border-amber-300/80 bg-amber-50/90 px-3 py-2 text-xs leading-relaxed text-amber-950 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-200"
+            >
+              {runResult.environment_notice}
+            </p>
+          )}
           {runResult.compile_error && (
             <pre className="max-h-32 overflow-auto rounded-lg bg-destructive/10 p-2 font-mono text-[11px] whitespace-pre-wrap text-destructive">
               {runResult.compile_error}
@@ -182,12 +202,12 @@ export function InterviewCodeEditor({
           )}
           {!runResult.compile_error && runResult.total === 0 && (
             <pre className="max-h-32 overflow-auto rounded-lg bg-slate-900 p-2 font-mono text-[11px] whitespace-pre-wrap text-slate-100">
-              {runResult.stdout.trim() || '(Không có đầu ra stdout)'}
+              {(runResult.stdout ?? '').trim() || '(Không có đầu ra stdout)'}
             </pre>
           )}
-          {runResult.results.length > 0 && (
+          {(runResult.results ?? []).length > 0 && (
             <ul className="space-y-1.5">
-              {runResult.results.map(item => (
+              {(runResult.results ?? []).map(item => (
                 <li key={item.name} className="rounded-lg border bg-background p-2">
                   <div className="flex items-center justify-between gap-2">
                     <span className="flex items-center gap-1.5 font-medium">

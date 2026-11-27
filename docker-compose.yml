@@ -52,12 +52,12 @@ services:
       dockerfile: Dockerfile
     container_name: smile_code_runner
     restart: always
-    mem_limit: 256m
+    mem_limit: 384m
     cpus: "0.5"
     pids_limit: 64
     read_only: true
     tmpfs:
-      - /tmp:rw,noexec,nosuid,size=32m
+      - /tmp:rw,noexec,nosuid,size=48m
     security_opt:
       - no-new-privileges:true
     cap_drop:

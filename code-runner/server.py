@@ -15,6 +15,9 @@ from typing import Literal
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
+from sandbox_shims import active_shims
+
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
 MAX_CODE_CHARS = 16000
 MAX_OUTPUT_CHARS = 8192
 DEFAULT_TIMEOUT_SECONDS = 3.0
@@ -102,27 +105,36 @@ def _run_subprocess(cmd: list[str], cwd: str, stdin_text: str, timeout: float) -
         return -1, "", f"Hết thời gian thực thi ({timeout:.1f}s).", elapsed
 
 
-def _python_harness(entry_point: str) -> str:
+def _python_harness(entry_point: str, tmpdir: str) -> str:
     return (
-        "import inspect, json, sys\n"
+        "import sys\n"
+        f"_app_dir = {APP_DIR!r}\n"
+        f"_tmp_dir = {tmpdir!r}\n"
+        "sys.path.insert(0, _app_dir)\n"
+        "from sandbox_shims import install_shims, invoke_entry_point\n"
+        "install_shims()\n"
+        "sys.path = [p for p in sys.path if p != _app_dir]\n"
+        "sys.path.insert(0, _tmp_dir)\n"
         "import solution\n"
         f"fn = getattr(solution, {entry_point!r}, None)\n"
         "if not callable(fn):\n"
         f"    sys.stderr.write('Không tìm thấy hàm ' + {entry_point!r})\n"
         "    sys.exit(2)\n"
-        "raw = sys.stdin.read()\n"
-        "arg = json.loads(raw) if raw.strip() else None\n"
-        "params = [p for p in inspect.signature(fn).parameters.values() "
-        "if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)]\n"
-        "if len(params) == 0:\n"
-        "    out = fn()\n"
-        "elif len(params) == 1:\n"
-        "    out = fn(arg)\n"
-        "elif isinstance(arg, list) and len(arg) == len(params):\n"
-        "    out = fn(*arg)\n"
-        "else:\n"
-        "    out = fn(arg)\n"
-        "sys.stdout.write(json.dumps(out, ensure_ascii=False))\n"
+        "sys.stdout.write(invoke_entry_point(fn, sys.stdin.read()))\n"
+    )
+
+
+def _python_free_runner(sol_path: str, tmpdir: str) -> str:
+    return (
+        "import runpy, sys\n"
+        f"_app_dir = {APP_DIR!r}\n"
+        f"_tmp_dir = {tmpdir!r}\n"
+        "sys.path.insert(0, _app_dir)\n"
+        "from sandbox_shims import install_shims\n"
+        "install_shims()\n"
+        "sys.path = [p for p in sys.path if p != _app_dir]\n"
+        "sys.path.insert(0, _tmp_dir)\n"
+        f"runpy.run_path({sol_path!r}, run_name='__main__')\n"
     )
 
 
@@ -137,7 +149,10 @@ def _node_harness(entry_point: str) -> str:
         "  process.exit(2);\n"
         "}\n"
         "const raw = fs.readFileSync(0, 'utf8');\n"
-        "const arg = raw.trim() ? JSON.parse(raw) : undefined;\n"
+        "let arg;\n"
+        "if (raw.trim()) {\n"
+        "  try { arg = JSON.parse(raw); } catch { arg = raw.trim(); }\n"
+        "}\n"
         "let out;\n"
         "if (fn.length === 0) out = fn();\n"
         "else if (fn.length === 1) out = fn(arg);\n"
@@ -156,15 +171,21 @@ def _execute_python(req: ExecuteRequest) -> ExecuteResponse:
         if syntax[0] != 0:
             return ExecuteResponse(language="python", total=len(req.cases), compile_error=syntax[2] or "Lỗi cú pháp Python")
         if not req.cases:
-            rc, out, err, _ = _run_subprocess([sys.executable, "-I", sol_path], tmpdir, "", req.timeout_seconds)
+            free_path = os.path.join(tmpdir, "run_free.py")
+            with open(free_path, "w", encoding="utf-8") as handle:
+                handle.write(_python_free_runner(sol_path, tmpdir))
+            rc, out, err, _ = _run_subprocess([sys.executable, "-I", free_path], tmpdir, "", req.timeout_seconds)
             return ExecuteResponse(language="python", compile_error=err if rc != 0 else "", stdout=out)
         if req.entry_point:
             harness_path = os.path.join(tmpdir, "harness.py")
             with open(harness_path, "w", encoding="utf-8") as handle:
-                handle.write(_python_harness(req.entry_point))
-            cmd = [sys.executable, harness_path]
+                handle.write(_python_harness(req.entry_point, tmpdir))
+            cmd = [sys.executable, "-I", harness_path]
         else:
-            cmd = [sys.executable, "-I", sol_path]
+            free_path = os.path.join(tmpdir, "run_free.py")
+            with open(free_path, "w", encoding="utf-8") as handle:
+                handle.write(_python_free_runner(sol_path, tmpdir))
+            cmd = [sys.executable, "-I", free_path]
         results = _run_cases(cmd, tmpdir, req.cases, req.timeout_seconds)
         passed = sum(1 for item in results if item.passed)
         return ExecuteResponse(language="python", passed=passed, total=len(results), results=results)
@@ -255,7 +276,7 @@ def _execute_sql(req: ExecuteRequest) -> ExecuteResponse:
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "languages": ["python", "javascript", "sql"]}
+    return {"status": "ok", "languages": ["python", "javascript", "sql"], "shims": active_shims()}
 
 
 @app.post("/execute", response_model=ExecuteResponse)

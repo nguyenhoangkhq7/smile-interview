@@ -57,6 +57,7 @@ export interface RunCodeResult {
   compile_error: string;
   stdout: string;
   results: CodingCaseResult[];
+  environment_notice?: string;
 }
 export interface PendingTurn {
   turn_id: string; objective_id: string; mode: QuestionMode;

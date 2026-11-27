@@ -497,6 +497,7 @@ class RunCodeResponse(BaseModel):
     compile_error: str = ""
     stdout: str = ""
     results: list[CodingCaseResult] = Field(default_factory=list)
+    environment_notice: str = ""
 
 
 class ClarifyRequest(BaseModel):

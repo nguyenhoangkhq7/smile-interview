@@ -14,7 +14,7 @@ from pydantic import ValidationError
 from .assessment import (TERMINAL, apply_judgment, criterion_action, criterion_resolved, eligible_criteria,
                          mode_for_criterion, next_action, standalone_inability, validate_judgment)
 from .code_runner import CodeExecutionProvider, default_code_runner
-from .coding_verification import check_coding_answer, run_sample_code
+from .coding_verification import check_coding_answer, run_sample_code, sanitize_coding_spec
 from .errors import JudgmentUnavailableError, QuestionUnavailableError
 from .models import (
     Action, Blueprint, BlueprintRequest, ClarifyRequest, CodingCheckResult, ConversationRequest, InterviewConfig,
@@ -816,16 +816,18 @@ class EvidenceWorkflow:
                 if verdict == "ALIGNED":
                     event("question.generated", attempts=attempt + 1,
                           gen_seconds=round(gen_seconds, 3), review_seconds=round(review_seconds, 3))
-                    return question
+                    return sanitize_coding_spec(question)
                 failure = verdict
                 last_verdict = verdict
                 if verdict not in _HARD_ALIGNMENT_VERDICTS and question is not None:
                     penalty = _PENALTY_DIAGNOSTIC_SOFT_REVIEW if is_diagnostic else _PENALTY_STANDARD_SOFT_REVIEW
                     best_fallback = self._prefer_fallback(best_fallback, penalty, question, verdict, True)
                     if is_diagnostic and attempt + 1 >= DIAGNOSTIC_SOFT_REPAIR_LIMIT:
-                        event("question.generated", attempts=attempt + 1,
-                              gen_seconds=round(gen_seconds, 3), review_seconds=round(review_seconds, 3))
-                        return self._safe_soft_fallback(context, snapshot, best_fallback)
+                        fallback_q = self._safe_soft_fallback(context, snapshot, best_fallback)
+                        if fallback_q is not None:
+                            event("question.generated", attempts=attempt + 1,
+                                  gen_seconds=round(gen_seconds, 3), review_seconds=round(review_seconds, 3))
+                            return sanitize_coding_spec(fallback_q)
                 context["rejected_draft"] = question.text
                 rejected_seen.add(self._normalize_question_text(question.text))
                 base_repair = ALIGNMENT_REPAIRS.get(
@@ -851,7 +853,7 @@ class EvidenceWorkflow:
         if fallback is not None:
             event("question.generated", attempts=GENERATION_ATTEMPTS,
                   gen_seconds=round(gen_seconds, 3), review_seconds=round(review_seconds, 3))
-            return fallback
+            return sanitize_coding_spec(fallback)
         raise QuestionUnavailableError("AI chưa tạo được câu hỏi phù hợp. Dữ liệu đã lưu được giữ nguyên; vui lòng thử lại.")
 
     @staticmethod
