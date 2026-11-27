@@ -225,7 +225,9 @@ export function EvidenceTextInterview({ interview, onHistory, onStop }: {
       </div>
       <div className="flex min-h-0 min-w-0 flex-col gap-3 rounded-2xl border bg-card p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <label htmlFor="interview-answer" className="font-semibold">{answerLabel}</label>
+          {showCodeEditor
+            ? <p className="font-semibold">{answerLabel}</p>
+            : <label htmlFor="interview-answer" className="font-semibold">{answerLabel}</label>}
           {awaiting && (
             <span className="inline-flex items-center gap-1 rounded-full bg-brand-green-light px-2.5 py-0.5 text-xs font-medium text-brand-green">
               <Check size={12} aria-hidden="true" />
@@ -250,20 +252,42 @@ export function EvidenceTextInterview({ interview, onHistory, onStop }: {
             questionHint={`${turnSkillId(session, pendingTurn)} ${pendingTurn.question}`}
             disabled={busy}
             readOnly={readOnlyAnswer}
+            defaultAutocomplete={isPractice}
           />
         )}
-        <textarea id="interview-answer" aria-label="Câu trả lời" className={`w-full resize-none overflow-y-auto rounded-xl border p-4 text-sm leading-relaxed transition-colors focus-visible:outline-2 focus-visible:outline-brand-orange ${showCodeEditor ? 'h-24 min-h-20' : 'h-40 min-h-32 lg:h-auto lg:flex-1'} ${readOnlyAnswer ? 'bg-muted/40 text-muted-foreground' : 'bg-background'} ${!showCodeEditor && session.pending_turn?.mode === 'CODING' ? 'font-mono' : ''}`}
-          maxLength={conversation.introducing ? 10000 : 50000} value={answerValue} readOnly={readOnlyAnswer}
-          onChange={e => { if (isRevealing) complete(); interview.setAnswer(e.target.value); }} disabled={busy || (!conversation.introducing && !session.pending_turn)}
-          placeholder={showCodeEditor ? 'Giải thích hướng giải hoặc độ phức tạp (tuỳ chọn)…' : answerPlaceholder} />
-        <div className="flex flex-wrap items-center gap-3">{conversation.closing
+        {showCodeEditor ? (
+          <div className="space-y-1">
+            <label htmlFor="interview-answer" className="text-xs font-medium text-muted-foreground">
+              Giải thích ngắn hoặc độ phức tạp (tuỳ chọn)
+            </label>
+            <textarea
+              id="interview-answer"
+              aria-label="Câu trả lời"
+              className={`h-16 min-h-14 w-full resize-none overflow-y-auto rounded-xl border border-border/80 px-3.5 py-2 text-sm leading-relaxed transition-colors focus-visible:bg-background focus-visible:outline-2 focus-visible:outline-brand-orange ${readOnlyAnswer ? 'bg-muted/40 text-muted-foreground' : 'bg-muted/20'}`}
+              maxLength={50000}
+              value={answerValue}
+              readOnly={readOnlyAnswer}
+              onChange={e => { if (isRevealing) complete(); interview.setAnswer(e.target.value); }}
+              disabled={busy || !session.pending_turn}
+              placeholder="VD: Dùng TTL 3600s để tự hết hạn cache, độ phức tạp O(1)…"
+            />
+          </div>
+        ) : (
+          <textarea id="interview-answer" aria-label="Câu trả lời" className={`h-40 min-h-32 w-full resize-none overflow-y-auto rounded-xl border p-4 text-sm leading-relaxed transition-colors focus-visible:outline-2 focus-visible:outline-brand-orange lg:h-auto lg:flex-1 ${readOnlyAnswer ? 'bg-muted/40 text-muted-foreground' : 'bg-background'} ${session.pending_turn?.mode === 'CODING' ? 'font-mono' : ''}`}
+            maxLength={conversation.introducing ? 10000 : 50000} value={answerValue} readOnly={readOnlyAnswer}
+            onChange={e => { if (isRevealing) complete(); interview.setAnswer(e.target.value); }} disabled={busy || (!conversation.introducing && !session.pending_turn)}
+            placeholder={answerPlaceholder} />
+        )}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3">{conversation.closing
           ? <Button disabled={busy} onClick={() => void interview.converse('NEXT')}>Xem kết quả</Button>
-          : <>{!awaiting && <Button disabled={busy || !canSubmit} onClick={() => void interview.submit(interview.answer, showCodeEditor && activeCode.trim() ? activeCode : undefined)}>{isSubmitting
-              ? <><LoaderCircle size={15} className="animate-spin" />{conversation.introducing ? 'Đang gửi giới thiệu…' : 'Đang đánh giá…'}</>
-              : <><Send size={15} />Gửi câu trả lời</>}</Button>}
-            <Button variant="outline" disabled={busy} onClick={onStop}>Kết thúc phiên</Button>
-            {conversation.introducing && <Button variant="ghost" disabled={busy} onClick={() => void interview.converse('SKIP_INTRODUCTION')}>Bỏ qua giới thiệu</Button>}
-            {isLoadingQuestion && <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground"><LoaderCircle size={14} className="animate-spin text-brand-orange" aria-hidden="true" />Đang chuyển tiếp…</span>}</>}
+          : <><div className="flex flex-wrap items-center gap-2">
+              {!awaiting && <Button disabled={busy || !canSubmit} onClick={() => void interview.submit(interview.answer, showCodeEditor && activeCode.trim() ? activeCode : undefined)}>{isSubmitting
+                ? <><LoaderCircle size={15} className="animate-spin" />{conversation.introducing ? 'Đang gửi giới thiệu…' : 'Đang đánh giá…'}</>
+                : <><Send size={15} />Gửi câu trả lời</>}</Button>}
+              {conversation.introducing && <Button variant="ghost" disabled={busy} onClick={() => void interview.converse('SKIP_INTRODUCTION')}>Bỏ qua giới thiệu</Button>}
+              {isLoadingQuestion && <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground"><LoaderCircle size={14} className="animate-spin text-brand-orange" aria-hidden="true" />Đang chuyển tiếp…</span>}
+            </div>
+            <Button variant="outline" size="sm" disabled={busy} onClick={onStop}>Kết thúc phiên</Button></>}
         </div>
       </div>
     </section>
