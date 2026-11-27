@@ -1,4 +1,8 @@
 services:
+  code-runner:
+    build: !reset null
+    image: ${CODE_RUNNER_IMAGE:?Missing code-runner digest}
+    networks: !override [code-execution]
   backend:
     build: !reset null
     env_file: !override
@@ -13,3 +17,9 @@ services:
     image: ${AI_IMAGE:?Missing AI digest}
     environment:
       GNN_REQUIRE_CHECKPOINT: "true"
+      CODE_RUNNER_URL: http://code-runner:8090
+    networks: [code-execution]
+
+networks:
+  code-execution:
+    internal: true

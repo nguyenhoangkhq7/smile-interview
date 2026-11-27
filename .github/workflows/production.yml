@@ -76,6 +76,7 @@ jobs:
         run: |
           docker build -t smile/backend:candidate backend
           docker build -t smile/ai-service:candidate ai-service
+          docker build -t smile/code-runner:candidate code-runner
       - name: Scan backend image
         if: ${{ !inputs.rollback_sha }}
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
@@ -92,6 +93,14 @@ jobs:
           severity: CRITICAL,HIGH
           ignore-unfixed: true
           exit-code: '1'
+      - name: Scan code-runner image
+        if: ${{ !inputs.rollback_sha }}
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          image-ref: smile/code-runner:candidate
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
       - name: Publish verified images by digest
         if: ${{ !inputs.rollback_sha }}
         run: |
@@ -99,14 +108,22 @@ jobs:
           registry="$account.dkr.ecr.$AWS_REGION.amazonaws.com"
           aws ecr get-login-password | docker login --username AWS --password-stdin "$registry"
           tag="$GITHUB_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
-          for svc in backend ai-service; do
+          for svc in backend ai-service code-runner; do
             repo="smile/$svc"
-            docker tag "$repo:candidate" "$registry/$repo:$tag"
-            docker push "$registry/$repo:$tag"
-            digest=$(aws ecr describe-images --repository-name "$repo" --image-ids imageTag="$tag" --query 'imageDetails[0].imageDigest' --output text)
+            image_tag="$tag"
+            case "$svc" in
+              backend) key=BACKEND_IMAGE ;;
+              ai-service) key=AI_IMAGE ;;
+              code-runner)
+                key=CODE_RUNNER_IMAGE
+                repo=smile/ai-service
+                image_tag="code-runner-$tag"
+                ;;
+            esac
+            docker tag "smile/$svc:candidate" "$registry/$repo:$image_tag"
+            docker push "$registry/$repo:$image_tag"
+            digest=$(aws ecr describe-images --repository-name "$repo" --image-ids imageTag="$image_tag" --query 'imageDetails[0].imageDigest' --output text)
             [[ $digest =~ ^sha256:[0-9a-f]{64}$ ]]
-            key=BACKEND_IMAGE
-            if [[ $svc == ai-service ]]; then key=AI_IMAGE; fi
             echo "$key=$registry/$repo@$digest" >> "$GITHUB_ENV"
           done
       - name: Build Vercel production deployment

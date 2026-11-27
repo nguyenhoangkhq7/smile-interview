@@ -17,9 +17,19 @@ jobs:
           python -m unittest discover -s deploy/production -p 'test_*.py'
           cp backend/.env.example backend/.env
           cp ai-service/.env.example ai-service/.env
-          export BACKEND_IMAGE=backend:test AI_IMAGE=ai:test
+          export BACKEND_IMAGE=backend:test AI_IMAGE=ai:test CODE_RUNNER_IMAGE=code-runner:test
           docker compose --env-file .env.example -f deploy/docker-compose.staging.yml -f deploy/production/compose.yml config --format json |
-            jq -e 'all(.services[]; has("build") | not) and .services["ai-service"].environment.GNN_REQUIRE_CHECKPOINT == "true"'
+            jq -e '
+              [.services | to_entries[] | select(.value | has("build")) | .key] as $builds |
+              if ($builds | length) > 0 then error("Production services still configured to build: " + ($builds | join(", ")))
+              elif .services["code-runner"].image != env.CODE_RUNNER_IMAGE then error("Production code-runner image is missing")
+              elif .services["ai-service"].environment.GNN_REQUIRE_CHECKPOINT != "true" then error("Production must require the GNN checkpoint")
+              else true end'
+      - name: Test code-runner image
+        run: |
+          docker build -t smile-code-runner:test code-runner
+          docker run --rm -e PYTHONPATH=/app -v "$PWD/code-runner/test_server.py:/tests/test_server.py:ro" smile-code-runner:test \
+            sh -ec 'python -m venv --system-site-packages /tmp/testenv && /tmp/testenv/bin/pip install pytest==9.0.2 && /tmp/testenv/bin/python -m pytest -q -p no:cacheprovider /tests/test_server.py'
       - name: Test matching and GNN graph contracts
         run: |
           docker build -t smile-ai:test ai-service
