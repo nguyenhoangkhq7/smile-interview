@@ -49,6 +49,12 @@ public class EvidenceController {
         return candidateView(service.converse(sessionId, user, command)).toString();
     }
 
+    @PostMapping("/run-code")
+    public String runCode(@PathVariable String sessionId, @AuthenticationPrincipal User user,
+                          @Valid @RequestBody EvidenceDtos.RunCode command) {
+        return service.runCode(sessionId, user, command).toString();
+    }
+
     @GetMapping("/report")
     public String report(@PathVariable String sessionId, @AuthenticationPrincipal User user) {
         return candidateView(service.read(sessionId, user)).path("report").toString();

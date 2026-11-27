@@ -46,6 +46,25 @@ services:
       postgres:
         condition: service_healthy
 
+  code-runner:
+    build:
+      context: ./code-runner
+      dockerfile: Dockerfile
+    container_name: smile_code_runner
+    restart: always
+    mem_limit: 256m
+    cpus: "0.5"
+    pids_limit: 64
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    expose:
+      - "8090"
+
   ai-service:
     build:
       context: ./ai-service
@@ -59,6 +78,7 @@ services:
       HF_HOME: /app/.cache/huggingface
       AI_RUNTIME_BACKEND_URL: http://backend:8081
       AI_RUNTIME_KEY_FILE: /run/smile-ai/ai-runtime.key
+      CODE_RUNNER_URL: http://code-runner:8090
     ports:
       - "8000:8000"
     volumes:

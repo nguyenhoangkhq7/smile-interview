@@ -13,13 +13,14 @@ from pydantic import ValidationError
 
 from .assessment import (TERMINAL, apply_judgment, criterion_action, criterion_resolved, eligible_criteria,
                          next_action, standalone_inability, validate_judgment)
-from .coding_verification import check_coding_answer
+from .code_runner import CodeExecutionProvider, default_code_runner
+from .coding_verification import check_coding_answer, run_sample_code
 from .errors import JudgmentUnavailableError, QuestionUnavailableError
 from .models import (
     Action, Blueprint, BlueprintRequest, CodingCheckResult, ConversationRequest, InterviewConfig, InterviewSkillContext,
     InterviewVerification, Judgment, Mode,
-    NextQuestionRequest, ObjectiveState, Question, SessionCoaching, Snapshot, StartRequest,
-    StoredQuestion, TransitionRequest, TransitionResult, Turn,
+    NextQuestionRequest, ObjectiveState, Question, RunCodeRequest, RunCodeResponse, SessionCoaching, Snapshot,
+    StartRequest, StoredQuestion, TransitionRequest, TransitionResult, Turn,
 )
 from . import lifecycle
 from .planning import ALL_COMPATIBLE_SKILLS_MASTERED, BlueprintBuilder, plan, plan_recheck, select_mode
@@ -85,12 +86,14 @@ class EvidenceWorkflow:
         preparation_cache: PreparationCache | None = None,
         *,
         prewarm_q1: bool = False,
+        code_runner: CodeExecutionProvider | None = None,
     ):
         self.provider = provider
         self.clock = clock or (lambda: datetime.now(timezone.utc))
         self.policy = policy or InterviewPolicy()
         self.preparation_cache = preparation_cache
         self.prewarm_q1 = prewarm_q1
+        self.code_runner = code_runner
         self._prewarm_lock = Lock()
         self._prewarm_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="q1-prewarm")
         self._prewarmed_q1: OrderedDict[str, _PrewarmedQuestion] = OrderedDict()
@@ -320,15 +323,38 @@ class EvidenceWorkflow:
                 snapshot.conversation.introduction, snapshot.skills,
             )
 
+    def run_code(self, request: RunCodeRequest) -> RunCodeResponse:
+        snapshot = request.snapshot
+        if snapshot.is_finished or snapshot.pending_turn is None:
+            raise ValueError("Phiên phỏng vấn không có câu hỏi đang mở để chạy thử mã nguồn")
+        if snapshot.pending_turn.turn_id != request.turn_id:
+            raise ValueError("Mã lượt không khớp với câu hỏi hiện tại")
+        if self.clock() >= snapshot.deadline_at:
+            raise ValueError("Phiên phỏng vấn đã hết thời gian")
+        outcome = run_sample_code(
+            code=request.code,
+            spec=snapshot.pending_turn.question.coding_spec,
+            language_override=request.language,
+            runner=self.code_runner or default_code_runner(),
+        )
+        event("coding.dry_run", turn_id=request.turn_id, language=outcome.language,
+              passed=outcome.passed, total=outcome.total)
+        return RunCodeResponse.model_validate(outcome.model_dump())
+
     def _judge(self, snapshot: Snapshot, turn: Turn) -> Judgment:
         admission = standalone_inability(turn)
         if admission is not None:
             return admission
         coding_turn = turn.model_copy(update={"answer": turn.submitted_code}) if turn.submitted_code else turn
-        coding_check = check_coding_answer(coding_turn, "TEXT" if turn.submitted_code else snapshot.config.interaction_mode)
+        coding_check = check_coding_answer(
+            coding_turn,
+            "TEXT" if turn.submitted_code else snapshot.config.interaction_mode,
+            runner=self.code_runner,
+        )
         if coding_check is not None:
-            turn.coding_checks = CodingCheckResult(passed=coding_check.passed, total=coding_check.total)
-            event("coding.checked", turn_id=turn.turn_id, total=coding_check.total, passed=coding_check.passed)
+            turn.coding_checks = coding_check.to_result()
+            event("coding.checked", turn_id=turn.turn_id, language=coding_check.language,
+                  total=coding_check.total, passed=coding_check.passed)
             if coding_check.passed < coding_check.total:
                 judgment = coding_check.failure_judgment(turn)
                 validate_judgment(judgment, turn)
@@ -493,7 +519,8 @@ class EvidenceWorkflow:
             action=action, question_depth=question.depth,
             question=StoredQuestion(
                 text=question.text, criterion_ids=question.criterion_ids, evidence_scope=question.evidence_scope,
-                requires_code=bool(snapshot.recheck_target and question.requires_code),
+                requires_code=bool(question.coding_spec is not None or (snapshot.recheck_target and question.requires_code)),
+                coding_spec=question.coding_spec,
             ),
         )
         snapshot.pending_turn.introduction = turn_introduction(snapshot, snapshot.pending_turn)
@@ -587,15 +614,14 @@ class EvidenceWorkflow:
                 "focused question about adapting the algorithm/data structure or evaluating trade-offs for above_target. "
                 "Do not ask the candidate to rewrite the basic function from scratch or split into separate deliverables."
             )
-        criterion_blob = f"{objective.get('claim', '')} {objective['criteria'][0].get('description', '')}".casefold()
         if (not history_turns
                 and action in {Action.INITIAL, Action.FOLLOW_UP}
                 and snapshot.config.interaction_mode == "TEXT"
-                and state.selected_mode == Mode.CODING
-                and ("deduplicate" in criterion_blob or "khử trùng" in criterion_blob)
-                and "event" in criterion_blob):
+                and state.selected_mode in {Mode.CODING, Mode.DEBUGGING}):
             guidance_parts.append(
-                "Request a Python function `deduplicate_events(events)` preserving first occurrence by `event_id` and input order."
+                "When asking for executable Python, JavaScript, or SQL code, optionally populate `coding_spec` "
+                "(language, entry_point or setup_sql, starter_code, 1–2 sample_tests, and 1–3 hidden_tests) so the "
+                "sandbox can verify correctness automatically."
             )
         if snapshot.recheck_target:
             target = snapshot.recheck_target

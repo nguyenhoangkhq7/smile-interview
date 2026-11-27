@@ -537,7 +537,7 @@ def test_api_carries_action_depth_evidence_and_recovery_through_response(audit):
         pending = updated["snapshot"]["pending_turn"]
         assert (pending["action"], pending["question_depth"]) == ("ASK_EASIER", 1)
         assert pending["mode"] == initial["snapshot"]["pending_turn"]["mode"]
-        assert set(pending["question"]) == {"text", "criterion_ids", "evidence_scope", "requires_code"}
+        assert set(pending["question"]) == {"text", "criterion_ids", "evidence_scope", "requires_code", "coding_spec"}
         restored = Snapshot.model_validate(updated["snapshot"])
         state = next(iter(restored.objectives.values()))
         assert state.objective.target_depth == 2

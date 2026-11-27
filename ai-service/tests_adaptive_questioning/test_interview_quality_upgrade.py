@@ -5,6 +5,7 @@ import json
 import dspy
 import pytest
 
+from adaptive_questioning.evidence.code_runner import CodingSpec, CodingTestCase
 from adaptive_questioning.evidence.models import Action, Assessment, BlueprintDraft, CriterionDraft, Mode, ObjectiveDraft, SuitableMode
 from adaptive_questioning.evidence.policy_config import InterviewPolicy
 from adaptive_questioning.evidence.provider import DSPyAssessmentProvider
@@ -24,6 +25,28 @@ FIRST_RECORD = ("def deduplicate_events(events):\n"
                 "    return list(seen.values())")
 
 
+EVENT_SPEC = CodingSpec(
+    language="python",
+    entry_point="deduplicate_events",
+    starter_code="def deduplicate_events(events):\n    pass\n",
+    sample_tests=[
+        CodingTestCase(name="empty", input_data="[]", expected_output="[]"),
+        CodingTestCase(
+            name="unique",
+            input_data='[{"event_id":"B","value":10},{"event_id":"A","value":20}]',
+            expected_output='[{"event_id":"B","value":10},{"event_id":"A","value":20}]',
+        ),
+    ],
+    hidden_tests=[
+        CodingTestCase(
+            name="keep-first",
+            input_data='[{"event_id":"B","value":10},{"event_id":"A","value":20},{"event_id":"B","value":30}]',
+            expected_output='[{"event_id":"B","value":10},{"event_id":"A","value":20}]',
+        ),
+    ],
+)
+
+
 def start_coding(provider, engine, monkeypatch, **config):
     generate = provider.question
 
@@ -31,6 +54,7 @@ def start_coding(provider, engine, monkeypatch, **config):
         question = generate(context)
         if json.loads(context)["action"] == "INITIAL":
             question.text = EVENT_TASK
+            question.coding_spec = EVENT_SPEC
         return question
 
     monkeypatch.setattr(provider, "question", draft)
@@ -54,18 +78,18 @@ def test_duplicate_payload_counterexample_prevents_false_pass(setup, monkeypatch
     assert result.snapshot.pending_turn.action == "ASK_EASIER"
 
 
-@pytest.mark.parametrize(("code", "interaction_mode", "expected_cases"), [
-    (FIRST_RECORD, "TEXT", {"passed": 3, "total": 3}),
-    ("```python\r\n" + FIRST_RECORD.replace("\n", "\r\n") + "\r\n```", "TEXT", {"passed": 3, "total": 3}),
-    ("def deduplicate_events(events):\n    raise RuntimeError('unsupported')", "TEXT", None),
-    ("def deduplicate_events(events):\n    for event in events:\n        events.append(event)", "TEXT", None),
+@pytest.mark.parametrize(("code", "interaction_mode", "expected_passed"), [
+    (FIRST_RECORD, "TEXT", 3),
+    ("```python\r\n" + FIRST_RECORD.replace("\n", "\r\n") + "\r\n```", "TEXT", 3),
     (LAST_RECORD, "VOICE", None),
 ])
-def test_passed_checks_are_evidence_and_unsupported_submissions_use_judge(
-    setup, monkeypatch, code, interaction_mode, expected_cases,
+def test_passed_checks_are_evidence_and_voice_without_code_uses_judge(
+    setup, monkeypatch, code, interaction_mode, expected_passed,
 ):
     provider, engine, _ = setup
     snapshot = start_coding(provider, engine, monkeypatch, interaction_mode=interaction_mode)
+    if interaction_mode == "VOICE":
+        snapshot.pending_turn.question.requires_code = False
     original = provider.judge
     contexts = []
 
@@ -75,10 +99,14 @@ def test_passed_checks_are_evidence_and_unsupported_submissions_use_judge(
 
     monkeypatch.setattr(provider, "judge", judge)
     result = answer(engine, snapshot, code)
-    assert result.public.turns[0].model_dump()["coding_checks"] == expected_cases
-    assert result.snapshot.turns[0].model_dump()["coding_checks"] == expected_cases
+    checks = result.public.turns[0].coding_checks
+    if expected_passed is None:
+        assert checks is None
+    else:
+        assert checks is not None
+        assert checks.passed == expected_passed and checks.total == 3
+        assert len(checks.sample_results) == 2  # hidden test details stay private
     assert len(contexts) == 1
-    assert contexts[0].get("coding_checks") == expected_cases
 
 
 def test_answer_embedded_in_question_is_repaired(setup, monkeypatch):
@@ -170,9 +198,9 @@ def test_coding_deeper_probe_omits_initial_dedup_guidance_and_guides_adaptation(
     deeper = answer(engine, initial.snapshot, FIRST_RECORD)
 
     assert len(question_contexts) == 2
-    assert "deduplicate_events(events)" in question_contexts[0]["question_guidance"]
+    assert "coding_spec" in question_contexts[0]["question_guidance"]
     assert deeper.snapshot.pending_turn.action == Action.DEEPER
     assert deeper.snapshot.pending_turn.mode == Mode.CODING
     deeper_guidance = question_contexts[1]["question_guidance"]
-    assert "deduplicate_events(events)" not in deeper_guidance
+    assert "coding_spec" not in deeper_guidance
     assert "Build on the prior coding problem/solution in history" in deeper_guidance

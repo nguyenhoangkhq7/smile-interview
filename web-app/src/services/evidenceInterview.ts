@@ -20,15 +20,48 @@ export interface InterviewConfig extends InterviewStartConfig {
 export const defaultConfig: InterviewStartConfig = {
   interaction_mode: 'TEXT', focused_question_mode: null, max_questions: 10, duration_seconds: 900,
 };
+export type CodingLanguage = 'python' | 'javascript' | 'sql';
+export interface CodingTestCase {
+  name: string;
+  input_data: string;
+  expected_output: string;
+}
+export interface PublicCodingSpec {
+  language: CodingLanguage;
+  entry_point: string;
+  starter_code: string;
+  setup_sql: string;
+  sample_tests: CodingTestCase[];
+}
+export interface CodingCaseResult {
+  name: string;
+  passed: boolean;
+  actual_output: string;
+  expected_output: string;
+  error: string;
+  elapsed_ms: number;
+}
+export interface RunCodeResult {
+  language: CodingLanguage;
+  passed: number;
+  total: number;
+  compile_error: string;
+  stdout: string;
+  results: CodingCaseResult[];
+}
 export interface PendingTurn {
   turn_id: string; objective_id: string; mode: QuestionMode;
   question: string; introduction?: string; requires_code?: boolean;
+  coding_spec?: PublicCodingSpec | null;
 }
 export interface EvidenceTurn {
   turn_id: string; objective_id: string; mode: QuestionMode;
   question: string; answer: string | null; feedback: string | null;
   submitted_code?: string | null; transcript?: string | null;
-  coding_checks?: { passed: number; total: number } | null;
+  coding_checks?: {
+    passed: number; total: number; language?: string; compile_error?: string;
+    sample_results?: CodingCaseResult[];
+  } | null;
 }
 export type EvidenceDepthRole = 'TARGET' | 'DIAGNOSTIC' | 'EXTENSION';
 export type EvidenceObservation = 'SUPPORTS' | 'CONTRADICTS' | 'UNCLEAR' | 'NO_EVIDENCE';
@@ -156,6 +189,9 @@ export const evidenceInterview = {
   },
   async converse(id: string, request: ConversationRequest): Promise<EvidenceSession> {
     return (await axiosClient.post<EvidenceSession>(endpoint(id, 'conversation'), request)).data;
+  },
+  async runCode(id: string, payload: { turn_id: string; code: string; language?: CodingLanguage }): Promise<RunCodeResult> {
+    return (await axiosClient.post<RunCodeResult>(endpoint(id, 'run-code'), payload)).data;
   },
   async stop(session: EvidenceSession, requestId: string): Promise<EvidenceSession> {
     return (await axiosClient.post<EvidenceSession>(endpoint(session.session_id, 'stop'), {

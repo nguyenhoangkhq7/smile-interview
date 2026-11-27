@@ -166,6 +166,27 @@ public class EvidenceService {
                 hash, json.read(run.getConfigJson()), result));
     }
 
+    public JsonNode runCode(String sessionId, User user, EvidenceDtos.RunCode request) {
+        owned(sessionId, user);
+        InterviewRun run = run(sessionId);
+        JsonNode visible = json.read(run.getPublicJson());
+        if (visible.path("is_finished").asBoolean() || !visible.path("pending_turn").isObject()) {
+            throw EvidenceStore.conflict("Phiên phỏng vấn không có câu hỏi đang chờ");
+        }
+        String pendingTurnId = visible.path("pending_turn").path("turn_id").asText("");
+        if (!pendingTurnId.equals(request.turnId())) {
+            throw EvidenceStore.conflict("Mã lượt không khớp với câu hỏi hiện tại");
+        }
+        var payload = new java.util.HashMap<String, Object>();
+        payload.put("snapshot", json.read(run.getSnapshotJson()));
+        payload.put("turn_id", request.turnId());
+        payload.put("code", request.code());
+        if (request.language() != null && !request.language().isBlank()) {
+            payload.put("language", request.language());
+        }
+        return ai.runCode(payload);
+    }
+
     public JsonNode stop(String sessionId, User user, EvidenceDtos.Stop stop) {
         owned(sessionId, user);
         String hash = json.hash(stop);

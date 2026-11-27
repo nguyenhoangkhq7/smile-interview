@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { Check, Clock3, History, LoaderCircle, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -7,6 +8,7 @@ import { MarkdownContent } from '@/components/common/MarkdownContent';
 import type { useEvidenceInterview } from '@/hooks/useEvidenceInterview';
 import { skillLabel } from '@/components/features/applications/applicationUi';
 import { modeLabels } from './EvidenceSetup';
+import { InterviewCodeEditor } from './InterviewCodeEditor';
 import { turnSkillId } from '@/services/evidenceInterview';
 import { useTextInterviewConversation } from '@/hooks/useTextInterviewConversation';
 import { useProgressiveText } from '@/hooks/useProgressiveText';
@@ -21,7 +23,26 @@ export function EvidenceTextInterview({ interview, onHistory, onStop }: {
   const awaiting = Boolean(session?.awaiting_question);
   const shouldReveal = Boolean(session) && !awaiting && !conversation.closing && Boolean(conversation.text);
   const { displayedText, isRevealing, complete } = useProgressiveText(conversation.text || '', shouldReveal);
+  const pendingTurn = session?.pending_turn ?? null;
+  const [codeState, setCodeState] = useState<{ turnId: string; code: string }>({ turnId: '', code: '' });
   if (!session) return null;
+
+  const showCodeEditor = Boolean(
+    !conversation.introducing
+    && !conversation.closing
+    && !awaiting
+    && pendingTurn
+    && (pendingTurn.mode === 'CODING' || pendingTurn.requires_code || pendingTurn.coding_spec),
+  );
+  const activeCode = pendingTurn && codeState.turnId === pendingTurn.turn_id
+    ? codeState.code
+    : (pendingTurn?.coding_spec?.starter_code ?? '');
+  const setActiveCode = (next: string) => {
+    if (!pendingTurn) return;
+    if (isRevealing) complete();
+    setCodeState({ turnId: pendingTurn.turn_id, code: next });
+  };
+  const canSubmit = Boolean(interview.answer.trim() || (showCodeEditor && activeCode.trim()));
 
   const readOnlyAnswer = conversation.closing || awaiting;
   const isSubmitting = busy && !awaiting;
@@ -129,13 +150,26 @@ export function EvidenceTextInterview({ interview, onHistory, onStop }: {
             </span>
           )}
         </div>
-        <textarea id="interview-answer" aria-label="Câu trả lời" className={`h-40 min-h-32 w-full resize-none overflow-y-auto rounded-xl border p-4 text-sm leading-relaxed transition-colors focus-visible:outline-2 focus-visible:outline-brand-orange lg:h-auto lg:flex-1 ${readOnlyAnswer ? 'bg-muted/40 text-muted-foreground' : 'bg-background'} ${session.pending_turn?.mode === 'CODING' ? 'font-mono' : ''}`}
+        {showCodeEditor && pendingTurn && (
+          <InterviewCodeEditor
+            key={pendingTurn.turn_id}
+            sessionId={session.session_id}
+            turnId={pendingTurn.turn_id}
+            value={activeCode}
+            onChange={setActiveCode}
+            codingSpec={pendingTurn.coding_spec}
+            questionHint={`${turnSkillId(session, pendingTurn)} ${pendingTurn.question}`}
+            disabled={busy}
+            readOnly={readOnlyAnswer}
+          />
+        )}
+        <textarea id="interview-answer" aria-label="Câu trả lời" className={`w-full resize-none overflow-y-auto rounded-xl border p-4 text-sm leading-relaxed transition-colors focus-visible:outline-2 focus-visible:outline-brand-orange ${showCodeEditor ? 'h-24 min-h-20' : 'h-40 min-h-32 lg:h-auto lg:flex-1'} ${readOnlyAnswer ? 'bg-muted/40 text-muted-foreground' : 'bg-background'} ${!showCodeEditor && session.pending_turn?.mode === 'CODING' ? 'font-mono' : ''}`}
           maxLength={conversation.introducing ? 10000 : 50000} value={answerValue} readOnly={readOnlyAnswer}
           onChange={e => { if (isRevealing) complete(); interview.setAnswer(e.target.value); }} disabled={busy || (!conversation.introducing && !session.pending_turn)}
-          placeholder={answerPlaceholder} />
+          placeholder={showCodeEditor ? 'Giải thích hướng giải hoặc độ phức tạp (tuỳ chọn)…' : answerPlaceholder} />
         <div className="flex flex-wrap items-center gap-3">{conversation.closing
           ? <Button disabled={busy} onClick={() => void interview.converse('NEXT')}>Xem kết quả</Button>
-          : <>{!awaiting && <Button disabled={busy || !interview.answer.trim()} onClick={() => void interview.submit()}>{isSubmitting
+          : <>{!awaiting && <Button disabled={busy || !canSubmit} onClick={() => void interview.submit(interview.answer, showCodeEditor && activeCode.trim() ? activeCode : undefined)}>{isSubmitting
               ? <><LoaderCircle size={15} className="animate-spin" />{conversation.introducing ? 'Đang gửi giới thiệu…' : 'Đang đánh giá…'}</>
               : <><Send size={15} />Gửi câu trả lời</>}</Button>}
             <Button variant="outline" disabled={busy} onClick={onStop}>Kết thúc phiên</Button>

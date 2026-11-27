@@ -15,6 +15,7 @@
           ],
           "evidence_scope": "xq18-search-race",
           "requires_code": false,
+          "coding_spec": null,
           "mode": "DEBUGGING",
           "depth": 2
         }
@@ -31,6 +32,7 @@
           ],
           "evidence_scope": "q11-case",
           "requires_code": false,
+          "coding_spec": null,
           "mode": "DEBUGGING",
           "depth": 3
         }
@@ -47,6 +49,7 @@
           ],
           "evidence_scope": "q07-case",
           "requires_code": false,
+          "coding_spec": null,
           "mode": "DESIGN",
           "depth": 4
         }
@@ -95,6 +98,7 @@
           ],
           "evidence_scope": "xq11-mock-timeout-test",
           "requires_code": false,
+          "coding_spec": null,
           "mode": "CODING",
           "depth": 3
         }
@@ -111,6 +115,7 @@
           ],
           "evidence_scope": "xq37-dedup-bounded-memory",
           "requires_code": false,
+          "coding_spec": null,
           "mode": "CODING",
           "depth": 3
         }
@@ -127,6 +132,7 @@
           ],
           "evidence_scope": "xq03-async-lost-update",
           "requires_code": false,
+          "coding_spec": null,
           "mode": "DEBUGGING",
           "depth": 3
         }
@@ -166,7 +172,7 @@
       {
         "target_criterion": "{\"skill_id\": \"kiểm thử\", \"claim\": \"Chọn đầu vào kiểm tra giới hạn độ dài mật khẩu.\", \"target_depth\": 2, \"criteria\": [{\"criterion_id\": \"dialogue-train:c1\", \"description\": \"Chọn đầu vào kiểm tra giới hạn độ dài mật khẩu.\", \"expected_evidence\": \"Chọn mật khẩu 7 ký tự để kiểm tra việc từ chối.\", \"at_target\": \"Chọn mật khẩu 7 ký tự để kiểm tra việc từ chối.\", \"below_target\": \"Chọn đầu vào hợp lệ để kiểm tra việc từ chối.\", \"above_target\": \"Xác định hai phía của biên độ dài.\"}]}",
         "question_contract": "{\"action\": \"ASK_EASIER\", \"interaction_mode\": \"VOICE\", \"required_question_contract\": {\"mode\": \"TECHNICAL_EXPLANATION\", \"depth\": 1, \"criterion_ids\": [\"dialogue-train:c1\"]}, \"depth_definition\": \"Foundation: recognize, define and explain fundamental concepts\", \"probe_reason\": \"\"}",
-        "session_context": "{\"cv_evidence\": [], \"history\": [{\"turn_id\": \"dialogue-train-first\", \"objective_id\": \"dialogue-train\", \"skill_id\": \"kiểm thử\", \"mode\": \"TECHNICAL_EXPLANATION\", \"action\": \"INITIAL\", \"question_depth\": 2, \"question\": {\"text\": \"Mật khẩu phải dài ít nhất 8 ký tự. Bạn sẽ thử đầu vào nào để phát hiện lỗi chấp nhận mật khẩu quá ngắn?\", \"criterion_ids\": [\"dialogue-train:c1\"], \"evidence_scope\": \"dialogue-train-case\", \"requires_code\": false}, \"answer\": \"Em chưa biết.\", \"submitted_code\": null, \"transcript\": null, \"judgment\": {\"observations\": [{\"criterion_id\": \"dialogue-train:c1\", \"response_excerpt\": \"\", \"response_line_range\": null, \"observation\": \"NO_EVIDENCE\", \"performance\": \"UNDETERMINED\", \"rationale\": \"Ứng viên cho biết chưa trả lời được.\", \"resolves_contradiction\": false, \"unresolved_aspects\": []}], \"feedback\": \"Cảm ơn bạn đã chia sẻ.\", \"explicit_inability\": true, \"inability_excerpt\": \"Em chưa biết.\", \"feedback_contains_hint\": false}, \"introduction\": \"\"}], \"prior_observations\": [], \"other_questions\": []}",
+        "session_context": "{\"cv_evidence\": [], \"history\": [{\"turn_id\": \"dialogue-train-first\", \"objective_id\": \"dialogue-train\", \"skill_id\": \"kiểm thử\", \"mode\": \"TECHNICAL_EXPLANATION\", \"action\": \"INITIAL\", \"question_depth\": 2, \"question\": {\"text\": \"Mật khẩu phải dài ít nhất 8 ký tự. Bạn sẽ thử đầu vào nào để phát hiện lỗi chấp nhận mật khẩu quá ngắn?\", \"criterion_ids\": [\"dialogue-train:c1\"], \"evidence_scope\": \"dialogue-train-case\", \"requires_code\": false, \"coding_spec\": null}, \"answer\": \"Em chưa biết.\", \"submitted_code\": null, \"transcript\": null, \"coding_checks\": null, \"judgment\": {\"observations\": [{\"criterion_id\": \"dialogue-train:c1\", \"response_excerpt\": \"\", \"response_line_range\": null, \"observation\": \"NO_EVIDENCE\", \"performance\": \"UNDETERMINED\", \"rationale\": \"Ứng viên cho biết chưa trả lời được.\", \"resolves_contradiction\": false, \"unresolved_aspects\": []}], \"feedback\": \"Cảm ơn bạn đã chia sẻ.\", \"explicit_inability\": true, \"inability_excerpt\": \"Em chưa biết.\", \"feedback_contains_hint\": false}, \"introduction\": \"\"}], \"prior_observations\": [], \"other_questions\": []}",
         "reasoning": "Lượt ASK_EASIER (VOICE, TECHNICAL_EXPLANATION L1): bám đúng tiêu chí 'Chọn mật khẩu 7 ký tự để kiểm tra việc từ chối.', giữ một nhiệm vụ rõ ràng, phạm vi 'dialogue-train-case-foundation' và không lộ.",
         "question": {
           "text": "Mật khẩu dài 6 ký tự có đạt mức tối thiểu 8 ký tự không?",
@@ -175,6 +181,7 @@
           ],
           "evidence_scope": "dialogue-train-case-foundation",
           "requires_code": false,
+          "coding_spec": null,
           "mode": "TECHNICAL_EXPLANATION",
           "depth": 1
         }
@@ -182,7 +189,7 @@
       {
         "target_criterion": "{\"skill_id\": \"kiểm thử\", \"claim\": \"Chọn đầu vào kiểm tra giới hạn độ dài mật khẩu.\", \"target_depth\": 2, \"criteria\": [{\"criterion_id\": \"dialogue-train:c1\", \"description\": \"Chọn đầu vào kiểm tra giới hạn độ dài mật khẩu.\", \"expected_evidence\": \"Chọn mật khẩu 7 ký tự để kiểm tra việc từ chối.\", \"at_target\": \"Chọn mật khẩu 7 ký tự để kiểm tra việc từ chối.\", \"below_target\": \"Chọn đầu vào hợp lệ để kiểm tra việc từ chối.\", \"above_target\": \"Xác định hai phía của biên độ dài.\"}]}",
         "question_contract": "{\"action\": \"CLARIFY\", \"interaction_mode\": \"TEXT\", \"required_question_contract\": {\"mode\": \"TECHNICAL_EXPLANATION\", \"depth\": 2, \"criterion_ids\": [\"dialogue-train:c1\"], \"evidence_scope\": \"dialogue-train-case\"}, \"depth_definition\": \"Application: independently apply a concept to a concrete bounded task\", \"probe_reason\": \"\"}",
-        "session_context": "{\"cv_evidence\": [], \"history\": [{\"turn_id\": \"dialogue-train-first\", \"objective_id\": \"dialogue-train\", \"skill_id\": \"kiểm thử\", \"mode\": \"TECHNICAL_EXPLANATION\", \"action\": \"INITIAL\", \"question_depth\": 2, \"question\": {\"text\": \"Mật khẩu phải dài ít nhất 8 ký tự. Bạn sẽ thử đầu vào nào để phát hiện lỗi chấp nhận mật khẩu quá ngắn?\", \"criterion_ids\": [\"dialogue-train:c1\"], \"evidence_scope\": \"dialogue-train-case\", \"requires_code\": false}, \"answer\": \"Em sẽ thử một mật khẩu ngắn.\", \"submitted_code\": null, \"transcript\": null, \"judgment\": {\"observations\": [{\"criterion_id\": \"dialogue-train:c1\", \"response_excerpt\": \"\", \"response_line_range\": null, \"observation\": \"UNCLEAR\", \"performance\": \"UNDETERMINED\", \"rationale\": \"Ứng viên nêu hướng thử nhưng chưa chọn giá trị cụ thể.\", \"resolves_contradiction\": false, \"unresolved_aspects\": [\"Giá trị đầu vào cụ thể\"]}], \"feedback\": \"\", \"explicit_inability\": false, \"inability_excerpt\": \"\", \"feedback_contains_hint\": false}, \"introduction\": \"\"}], \"prior_observations\": [], \"other_questions\": []}",
+        "session_context": "{\"cv_evidence\": [], \"history\": [{\"turn_id\": \"dialogue-train-first\", \"objective_id\": \"dialogue-train\", \"skill_id\": \"kiểm thử\", \"mode\": \"TECHNICAL_EXPLANATION\", \"action\": \"INITIAL\", \"question_depth\": 2, \"question\": {\"text\": \"Mật khẩu phải dài ít nhất 8 ký tự. Bạn sẽ thử đầu vào nào để phát hiện lỗi chấp nhận mật khẩu quá ngắn?\", \"criterion_ids\": [\"dialogue-train:c1\"], \"evidence_scope\": \"dialogue-train-case\", \"requires_code\": false, \"coding_spec\": null}, \"answer\": \"Em sẽ thử một mật khẩu ngắn.\", \"submitted_code\": null, \"transcript\": null, \"coding_checks\": null, \"judgment\": {\"observations\": [{\"criterion_id\": \"dialogue-train:c1\", \"response_excerpt\": \"\", \"response_line_range\": null, \"observation\": \"UNCLEAR\", \"performance\": \"UNDETERMINED\", \"rationale\": \"Ứng viên nêu hướng thử nhưng chưa chọn giá trị cụ thể.\", \"resolves_contradiction\": false, \"unresolved_aspects\": [\"Giá trị đầu vào cụ thể\"]}], \"feedback\": \"\", \"explicit_inability\": false, \"inability_excerpt\": \"\", \"feedback_contains_hint\": false}, \"introduction\": \"\"}], \"prior_observations\": [], \"other_questions\": []}",
         "reasoning": "Lượt CLARIFY (TEXT, TECHNICAL_EXPLANATION L2): bám đúng tiêu chí 'Chọn mật khẩu 7 ký tự để kiểm tra việc từ chối.', giữ một nhiệm vụ rõ ràng, phạm vi 'dialogue-train-case' và không lộ đáp án.",
         "question": {
           "text": "Mật khẩu bạn định thử dài bao nhiêu ký tự?",
@@ -191,6 +198,7 @@
           ],
           "evidence_scope": "dialogue-train-case",
           "requires_code": false,
+          "coding_spec": null,
           "mode": "TECHNICAL_EXPLANATION",
           "depth": 2
         }
@@ -207,6 +215,7 @@
           ],
           "evidence_scope": "xq06-selectivity-foundation",
           "requires_code": false,
+          "coding_spec": null,
           "mode": "TECHNICAL_EXPLANATION",
           "depth": 1
         }

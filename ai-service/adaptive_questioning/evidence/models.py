@@ -6,6 +6,7 @@ from typing import Literal, TypedDict
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from skill_gap.domain.models import JobTask
+from .code_runner import CodingCaseResult, CodingSpec, PublicCodingSpec, SupportedLanguage
 from .policy_config import InterviewPolicy
 
 
@@ -226,6 +227,7 @@ class StoredQuestion(BaseModel):
     criterion_ids: list[str] = Field(min_length=1)
     evidence_scope: str = ""
     requires_code: bool = False
+    coding_spec: CodingSpec | None = None
 
 
 class Question(StoredQuestion):
@@ -298,7 +300,10 @@ class VerificationBatchDraft(BaseModel):
 
 class CodingCheckResult(BaseModel):
     passed: int = Field(ge=0)
-    total: int = Field(gt=0)
+    total: int = Field(ge=0)
+    language: str = ""
+    compile_error: str = ""
+    sample_results: list[CodingCaseResult] = Field(default_factory=list)
 
 
 class Turn(BaseModel):
@@ -465,6 +470,22 @@ class NextQuestionRequest(BaseModel):
     expected_state_version: int
 
 
+class RunCodeRequest(BaseModel):
+    snapshot: Snapshot
+    turn_id: str
+    code: str = Field(min_length=1, max_length=16000)
+    language: SupportedLanguage | None = None
+
+
+class RunCodeResponse(BaseModel):
+    language: SupportedLanguage
+    passed: int = 0
+    total: int = 0
+    compile_error: str = ""
+    stdout: str = ""
+    results: list[CodingCaseResult] = Field(default_factory=list)
+
+
 class TurnReview(BaseModel):
     turn_id: str
     excerpt: str
@@ -504,6 +525,7 @@ class Report(BaseModel):
 
 class PendingTurn(BaseModel):
     requires_code: bool = False
+    coding_spec: PublicCodingSpec | None = None
     turn_id: str
     objective_id: str
     mode: Mode

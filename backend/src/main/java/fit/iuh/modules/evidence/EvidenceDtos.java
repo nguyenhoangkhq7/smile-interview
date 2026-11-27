@@ -71,4 +71,9 @@ public final class EvidenceDtos {
             @JsonProperty("expected_state_version") @Min(1) long expectedVersion,
             @NotBlank @Pattern(regexp = "NEXT|SUBMIT_INTRODUCTION|SKIP_INTRODUCTION") String action,
             @Size(max = 10000) String introduction) {}
+
+    public record RunCode(
+            @JsonProperty("turn_id") @NotBlank String turnId,
+            @NotBlank @Size(max = 16000) String code,
+            @Pattern(regexp = "python|javascript|sql") String language) {}
 }

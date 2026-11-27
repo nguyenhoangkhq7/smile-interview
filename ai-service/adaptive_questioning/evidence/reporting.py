@@ -228,10 +228,12 @@ def report(snapshot: Snapshot) -> Report:
 def pending_turn(turn: Turn | None) -> PendingTurn | None:
     if turn is None:
         return None
+    public_spec = turn.question.coding_spec.to_public() if turn.question.coding_spec else None
     return PendingTurn(
         turn_id=turn.turn_id, objective_id=turn.objective_id,
         mode=turn.mode, question=turn.question.text,
         introduction=turn.introduction, requires_code=turn.question.requires_code,
+        coding_spec=public_spec,
     )
 
 

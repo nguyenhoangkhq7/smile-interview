@@ -113,7 +113,11 @@ try {
       } else {
         await click('Bắt đầu trò chuyện');
         await page.waitForFunction(() => window.__frames?.onmessage && window.__simliMock?.bytes > 0);
-        if (scenario === 'VOICE_CODE') await page.type('#voice-code', code.split('\n', 1)[0]);
+        if (scenario === 'VOICE_CODE') {
+          await page.waitForSelector('#voice-code-wrapper .cm-content');
+          await page.click('#voice-code-wrapper .cm-content');
+          await page.keyboard.type(code.split('\n', 1)[0]);
+        }
         await page.evaluate(() => {
           for (let i = 0; i < Math.ceil(window.__captureRate * 0.5 / 2048); i++)
             window.__frames.onmessage({ data: new Float32Array(2048).fill(0.14) });
@@ -123,12 +127,17 @@ try {
         if (scenario === 'VOICE_CODE') {
           await click('Nhận diện lại bản ghi');
           await waitText(spoken);
-          await page.type('#voice-code', code.slice(code.indexOf('\n')));
+          await page.click('#voice-code-wrapper .cm-content');
+          await page.keyboard.press('End');
+          for (const line of code.split('\n').slice(1)) {
+            await page.keyboard.press('Enter');
+            await page.keyboard.type(line);
+          }
           await new Promise(resolve => setTimeout(resolve, 900));
           assert.equal(writes.length, 0);
           await click('Nộp bài');
-          await page.waitForFunction(() => document.querySelector('[role="alert"]') && !document.querySelector('#voice-code')?.disabled);
-          assert.equal(await page.$eval('#voice-code', el => el.value), code);
+          await page.waitForFunction(() => document.querySelector('[role="alert"]') && document.querySelector('#voice-code-wrapper .cm-content')?.getAttribute('contenteditable') === 'true');
+          assert.equal(await page.$eval('#voice-code-wrapper .cm-content', el => el.innerText.replace(/\r/g, '').trim()), code);
           await click('Nộp bài');
         }
       }

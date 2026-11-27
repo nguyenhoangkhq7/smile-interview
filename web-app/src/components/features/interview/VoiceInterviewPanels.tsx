@@ -5,6 +5,7 @@ import { Check, LoaderCircle, Mic, UserRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MarkdownContent } from '@/components/common/MarkdownContent';
 import type { VoiceInterviewRoom } from '@/hooks/useVoiceInterviewRoom';
+import { InterviewCodeEditor } from './InterviewCodeEditor';
 import styles from './EvidenceVoiceInterview.module.css';
 
 export function VoiceAvatarPanel({ room }: { room: VoiceInterviewRoom }) {
@@ -36,13 +37,32 @@ export function VoiceQuestionPanel({ room }: { room: VoiceInterviewRoom }) {
 }
 
 function VoiceCodeAnswer({ room }: { room: VoiceInterviewRoom }) {
-  const [code, setCode] = useState('');
-  return <div className="space-y-2 p-3"><label htmlFor="voice-code">Mã nguồn</label>
-    <textarea id="voice-code" spellCheck={false} className="min-h-36 w-full rounded border p-2 font-mono"
-      value={code} onChange={event => setCode(event.target.value)} disabled={room.busy} />
-    <div className="flex gap-2"><Button disabled={!code.trim() || room.cannotSubmit} onClick={() => void room.voice.submit(room.interview.answer, code)}>Nộp bài</Button>
-      <Button variant="outline" disabled={room.cannotSubmit} onClick={() => void room.voice.submit('Em chưa biết.')}>Chưa làm được</Button></div>
-  </div>;
+  const pending = room.session?.pending_turn;
+  const [code, setCode] = useState(() => pending?.coding_spec?.starter_code ?? '');
+  if (!room.session || !pending) return null;
+  return (
+    <div id="voice-code-wrapper" className="space-y-2.5 border-t p-3">
+      <p className="text-xs font-semibold text-muted-foreground uppercase">Mã nguồn</p>
+      <InterviewCodeEditor
+        sessionId={room.session.session_id}
+        turnId={pending.turn_id}
+        value={code}
+        onChange={setCode}
+        codingSpec={pending.coding_spec}
+        questionHint={pending.question}
+        disabled={room.busy}
+        compact
+      />
+      <div className="flex flex-wrap gap-2">
+        <Button disabled={!code.trim() || room.cannotSubmit} onClick={() => void room.voice.submit(room.interview.answer, code)}>
+          Nộp bài
+        </Button>
+        <Button variant="outline" disabled={room.cannotSubmit} onClick={() => void room.voice.submit('Em chưa biết.')}>
+          Chưa làm được
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 export function VoiceAnswerPanel({ room }: { room: VoiceInterviewRoom }) {
