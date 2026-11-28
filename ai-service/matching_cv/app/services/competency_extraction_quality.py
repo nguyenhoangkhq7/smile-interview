@@ -19,20 +19,32 @@ _DOMAIN_SCOPE = re.compile(r"^(?:(?:another|other) )?(?:highly )?regulated (?:do
 _DOMAIN_QUALIFICATION = re.compile(
     r"\b(?:experience|expertise|background|knowledge|familiarity|proficiency)"
     r"\s+(?:(?:working\s+)?(?:in|with|of|on)\s+)|"
-    r"\b(?:kinh nghiệm|kiến thức|am hiểu)\s+(?:về\s+|trong\s+|với\s+)?"
+    r"\b(?:understanding of|familiar with|worked in|speciali[sz]ed in)\s+|"
+    r"\b(?:kinh nghiệm|kiến thức|am hiểu|hiểu biết)\s+(?:về\s+|trong\s+|với\s+)?"
 )
 _GAP_CUE = re.compile(r"\b(?:no|not|without|lack(?:s|ing)?|never|chưa|không)\b")
-_COMPANY_PRODUCT = re.compile(
-    r"^(?:[A-Z][\w&.'-]*[ \t]+){1,5}(?:builds|offers|provides|operates|develops)\s+(?:a|an|the)\s+",
+_DOMAIN_CLAUSE_END = re.compile(
+    r"[;!?•]|\.(?!\w)|\b(?:for|to|using|supporting|on behalf of|"
+    r"in (?:a|an|the|our)|để|cho|nhằm|bằng)\b"
 )
-_PAYMENT_WORK = re.compile(
-    r"\b(?:migrat(?:ed|ing)|design(?:ed|ing)|implement(?:ed|ing)|built|build(?:ing)?|"
-    r"develop(?:ed|ing)|operat(?:ed|ing)|maintain(?:ed|ing)|led|owned|"
-    r"phát triển|triển khai|vận hành|xây dựng|thiết kế)\b"
-    r"[^.;!?\n•]{0,95}?\b(?P<mention>payments\b|payment(?=\s+"
-    r"(?:modules?|microservices?|services?|systems?|gateways?|processing|platforms?|flows?)\b)|thanh toán\b)",
-    re.IGNORECASE,
+_CLAUSE_BOUNDARY = re.compile(r"[;!?•]|\.(?!\w)|\b(?:but|however|nhưng|tuy nhiên)\b")
+_COMPANY_EXPERIENCE = re.compile(
+    r"^(?:we|our (?:team|company)|the company)\s+(?:have|has|bring|brings|offer|offers|speciali[sz]e[sd]?)\b"
 )
+_CANDIDATE_REQUIREMENT = re.compile(
+    r"\b(?:must|require[sd]?|preferred|candidates?|looking for|seeking|"
+    r"you (?:have|bring|need|should)|ứng viên|yêu cầu|ưu tiên|bắt buộc)\b"
+)
+_DOMAIN_EXPERIENCE_SUFFIX = re.compile(
+    r"\s+(?:(?:domain|industry)\s+)?(?:experience|knowledge|expertise|familiarity)\b"
+)
+_PROJECT_IMPLEMENTATION = re.compile(
+    r"\b(?:build(?:ing)?|develop(?:ing|ment)?|implement(?:ing|ation)?|integrat(?:ing|ion)|"
+    r"migrat(?:ing|ion)|deploy(?:ing|ment)?|maintain(?:ing)?|"
+    r"triển khai|phát triển|xây dựng|tích hợp|bảo trì)\b"
+)
+_JD_REQUIREMENT_PREFIX = r"\b(?:must have|must understand|require[sd]?|yêu cầu|bắt buộc|ưu tiên)\s+"
+_JD_REQUIREMENT_SUFFIX = r"\s+(?:is\s+|are\s+)?(?:required|preferred|mandatory|bắt buộc|là điểm cộng)\b"
 _REGISTERED_STACKS = {
     "java-spring-boot": (("java", r"java"), ("spring-boot", r"spring\s+boot")),
 }
@@ -40,7 +52,6 @@ _DESIGN_SYSTEM_WORK = re.compile(
     r"\b(?:build(?:ing)?|built|design(?:ed|ing)?|maintain(?:ed|ing)?|extend(?:ed|ing)?|"
     r"develop(?:ed|ing)?|contribut(?:e|ed|ing)\s+to)\b[^.;!?]{0,55}\bdesign systems?\b"
 )
-_PAYMENT_DOMAIN_IDS = {"payments", "payment-gateway", "payment-processing"}
 INTEGRATION_TEST_SKILL_ID = "integration-tests"
 INTEGRATION_TEST_VARIANTS = {"integration-test", "integration-testing"}
 _INTEGRATION_TEST = re.compile(r"\bintegration[\s-]+test(?:s|ing)?\b", re.IGNORECASE)
@@ -60,32 +71,83 @@ def _has_domain_qualification(evidence: Evidence) -> bool:
     mention = norm_casefold(evidence.surface_form)
     if not mention:
         return False
+    if _FUTURE_ACTIVITY.search(sentence):
+        return False
+    term = rf"(?<!\w){re.escape(mention)}(?!\w)"
     for cue in _DOMAIN_QUALIFICATION.finditer(sentence):
-        clause = re.split(r"[.;!?]", sentence[cue.end():], maxsplit=1)[0][:110]
-        if mention in clause and not _GAP_CUE.search(sentence[max(0, cue.start() - 24):cue.start()]):
+        clause = _DOMAIN_CLAUSE_END.split(sentence[cue.end():], maxsplit=1)[0][:110]
+        before = _CLAUSE_BOUNDARY.split(sentence[:cue.start()])[-1]
+        occurrence = re.search(term, clause)
+        if occurrence and not _GAP_CUE.search(before + clause) and not _PROJECT_IMPLEMENTATION.search(clause[:occurrence.start()]):
             return True
-    return False
+    return not _GAP_CUE.search(sentence) and bool(re.search(term + _DOMAIN_EXPERIENCE_SUFFIX.pattern, sentence))
 
 
-def _is_contextual_domain(skill: ExtractedSkill, side: str | None) -> bool:
-    if skill.kind != "domain" and skill.category != "Domain Knowledge":
+def is_domain_skill(skill: ExtractedSkill) -> bool:
+    return skill.kind == "domain" or (
+        skill.category == "Domain Knowledge" and skill.kind in {None, "skill", "context"}
+    )
+
+
+def _has_jd_domain_requirement(evidence: Evidence) -> bool:
+    sentence = norm_casefold(evidence.sentence)
+    mention = norm_casefold(evidence.surface_form)
+    if not mention or _GAP_CUE.search(sentence):
         return False
-    label = norm_casefold(skill.label)
-    if _DOMAIN_SCOPE.fullmatch(label):
-        return True
-    if not skill.evidences or any(_has_domain_qualification(ev) for ev in skill.evidences):
+    term = rf"(?<!\w){re.escape(mention)}(?!\w)"
+    return bool(re.search(_JD_REQUIREMENT_PREFIX + term + "|" + term + _JD_REQUIREMENT_SUFFIX, sentence))
+
+
+def is_jd_requirement_context(sentence: str, section: str | None) -> bool:
+    text = norm_casefold(sentence)
+    return (
+        section != "benefits" and not _COMPANY_EXPERIENCE.match(text)
+        and (section != "about" or bool(_CANDIDATE_REQUIREMENT.search(text)))
+    )
+
+
+def _is_qualified_domain_evidence(evidence: Evidence, side: str, text: str) -> bool:
+    if not evidence.verbatim_ok or locate_sentence(text, evidence.sentence) is None:
         return False
-    if _DOMAIN_OBJECT.search(label):
+    sentence = norm_casefold(evidence.sentence)
+    if side == "CV" and _COMPANY_EXPERIENCE.match(sentence):
+        return False
+    if side == "JD" and not is_jd_requirement_context(sentence, evidence.section):
+        return False
+    if _has_domain_qualification(evidence) or (side == "JD" and _has_jd_domain_requirement(evidence)):
         return True
-    return side == "JD" and all(
-        ev.section == "about" or _COMPANY_PRODUCT.search(ev.sentence.strip())
-        for ev in skill.evidences
+    phrase = sentence.strip(" •-*.;:")
+    return (
+        side == "JD" and evidence.section in {"requirements", "nice_to_have"}
+        and phrase == norm_casefold(evidence.surface_form) and not _DOMAIN_OBJECT.search(phrase)
     )
 
 
 def _as_context(skill: ExtractedSkill) -> ExtractedSkill:
     evidences = [ev.model_copy(update={"kind": "context", "kind_source": "inferred"}) for ev in skill.evidences]
     return skill.model_copy(update={"kind": "context", "evidences": evidences})
+
+
+def _with_evidences(skill: ExtractedSkill, evidences: list[Evidence]) -> ExtractedSkill:
+    return skill.model_copy(update={
+        "evidences": evidences,
+        "surface_forms": list(dict.fromkeys(ev.surface_form for ev in evidences if ev.surface_form)),
+        "sections": list(dict.fromkeys(ev.section for ev in evidences if ev.section)),
+    })
+
+
+def _refine_domain(skill: ExtractedSkill, side: str, text: str) -> list[ExtractedSkill]:
+    if skill.kind == "context" or _DOMAIN_SCOPE.fullmatch(norm_casefold(skill.label)):
+        return [_as_context(skill)]
+    qualified, context = [], []
+    for evidence in skill.evidences:
+        destination = qualified if _is_qualified_domain_evidence(evidence, side, text) else context
+        destination.append(evidence)
+    if not qualified:
+        return [_as_context(skill)]
+    if not context:
+        return [skill]
+    return [_with_evidences(skill, qualified), _as_context(_with_evidences(skill, context))]
 
 
 _COVERAGE_ANALYSIS_LABEL = re.compile(r"(?:(?:code|test) )?coverage analysis|analysis of (?:(?:code|test) )?coverage")
@@ -122,8 +184,6 @@ def _refine_kind(skill: ExtractedSkill, side: str) -> ExtractedSkill:
         or has_unsupported_coverage_analysis(skill.label, (ev.sentence for ev in skill.evidences if ev.offset_resolved))
     ):
         return _as_context(skill)
-    if _is_contextual_domain(skill, side):
-        return _as_context(skill)
     if skill.kind != "context" or skill.skill_id not in {"design-system", "design-systems"}:
         return skill
     if not any(
@@ -135,36 +195,6 @@ def _refine_kind(skill: ExtractedSkill, side: str) -> ExtractedSkill:
         return skill
     evidences = [ev.model_copy(update={"kind": "skill", "kind_source": "inferred"}) for ev in skill.evidences]
     return skill.model_copy(update={"kind": "skill", "evidences": evidences})
-
-
-def _payment_evidence(text: str) -> Iterable[Evidence]:
-    sections = find_section_spans(text)
-    # Work claims can wrap across PDF lines. Normalize horizontal layout and locate the whole span again.
-    for span in _CV_SENTENCE_BOUNDARIES.split(text):
-        normalized = " ".join(span.strip().lstrip("•●▪*- ").split())
-        match = _PAYMENT_WORK.search(normalized)
-        claim = norm_casefold(normalized[:match.end()]) if match else ""
-        if match is None or _GAP_CUE.search(claim) or re.search(r"\b(?:looking to|seeking to|want to|plan to)\b", claim):
-            continue
-        location = locate_sentence(text, normalized)
-        if location is None:
-            continue
-        start, end = location
-        section = section_at(sections, start)
-        if section not in _WORK_SECTIONS:
-            continue
-        original = text[start:end]
-        surface = match.group("mention")
-        # Search the matched mention in the original span to get source offsets for wrapped PDF lines.
-        offsets = re.search(r"(?<!\w)" + r"\s+".join(map(re.escape, surface.split())) + r"(?!\w)", original, re.I)
-        if offsets is None:
-            continue
-        yield Evidence(
-            surface_form=original[offsets.start():offsets.end()], sentence=original,
-            kind="domain", category="Domain Knowledge", kind_source="inferred", section=section,
-            start=start, end=end, offset_resolved=True, verbatim_ok=True,
-            mention_start=start + offsets.start(), mention_end=start + offsets.end(),
-        )
 
 
 def _integration_test_claim(clause: str, mention: re.Match[str], section: str | None) -> bool:
@@ -234,21 +264,16 @@ def refine_competency_entities(
     """Refine extraction and recover selected verbatim competencies before embedding."""
     if not text or side not in {"CV", "JD"}:
         return entities
-    refined = [
-        _refine_kind(skill, side)
-        for entity in entities
-        for skill in _split_stack(entity, text)
-    ]
+    refined = []
+    for entity in entities:
+        for skill in _split_stack(entity, text):
+            if is_domain_skill(skill):
+                refined.extend(_refine_domain(skill, side, text))
+            else:
+                refined.append(_refine_kind(skill, side))
     refined.extend(recover_engineering_competencies(refined, text, side))
     if side != "CV":
         return refined
-    if not any(
-        skill.skill_id in _PAYMENT_DOMAIN_IDS and skill.kind == "domain"
-        and any(ev.offset_resolved for ev in skill.evidences) for skill in refined
-    ):
-        evidence = list(_payment_evidence(text))
-        if evidence:
-            refined.append(ExtractedSkill(skill_id="payments", kind="domain", category="Domain Knowledge", evidences=evidence))
     if not any(
         (skill.skill_id == INTEGRATION_TEST_SKILL_ID or skill.skill_id in INTEGRATION_TEST_VARIANTS)
         and skill.kind == "skill"

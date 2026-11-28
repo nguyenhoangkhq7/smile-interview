@@ -106,26 +106,8 @@ def deduplicate_explicit_implicit(
     has_explicit_skills = bool(explicit_result and explicit_result.skills)
     has_non_skills = bool(explicit_result and getattr(explicit_result, "non_skill_entities", None))
 
-    if not explicit_result or (not has_explicit_skills and not has_non_skills):
-        layer_a_accepted = list(verbatim_implicit_skills)
-        if validation_policy == "dedup_plus_evidence_verification":
-            accepted_skills, rejected_skills, verifications = ImplicitEvidenceVerifier.verify_candidates(
-                layer_a_accepted, explicit_result=None, document_type=document_type
-            )
-        else:
-            accepted_skills = layer_a_accepted
-            rejected_skills = []
-            verifications = []
-
-        return DocumentValidationResult(
-            status="completed",
-            validation_origin="original",
-            validation_policy=validation_policy,
-            duplicate_implicit_skills=[],
-            accepted_implicit_skills=accepted_skills,
-            rejected_implicit_skills=rejected_skills,
-            evidence_verifications=verifications,
-        )
+    if not has_explicit_skills and not has_non_skills:
+        explicit_result = None
 
     # Build lookup mappings from the explicit skills
     # 1. Exact canonical skill_ids: id.lower() -> (canonical_id, display_name)
@@ -135,7 +117,7 @@ def deduplicate_explicit_implicit(
     # 3. Slugs of all surface forms: slug -> (canonical_id, surface_form)
     explicit_slugs: Dict[str, Tuple[str, str]] = {}
 
-    for exp_skill in explicit_result.skills or []:
+    for exp_skill in (explicit_result.skills if explicit_result else []):
         first_sf = exp_skill.surface_forms[0] if exp_skill.surface_forms else exp_skill.skill_id
         explicit_ids[exp_skill.skill_id.lower()] = (exp_skill.skill_id, first_sf)
 
@@ -238,32 +220,34 @@ def deduplicate_explicit_implicit(
                     matched_ns = orig_ns
                     break
 
-        if matched_ns is not None:
-            layer_a_rejected_non_skill.append(imp_skill)
-            layer_a_verifications_non_skill.append(
-                ImplicitEvidenceVerification(
-                    skill_id=imp_skill.skill_id,
-                    original_label=imp_skill.label,
-                    assessment="unsupported",
-                    assessment_reason=(
-                        f"Rejected by Stage B1 leakage guard: implicit label '{imp_skill.label}' "
-                        f"matches or contains non_skill_entities item '{matched_ns}'."
-                    ),
-                    is_accepted=False,
-                    confidence=0.0,
-                    skill_name=imp_skill.label,
-                    document_type="JD" if document_type.upper() == "JD" else "CV",
-                    support_status="unsupported",
-                    support_reason=(
-                        f"Rejected by Stage B1 leakage guard: implicit label '{imp_skill.label}' "
-                        f"matches or contains non_skill_entities item '{matched_ns}'."
-                    ),
-                    confidence_normalized=0.0,
-                    acceptance_decision="rejected",
-                )
+        if imp_skill.category == "Domain Knowledge":
+            rejection_reason = "Domain expertise must be stated explicitly in the source document."
+        elif matched_ns is not None:
+            rejection_reason = (
+                f"Rejected by Stage B1 leakage guard: implicit label '{imp_skill.label}' "
+                f"matches or contains non_skill_entities item '{matched_ns}'."
             )
         else:
             layer_a_accepted.append(imp_skill)
+            continue
+
+        layer_a_rejected_non_skill.append(imp_skill)
+        layer_a_verifications_non_skill.append(
+            ImplicitEvidenceVerification(
+                skill_id=imp_skill.skill_id,
+                original_label=imp_skill.label,
+                assessment="unsupported",
+                assessment_reason=rejection_reason,
+                is_accepted=False,
+                confidence=0.0,
+                skill_name=imp_skill.label,
+                document_type="JD" if document_type.upper() == "JD" else "CV",
+                support_status="unsupported",
+                support_reason=rejection_reason,
+                confidence_normalized=0.0,
+                acceptance_decision="rejected",
+            )
+        )
 
     # Layer B: Evidence Validity Verification
     if validation_policy == "dedup_plus_evidence_verification":

@@ -24,6 +24,7 @@ public final class MatchingDtos {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record ExtractedSkillDto(
             @JsonProperty("skill_id") String skillId,
+            @JsonProperty("skill_name") String skillName,
             @JsonProperty("type") String type,
             @JsonProperty("confidence") double confidence,
             @JsonProperty("evidence_spans") List<String> evidenceSpans
@@ -42,6 +43,7 @@ public final class MatchingDtos {
     public record Module1OutputDto(
             @JsonProperty("cv_skills") List<ExtractedSkillDto> cvSkills,
             @JsonProperty("jd_skills") List<ExtractedSkillDto> jdSkills,
-            @JsonProperty("match_results") List<MatchResultDto> matchResults
+            @JsonProperty("match_results") List<MatchResultDto> matchResults,
+            @JsonProperty("eligibility") EligibilityReportDto eligibility
     ) {}
 }

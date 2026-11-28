@@ -21,11 +21,12 @@ from matching_cv.app.schemas.skill_extraction import (
 from matching_cv.app.services.competency_extraction_quality import (
     INTEGRATION_TEST_SKILL_ID,
     INTEGRATION_TEST_VARIANTS,
+    is_domain_skill,
     refine_competency_entities,
 )
 from matching_cv.app.services.section_tagger import find_section_spans, section_at
 from matching_cv.app.services.text_locator import locate_mention_in_sentence, locate_sentence
-from matching_cv.research.data.canonical_skill_normalizer import ENGINEERING_COMPETENCY_ALIASES
+from matching_cv.research.data.canonical_skill_normalizer import DOMAIN_SKILL_ALIASES, ENGINEERING_COMPETENCY_ALIASES
 
 
 
@@ -506,6 +507,8 @@ class SkillPostprocessor:
         canonicalized_list: List[ExtractedSkill] = []
         for s in skills:
             target_id = CANONICAL_SKILL_ID_MAP.get(s.skill_id, s.skill_id)
+            if is_domain_skill(s):
+                target_id = DOMAIN_SKILL_ALIASES.get(target_id, target_id)
             if target_id in canonicalized_by_id:
                 target_skill = canonicalized_by_id[target_id]
                 for sf in s.surface_forms:

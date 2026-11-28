@@ -175,7 +175,7 @@ try {
   await page.reload({ waitUntil: 'networkidle0' }); await text('Các lượt phỏng vấn');
   await page.screenshot({ path: '.next/application-history-desktop.png', fullPage: true });
   await tab('CV & JD'); await text('Tài liệu đã dùng');
-  await text('Đối chiếu theo kỹ năng');
+  await text('Kết quả đối chiếu CV và JD');
   await page.waitForSelector('[data-cv-skill]');
   await page.screenshot({ path: '.next/application-documents-desktop.png', fullPage: true });
   await page.setViewport({ width: 390, height: 844 }); await noOverflow();

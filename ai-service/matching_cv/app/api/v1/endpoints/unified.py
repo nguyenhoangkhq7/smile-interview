@@ -76,6 +76,7 @@ async def analyze(request: Request) -> AnalyzeWithReportResponse:
         analysis_id=resolved_analysis_id,
     )
     report.matching_score = documents.matching_score
+    report.eligibility = match_result.eligibility
     return AnalyzeWithReportResponse(analysis_id=resolved_analysis_id, skills=skills, report=report)
 
 

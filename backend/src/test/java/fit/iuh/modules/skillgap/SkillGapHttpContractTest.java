@@ -29,7 +29,12 @@ class SkillGapHttpContractTest {
                   "job_tasks":[{"task_id":"sql-1","description":"Tối ưu truy vấn SQL",
                     "required_level":4,"evidence_spans":["Tối ưu truy vấn"],
                     "metadata":{"optional":false,"tags":["SQL","EXPLAIN"],"note":null}}]
-                }],"report":{"matching_score":0.85,"degraded":false}}
+                }],"report":{"matching_score":0.85,"degraded":false,
+                  "eligibility":{"state":"complete","results":[{"condition_id":"C1","type":"gpa",
+                    "priority":"required","jd_quote":"GPA > 3.0/4.0","cv_quotes":["GPA 2.9/4.0"],
+                    "status":"not_met","reason":"GPA dưới ngưỡng yêu cầu."}]},"cv_skills":[
+                  {"skill_id":"helm","skill_name":"Helm","type":"explicit","confidence":0.95,
+                   "evidence_spans":["Deployed with Helm"]}]}}
                 """;
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/api/v1/pipeline/analyze", exchange -> {
@@ -76,6 +81,8 @@ class SkillGapHttpContractTest {
                     "jd_skill_id", "required_proficiency", "importance_weight", "priority", "job_tasks", "cv_evidence_spans");
             // Spring Boot 4's MVC and RestClient use Jackson 3 by default.
             var webMapper = tools.jackson.databind.json.JsonMapper.builder().build();
+            assertThat(mapper.readTree(webMapper.writeValueAsString(result)).path("report").path("eligibility"))
+                    .isEqualTo(original.path("report").path("eligibility"));
             assertThat(mapper.readTree(webMapper.writeValueAsString(result)).path("skills").get(0).path("jd_skill_name").asText())
                     .isEqualTo("Tối ưu PostgreSQL");
             assertThat(mapper.readTree(webMapper.writeValueAsString(result)).path("skills").get(0).path("job_tasks"))

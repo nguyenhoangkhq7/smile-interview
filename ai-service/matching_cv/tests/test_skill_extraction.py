@@ -476,11 +476,11 @@ def test_golden_01_backend_cv_and_jd_extraction():
         filename="01_Backend_CV.pdf",
         document_type="CV",
     )
-    assert cv_result.stats.total_mentions == 52
+    assert cv_result.stats.total_mentions == 51
     assert cv_result.stats.unresolved_evidences == 0
-    assert cv_result.stats.unique_skills == 39
-    assert cv_result.stats.non_skill_count == 5
-    assert len(cv_result.non_skill_entities) == 5
+    assert cv_result.stats.unique_skills == 36
+    assert cv_result.stats.non_skill_count == 7
+    assert len(cv_result.non_skill_entities) == 7
     assert cv_result.stats.header_evidences == 0
     assert cv_result.stats.kind_conflicts == 0
     assert cv_result.stats.non_verbatim_mentions == 0
@@ -494,15 +494,16 @@ def test_golden_01_backend_cv_and_jd_extraction():
     )
     assert jd_result.stats.total_mentions == 46
     assert jd_result.stats.unresolved_evidences == 0
-    assert jd_result.stats.unique_skills == 32
-    assert jd_result.stats.non_skill_count == 10
-    assert len(jd_result.non_skill_entities) == 10
+    assert jd_result.stats.unique_skills == 30
+    assert jd_result.stats.non_skill_count == 12
+    assert len(jd_result.non_skill_entities) == 12
     assert jd_result.stats.header_evidences == 0
     assert jd_result.stats.kind_conflicts == 0
     assert jd_result.stats.non_verbatim_mentions == 1
 
-    assert {"payments", "fintech", "kafka"} <= {skill.skill_id for skill in cv_result.skills}
-    assert {"checkout", "inventory-updates", "kyc-onboarding-flow"} <= {
+    assert "kafka" in {skill.skill_id for skill in cv_result.skills}
+    assert {"payments", "fintech"}.isdisjoint(skill.skill_id for skill in cv_result.skills)
+    assert {"fintech", "payment-module", "checkout", "inventory-updates", "kyc-onboarding-flow"} <= {
         skill.skill_id for skill in cv_result.non_skill_entities
     }
     assert {"reporting-system", "compliance-requirements", "highly-regulated-domain"} <= {
@@ -518,7 +519,7 @@ def test_golden_01_backend_cv_and_jd_extraction():
             assert ev.offset_resolved is True
             assert norm(cv_cleaned[ev.start:ev.end]) == norm(ev.sentence)
             cv_checked += 1
-    assert cv_checked == 47
+    assert cv_checked == 44
 
     jd_checked = 0
     for s in jd_result.skills:
@@ -526,7 +527,7 @@ def test_golden_01_backend_cv_and_jd_extraction():
             assert ev.offset_resolved is True
             assert norm(jd_cleaned[ev.start:ev.end]) == norm(ev.sentence)
             jd_checked += 1
-    assert jd_checked == 36
+    assert jd_checked == 34
 
     # Assert text_sha256 matches exact cleaned text sha256
     assert cv_result.text_sha256 == hashlib.sha256(cv_cleaned.encode("utf-8")).hexdigest()
@@ -970,8 +971,8 @@ def test_kind_from_llm_wins_over_category_inferred():
     assert go_skill.evidences[0].kind_source == "inferred"
 
 
-def test_kind_conflicts_increments_stat_and_satisfies_invariant():
-    """Verify conflicting kinds for the same skill_id increments stats.kind_conflicts."""
+def test_domain_qualification_and_same_named_project_context_keep_separate_evidence():
+    """Keep the source qualification and project context on separate entries."""
     from matching_cv.app.services.skill_postprocessor import skill_postprocessor
 
     raw_data = {
@@ -980,7 +981,7 @@ def test_kind_conflicts_increments_stat_and_satisfies_invariant():
                 "mention": "Payment Gateway",
                 "kind": "domain",
                 "category": "Domain Knowledge",
-                "sentence": "Integrated international Payment Gateway services.",
+                "sentence": "Experience in Payment Gateway services.",
             },
             {
                 "mention": "payment gateway",
@@ -990,19 +991,18 @@ def test_kind_conflicts_increments_stat_and_satisfies_invariant():
             },
         ]
     }
-    text = "Integrated international Payment Gateway services. Maintained payment gateway microservice cluster."
+    text = "Experience in Payment Gateway services. Maintained payment gateway microservice cluster."
     result = skill_postprocessor.process_extraction(raw_data, text=text, document_type="CV")
 
     assert result.stats.unique_skills == 1
     assert result.stats.total_mentions == 2
-    assert result.stats.kind_conflicts == 1
+    assert result.stats.kind_conflicts == 0
     skill = result.skills[0]
     assert skill.skill_id == "payment-gateway"
-    assert skill.surface_forms == ["Payment Gateway", "payment gateway"]
-    # First evidence kind is kept for the canonical skill
+    assert skill.surface_forms == ["Payment Gateway"]
     assert skill.kind == "domain"
     assert skill.evidences[0].kind == "domain"
-    assert skill.evidences[1].kind == "context"
+    assert result.non_skill_entities[0].evidences[0].kind == "context"
 
 
 def test_non_verbatim_mention_flagged_and_counted():

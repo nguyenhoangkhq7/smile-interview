@@ -8,7 +8,7 @@ const source = readFileSync(new URL('../src/lib/skillLabels.ts', import.meta.url
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } });
 const sandbox = { exports: {} };
 vm.runInNewContext(compiled.outputText, sandbox);
-const { skillLabel } = sandbox.exports;
+const { jdSkillLabel, skillLabel } = sandbox.exports;
 
 test('restores saved Vietnamese IDs from exact JD evidence without changing the IDs', () => {
   const examples = [
@@ -32,6 +32,30 @@ test('prefers explicit names, preserves technical brands and formats Unicode IDs
   assert.equal(skillLabel('golang'), 'Golang');
   assert.equal(skillLabel('thị-trường-chứng-khoán'), 'thị trường chứng khoán');
   assert.equal(skillLabel('C++'), 'C++');
+});
+
+test('normalizes extracted JD names and their saved ID fallbacks for display', () => {
+  const examples = [
+    ['spring_boot', 'spring BOOT', 'Spring Boot'],
+    ['restful-microservices', 'RESTful microservices', 'RESTful Microservices'],
+    ['query-performance', 'query performance', 'Query Performance'],
+    ['integration-tests', 'integration tests', 'Integration Tests'],
+    ['indexing', 'indexing', 'Indexing'],
+  ];
+  for (const [id, name, expected] of examples) {
+    assert.equal(jdSkillLabel({ jd_skill_id: id, jd_skill_name: name }), expected);
+    assert.equal(jdSkillLabel({ jd_skill_id: id }), expected);
+  }
+});
+
+test('formats extracted names and evidence without losing technical casing or Vietnamese accents', () => {
+  assert.equal(skillLabel('node-js-development', 'node.js development'), 'Node.js Development');
+  assert.equal(skillLabel('ci-cd', 'ci/cd'), 'CI/CD');
+  assert.equal(skillLabel('ebpf-programming', 'eBPF programming'), 'eBPF Programming');
+  assert.equal(skillLabel('service-design', 'restful api – microservice design'), 'RESTful API – Microservice Design');
+  assert.equal(skillLabel('performance testing', 'performance testing'), 'Performance Testing');
+  assert.equal(skillLabel('database-indexing', null, ['Experience with database indexing.']), 'Database Indexing');
+  assert.equal(skillLabel('phan-tich-he-thong', 'phân tích hệ thống'), 'Phân tích hệ thống');
 });
 
 test('does not guess accents from an ambiguous or unrelated quote', () => {

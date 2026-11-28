@@ -1,13 +1,15 @@
 'use client';
 
 import { useId, useMemo, useState, type ReactNode } from 'react';
-import { ChevronDown, ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, FileText, Search, Sparkles } from 'lucide-react';
 import { searchText, skillLabel } from './applicationUi';
 import { getTaskPreparation } from './taskPreparation';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { jdSkillLabel } from '@/lib/skillLabels';
-import type { SkillGapResult, SkillGapReport } from '@/services/cvJdMatching';
+import { EligibilityPanel } from './eligibility/EligibilityPanel';
+import type { ExtractedCvSkill, SkillGapResult, SkillGapReport } from '@/services/cvJdMatching';
 
 const alignmentInfo = {
   MATCH: { label: 'Phù hợp', profileLabel: 'CV có nội dung phù hợp', tone: 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200', order: 2 },
@@ -120,11 +122,70 @@ function ProfileSkillRow({ row, group }: { row: ReturnType<typeof skillRow>; gro
 }
 
 // Candidate pages use structured fields instead of the internal audit Markdown.
-export function CandidateCvJdSummary({ skills, report, view = 'analysis' }: {
+type SummaryProps = {
   skills: SkillGapResult[];
-  report: Pick<SkillGapReport, 'matching_score' | 'degraded'>;
+  report: SkillGapReport;
   view?: 'analysis' | 'profile';
-}) {
+};
+
+export function CandidateCvJdSummary(props: SummaryProps) {
+  const cvSkills = props.report?.cv_skills;
+  return <Tabs defaultValue="jd">
+    <TabsList aria-label="Kết quả phân tích" className="max-w-full">
+      <TabsTrigger value="jd">Đối chiếu với JD</TabsTrigger>
+      <TabsTrigger value="cv">Kỹ năng từ CV{cvSkills && <span className="tabular-nums">({cvSkills.length})</span>}</TabsTrigger>
+    </TabsList>
+    <TabsContent value="jd" className="space-y-4">
+      <JdComparison {...props} />
+      {props.report?.eligibility && <EligibilityPanel report={props.report.eligibility} />}
+    </TabsContent>
+    <TabsContent value="cv"><CvSkillList skills={cvSkills} /></TabsContent>
+  </Tabs>;
+}
+
+function CvSkillList({ skills }: { skills?: ExtractedCvSkill[] | null }) {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const panelId = useId();
+  if (!skills?.length) {
+    return <p className="rounded-xl border px-4 py-6 text-sm text-muted-foreground">
+      {skills ? 'Lần phân tích này chưa trích xuất được kỹ năng nào từ CV.' : 'Lần phân tích này chưa lưu danh sách kỹ năng từ CV.'}
+    </p>;
+  }
+  return <div className="divide-y rounded-xl border bg-card">
+    {(['explicit', 'implicit'] as const).map(type => {
+      const group = skills.filter(skill => skill.type === type);
+      if (!group.length) return null;
+      const direct = type === 'explicit';
+      const Icon = direct ? FileText : Sparkles;
+      const selected = group.find(skill => skill.skill_id === selectedId);
+      const evidenceId = `${panelId}-${type}`;
+      return <section key={type} className="space-y-3 px-4 py-4 sm:px-5">
+        <div className="flex items-center gap-2">
+          <Icon aria-hidden="true" size={16} className="text-muted-foreground" />
+          <h3 className="text-sm font-semibold">{direct ? 'Nêu trực tiếp' : 'Suy ra từ ngữ cảnh'}</h3>
+          <span className="rounded-full bg-muted px-2 text-xs tabular-nums text-muted-foreground">{group.length}</span>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {group.map(skill => {
+            const active = selected?.skill_id === skill.skill_id;
+            return <button key={skill.skill_id} type="button" aria-expanded={active} aria-controls={evidenceId}
+              onClick={() => setSelectedId(active ? null : skill.skill_id)}
+              className="inline-flex min-h-9 max-w-full items-center gap-1.5 rounded-lg border bg-background px-3 py-1.5 text-left text-sm font-medium transition-colors hover:border-brand-orange/50 hover:bg-muted/35 focus-visible:outline-2 focus-visible:outline-brand-orange aria-expanded:border-brand-orange/50 aria-expanded:bg-brand-orange/10">
+              <span className="min-w-0 wrap-anywhere">{skillLabel(skill.skill_id, skill.skill_name, skill.evidence_spans)}</span>
+              <ChevronDown aria-hidden="true" size={13} className={`shrink-0 text-muted-foreground ${active ? 'rotate-180' : ''}`} />
+            </button>;
+          })}
+        </div>
+        <div id={evidenceId} hidden={!selected} className="rounded-lg bg-muted/45 p-3 text-sm leading-6">
+          {selected && <DocumentEvidence title={`Trích dẫn từ CV · ${skillLabel(selected.skill_id, selected.skill_name, selected.evidence_spans)}`}
+            quotes={distinctQuotes(selected.evidence_spans ?? [])} empty="Chưa có trích dẫn từ CV cho kỹ năng này." />}
+        </div>
+      </section>;
+    })}
+  </div>;
+}
+
+function JdComparison({ skills, report, view = 'analysis' }: SummaryProps) {
   const profileView = view === 'profile';
   const showControls = !profileView || skills.length > pageSize;
   const group = useId();

@@ -4,6 +4,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
+from matching_cv.app.eligibility.models import EligibilityReport
 from skill_gap.domain.models import ExtractedCVSkill, ExtractedJDSkill, MatchResult
 
 
@@ -14,6 +15,7 @@ class MatchPipelineRequest(BaseModel):
 
 
 class Module1Output(BaseModel):
+    eligibility: EligibilityReport | None = None
     matcher_source: str = "EXTERNAL"
     cv_skills: List[ExtractedCVSkill] = Field(default_factory=list)
     jd_skills: List[ExtractedJDSkill] = Field(default_factory=list)

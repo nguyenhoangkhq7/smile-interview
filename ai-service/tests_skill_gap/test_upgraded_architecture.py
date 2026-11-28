@@ -383,7 +383,7 @@ def test_fastapi_endpoints_and_module3_contract_interoperability():
     data = analyze_res.json()
     assert data["analysis_id"] == "api_session_01"
     assert set(data) == {"analysis_id", "skills", "report"}
-    assert set(data["report"]) == {"matching_score", "degraded"}
+    assert set(data["report"]) == {"matching_score", "degraded", "cv_skills"}
     assert len(data["skills"]) == 4
     for skill in data["skills"]:
         assert set(skill) - {"jd_evidence_spans"} == {

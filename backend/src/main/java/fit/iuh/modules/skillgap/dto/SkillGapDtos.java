@@ -4,6 +4,9 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import fit.iuh.modules.matching.dto.MatchingDtos.ExtractedSkillDto;
+import fit.iuh.modules.matching.dto.EligibilityReportDto;
+
 import java.util.List;
 import java.util.Map;
 
@@ -35,7 +38,11 @@ public final class SkillGapDtos {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record SkillGapReportDto(
             @JsonProperty("matching_score") Double matchingScore,
-            @JsonProperty("degraded") boolean degraded
+            @JsonProperty("degraded") boolean degraded,
+            @JsonInclude(JsonInclude.Include.NON_NULL)
+            @JsonProperty("cv_skills") List<ExtractedSkillDto> cvSkills,
+            @JsonInclude(JsonInclude.Include.NON_NULL)
+            @JsonProperty("eligibility") EligibilityReportDto eligibility
     ) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)

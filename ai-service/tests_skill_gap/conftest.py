@@ -14,8 +14,10 @@ def fixed_matching_result(monkeypatch):
     ) -> MatchedDocuments:
         return MatchedDocuments(cv_text, jd_text, Module1Output(
             matcher_source="MATCHING_CV",
+            eligibility={"state": "complete", "results": []},
             cv_skills=[
                 ExtractedCVSkill(skill_id="kubernetes", skill_name="Vận hành Kubernetes", type="explicit", confidence=0.9, evidence_spans=[]),
+                ExtractedCVSkill(skill_id="kafka", skill_name="Kafka", type="explicit", confidence=0.9, evidence_spans=["Xây dựng Kafka pipeline"]),
             ],
             jd_skills=[
                 ExtractedJDSkill(skill_id="kubernetes", skill_name="Quản trị Kubernetes", type="explicit", confidence=0.9, evidence_spans=["Kubernetes"]),

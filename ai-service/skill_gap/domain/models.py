@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field, SerializerFunctionWrapHandler, model_serializer
 from typing import List, Optional, Literal
+from matching_cv.app.eligibility.models import EligibilityReport
 from .enums import SkillType, SemanticAlignment, SeniorityLevel, RichnessLabel
 
 UNASSIGNED_JOB_ID = "UNASSIGNED"
@@ -144,6 +145,9 @@ class SkillGapResult(SkillGapSummary):
 
 
 class SkillGapReportSummary(BaseModel):
+    eligibility: EligibilityReport | None = None
+
+    cv_skills: List[ExtractedCVSkill] = Field(default_factory=list)
     matching_score: Optional[float] = Field(
         default=None,
         ge=0.0,
@@ -151,3 +155,10 @@ class SkillGapReportSummary(BaseModel):
         description="Module 1 semantic & dependency GNN CV-JD match score (S_semantic) on a 0-1 scale",
     )
     degraded: bool = False
+
+    @model_serializer(mode="wrap")
+    def serialize_report(self, handler: SerializerFunctionWrapHandler):
+        data = handler(self)
+        if self.eligibility is None:
+            data.pop("eligibility", None)
+        return data

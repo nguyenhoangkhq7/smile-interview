@@ -4,7 +4,12 @@ const labels: Record<string, string> = {
   'html css': 'HTML / CSS', html: 'HTML', css: 'CSS', javascript: 'JavaScript', typescript: 'TypeScript',
   sql: 'SQL', postgresql: 'PostgreSQL', 'postgresql jd': 'PostgreSQL', mysql: 'MySQL', java: 'Java', python: 'Python',
   react: 'React', reactjs: 'React', nodejs: 'Node.js', git: 'Git', docker: 'Docker', 'docker jd': 'Docker',
-  'spring boot': 'Spring Boot', 'rest api': 'REST API', mongodb: 'MongoDB', aws: 'AWS',
+  'spring boot': 'Spring Boot', 'rest api': 'REST API', 'restful microservices': 'RESTful Microservices',
+  'query performance': 'Query Performance', 'integration tests': 'Integration Tests', indexing: 'Indexing',
+  mongodb: 'MongoDB', aws: 'AWS', api: 'API', http: 'HTTP', https: 'HTTPS', ai: 'AI',
+  cv: 'CV', jd: 'JD', sdk: 'SDK', ui: 'UI', ux: 'UX',
+  rest: 'REST', restful: 'RESTful', 'node.js': 'Node.js', 'next.js': 'Next.js', nosql: 'NoSQL',
+  ios: 'iOS', github: 'GitHub', graphql: 'GraphQL', grpc: 'gRPC', 'c++': 'C++', 'c#': 'C#', '.net': '.NET',
   'react native': 'React Native', 'machine learning': 'Machine Learning', 'ci cd': 'CI/CD',
   golang: 'Golang', go: 'Go', redis: 'Redis', oop: 'OOP',
   'ai tools usage': 'Sử dụng công cụ AI',
@@ -15,6 +20,24 @@ const labels: Record<string, string> = {
   'web development basics': 'Phát triển web cơ bản',
   'behavioral competency': 'Kinh nghiệm & Ứng xử (STAR)',
 };
+
+function canonicalLabel(value: string) {
+  const key = value.toLowerCase().replace(/[-_/\s]+/g, ' ');
+  return Object.hasOwn(labels, key) ? labels[key] : undefined;
+}
+
+function formatSkillName(name: string) {
+  const known = canonicalLabel(name);
+  if (known) return known;
+  if (/[^\x00-\x7f]/.test(name.replace(/[^\p{L}\p{M}]/gu, ''))) {
+    return name.replace(/^\p{Ll}/u, initial => initial.toUpperCase());
+  }
+  return name.replace(/\.?[a-z0-9]+(?:\.[a-z0-9]+)*[+#]*/gi, word => {
+    const knownWord = canonicalLabel(word);
+    if (knownWord) return knownWord;
+    return word === word.toLowerCase() ? word[0].toUpperCase() + word.slice(1) : word;
+  });
+}
 
 // Reproduce the old ASCII-only slug strictly for looking up names in saved evidence.
 function legacySlug(value: string) {
@@ -46,9 +69,13 @@ function nameFromEvidence(id: string, spans: readonly string[]) {
 
 export function skillLabel(value: string, displayName?: string | null, evidenceSpans: readonly string[] = []) {
   const name = displayName?.trim();
-  if (name && name !== value) return name;
-  const known = labels[value.toLowerCase().replace(/[-_]/g, ' ')];
-  return known || nameFromEvidence(value, evidenceSpans) || value.replace(/[-_]+/g, ' ');
+  if (name && name !== value) return formatSkillName(name);
+  const known = canonicalLabel(value);
+  if (known) return known;
+  const restoredName = nameFromEvidence(value, evidenceSpans);
+  if (restoredName) return formatSkillName(restoredName);
+  if (name && !/[-_]/.test(name)) return formatSkillName(name);
+  return value.replace(/[-_]+/g, ' ');
 }
 
 export function jdSkillLabel(skill: Pick<SkillGapResult,

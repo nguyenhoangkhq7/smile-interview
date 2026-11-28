@@ -834,7 +834,6 @@ class ImplicitEvidenceVerifier:
             confidence_raw = round(sum(raw_confidence_vals) / len(raw_confidence_vals), 3) if raw_confidence_vals else None
             evidence_quotes_text = " ".join(quotes)
             inference_rationale = " ".join(reasonings)
-            full_context_text = f"{evidence_quotes_text} {inference_rationale}".strip()
             cand_label_clean = cand.label.strip()
 
             # Helper to create verification record
@@ -1041,59 +1040,20 @@ class ImplicitEvidenceVerifier:
                 std_term = std_match.group(0)
                 quote_has_std = bool(re.search(rf"\b{re.escape(std_term)}\b", evidence_quotes_text, re.IGNORECASE))
                 if not quote_has_std:
-                    # Generalize safely
-                    generalized_label = re.sub(
-                        r"\s*\([^)]*" + re.escape(std_term) + r"[^)]*\)",
-                        "",
-                        cand_label_clean,
-                        flags=re.IGNORECASE,
-                    ).strip()
-                    if not generalized_label or generalized_label.casefold() == cand_label_clean.casefold():
-                        if "health" in full_context_text.casefold():
-                            generalized_label = "Healthcare Domain Familiarity"
-                        else:
-                            generalized_label = "Regulatory Domain Knowledge"
-
-                    gen_slug = skill_postprocessor.slugify_skill(generalized_label)
-
-                    if gen_slug in known_explicit_ids or generalized_label.casefold() in known_explicit_labels:
-                        v_record = build_verification(
-                            assessment="partially_supported",
-                            support_status="unsupported",
-                            acceptance_decision="rejected",
-                            is_accepted=False,
-                            support_reason=(
-                                f"Specific standard '{std_term}' is unsupported by evidence quotes. "
-                                f"Proposed generalization '{generalized_label}' duplicates an existing explicit skill."
-                            ),
-                            confidence_norm=0.6,
-                            proposed_label=generalized_label,
-                            extra_orig={"standard_claimed": std_term},
-                        )
-                        verifications.append(v_record)
-                        rejected_skills.append(cand)
-                        continue
-
-                    cand_copy = cand.model_copy(deep=True)
-                    cand_copy.skill_id = gen_slug
-                    cand_copy.label = generalized_label
-
                     v_record = build_verification(
-                        assessment="partially_supported",
-                        support_status="supported",
-                        acceptance_decision="accepted",
-                        is_accepted=True,
+                        assessment="unsupported",
+                        support_status="unsupported",
+                        acceptance_decision="rejected",
+                        is_accepted=False,
                         support_reason=(
-                            f"General domain context is mentioned in evidence, but specific standard '{std_term}' "
-                            f"is not established in source text. Safely generalized to '{generalized_label}'."
+                            f"Evidence quotes do not name the standard '{std_term}'. "
+                            "Domain context alone does not support a separate competency."
                         ),
-                        confidence_norm=0.85,
-                        proposed_label=generalized_label,
-                        extra_orig={"standard_claimed": std_term, "original_skill_id": cand.skill_id},
+                        confidence_norm=0.0,
+                        extra_orig={"standard_claimed": std_term},
                     )
                     verifications.append(v_record)
-                    accepted_skills.append(cand_copy)
-                    accepted_ids.add(gen_slug)
+                    rejected_skills.append(cand)
                     continue
 
             # 5 (Stage B4 Rework): Check Compound Skill Candidates & Decompose (Phase 3B.2 Atomic Decomposition)

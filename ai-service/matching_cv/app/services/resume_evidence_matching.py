@@ -47,11 +47,6 @@ r"(?:didn|don|doesn|haven|hasn)[’']t|no\s+(?:prior\s+)?experience|"
     r"interest(?:ed)?\s+in|"
     r"looking\s+to|want\s+to|learning|plan(?:ning)?\s+to|chưa|không)\b"
 )
-_FINTECH = re.compile(r"\b(?:fintech|financial technology)\b")
-_PAYMENTS = re.compile(
-    r"\b(?:payment(?:s)? (?:modules?|services?|systems?|gateways?|platforms?|flows?|processing)|"
-    r"merchant settlement|card processing|processed payments|(?:building|handling|operating) payments)\b"
-)
 _QUERY = re.compile(r"\b(?:query (?:optimi[sz]ation|tuning|indexing)|optimi[sz](?:e|ed|ing) (?:sql )?quer(?:y|ies))\b")
 _QUERY_PERFORMANCE_TECHNIQUE = (
     r"(?:query (?:indexing|tuning|optimi[sz]ation)|(?:sql|database) (?:indexing|tuning)|"
@@ -83,8 +78,6 @@ _MOCKITO = re.compile(r"\bmockito\b")
 _JENKINS = re.compile(r"\bjenkins\b")
 
 _WORK_REQUIREMENTS = {
-    "fintech": (_FINTECH, _DIRECT),
-    "payments": (_PAYMENTS, _DEMONSTRATED),
     "query-optimization": (_QUERY, _DEMONSTRATED),
     "query-performance": (_QUERY_PERFORMANCE, _DEMONSTRATED),
 }
@@ -212,10 +205,9 @@ def _graph_skill(
         ))
     if not evidence:
         return None
-    category = "Domain Knowledge" if normalize_canonical_skill(jd_skill.skill_id) in {"fintech", "payments"} else None
     return ImplicitExtractedSkill(
         skill_id=jd_skill.skill_id, label=jd_skill.display_name,
-        category=category, basis="activity", evidences=evidence,
+        basis="activity", evidences=evidence,
     )
 
 
@@ -259,7 +251,7 @@ def _unsupported_match(match: MatchResult, matched_skill: ProficiencySkill | Non
         return True
     if jd_id in ("unit-tests", "unit-testing") and cv_id == "testcontainers":
         return True
-    if jd_id not in {"fintech", "payments", "github-actions"} or cv_id != jd_id or matched_skill is None:
+    if jd_id != "github-actions" or cv_id != jd_id or matched_skill is None:
         return False
 
     spans = matched_skill.evidence_spans

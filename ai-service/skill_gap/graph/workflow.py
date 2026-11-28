@@ -241,6 +241,6 @@ class SkillGapWorkflow:
         )
         return (
             gap_results,
-            SkillGapReportSummary(degraded=degraded),
+            SkillGapReportSummary(degraded=degraded, cv_skills=cv_skills),
             final_state,
         )

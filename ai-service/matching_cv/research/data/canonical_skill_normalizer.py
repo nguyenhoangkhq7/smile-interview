@@ -38,9 +38,12 @@ ENGINEERING_COMPETENCY_ALIASES: dict[str, str] = {
     "containerised-deployment-workflows": "containerized-deployment",
 }
 
+DOMAIN_SKILL_ALIASES: dict[str, str] = {"payment": "payments", "thanh-toán": "payments"}
+
 # Comprehensive alias map to authoritative canonical IDs
 CANONICAL_ALIASES: dict[str, str] = {
     **ENGINEERING_COMPETENCY_ALIASES,
+    **DOMAIN_SKILL_ALIASES,
     # Node.js
     "node.js": "nodejs",
     "node-js": "nodejs",

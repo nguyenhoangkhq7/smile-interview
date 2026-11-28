@@ -62,8 +62,28 @@ async def _dspy() -> None:
         raise ValueError("Missing model reply")
 
 
+def _sample_audio_bytes() -> bytes:
+    if SAMPLE_AUDIO.is_file():
+        return SAMPLE_AUDIO.read_bytes()
+    import io
+    import math
+    import struct
+    import wave
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(16000)
+        frames = bytearray()
+        for i in range(8000):
+            val = int(2500 * math.sin(2 * math.pi * 440 * i / 16000))
+            frames.extend(struct.pack("<h", val))
+        wav.writeframes(frames)
+    return buffer.getvalue()
+
+
 async def _stt() -> None:
-    audio = base64.b64encode(SAMPLE_AUDIO.read_bytes()).decode("ascii")
+    audio = base64.b64encode(_sample_audio_bytes()).decode("ascii")
     await transcribe(Transcription(audio=audio))
 
 

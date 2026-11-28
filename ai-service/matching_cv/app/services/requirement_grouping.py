@@ -5,6 +5,7 @@ import re
 
 from matching_cv.app.schemas.skill_extraction import Evidence, ExtractedSkill
 from matching_cv.app.schemas.unified_skill_extraction import DocumentUnifiedResult, UnifiedExtractFileResponse
+from matching_cv.app.services.competency_extraction_quality import is_domain_skill, is_jd_requirement_context
 from matching_cv.app.services.extraction_adapter import ExtractionDataAdapter
 from matching_cv.app.services.resume_evidence_matching import enrich_verified_resume_skills
 from matching_cv.app.services.section_tagger import find_section_spans, section_at
@@ -20,6 +21,8 @@ class RequirementRule:
     aliases: tuple[str, ...] = ()
     certification: bool = False
     allow_examples: bool = False
+    base_skill: tuple[str, str] | None = None
+    domain: bool = False
 
 
 @dataclass(frozen=True)
@@ -54,6 +57,7 @@ _BROKERS = {"kafka": r"(?:apache\s+)?kafka", "rabbitmq": "rabbitmq", "activemq":
 _CI_TOOLS = {"jenkins": "jenkins", "github-actions": r"github\s+actions", "gitlab-ci": r"gitlab\s+ci(?:/cd)?", "circleci": "circleci"}
 _CERTIFIERS = {"aws": r"aws", "gcp": r"gcp|google\s+cloud", "azure": r"(?:microsoft\s+)?azure"}
 _STATE_TOOLS = {"redux-toolkit": r"redux\s+toolkit", "zustand": "zustand", "react-query": r"(?:tanstack|react)\s+query"}
+_NODEJS = r"node\.?js"
 _HTTP_APIS = {"graphql": r"graphql(?:\s+apis?)?", "rest-api": r"rest(?:ful)?\s+apis?"}
 _SCRIPTING = {"python": "python", "bash": "bash", "powershell": "powershell"}
 _GITOPS = {"argocd": r"argo\s*cd", "flux": r"flux(?:cd)?"}
@@ -75,7 +79,7 @@ _RULES = (
         r"\b(?:experience|familiarity|background)\s+(?:in|with)\s+"
         r"(?P<options>(?:fintech\s*,\s*payments|healthcare)\s*,?\s+or\s+another\s+"
         r"(?:highly\s+)?regulated\s+(?:domain|consumer\s+product|industry))\b",
-        {"fintech": "fintech", "payments": r"payments?", "healthcare": r"health\s*care"},
+        {"fintech": "fintech", "payments": r"payments?", "healthcare": r"health\s*care"}, domain=True,
     ),
     RequirementRule("utility-first-css-framework", _parenthesized(r"utility[-\s]+first\s+framework"),
                     {"tailwind-css": r"tailwind(?:\s+css)?", "unocss": "unocss"}, ("utility-first-framework",)),
@@ -83,13 +87,14 @@ _RULES = (
                     ("state-management-patterns", "state-management-pattern")),
     RequirementRule("component-documentation", r"\b(?P<options>storybook\s+or\s+other\s+component[-\s]documentation)\b",
                     {"storybook": "storybook"}),
-    RequirementRule("nodejs-framework", _parenthesized(r"node\.?js"), {"express": r"express(?:\.?js)?", "nestjs": r"nest\.?js"}),
+    RequirementRule("nodejs-framework", _parenthesized(_NODEJS),
+                    {"express": r"express(?:\.?js)?", "nestjs": r"nest\.?js"}, base_skill=("nodejs", _NODEJS)),
     RequirementRule("api-protocol", _alternatives(_HTTP_APIS), _HTTP_APIS),
     RequirementRule("scripting-language", _alternatives(_SCRIPTING), _SCRIPTING),
     RequirementRule("gitops-tool", _alternatives(_GITOPS), _GITOPS, ("gitops-tools",)),
     RequirementRule("spark-processing", _alternatives(_SPARK), _SPARK),
     RequirementRule("commerce-domain-experience", r"\b(?:background|experience)\s+(?:in|with)\s+" + _alternatives(_COMMERCE_DOMAINS),
-                    _COMMERCE_DOMAINS),
+                    _COMMERCE_DOMAINS, domain=True),
     RequirementRule("cloud-data-warehouse", _parenthesized(r"cloud\s+data\s+warehouse"),
                     {"snowflake": "snowflake", "bigquery": "bigquery", "redshift": "redshift"}),
     RequirementRule("model-tracking-tool", r"\b(?P<options>mlflow\s+or\s+a\s+similar\s+model[-\s]tracking(?:/serving)?\s+tool)\b",
@@ -130,11 +135,17 @@ def _find_groups(text):
             section = section_at(sections, start)
             prefix = re.split(r"[;.!?]|\n\s*(?=[•●▪*-]\s)", text[max(0, start - 90):start])[-1]
             suffix = text[end:end + 40]
-            if section == "benefits" or re.search(r"\b(?:no|without)\s*$", prefix, re.I):
+            if section == "benefits":
+                continue
+            if rule.domain and not is_jd_requirement_context(prefix.rsplit("\n", 1)[-1] + match.group(), section):
+                continue
+            if re.search(r"\b(?:no|without)\s*$", prefix, re.I):
                 continue
             if re.match(r"\s+(?:(?:is|are)\s+)?not\s+required\b", suffix, re.I):
                 continue
             kind, category = ("certification", "Certification") if rule.certification else ("skill", "Technical Concept")
+            if rule.domain:
+                kind, category = "domain", "Domain Knowledge"
             groups.append(RequirementGroup(rule, Evidence(
                 surface_form=match.group(), sentence=match.group(), kind=kind, category=category,
                 start=start, end=end, mention_start=start, mention_end=end,
@@ -149,35 +160,55 @@ def _independent_requirements(text, groups):
     for group in groups:
         start, end = group.evidence.start, group.evidence.end
         outside[start:end] = " " * (end - start)
-    clauses = re.split(r"[;.!?]|\n\s*(?=[•●▪*-]\s)|\n\s*\n", "".join(outside))
+    clauses = re.split(r"[;!?]|\.(?!\w)|\n\s*(?=[•●▪*-]\s)|\n\s*\n", "".join(outside))
+    patterns = {key: group.rule.options[key] for group in groups for key in group.options}
+    patterns.update(group.rule.base_skill for group in groups if group.rule.base_skill is not None)
     return {
-        key for group in groups for key in group.options
-        if any(re.search(rf"\b{_REQUIRED}\s+(?:{group.rule.options[key]})(?!\w)|"
-                         rf"(?<!\w)(?:{group.rule.options[key]})\s+{_SUFFIX_REQUIRED}", clause, re.I)
+        key for key, phrase in patterns.items()
+        if any(re.search(rf"\b{_REQUIRED}\s+(?:{phrase})(?!\w)|"
+                         rf"(?<!\w)(?:{phrase})\s+{_SUFFIX_REQUIRED}", clause, re.I)
                for clause in clauses)
     }
 
 
+def _group_source_ids(groups: list[RequirementGroup], independent: set[str]) -> set[str]:
+    rule = groups[0].rule
+    ids = {rule.skill_id, *rule.aliases, *(_id(group.evidence.surface_form) for group in groups)}
+    if rule.base_skill and rule.base_skill[0] not in independent:
+        ids.add(rule.base_skill[0])
+    return ids
+
+
 def _grouped_jd(jd, groups, text):
     independent = _independent_requirements(text, groups)
-    excluded = {item for g in groups for item in (g.rule.skill_id, *g.rule.aliases)}
+    by_id: dict[str, list[RequirementGroup]] = {}
+    for group in groups:
+        by_id.setdefault(group.rule.skill_id, []).append(group)
+    source_ids = {key: _group_source_ids(members, independent) for key, members in by_id.items()}
+    excluded = set().union(*source_ids.values())
     excluded.update({key for g in groups for key in g.options if key not in independent})
     updated = jd.model_copy(deep=True)
-    updated.explicit.skills = [item for item in jd.explicit.skills if _id(item.skill_id) not in excluded]
+    original_skills = updated.explicit.skills
+    updated.explicit.skills = [item for item in original_skills if _id(item.skill_id) not in excluded]
     updated.validation.accepted_implicit_skills = [
         item for item in jd.validation.accepted_implicit_skills if _id(item.skill_id) not in excluded
     ]
     if updated.implicit:
         updated.implicit.skills = [item for item in updated.implicit.skills if _id(item.skill_id) not in excluded]
-    for key in dict.fromkeys(group.rule.skill_id for group in groups):
-        citations = [group.evidence for group in groups if group.rule.skill_id == key]
+    for key, members in by_id.items():
+        citations = [group.evidence for group in members]
+        citations.extend(evidence for item in original_skills if _id(item.skill_id) in source_ids[key]
+                         for evidence in item.evidences)
+        unique = {}
+        for evidence in citations:
+            unique.setdefault((evidence.start, evidence.end, evidence.surface_form, evidence.sentence), evidence)
         updated.explicit.skills.append(ExtractedSkill(
             skill_id=key, surface_forms=[" ".join(citations[0].surface_form.split())],
-            sections=list(dict.fromkeys(ev.section for ev in citations if ev.section)), evidences=citations,
+            sections=list(dict.fromkeys(ev.section for ev in unique.values() if ev.section)), evidences=list(unique.values()),
         ))
     updated._requirement_groups = {
-        key: tuple(dict.fromkeys(option for group in groups if group.rule.skill_id == key for option in group.options))
-        for key in dict.fromkeys(group.rule.skill_id for group in groups)
+        key: tuple(dict.fromkeys(option for group in members for option in group.options))
+        for key, members in by_id.items()
     }
     updated._strict_requirement_group_ids = {group.rule.skill_id for group in groups if group.rule.skill_id != "ci-cd"}
     return updated
@@ -196,6 +227,8 @@ def _option_proof(candidate, group, text):
         if candidate.kind != "certification" and candidate.category != "Certification":
             return False
         return any(_option_in(group.rule.options[key], candidate.display_name) for key in group.options) and bool(spans)
+    if group.rule.domain and (not isinstance(item, ExtractedSkill) or not is_domain_skill(item)):
+        return False
     key = _id(candidate.skill_id)
     return key in eligible and any(_option_in(group.rule.options[key], span) for span in spans)
 
@@ -238,6 +271,34 @@ def _project_skill(doc, source, target, *, keep_original):
         skills[skills.index(source)] = projected
 
 
+def _prepare_domain_skills(doc: DocumentUnifiedResult, allowed_domains: set[str] | None = None) -> DocumentUnifiedResult:
+    """Remove inferred domains and keep unrequested explicit domains as context."""
+    raw = doc.implicit.skills if doc.implicit else []
+    inferred = [*raw, *doc.validation.accepted_implicit_skills, *doc._verified_resume_skills]
+    unrequested = {
+        skill.skill_id for skill in doc.explicit.skills
+        if is_domain_skill(skill) and _id(skill.skill_id) not in allowed_domains
+    } if allowed_domains is not None else set()
+    if not unrequested and all(skill.category != "Domain Knowledge" for skill in inferred):
+        return doc
+
+    updated = doc.model_copy(deep=True)
+    updated.validation.accepted_implicit_skills = [
+        skill for skill in updated.validation.accepted_implicit_skills if skill.category != "Domain Knowledge"
+    ]
+    if updated.implicit:
+        updated.implicit.skills = [skill for skill in updated.implicit.skills if skill.category != "Domain Knowledge"]
+    updated._verified_resume_skills = [
+        skill for skill in updated._verified_resume_skills if skill.category != "Domain Knowledge"
+    ]
+    if unrequested:
+        updated.explicit.non_skill_entities.extend(
+            skill for skill in updated.explicit.skills if skill.skill_id in unrequested
+        )
+        updated.explicit.skills = [skill for skill in updated.explicit.skills if skill.skill_id not in unrequested]
+    return updated
+
+
 def prepare_pipeline_skills(pair: UnifiedExtractFileResponse, cv_text: str, jd_text: str) -> UnifiedExtractFileResponse:
     """Only change the per-request representation shared by SBERT, JSI and GNN."""
     cv, jd = pair.cv, pair.jd
@@ -245,10 +306,15 @@ def prepare_pipeline_skills(pair: UnifiedExtractFileResponse, cv_text: str, jd_t
         return pair
     groups = _find_groups(jd_text)
     if groups:
-        pair = pair.model_copy(update={"jd": _grouped_jd(jd, groups, jd_text)})
+        jd = _grouped_jd(jd, groups, jd_text)
+    jd = _prepare_domain_skills(jd)
+    cv = _prepare_domain_skills(cv)
+    pair = pair.model_copy(update={"cv": cv, "jd": jd})
     pair = enrich_verified_resume_skills(pair, cv_text)
     if groups:
         pair = pair.model_copy(update={"cv": _project_cv_options(pair.cv, pair.jd, groups, cv_text)})
+    allowed_domains = {_id(skill.skill_id) for skill in jd.explicit.skills if is_domain_skill(skill)}
+    pair = pair.model_copy(update={"cv": _prepare_domain_skills(pair.cv, allowed_domains)})
     return deduplicate_resume_evidence(pair, cv_text)
 
 

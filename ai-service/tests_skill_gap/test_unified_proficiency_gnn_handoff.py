@@ -6,7 +6,7 @@ Ensures:
 2. Module 2 runs strictly downstream on Module 1 outputs and NEVER injects proficiencies back
    into Module 1's graph or GNN (`apply_module2_proficiencies` is never invoked).
 3. `report.matching_score` equals Module 1's `S_semantic` directly, and no `S_readiness` or
-   score-fusion fields are added to `report` (strictly `{"matching_score", "degraded"}`).
+   score-fusion fields are added to `report` (strictly `{"matching_score", "degraded", "cv_skills"}`).
 """
 from __future__ import annotations
 
@@ -103,6 +103,6 @@ def test_pipeline_analyze_is_strictly_one_way_and_uses_s_semantic_as_match_score
     assert res.status_code == 200
     body = res.json()
     assert captured.get("include_compatibility_score") is True
-    assert set(body["report"].keys()) == {"matching_score", "degraded"}
+    assert set(body["report"].keys()) == {"matching_score", "degraded", "cv_skills"}
     assert body["report"]["matching_score"] == 0.7314
     assert len(body["skills"]) == 2
