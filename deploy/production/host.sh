@@ -52,6 +52,24 @@ prepare)
 activate)
     "${compose[@]}" up -d --no-build --wait --wait-timeout 420
     "${compose[@]}" exec -T nginx nginx -s reload
+    "${compose[@]}" exec -T ai-service python - <<'PY'
+import os
+
+import httpx
+from app.ai_runtime import TOKEN_HEADER, key_bytes, machine_token
+
+if not os.environ.get("AI_RUNTIME_BACKEND_URL", "").strip():
+    raise RuntimeError("AI runtime backend URL is missing")
+
+response = httpx.get(
+    "http://127.0.0.1:8000/internal/runtime/status",
+    headers={TOKEN_HEADER: machine_token(key_bytes())},
+    timeout=10,
+    trust_env=False,
+)
+response.raise_for_status()
+print("AI runtime configuration check passed")
+PY
     "${compose[@]}" exec -T ai-service python - < deploy/production/smoke-gnn.py
     curl -fsS --retry 5 --retry-all-errors "https://$API_HOST/actuator/health" | jq -e '.status == "UP"'
     ;;

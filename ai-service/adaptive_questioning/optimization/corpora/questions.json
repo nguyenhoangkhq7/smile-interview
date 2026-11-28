@@ -3228,5 +3228,195 @@
       "mode": "CODING",
       "depth": 3
     }
+  },
+  {
+    "sample_id": "xq38",
+    "split": "train",
+    "context": {
+      "objective": {
+        "skill_id": "python",
+        "target_depth": 2,
+        "extension_depth": null,
+        "claim": "Khử trùng lặp sự kiện giữ bản ghi đầu tiên",
+        "criteria": [
+          {
+            "criterion_id": "xq38:c1",
+            "description": "Viết hàm deduplicate_events(events) giữ bản ghi đầu tiên theo event_id",
+            "expected_evidence": "Cài đặt giữ bản ghi đầu tiên cho mỗi event_id và bảo toàn thứ tự đầu vào.",
+            "below_target": "Ghi đè bằng bản ghi sau hoặc làm thay đổi thứ tự.",
+            "at_target": "Giữ bản ghi xuất hiện đầu tiên theo đúng thứ tự đầu vào.",
+            "above_target": "Tối ưu bộ nhớ cho luồng dữ liệu lớn.",
+            "essential": true
+          }
+        ]
+      },
+      "required_question_contract": {
+        "mode": "CODING",
+        "depth": 2,
+        "criterion_ids": [
+          "xq38:c1"
+        ],
+        "evidence_scope": "xq38-dedup-events"
+      },
+      "question_guidance": "The candidate's previous code passed some automated tests but failed an edge or logic case. Keep the exact same problem and ask the candidate to inspect and fix their submitted code for the failing behavior/edge case without revealing the fix or hidden test inputs.",
+      "interaction_mode": "TEXT",
+      "action": "CLARIFY",
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "probe_reason": "Ask the candidate to inspect and fix the remaining failing edge or logic case in their submitted code",
+      "criterion_progress": {
+        "turns_spent": 1,
+        "clarification_spent": false,
+        "easier_spent": false,
+        "deeper_spent": false,
+        "stagnant_turns": 0,
+        "unresolved_aspects": [
+          "xử lý bản ghi trùng lặp giữ đúng phần tử xuất hiện đầu tiên"
+        ],
+        "stop_reason": null,
+        "observed_cases": [
+          "2:xq38-dedup-events"
+        ]
+      },
+      "cv_evidence": [],
+      "history": [
+        {
+          "turn_id": "xq38-t1",
+          "action": "INITIAL",
+          "question_depth": 2,
+          "question": {
+            "text": "Hãy viết hàm Python `deduplicate_events(events)` giữ bản ghi xuất hiện đầu tiên của mỗi `event_id` theo thứ tự đầu vào.",
+            "criterion_ids": [
+              "xq38:c1"
+            ],
+            "evidence_scope": "xq38-dedup-events"
+          },
+          "answer": "def deduplicate_events(events):\n    by_id = {e['event_id']: e for e in events}\n    return list(by_id.values())"
+        }
+      ],
+      "other_questions": [],
+      "prior_observations": [
+        {
+          "turn_id": "xq38-t1",
+          "criterion_id": "xq38:c1",
+          "response_excerpt": "    by_id = {e['event_id']: e for e in events}",
+          "performance": "BELOW",
+          "rationale": "Đoạn dict comprehension giữ được thứ tự khóa nhưng ghi đè bản ghi đầu bằng bản ghi trùng xuất hiện sau.",
+          "observation": "CONTRADICTS",
+          "question_depth": 2,
+          "evidence_scope": "xq38-dedup-events",
+          "independent": true,
+          "explicit_inability": false
+        }
+      ]
+    },
+    "question": {
+      "text": "Hàm bạn vừa nộp vượt qua các ca không trùng nhưng sai khi có `event_id` lặp lại. Bạn hãy rà soát và sửa lại đúng đoạn xử lý trùng lặp trong hàm `deduplicate_events` để bảo toàn bản ghi đầu tiên nhé?",
+      "criterion_ids": [
+        "xq38:c1"
+      ],
+      "evidence_scope": "xq38-dedup-events",
+      "mode": "CODING",
+      "depth": 2
+    }
+  },
+  {
+    "sample_id": "xq39",
+    "split": "train",
+    "context": {
+      "objective": {
+        "skill_id": "teamwork_incident",
+        "target_depth": 2,
+        "extension_depth": 3,
+        "claim": "Xử lý sự cố kỹ thuật hoặc áp lực tiến độ trong dự án",
+        "criteria": [
+          {
+            "criterion_id": "xq39:c1",
+            "description": "Trình bày tình huống sự cố cụ thể, hành động cá nhân và kết quả đạt được theo khung STAR",
+            "expected_evidence": "Nêu rõ bối cảnh, hành động cá nhân trực tiếp và kết quả đo lường được.",
+            "below_target": "Chỉ nêu chung chung việc cả nhóm làm, thiếu hành động cá nhân và kết quả.",
+            "at_target": "Nêu rõ tình huống, hành động trực tiếp của bản thân và kết quả cụ thể.",
+            "above_target": "Phân tích nguyên nhân gốc và biện pháp phòng ngừa tái diễn cho nhóm.",
+            "essential": true
+          }
+        ]
+      },
+      "required_question_contract": {
+        "mode": "BEHAVIORAL",
+        "depth": 2,
+        "criterion_ids": [
+          "xq39:c1"
+        ],
+        "evidence_scope": "xq39-release-delay"
+      },
+      "question_guidance": "Stay grounded in the candidate's own story from history and probe ONE missing STAR element (their specific personal decision/Action, measurable Result/impact, or concrete lesson learned) rather than switching to abstract definitions.",
+      "interaction_mode": "TEXT",
+      "action": "CLARIFY",
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "probe_reason": "Probe the missing STAR detail (personal Action or measurable Result) in the candidate's own story",
+      "criterion_progress": {
+        "turns_spent": 1,
+        "clarification_spent": false,
+        "easier_spent": false,
+        "deeper_spent": false,
+        "stagnant_turns": 0,
+        "unresolved_aspects": [
+          "hành động cá nhân trực tiếp và kết quả bàn giao cụ thể"
+        ],
+        "stop_reason": null,
+        "observed_cases": [
+          "2:xq39-release-delay"
+        ]
+      },
+      "cv_evidence": [],
+      "history": [
+        {
+          "turn_id": "xq39-t1",
+          "action": "INITIAL",
+          "question_depth": 2,
+          "question": {
+            "text": "Hãy kể một lần dự án hoặc đồ án của bạn gặp sự cố gấp sát hạn bàn giao và cách bạn xử lý tình huống đó?",
+            "criterion_ids": [
+              "xq39:c1"
+            ],
+            "evidence_scope": "xq39-release-delay"
+          },
+          "answer": "Học kỳ trước nhóm em bị lỗi API thanh toán ngay sát ngày bảo vệ nên cả nhóm thức đêm sửa lại."
+        }
+      ],
+      "other_questions": [],
+      "prior_observations": [
+        {
+          "turn_id": "xq39-t1",
+          "criterion_id": "xq39:c1",
+          "response_excerpt": "cả nhóm thức đêm sửa lại.",
+          "performance": "BELOW",
+          "rationale": "Ứng viên mới nêu bối cảnh chung của nhóm, chưa làm rõ hành động trực tiếp của bản thân và kết quả cụ thể.",
+          "observation": "CONTRADICTS",
+          "question_depth": 2,
+          "evidence_scope": "xq39-release-delay",
+          "independent": true,
+          "explicit_inability": false
+        }
+      ]
+    },
+    "question": {
+      "text": "Trong đêm xử lý lỗi API thanh toán đó, cá nhân bạn đã trực tiếp đảm nhận bước điều tra hoặc sửa lỗi nào và kết quả đạt được ra sao?",
+      "criterion_ids": [
+        "xq39:c1"
+      ],
+      "evidence_scope": "xq39-release-delay",
+      "mode": "BEHAVIORAL",
+      "depth": 2
+    }
   }
 ]

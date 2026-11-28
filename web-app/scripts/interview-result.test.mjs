@@ -189,5 +189,128 @@ test('computes weighted readiness giving Core objectives double weight over non-
   assert.equal(data.weightedReadiness.hasCoreWeight, true);
   assert.equal(data.weightedReadiness.coreTotal, 1);
   assert.equal(data.weightedReadiness.coreMet, 0);
+  assert.equal(data.weightedReadiness.conclusiveCount, 2);
+  assert.equal(data.weightedReadiness.inconclusiveCount, 0);
   assert.equal(data.weightedReadiness.percent, 33);
+});
+
+test('does not penalize INSUFFICIENT_EVIDENCE objectives as zero in weightedReadiness', () => {
+  const data = buildResult(session([
+    objective('core-java', 'java', 'DEMONSTRATED_AT_TARGET', {
+      is_core: true,
+      importance_weight: 0.9,
+      target_depth: 2,
+    }),
+    objective('core-sql-unfinished', 'sql', 'INSUFFICIENT_EVIDENCE', {
+      is_core: true,
+      importance_weight: 0.85,
+      target_depth: 3,
+    }),
+  ], [
+    turn('t1', 'core-java'),
+    turn('t2', 'core-sql-unfinished'),
+  ]));
+
+  assert.equal(data.weightedReadiness.conclusiveCount, 1);
+  assert.equal(data.weightedReadiness.inconclusiveCount, 1);
+  assert.equal(data.weightedReadiness.coreTotal, 1);
+  assert.equal(data.weightedReadiness.coreMet, 1);
+  assert.equal(data.weightedReadiness.percent, 100);
+  assert.equal(data.weightedReadiness.inconclusiveWithRiskCount, 0);
+  assert.equal(data.weightedReadiness.provisionalPercent, 100);
+  assert.equal(data.hiringSignal.key, 'BORDERLINE'); // 50% coverage (< 70%) avoids premature HIRE
+});
+
+test('flags observed risk inside INSUFFICIENT_EVIDENCE objectives to prevent false 100% readiness illusion', () => {
+  const data = buildResult(session([
+    objective('core-java', 'java', 'DEMONSTRATED_AT_TARGET', {
+      is_core: true,
+      importance_weight: 0.9,
+      target_depth: 2,
+      evidence: [{ turn_id: 't1', performance: 'AT_TARGET', observation: 'SUPPORTS' }],
+    }),
+    objective('core-sql-risk', 'sql', 'INSUFFICIENT_EVIDENCE', {
+      is_core: true,
+      importance_weight: 0.85,
+      target_depth: 3,
+      weaknesses: ['Trả lời sai cơ chế composite index'],
+      evidence: [{ turn_id: 't2', performance: 'BELOW', observation: 'CONTRADICTS' }],
+    }),
+  ], [
+    turn('t1', 'core-java'),
+    turn('t2', 'core-sql-risk'),
+  ]));
+
+  assert.equal(data.weightedReadiness.percent, 100); // concluded-only metric preserved
+  assert.equal(data.weightedReadiness.inconclusiveWithRiskCount, 1);
+  assert.equal(data.weightedReadiness.coreRiskCount, 1);
+  assert.equal(data.weightedReadiness.provisionalPercent, 50); // conservative readiness catches the observed failure
+  assert.equal(data.hiringSignal.key, 'NEEDS_PREP');
+});
+
+test('tracks hint-assisted passes distinctly and distinguishes STRONG_HIRE vs BORDERLINE signals', () => {
+  const hintedSession = buildResult(session([
+    objective('core-py', 'python', 'DEMONSTRATED_AT_TARGET', {
+      is_core: true,
+      importance_weight: 0.9,
+      hinted: true,
+      evidence: [{ turn_id: 't1', performance: 'AT_TARGET', observation: 'SUPPORTS' }],
+      criteria: [{ criterion_id: 'c1', description: 'Viết hàm lọc trùng', essential: true, hinted: true, assessment: 'DEMONSTRATED_AT_TARGET' }],
+    }),
+  ], [
+    { turn_id: 't1', objective_id: 'core-py', clarifications: [{ kind: 'HINT', question: '', answer: 'Gợi ý dùng dict.' }] },
+  ]));
+  assert.equal(hintedSession.skills[0].hinted, true);
+  assert.equal(hintedSession.questions[0].usedHint, true);
+  assert.equal(hintedSession.questions[0].badge.label, 'Đạt yêu cầu (có gợi ý)');
+  assert.equal(hintedSession.weightedReadiness.hintedStrongCount, 1);
+  assert.equal(hintedSession.hiringSignal.key, 'BORDERLINE');
+
+  const strongSession = buildResult(session([
+    objective('core-arch', 'architecture', 'DEMONSTRATED_ABOVE_TARGET', {
+      is_core: true,
+      importance_weight: 0.95,
+      evidence: [{ turn_id: 't1', performance: 'ABOVE', depth_role: 'EXTENSION', observation: 'SUPPORTS' }],
+    }),
+  ], [turn('t1', 'core-arch')]));
+  assert.equal(strongSession.hiringSignal.key, 'STRONG_HIRE');
+});
+
+test('computes per-mode performance breakdown for answered turns', () => {
+  const data = buildResult(session([
+    objective('o-code', 'python', 'DEMONSTRATED_BELOW_TARGET', {
+      evidence: [
+        { turn_id: 't1', performance: 'BELOW', observation: 'CONTRADICTS' },
+        { turn_id: 't2', performance: 'AT_TARGET', observation: 'SUPPORTS' },
+      ],
+    }),
+    objective('o-design', 'architecture', 'DEMONSTRATED_AT_TARGET', {
+      evidence: [{ turn_id: 't3', performance: 'AT_TARGET', observation: 'SUPPORTS' }],
+    }),
+  ], [
+    { turn_id: 't1', objective_id: 'o-code', mode: 'CODING' },
+    { turn_id: 't2', objective_id: 'o-code', mode: 'CODING' },
+    { turn_id: 't3', objective_id: 'o-design', mode: 'DESIGN' },
+  ]));
+
+  assert.deepEqual(plain(data.modeBreakdown), [
+    { mode: 'CODING', label: 'Lập trình', total: 2, strong: 1, weak: 1, partial: 0, passRate: 50 },
+    { mode: 'DESIGN', label: 'Thiết kế hệ thống', total: 1, strong: 1, weak: 0, partial: 0, passRate: 100 },
+  ]);
+});
+
+test('shows the coached retry separately and credits a later independent transfer', () => {
+  const data = buildResult(session([objective('o', 'sql', 'DEMONSTRATED_AT_TARGET', {
+    hinted: true, criteria: [{ criterion_id: 'c', hinted: true, transfer_verified: true, essential: true,
+      assessment: 'DEMONSTRATED_AT_TARGET' }],
+    evidence: [{ turn_id: 'fresh', observation: 'SUPPORTS', performance: 'AT_TARGET', depth_role: 'TARGET' }],
+  })], [
+    { ...turn('first', 'o'), clarifications: [{ kind: 'HINT' }] },
+    { ...turn('again', 'o'), practice_step: 'RETRY' },
+    { ...turn('fresh', 'o'), practice_step: 'TRANSFER' },
+  ]));
+  assert.equal(data.questions[1].badge.key, 'retry');
+  assert.equal(data.questions[2].badge.key, 'strong');
+  assert.equal(data.weightedReadiness.hintedStrongCount, 0);
+  assert.equal(data.skills[0].hinted, false);
 });

@@ -1,14 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, Clock3, HelpCircle, History, Lightbulb, LoaderCircle, Send } from 'lucide-react';
+import { Check, Clock3, History, LoaderCircle, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
 import { MarkdownContent } from '@/components/common/MarkdownContent';
 import type { useEvidenceInterview } from '@/hooks/useEvidenceInterview';
 import { skillLabel } from '@/components/features/applications/applicationUi';
 import { modeLabels } from './EvidenceSetup';
+import { InterviewClarifyBar } from './InterviewClarifyBar';
 import { InterviewCodeEditor } from './InterviewCodeEditor';
 import { turnSkillId } from '@/services/evidenceInterview';
 import { useTextInterviewConversation } from '@/hooks/useTextInterviewConversation';
@@ -22,26 +21,17 @@ export function EvidenceTextInterview({ interview, onHistory, onStop }: {
   const { session, busy } = interview;
   const conversation = useTextInterviewConversation(interview);
   const awaiting = Boolean(session?.awaiting_question);
+  const grading = session?.submission?.status === 'QUEUED';
   const shouldReveal = Boolean(session) && !awaiting && !conversation.closing && Boolean(conversation.text);
-  const { displayedText, isRevealing, complete } = useProgressiveText(conversation.text || '', shouldReveal);
+  const previousQuestion = awaiting ? session?.turns.at(-1)?.question : '';
+  const { displayedText, isRevealing, complete } = useProgressiveText(conversation.text || previousQuestion || '', shouldReveal);
   const pendingTurn = session?.pending_turn ?? null;
   const [codeState, setCodeState] = useState<{ turnId: string; code: string }>({ turnId: '', code: '' });
-  const [clarifyOpen, setClarifyOpen] = useState(false);
-  const [clarifyQuestion, setClarifyQuestion] = useState('');
   if (!session) return null;
 
   const isPractice = session.config.session_purpose === 'PRACTICE';
-  const clarifications = pendingTurn?.clarifications ?? [];
-  const remainingClarifications = Math.max(0, 2 - clarifications.length);
-  const canClarifyPrompt = Boolean(
-    !conversation.introducing && !conversation.closing && !awaiting && pendingTurn
-    && remainingClarifications > 0
-    && (isPractice || ['DESIGN', 'CODING', 'DEBUGGING'].includes(pendingTurn.mode)),
-  );
-  const canRequestHint = Boolean(
-    isPractice && !conversation.introducing && !conversation.closing && !awaiting && pendingTurn
-    && remainingClarifications > 0
-    && !clarifications.some(item => item.kind === 'HINT'),
+  const showClarifyBar = Boolean(
+    !conversation.introducing && !conversation.closing && !awaiting && pendingTurn,
   );
 
   const showCodeEditor = Boolean(
@@ -59,12 +49,19 @@ export function EvidenceTextInterview({ interview, onHistory, onStop }: {
     if (isRevealing) complete();
     setCodeState({ turnId: pendingTurn.turn_id, code: next });
   };
-  const canSubmit = Boolean(interview.answer.trim() || (showCodeEditor && activeCode.trim()));
+  const starterCode = (pendingTurn?.coding_spec?.starter_code ?? '').trim();
+  const hasEditedCode = Boolean(activeCode.trim() && (!starterCode || activeCode.trim() !== starterCode));
+  const canSubmit = Boolean(interview.answer.trim() || (showCodeEditor && hasEditedCode));
+  const lastTurnFeedback = session.turns.at(-1)?.feedback?.trim() || '';
+  const turnFeedbackText = conversation.phase === 'INTERVIEW'
+    ? (session.pending_turn?.introduction || lastTurnFeedback)
+    : (conversation.closing && session.turns.length > 0 && lastTurnFeedback && lastTurnFeedback !== (conversation.text || '').trim()
+        ? lastTurnFeedback
+        : '');
 
-  const readOnlyAnswer = conversation.closing || awaiting;
+  const readOnlyAnswer = conversation.closing || awaiting || grading;
   const isSubmitting = busy && !awaiting;
-  const isLoadingQuestion = awaiting && busy;
-  const needsManualRetry = awaiting && !busy;
+  const needsQuestionRetry = awaiting && !busy && Boolean(interview.error);
   const hasPreviousAnswers = session.turns.length > 0;
 
   const answerLabel = awaiting
@@ -94,130 +91,59 @@ export function EvidenceTextInterview({ interview, onHistory, onStop }: {
   return <div data-interview-mode="TEXT" data-conversation-phase={conversation.phase} className="space-y-4">
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3">
       <p className="text-sm">{conversation.phase === 'INTERVIEW' ? <>Đã trả lời <strong>{session.turns.length}/{session.config.max_questions}</strong> câu</> : 'Phòng phỏng vấn'}</p>
-      <div className="flex items-center gap-3">{conversation.phase === 'INTERVIEW' && <span className="flex items-center gap-2 text-sm tabular-nums"><Clock3 size={16} />Còn {Math.floor(interview.secondsLeft / 60)}:{String(interview.secondsLeft % 60).padStart(2, '0')}</span>}
+      <div className="flex items-center gap-3">{conversation.phase === 'INTERVIEW' && <span title="Đồng hồ tạm dừng khi AI chấm và tạo câu tiếp theo" className="flex items-center gap-2 text-sm tabular-nums"><Clock3 size={16} />Còn {Math.floor(interview.secondsLeft / 60)}:{String(interview.secondsLeft % 60).padStart(2, '0')}</span>}
         <Button variant="outline" size="sm" onClick={onHistory}><History size={15} />Lịch sử ({session.turns.length} câu)</Button></div>
     </div>
-    <section aria-label="Không gian phỏng vấn văn bản" className="grid gap-4 lg:h-[calc(100dvh-13rem)] lg:min-h-96 lg:grid-cols-2">
+    <section aria-label="Không gian phỏng vấn văn bản" className="grid gap-4 lg:h-[calc(100dvh-13rem)] lg:min-h-[34rem] lg:grid-cols-2">
       <div className="flex min-h-0 min-w-0 flex-col rounded-2xl border bg-card">
         <div className="flex flex-wrap items-start justify-between gap-2 border-b px-5 py-4">
           <div>
             <p className="text-sm font-semibold">{conversation.interviewer}</p>
             {session.pending_turn && <p className="mt-1 text-sm text-muted-foreground">{skillLabel(turnSkillId(session, session.pending_turn))} · {modeLabels[session.pending_turn.mode]}</p>}
-            {isLoadingQuestion && <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground"><LoaderCircle size={14} className="animate-spin text-brand-orange" aria-hidden="true" />{hasPreviousAnswers ? 'Đang chuẩn bị câu hỏi tiếp theo…' : 'Đang chuẩn bị câu hỏi đầu tiên…'}</p>}
-            {needsManualRetry && <p className="mt-1 text-sm text-amber-600 dark:text-amber-400">Chưa thể tải câu hỏi tiếp theo</p>}
           </div>
           {isSubmitting && conversation.phase === 'INTERVIEW' && (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
               <LoaderCircle size={12} className="animate-spin text-brand-orange" aria-hidden="true" />
-              Đang đánh giá câu trả lời…
+              Đang gửi yêu cầu…
             </span>
           )}
         </div>
         <div key={session.pending_turn?.turn_id || (awaiting ? 'awaiting' : conversation.phase)} role="region" aria-label="Nội dung câu hỏi" tabIndex={0} onClick={() => { if (isRevealing) complete(); }} className="max-h-[45dvh] min-h-0 overflow-y-auto overscroll-contain p-5 animate-in fade-in duration-200 lg:max-h-none lg:flex-1">
-          {conversation.phase === 'INTERVIEW' && (session.pending_turn?.introduction || session.turns.at(-1)?.feedback) && <div role="status" aria-label="Phản hồi và chuyển tiếp" className="mb-5 rounded-xl border bg-muted/30 p-4 text-sm leading-relaxed">
-            <MarkdownContent content={session.pending_turn?.introduction || session.turns.at(-1)?.feedback || ''} />
+          {turnFeedbackText && <div role="status" aria-label="Phản hồi và chuyển tiếp" className={`mb-5 rounded-xl border p-4 text-sm leading-relaxed ${isPractice && session.turns.length > 0 ? 'border-brand-green/35 bg-brand-green/5' : 'bg-muted/30'}`}>
+            {isPractice && session.turns.length > 0 ? (
+              <p className="mb-1.5 text-[11px] font-semibold tracking-wide text-brand-green uppercase">
+                {conversation.closing ? 'Góp ý luyện tập · câu cuối' : 'Góp ý luyện tập'}
+              </p>
+            ) : conversation.closing ? (
+              <p className="mb-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                Phản hồi câu cuối
+              </p>
+            ) : null}
+            <MarkdownContent content={turnFeedbackText} />
           </div>}
-          {awaiting ? (
-            <div role="status" aria-live="polite" className="space-y-4 rounded-xl border border-dashed bg-muted/20 p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="flex items-center gap-2 text-sm font-medium text-foreground">
-                  {isLoadingQuestion && <LoaderCircle size={16} className="shrink-0 animate-spin text-brand-orange" aria-hidden="true" />}
-                  <span>
-                    {awaitingMessage}
-                    {isLoadingQuestion
-                      ? (hasPreviousAnswers ? 'Người phỏng vấn đang chuẩn bị câu hỏi tiếp theo…' : 'Người phỏng vấn đang chuẩn bị câu hỏi đầu tiên…')
-                      : (hasPreviousAnswers ? 'Câu tiếp theo đang chờ tải.' : 'Câu hỏi đầu tiên đang chờ tải.')}
-                  </span>
-                </p>
-                {needsManualRetry && (
-                  <Button variant="outline" size="sm" onClick={() => void interview.loadNextQuestion()}>
-                    Thử tải lại câu hỏi
-                  </Button>
-                )}
-              </div>
-              {isLoadingQuestion && (
-                <div className="space-y-2.5 pt-1" aria-hidden="true">
-                  <Skeleton className="h-4 w-11/12" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-3/5" />
-                </div>
-              )}
+          {needsQuestionRetry ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed bg-muted/20 p-5">
+              <p role="status" className="text-sm font-medium text-foreground">
+                {awaitingMessage}
+                {hasPreviousAnswers ? 'Câu tiếp theo đang chờ tải.' : 'Câu hỏi đầu tiên đang chờ tải.'}
+              </p>
+              <Button variant="outline" size="sm" onClick={() => void interview.loadNextQuestion()}>
+                Thử tải lại câu hỏi
+              </Button>
             </div>
           ) : (
             <>
               <MarkdownContent content={displayedText} />
               {isRevealing && <span className="mt-1 inline-block h-4 w-1.5 animate-pulse rounded-xs bg-brand-orange/70 align-middle" aria-hidden="true" />}
-              {clarifications.length > 0 && (
-                <div className="mt-4 space-y-2 border-t pt-3">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase">Trao đổi làm rõ đề bài</p>
-                  {clarifications.map((item, idx) => (
-                    <div key={idx} className="space-y-1 rounded-xl border bg-muted/25 p-3 text-xs leading-relaxed">
-                      <p className="font-semibold text-foreground">
-                        {item.kind === 'HINT' ? 'Gợi ý hướng tiếp cận' : `Câu hỏi của bạn: ${item.question}`}
-                      </p>
-                      <p className="text-muted-foreground">{item.answer}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {(canClarifyPrompt || canRequestHint) && (
-                <div className="mt-4 space-y-2 border-t pt-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    {canClarifyPrompt && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-7 text-xs"
-                        disabled={busy}
-                        onClick={() => setClarifyOpen(open => !open)}
-                      >
-                        <HelpCircle size={13} aria-hidden="true" />
-                        Hỏi làm rõ đề bài (còn {remainingClarifications}/2)
-                      </Button>
-                    )}
-                    {canRequestHint && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 text-xs text-brand-green"
-                        disabled={busy}
-                        onClick={() => void interview.clarify('HINT')}
-                      >
-                        <Lightbulb size={13} aria-hidden="true" />
-                        Xin gợi ý nhỏ
-                      </Button>
-                    )}
-                  </div>
-                  {clarifyOpen && canClarifyPrompt && (
-                    <form
-                      className="flex flex-wrap gap-2"
-                      onSubmit={event => {
-                        event.preventDefault();
-                        if (!clarifyQuestion.trim() || busy) return;
-                        void interview.clarify('CLARIFY_PROMPT', clarifyQuestion).then(updated => {
-                          if (updated) {
-                            setClarifyQuestion('');
-                            setClarifyOpen(false);
-                          }
-                        });
-                      }}
-                    >
-                      <Input
-                        aria-label="Nội dung cần làm rõ đề bài"
-                        className="h-8 min-w-48 flex-1 text-xs"
-                        placeholder="VD: Input có thể rỗng không? Tải dự kiến bao nhiêu QPS?"
-                        value={clarifyQuestion}
-                        disabled={busy}
-                        onChange={e => setClarifyQuestion(e.target.value)}
-                      />
-                      <Button type="submit" size="sm" className="h-8 text-xs" disabled={busy || !clarifyQuestion.trim()}>
-                        Gửi câu hỏi
-                      </Button>
-                    </form>
-                  )}
-                </div>
+              {showClarifyBar && pendingTurn && (
+                <InterviewClarifyBar
+                  key={pendingTurn.turn_id}
+                  clarifications={pendingTurn.clarifications ?? []}
+                  mode={pendingTurn.mode}
+                  isPractice={isPractice}
+                  busy={busy}
+                  onClarify={(kind, question) => interview.clarify(kind, question)}
+                />
               )}
             </>
           )}
@@ -256,14 +182,14 @@ export function EvidenceTextInterview({ interview, onHistory, onStop }: {
           />
         )}
         {showCodeEditor ? (
-          <div className="space-y-1">
+          <div className="shrink-0 space-y-1">
             <label htmlFor="interview-answer" className="text-xs font-medium text-muted-foreground">
               Giải thích ngắn hoặc độ phức tạp (tuỳ chọn)
             </label>
             <textarea
               id="interview-answer"
               aria-label="Câu trả lời"
-              className={`h-16 min-h-14 w-full resize-none overflow-y-auto rounded-xl border border-border/80 px-3.5 py-2 text-sm leading-relaxed transition-colors focus-visible:bg-background focus-visible:outline-2 focus-visible:outline-brand-orange ${readOnlyAnswer ? 'bg-muted/40 text-muted-foreground' : 'bg-muted/20'}`}
+              className={`h-12 min-h-12 w-full resize-none overflow-y-auto rounded-xl border border-border/80 px-3.5 py-1.5 text-sm leading-relaxed transition-colors focus-visible:bg-background focus-visible:outline-2 focus-visible:outline-brand-orange ${readOnlyAnswer ? 'bg-muted/40 text-muted-foreground' : 'bg-muted/20'}`}
               maxLength={50000}
               value={answerValue}
               readOnly={readOnlyAnswer}
@@ -281,11 +207,25 @@ export function EvidenceTextInterview({ interview, onHistory, onStop }: {
         <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3">{conversation.closing
           ? <Button disabled={busy} onClick={() => void interview.converse('NEXT')}>Xem kết quả</Button>
           : <><div className="flex flex-wrap items-center gap-2">
-              {!awaiting && <Button disabled={busy || !canSubmit} onClick={() => void interview.submit(interview.answer, showCodeEditor && activeCode.trim() ? activeCode : undefined)}>{isSubmitting
-                ? <><LoaderCircle size={15} className="animate-spin" />{conversation.introducing ? 'Đang gửi giới thiệu…' : 'Đang đánh giá…'}</>
+              {!awaiting && !grading && <Button
+                disabled={busy || !canSubmit}
+                title={!canSubmit && showCodeEditor && Boolean(starterCode) ? 'Hãy chỉnh sửa mã nguồn hoặc nhập giải thích trước khi gửi' : undefined}
+                onClick={() => void interview.submit(interview.answer, showCodeEditor && activeCode.trim() ? activeCode : undefined)}
+              >{isSubmitting
+                ? <><LoaderCircle size={15} className="animate-spin" />{conversation.introducing ? 'Đang gửi giới thiệu…' : 'Đang nộp bài…'}</>
                 : <><Send size={15} />Gửi câu trả lời</>}</Button>}
+              {!awaiting && !conversation.introducing && session.pending_turn && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => void interview.submit('Em chưa làm được.')}
+                >
+                  Chưa làm được
+                </Button>
+              )}
               {conversation.introducing && <Button variant="ghost" disabled={busy} onClick={() => void interview.converse('SKIP_INTRODUCTION')}>Bỏ qua giới thiệu</Button>}
-              {isLoadingQuestion && <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground"><LoaderCircle size={14} className="animate-spin text-brand-orange" aria-hidden="true" />Đang chuyển tiếp…</span>}
             </div>
             <Button variant="outline" size="sm" disabled={busy} onClick={onStop}>Kết thúc phiên</Button></>}
         </div>

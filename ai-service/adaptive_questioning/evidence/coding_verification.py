@@ -12,6 +12,7 @@ from .code_runner import (
     CodeExecutionProvider,
     CodingCaseResult,
     CodingSpec,
+    CodingTestCase,
     ExecutionResult,
     SupportedLanguage,
     default_code_runner,
@@ -30,11 +31,13 @@ _JS_IMPORT_RE = re.compile(
 _SANDBOX_ENV_ERROR_RE = re.compile(
     r"(?:ModuleNotFoundError:\s*No module named '(?!solution')[^']+'|"
     r"Cannot find module\s+['\"]|ERR_MODULE_NOT_FOUND|"
+    r"Node\.js runtime không khả dụng|"
     r"ConnectionRefusedError|ECONNREFUSED|"
     r"redis\.exceptions\.ConnectionError|ServerSelectionTimeoutError|"
     r"Temporary failure in name resolution|Name or service not known|socket\.gaierror)",
     re.IGNORECASE,
 )
+ORACLE_TIMEOUT_SECONDS = 2.0
 
 SANDBOX_PYTHON_CURATED_PACKAGES = frozenset({
     "redis",
@@ -55,6 +58,12 @@ SANDBOX_ENV_NOTICE = (
     "Môi trường chạy thử cô lập không cài sẵn thư viện hoặc dịch vụ mạng mà đoạn mã đang dùng "
     "(hỗ trợ Python chuẩn, Redis/MongoDB giả lập trong RAM, FastAPI/Pydantic, Node.js chuẩn và SQLite). "
     "Bạn vẫn có thể bấm Gửi câu trả lời — hệ thống sẽ chấm điểm theo logic mã nguồn của bạn."
+)
+_SQL_MISSING_TABLE_RE = re.compile(r"\bno such table\s*:", re.IGNORECASE)
+SQL_FREE_RUN_NO_SCHEMA_NOTICE = (
+    "Câu hỏi SQL này đang ở chế độ chạy tự do (sandbox SQLite trống, chưa tạo sẵn bảng dữ liệu mẫu nên báo thiếu bảng). "
+    "Bạn có thể thêm lệnh CREATE TABLE / INSERT ở đầu để tự chạy thử, hoặc bấm Gửi câu trả lời ngay — "
+    "AI sẽ chấm điểm trực tiếp theo logic truy vấn SQL của bạn."
 )
 
 
@@ -91,14 +100,36 @@ def _extract_js_imports(source: str) -> set[str]:
     return modules
 
 
-def _sqlite_setup_valid(setup_sql: str) -> bool:
-    if not setup_sql.strip():
+def _python_declares_entry_point(source: str, entry_point: str) -> bool:
+    if not source.strip() or not entry_point.strip():
         return True
-    if _FORBIDDEN_SQL.search(setup_sql):
+    try:
+        tree = ast.parse(source)
+        return any(
+            isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and node.name == entry_point
+            for node in tree.body
+        )
+    except SyntaxError:
+        return bool(re.search(rf"^\s*(?:async\s+)?def\s+{re.escape(entry_point)}\s*\(", source, re.MULTILINE))
+
+
+def _js_declares_entry_point(source: str, entry_point: str) -> bool:
+    if not source.strip() or not entry_point.strip():
+        return True
+    escaped = re.escape(entry_point)
+    pattern = rf"\b(?:(?:async\s+)?function\s+{escaped}\s*\(|(?:const|let|var)\s+{escaped}\s*=)"
+    return bool(re.search(pattern, source))
+
+
+def _sqlite_setup_valid(setup_sql: str, extra_sql: str = "") -> bool:
+    combined = "\n".join(part for part in (setup_sql, extra_sql) if part and part.strip())
+    if not combined.strip():
+        return True
+    if _FORBIDDEN_SQL.search(combined):
         return False
     conn = sqlite3.connect(":memory:")
     try:
-        conn.executescript(setup_sql)
+        conn.executescript(combined)
         return True
     except sqlite3.Error:
         return False
@@ -106,29 +137,101 @@ def _sqlite_setup_valid(setup_sql: str) -> bool:
         conn.close()
 
 
-def sanitize_coding_spec(question: Question) -> Question:
-    """Strip coding_spec when starter_code/setup_sql relies on runtimes unsupported by the isolated sandbox."""
-    spec = question.coding_spec
-    if spec is None:
-        return question
-    reason = ""
+def _validate_static_coding_spec(spec: CodingSpec, all_cases: list[CodingTestCase]) -> str:
+    if not all_cases or any(not case.expected_output.strip() for case in all_cases):
+        return "invalid_or_empty_test_cases"
     if spec.language == "python":
         disallowed = sorted(
             mod for mod in _extract_python_imports(spec.starter_code)
             if mod not in SANDBOX_PYTHON_ALLOWED_MODULES
         )
         if disallowed:
-            reason = f"unsupported_python_imports:{','.join(disallowed[:3])}"
+            return f"unsupported_python_imports:{','.join(disallowed[:3])}"
+        if not _python_declares_entry_point(spec.starter_code, spec.entry_point):
+            return f"missing_python_entry_point:{spec.entry_point}"
     elif spec.language == "javascript":
         disallowed = sorted(
             mod for mod in _extract_js_imports(spec.starter_code)
             if mod not in SANDBOX_NODE_BUILTINS
         )
         if disallowed:
-            reason = f"unsupported_js_imports:{','.join(disallowed[:3])}"
-    elif spec.language == "sql" and not _sqlite_setup_valid(spec.setup_sql):
-        reason = "invalid_sqlite_setup_sql"
+            return f"unsupported_js_imports:{','.join(disallowed[:3])}"
+        if not _js_declares_entry_point(spec.starter_code, spec.entry_point):
+            return f"missing_js_entry_point:{spec.entry_point}"
+    elif spec.language == "sql":
+        if not _sqlite_setup_valid(spec.setup_sql):
+            return "invalid_sqlite_setup_sql"
+        if any(not _sqlite_setup_valid(spec.setup_sql, case.input_data) for case in all_cases):
+            return "invalid_sqlite_case_input"
+    return ""
 
+
+def _verify_reference_solution(
+    spec: CodingSpec,
+    all_cases: list[CodingTestCase],
+    runner: CodeExecutionProvider | None,
+) -> str:
+    """When reference_solution is provided, verify it passes every sample and hidden test."""
+    cleaned = extract_code_snippet(spec.reference_solution).strip()
+    if not cleaned:
+        return ""
+    if spec.language == "python":
+        disallowed = sorted(
+            mod for mod in _extract_python_imports(cleaned)
+            if mod not in SANDBOX_PYTHON_ALLOWED_MODULES
+        )
+        if disallowed:
+            return f"unsupported_reference_python_imports:{','.join(disallowed[:3])}"
+    elif spec.language == "javascript":
+        disallowed = sorted(
+            mod for mod in _extract_js_imports(cleaned)
+            if mod not in SANDBOX_NODE_BUILTINS
+        )
+        if disallowed:
+            return f"unsupported_reference_js_imports:{','.join(disallowed[:3])}"
+    active_runner = runner or default_code_runner()
+    try:
+        outcome = active_runner.execute(
+            language=spec.language,
+            code=cleaned,
+            entry_point=spec.entry_point,
+            setup_sql=spec.setup_sql,
+            cases=all_cases,
+            timeout_seconds=ORACLE_TIMEOUT_SECONDS,
+        )
+    except Exception as exc:
+        logger.warning(
+            "Reference solution oracle runner error (language=%s, %s): %s",
+            spec.language, type(exc).__name__, exc,
+        )
+        return ""
+    total = outcome.total or len(all_cases)
+    if outcome.passed < total and is_sandbox_environment_error(outcome):
+        logger.warning(
+            "Reference solution oracle hit sandbox environment limit (language=%s); keeping spec.",
+            spec.language,
+        )
+        return ""
+    if outcome.compile_error:
+        return "reference_solution_compile_error"
+    if outcome.passed < total:
+        return f"reference_solution_failed_tests:{outcome.passed}/{total}"
+    return ""
+
+
+def sanitize_coding_spec(
+    question: Question,
+    *,
+    runner: CodeExecutionProvider | None = None,
+) -> Question:
+    """Strip coding_spec when starter_code, tests, setup_sql, or reference_solution cannot pass in sandbox."""
+    spec = question.coding_spec
+    if spec is None:
+        return question
+    all_cases = [*spec.sample_tests, *spec.hidden_tests]
+    reason = _validate_static_coding_spec(spec, all_cases)
+    if not reason:
+        reason = _verify_reference_solution(spec, all_cases, runner)
     if not reason:
         return question
     logger.info("Stripping non-runnable coding_spec (%s) for language=%s", reason, spec.language)
@@ -154,6 +257,7 @@ class CodingCheck:
     passed: int
     compile_error: str = ""
     sample_results: tuple[CodingCaseResult, ...] = ()
+    hidden_failed_summaries: tuple[str, ...] = ()
 
     def to_result(self) -> CodingCheckResult:
         return CodingCheckResult(
@@ -162,7 +266,31 @@ class CodingCheck:
             language=self.language,
             compile_error=self.compile_error,
             sample_results=list(self.sample_results),
+            hidden_failed_summaries=list(self.hidden_failed_summaries),
         )
+
+    def to_judge_payload(self) -> dict[str, object]:
+        payload: dict[str, object] = {
+            "passed": self.passed,
+            "total": self.total,
+            "language": self.language,
+        }
+        if self.compile_error:
+            payload["compile_error"] = self.compile_error[:300]
+        if self.sample_results:
+            payload["sample_results"] = [
+                {
+                    "name": item.name,
+                    "passed": item.passed,
+                    "actual_output": item.actual_output[:160],
+                    "expected_output": item.expected_output[:160],
+                    "error": item.error[:200],
+                }
+                for item in self.sample_results
+            ]
+        if self.hidden_failed_summaries:
+            payload["hidden_failed_summaries"] = list(self.hidden_failed_summaries)
+        return payload
 
     def failure_judgment(self, turn: Turn) -> Judgment:
         if self.compile_error:
@@ -178,6 +306,8 @@ class CodingCheck:
                     f" Ở ca `{first_fail.name}`, kết quả thực tế là `{first_fail.actual_output[:100]}` "
                     f"khác kỳ vọng `{first_fail.expected_output[:100]}`."
                 )
+            elif self.hidden_failed_summaries:
+                hint = f" {self.hidden_failed_summaries[0]}"
             detail = f"Mã nguồn chưa đạt {failed_count}/{self.total} ca kiểm thử tự động.{hint}"
         return Judgment(
             feedback="",
@@ -189,6 +319,12 @@ class CodingCheck:
                 rationale=detail,
             )],
         )
+
+
+def _summarize_hidden_failure(item: CodingCaseResult) -> str:
+    if item.error:
+        return f"Ca kiểm thử ẩn '{item.name}' gặp lỗi thực thi ({item.error[:120]})."
+    return f"Ca kiểm thử ẩn '{item.name}' trả về kết quả khác kỳ vọng (cần kiểm tra logic/ca biên)."
 
 
 def _code_line_range(answer: str) -> tuple[int, int]:
@@ -248,6 +384,11 @@ def check_coding_answer(
         event("coding.sandbox_env_fallback", turn_id=turn.turn_id, language=outcome.language)
         return None
     sample_count = len(spec.sample_tests)
+    hidden_failed = tuple(
+        _summarize_hidden_failure(item)
+        for item in outcome.results[sample_count:]
+        if not item.passed
+    )
     return CodingCheck(
         line_range=_code_line_range(raw_source),
         language=outcome.language,
@@ -255,6 +396,7 @@ def check_coding_answer(
         passed=outcome.passed,
         compile_error=outcome.compile_error,
         sample_results=tuple(outcome.results[:sample_count]),
+        hidden_failed_summaries=hidden_failed,
     )
 
 
@@ -281,4 +423,11 @@ def run_sample_code(
     )
     if is_sandbox_environment_error(result):
         return result.model_copy(update={"environment_notice": SANDBOX_ENV_NOTICE})
+    if (
+        language == "sql"
+        and not setup_sql.strip()
+        and not cases
+        and _SQL_MISSING_TABLE_RE.search(result.compile_error or "")
+    ):
+        return result.model_copy(update={"environment_notice": SQL_FREE_RUN_NO_SCHEMA_NOTICE})
     return result

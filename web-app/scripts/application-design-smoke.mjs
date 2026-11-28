@@ -5,17 +5,57 @@ import puppeteer from 'puppeteer';
 const base = process.argv[2] || 'http://localhost:3217';
 const statuses = ['NEEDS_VERIFICATION', 'DEMONSTRATED_BELOW_TARGET', 'DEMONSTRATED_BELOW_TARGET',
   'INSUFFICIENT_EVIDENCE', 'PARTIALLY_ASSESSED', 'NOT_ASSESSED', 'NOT_ASSESSED',
-  ...Array(5).fill('DEMONSTRATED_AT_TARGET')];
-const names = ['sql', 'java', 'docker', 'react', 'aws', 'html_css', 'git', 'typescript', 'javascript', 'python', 'postgresql', 'spring_boot'];
+  'INSUFFICIENT_EVIDENCE', ...Array(4).fill('DEMONSTRATED_AT_TARGET')];
+const names = ['ai_tools_usage', 'java', 'docker', 'react', 'aws', 'html_css', 'git', 'typescript', 'javascript', 'python', 'postgresql', 'spring_boot'];
+const aiSkill = '[data-skill="ai_tools_usage"]';
+const typeScriptSkill = '[data-skill="typescript"]';
 const source = { sessionId: 'session-11', attemptNumber: 11, assessedAt: '2026-11-07T10:30:00' };
-const evidence = { source, turnId: 'sql-turn', question: '## Truy vấn chậm\n\nBạn kiểm tra **execution plan** như thế nào?',
-  responseExcerpt: 'Tôi dùng EXPLAIN ANALYZE để kiểm tra actual rows.', rationale: '**Bằng chứng:** Có cách kiểm chứng rõ ràng.', performance: 'AT_TARGET' };
+const checked = { ...source, sessionId: 'session-12', attemptNumber: 12 };
+const evidence = { source, turnId: 'ai-turn', question: 'Đoạn mã do AI gợi ý có thể chạy sai với đầu vào nào?',
+  responseExcerpt: 'Với mảng rỗng, đoạn mã chia tổng cho 0.', rationale: 'Chỉ ra được lỗi và đầu vào làm lỗi xảy ra.', performance: 'AT_TARGET' };
+const earlierEvidence = { ...evidence, source: { ...source, sessionId: 'session-10', attemptNumber: 10 },
+  turnId: 'earlier-ai-turn', responseExcerpt: 'Tôi nghĩ chỉ cần chạy thử vài đầu vào thông thường.',
+  rationale: 'Chưa chỉ ra được lỗi cụ thể.', performance: 'BELOW' };
+const aiObjectives = [{
+  id: 'ai-review', claim: 'Đánh giá kiến thức thực hành ai_tools_usage', assessment: 'NEEDS_VERIFICATION',
+  lastChecked: checked, lastAssessment: source,
+  criteria: [{
+    id: 'ai-edge-case', description: 'Phát hiện lỗi logic hoặc trường hợp biên bị bỏ sót trong đoạn mã do AI gợi ý',
+    atTarget: 'Chỉ ra đoạn logic sai và một đầu vào cụ thể làm chương trình chạy sai.',
+    essential: true, assessment: 'NEEDS_VERIFICATION', lastAssessment: source, evidence: [earlierEvidence, evidence],
+  }, {
+    id: 'ai-explain', description: 'Giải thích chức năng của đoạn mã do AI gợi ý',
+    essential: true, assessment: 'DEMONSTRATED_AT_TARGET', lastAssessment: source, evidence: [],
+  }, {
+    id: 'ai-test', description: 'Viết kiểm thử để phát hiện lỗi trước khi dùng đoạn mã',
+    essential: true, assessment: 'DEMONSTRATED_BELOW_TARGET', lastAssessment: earlierEvidence.source, evidence: [],
+  }, {
+    id: 'ai-improve', description: 'So sánh hai cách sửa lỗi và nêu điểm đánh đổi',
+    essential: false, assessment: 'NOT_ASSESSED', lastAssessment: null, evidence: [],
+  }],
+}, {
+  id: 'ai-privacy', claim: 'Bảo vệ dữ liệu nhạy cảm khi sử dụng công cụ AI', assessment: 'NOT_ASSESSED',
+  lastChecked: null, lastAssessment: null, criteria: [{
+    id: 'ai-redact', description: 'Loại bỏ thông tin nhạy cảm trước khi gửi nội dung cho công cụ AI',
+    essential: true, assessment: 'NOT_ASSESSED', lastAssessment: null, evidence: [],
+  }],
+}];
+const typeScriptObjective = {
+  id: 'typescript-api-types', claim: 'Đánh giá kiến thức thực hành typescript', assessment: 'INSUFFICIENT_EVIDENCE',
+  lastChecked: checked, lastAssessment: null,
+  explanation: 'Đã kiểm tra nhưng chưa đủ bằng chứng để kết luận.',
+  criteria: [{
+    id: 'typescript-api-interface', description: 'Xây dựng interface và type cho đối tượng dữ liệu API',
+    atTarget: 'Khai báo các thuộc tính và kiểu dữ liệu phù hợp với phản hồi API.',
+    essential: true, assessment: 'NOT_ASSESSED', lastAssessment: null, evidence: [],
+  }],
+};
 const competency = {
-  completedAttempts: 11, incompatibleAssessments: 0,
+  completedAttempts: 11, incompatibleAssessments: 240,
   skills: names.map((skillId, index) => ({ skillId, assessment: statuses[index], baselineAlignment: 'PARTIAL',
-    objectives: [{ id: `${skillId}-objective`, claim: skillId === 'sql' ? 'Chẩn đoán và tối ưu hiệu năng truy vấn SQL' : `Thực hiện công việc với ${skillId}`,
+    objectives: index === 0 ? aiObjectives : skillId === 'typescript' ? [typeScriptObjective] : [{ id: `${skillId}-objective`, claim: `Thực hiện công việc với ${skillId}`,
       assessment: statuses[index], lastChecked: source, lastAssessment: source,
-      explanation: index === 0 ? 'Có bằng chứng mâu thuẫn. Cần kiểm chứng lại với bối cảnh độc lập.' : 'Kết luận áp dụng cho nội dung đã được kiểm tra.',
+      explanation: 'Kết luận áp dụng cho nội dung đã được kiểm tra.',
       criteria: [{ id: `${skillId}-criterion`, description: 'Giải thích nguyên nhân và đề xuất cách kiểm chứng bằng dữ liệu thực tế.',
         essential: true, assessment: statuses[index], lastAssessment: source, evidence: [evidence] }] }] })),
 };
@@ -74,20 +114,59 @@ try {
 
   await page.setViewport({ width: 1440, height: 1050 }); await visit('/applications/design');
   await text('Năng lực hiện tại theo JD'); await page.waitForSelector('[data-skill]');
+  assert.doesNotMatch(await page.$eval('body', element => element.innerText), /đánh giá có bộ tiêu chí khác/);
   assert.equal(await page.$$eval('[data-skill]', elements => elements.length), 1);
-  assert.equal(await page.$$eval('[data-skill]', elements => elements[0].dataset.skill), 'sql');
+  assert.equal(await page.$eval(`${aiSkill} > summary`, element => element.textContent.includes('Cần kiểm chứng lại')), true);
   assert.equal(await page.$$eval('[role="tabpanel"]', elements => elements.filter(e => !e.hidden && getComputedStyle(e).display !== 'none').length), 1);
   await page.screenshot({ path: '.next/application-overview-desktop.png', fullPage: true });
   await click('Dưới yêu cầu 2');
   assert.equal(await page.$$eval('[data-skill]', elements => elements.length), 2);
   await click('Tất cả'); await click('Xem thêm kỹ năng (6)');
   assert.equal(await page.$$eval('[data-skill]', elements => elements.length), 12);
-  await page.$eval('[data-skill="sql"] > summary', e => e.click());
-  await page.focus('[data-skill="sql"] button'); await page.keyboard.press('Enter');
-  await text('Bằng chứng đánh giá · SQL');
+  await page.$eval(`${aiSkill} > summary`, e => e.click());
+  await text('Mục tiêu đánh giá');
+  await text('Tiêu chí phỏng vấn');
+  assert.equal(await page.$eval(aiSkill, e => e.innerText.includes('ai_tools_usage')), false);
+  assert.equal(await page.$eval(aiSkill, e => e.innerText.includes('Để đạt yêu cầu')), false);
+  assert.equal(await page.$eval(aiSkill, e => e.innerText.includes('Kết quả từ các câu trả lời chưa nhất quán.')), false);
+  assert.deepEqual(await page.$$eval(`${aiSkill} article [role="heading"]`, elements => elements.map(e => e.textContent.trim())), [
+    'Thực hành · Sử dụng công cụ AI',
+    'Bảo vệ dữ liệu nhạy cảm khi sử dụng công cụ AI',
+  ]);
+  const criteria = await page.$$eval(`${aiSkill} article ul > li`, elements => elements.map(e => e.innerText));
+  assert.equal(criteria.length, 4);
+  assert.match(criteria[0], /Phát hiện lỗi logic[\s\S]+Cần kiểm chứng lại/);
+  assert.match(criteria[1], /Giải thích chức năng[\s\S]+Đạt yêu cầu/);
+  assert.match(criteria[2], /Viết kiểm thử[\s\S]+Chưa đạt/);
+  assert.match(criteria[3], /So sánh hai cách sửa lỗi[\s\S]+Chưa đánh giá/);
+  const firstObjectiveToggle = `${aiSkill} article:first-child > header button`;
+  const secondObjectiveToggle = `${aiSkill} article:last-child > header button`;
+  await page.click(secondObjectiveToggle);
+  assert.match(await page.$eval(`${aiSkill} article ul > li`, e => e.innerText), /Loại bỏ thông tin nhạy cảm[\s\S]+Chưa đánh giá/);
+  assert.equal(await page.$eval(firstObjectiveToggle, e => e.getAttribute('aria-expanded')), 'false');
+  await page.focus(firstObjectiveToggle); await page.keyboard.press('Enter');
+  await page.waitForSelector(`${aiSkill} article details > summary`, { visible: true });
+  await (await page.$(aiSkill)).screenshot({ path: '.next/application-skill-desktop.png' });
+  await page.click(`${aiSkill} article details > summary`);
+  await text('Kết quả từ các câu trả lời chưa nhất quán.');
+  assert.ok(await page.$(`${aiSkill} a[href="/interview/session/session-12/result"]`));
+  assert.equal(await page.$eval(`${aiSkill} a[href="/interview/session/session-11/result"]`, e => e.textContent.trim()), 'Xem căn cứ đánh giá ở lượt 11');
+  const criterionButton = `${aiSkill} ul button[aria-haspopup="dialog"]`;
+  await page.focus(criterionButton); await page.keyboard.press('Enter');
+  await text('Chi tiết tiêu chí'); await text('Để đạt yêu cầu'); await text('Câu trả lời và nhận xét (2)');
   assert.equal(await page.$$eval('[role="dialog"] a[href="/interview/session/session-11/result"]', elements => elements.length), 1);
+  await text('Nhận xét về câu trả lời');
+  assert.deepEqual(await page.$$eval('[role="dialog"] article span', elements => elements.map(e => e.textContent.trim())), ['Đạt yêu cầu', 'Chưa đạt']);
   await page.keyboard.press('Escape'); await page.waitForSelector('[role="dialog"]', { hidden: true });
-  await page.waitForFunction(() => document.activeElement?.textContent.includes('Xem bằng chứng (1)'));
+  await page.waitForFunction(selector => document.activeElement === document.querySelector(selector), {}, criterionButton);
+  await page.click(`${typeScriptSkill} > summary`);
+  const typeScriptOverview = await page.$eval(`${typeScriptSkill} > summary`, e => e.innerText);
+  assert.match(typeScriptOverview, /TypeScript[\s\S]+Kết quả kỹ năng · Chưa đủ bằng chứng/);
+  const typeScriptCriterion = await page.$eval(`${typeScriptSkill} article ul > li`, e => e.innerText);
+  assert.equal(await page.$eval(`${typeScriptSkill} article [role="heading"]`, e => e.innerText), typeScriptObjective.criteria[0].description);
+  assert.match(typeScriptCriterion, /Khai báo các thuộc tính và kiểu dữ liệu phù hợp với phản hồi API\.[\s\S]+Chưa đánh giá/);
+  assert.equal(await page.$(`${typeScriptSkill} button[aria-haspopup="dialog"]`), null);
+  await (await page.$(typeScriptSkill)).screenshot({ path: '.next/application-typescript-skill-desktop.png' });
   await page.focus('[role="tab"][aria-selected="true"]'); await page.keyboard.press('ArrowRight');
   assert.equal(await page.evaluate(() => document.activeElement?.textContent.includes('Lịch sử phỏng vấn')), true);
   await page.keyboard.press('Enter');
@@ -105,6 +184,11 @@ try {
     const rect = e.getBoundingClientRect(); return rect.left >= 0 && rect.right <= innerWidth;
   })), true, 'All profile tabs must be visible on mobile');
   await noOverflow(); await page.screenshot({ path: '.next/application-overview-mobile.png', fullPage: true });
+  await page.$eval(`${aiSkill} > summary`, e => e.click());
+  await text('Phát hiện lỗi logic'); await noOverflow();
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+  const mobileSkillBounds = await (await page.$(aiSkill)).boundingBox();
+  await page.screenshot({ path: '.next/application-skill-mobile.png', clip: mobileSkillBounds, captureBeyondViewport: true });
   await visit('/applications/long#documents'); await text('Tài liệu đã dùng'); await noOverflow();
   assert.deepEqual(errors, []);
   console.log('PASS: profile search/filters, long names, focused overview, pagination, evidence dialog, persistent tabs, CV & JD and mobile layouts.');

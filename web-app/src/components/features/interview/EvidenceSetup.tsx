@@ -1,15 +1,81 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { ChevronDown, Clock3, Compass, LoaderCircle, MessageSquareText, Mic, Play, ShieldCheck } from 'lucide-react';
+import { ChevronDown, Clock3, Compass, LoaderCircle, MessageSquareText, Mic, Play, ShieldCheck, SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { studyPlans } from '@/services/studyPlans';
+import { applicationProfiles } from '@/services/applicationProfiles';
 import { Input } from '@/components/ui/input';
+import { skillLabel } from '@/components/features/applications/applicationUi';
 import { InterviewLimits, InterviewStartConfig, QuestionMode, SessionPurpose, defaultConfig, evidenceInterview, questionModes } from '@/services/evidenceInterview';
 
 export const modeLabels: Record<QuestionMode, string> = {
   CODING: 'Lập trình', DEBUGGING: 'Tìm và sửa lỗi', DESIGN: 'Thiết kế hệ thống',
   TECHNICAL_EXPLANATION: 'Giải thích kỹ thuật', BEHAVIORAL: 'Kinh nghiệm và cách ứng xử',
 };
+
+interface InterviewPreset {
+  id: string;
+  label: string;
+  detail: string;
+  focused_question_mode: QuestionMode | null;
+  minutes: number;
+  questions: number;
+  include_behavioral_in_mixed: boolean;
+}
+
+const INTERVIEW_PRESETS: readonly InterviewPreset[] = [
+  {
+    id: 'screening',
+    label: 'Sàng lọc nhanh',
+    detail: 'Tổng hợp · 15p · 6 câu',
+    focused_question_mode: null,
+    minutes: 15,
+    questions: 6,
+    include_behavioral_in_mixed: true,
+  },
+  {
+    id: 'coding',
+    label: 'Luyện Coding',
+    detail: 'Lập trình · 30p · 4 câu',
+    focused_question_mode: 'CODING',
+    minutes: 30,
+    questions: 4,
+    include_behavioral_in_mixed: false,
+  },
+  {
+    id: 'design',
+    label: 'Thiết kế hệ thống',
+    detail: 'Design · 30p · 5 câu',
+    focused_question_mode: 'DESIGN',
+    minutes: 30,
+    questions: 5,
+    include_behavioral_in_mixed: false,
+  },
+  {
+    id: 'behavioral',
+    label: 'Hành vi STAR',
+    detail: 'Behavioral · 20p · 6 câu',
+    focused_question_mode: 'BEHAVIORAL',
+    minutes: 20,
+    questions: 6,
+    include_behavioral_in_mixed: false,
+  },
+  {
+    id: 'full-mock',
+    label: 'Phỏng vấn đầy đủ',
+    detail: 'Tổng hợp · 40p · 12 câu',
+    focused_question_mode: null,
+    minutes: 40,
+    questions: 12,
+    include_behavioral_in_mixed: true,
+  },
+];
+
+interface FocusableSkill {
+  id: string;
+  label: string;
+  isCore: boolean;
+}
 
 const interactionOptions = [
   {
@@ -38,7 +104,7 @@ export function EvidenceSetup({ busy, profileId, onStart }: Props) {
   const [config, setConfig] = useState<InterviewStartConfig>(() => recheck ? {
     ...defaultConfig, max_questions: 3, max_questions_per_objective: 3, duration_seconds: 300,
     interaction_mode: query.get('channel') === 'VOICE' ? 'VOICE' : 'TEXT', recheck: { taskId, checklistItemId },
-  } : defaultConfig);
+  } : { ...defaultConfig, include_behavioral_in_mixed: true });
   const [criterion, setCriterion] = useState('');
   const [previewError, setPreviewError] = useState('');
   useEffect(() => {
@@ -52,10 +118,75 @@ export function EvidenceSetup({ busy, profileId, onStart }: Props) {
   }, [profileId, recheck, taskId, checklistItemId]);
   const [limits, setLimits] = useState<InterviewLimits>();
   const [ready, setReady] = useState(false);
+  const [availableSkills, setAvailableSkills] = useState<FocusableSkill[]>([]);
   const maxQuestions = limits?.maxQuestions ?? 40;
   const maxMinutes = Math.floor((limits?.durationSeconds ?? 7200) / 60);
   const invalidLimits = config.max_questions < 1 || config.max_questions > maxQuestions
     || config.duration_seconds < 60 || config.duration_seconds > maxMinutes * 60;
+
+  useEffect(() => {
+    if (recheck || !profileId) return;
+    const ac = new AbortController();
+    void applicationProfiles.get(profileId, ac.signal)
+      .then(profile => {
+        if (ac.signal.aborted || !Array.isArray(profile?.skills)) return;
+        const mapped = profile.skills
+          .filter(s => typeof s?.jd_skill_id === 'string' && s.jd_skill_id.trim())
+          .map(s => ({
+            id: s.jd_skill_id.trim(),
+            label: skillLabel(s.jd_skill_id, s.jd_skill_name ?? null, s.jd_evidence_spans ?? []),
+            isCore: (s.importance_weight ?? 0) >= 0.7,
+            priority: s.priority ?? 0,
+            importance: s.importance_weight ?? 0,
+          }))
+          .sort((a, b) => Number(b.isCore) - Number(a.isCore) || b.priority - a.priority || b.importance - a.importance);
+        const deduped: FocusableSkill[] = [];
+        const seen = new Set<string>();
+        for (const item of mapped) {
+          if (seen.has(item.id)) continue;
+          seen.add(item.id);
+          deduped.push({ id: item.id, label: item.label, isCore: item.isCore });
+        }
+        setAvailableSkills(deduped);
+      })
+      .catch(() => {});
+    return () => ac.abort();
+  }, [profileId, recheck]);
+
+  const applyPreset = (preset: InterviewPreset) => {
+    const minutes = Math.max(1, Math.min(preset.minutes, maxMinutes));
+    const questions = Math.max(1, Math.min(preset.questions, maxQuestions));
+    setConfig(previous => ({
+      ...previous,
+      focused_question_mode: preset.focused_question_mode,
+      duration_seconds: minutes * 60,
+      max_questions: questions,
+      include_behavioral_in_mixed: preset.focused_question_mode === null ? preset.include_behavioral_in_mixed : false,
+    }));
+  };
+
+  const selectedFocusSkills = config.focus_skill_ids ?? [];
+  const toggleFocusSkill = (skillId: string) => {
+    setConfig(previous => {
+      const current = previous.focus_skill_ids ?? [];
+      const next = current.includes(skillId)
+        ? current.filter(id => id !== skillId)
+        : [...current, skillId];
+      if (!next.length) {
+        const updated = { ...previous };
+        delete updated.focus_skill_ids;
+        return updated;
+      }
+      return { ...previous, focus_skill_ids: next };
+    });
+  };
+  const clearFocusSkills = () => {
+    setConfig(previous => {
+      const updated = { ...previous };
+      delete updated.focus_skill_ids;
+      return updated;
+    });
+  };
 
   useEffect(() => {
     const request = new AbortController();
@@ -190,50 +321,161 @@ export function EvidenceSetup({ busy, profileId, onStart }: Props) {
         </fieldset>
       )}
 
-      {!recheck && <div className="grid gap-4 rounded-xl border bg-muted/25 p-4 sm:grid-cols-12 sm:p-5">
-        <label className="grid gap-1.5 sm:col-span-6">
-          <span className="text-sm font-medium text-foreground">Dạng phỏng vấn</span>
-          <span className="relative">
-            <select
-              className={selectClass}
+      {!recheck && <div className="space-y-4 rounded-xl border bg-muted/25 p-4 sm:p-5">
+        <div className="space-y-2">
+          <p className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+            <SlidersHorizontal size={13} aria-hidden="true" />
+            Chọn nhanh mẫu vòng phỏng vấn
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {INTERVIEW_PRESETS.map(preset => {
+              const clampedMinutes = Math.max(1, Math.min(preset.minutes, maxMinutes));
+              const clampedQuestions = Math.max(1, Math.min(preset.questions, maxQuestions));
+              const active = config.focused_question_mode === preset.focused_question_mode
+                && config.duration_seconds === clampedMinutes * 60
+                && config.max_questions === clampedQuestions;
+              return (
+                <button
+                  key={preset.id}
+                  type="button"
+                  disabled={busy}
+                  aria-pressed={active}
+                  onClick={() => applyPreset(preset)}
+                  className={`cursor-pointer rounded-lg border px-2.5 py-1.5 text-left text-xs transition-colors disabled:pointer-events-none disabled:opacity-50 ${
+                    active
+                      ? 'border-brand-orange bg-brand-orange/10 text-foreground ring-1 ring-brand-orange/25'
+                      : 'border-border/80 bg-background text-foreground hover:border-foreground/25 hover:bg-muted/40'
+                  }`}
+                >
+                  <span className="block font-semibold">{preset.label}</span>
+                  <span className="block text-[11px] text-muted-foreground">
+                    {preset.focused_question_mode ? modeLabels[preset.focused_question_mode] : 'Tổng hợp'} · {clampedMinutes}p · {clampedQuestions} câu
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-12">
+          <label className="grid gap-1.5 sm:col-span-6">
+            <span className="text-sm font-medium text-foreground">Dạng phỏng vấn</span>
+            <span className="relative">
+              <select
+                className={selectClass}
+                disabled={busy}
+                value={config.focused_question_mode ?? 'MIXED'}
+                onChange={e => {
+                  const nextFocus = e.target.value === 'MIXED' ? null : e.target.value as QuestionMode;
+                  setConfig({
+                    ...config,
+                    focused_question_mode: nextFocus,
+                    include_behavioral_in_mixed: nextFocus === null ? (config.include_behavioral_in_mixed ?? true) : false,
+                  });
+                }}
+              >
+                <option value="MIXED">Tổng hợp</option>
+                {questionModes.map(mode => <option key={mode} value={mode}>{modeLabels[mode]}</option>)}
+              </select>
+              <ChevronDown size={16} aria-hidden="true" className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground" />
+            </span>
+          </label>
+
+          <label className="grid gap-1.5 sm:col-span-3">
+            <span className="text-sm font-medium text-foreground">Thời lượng (phút)</span>
+            <Input
+              aria-label="Thời lượng"
+              className="h-10 bg-background px-3 tabular-nums"
+              type="number"
+              min={1}
+              max={maxMinutes}
               disabled={busy}
-              value={config.focused_question_mode ?? 'MIXED'}
-              onChange={e => setConfig({ ...config, focused_question_mode: e.target.value === 'MIXED' ? null : e.target.value as QuestionMode })}
-            >
-              <option value="MIXED">Tổng hợp</option>
-              {questionModes.map(mode => <option key={mode} value={mode}>{modeLabels[mode]}</option>)}
-            </select>
-            <ChevronDown size={16} aria-hidden="true" className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground" />
-          </span>
-        </label>
+              value={config.duration_seconds / 60}
+              onChange={e => setConfig({ ...config, duration_seconds: Number(e.target.value) * 60 })}
+            />
+          </label>
 
-        <label className="grid gap-1.5 sm:col-span-3">
-          <span className="text-sm font-medium text-foreground">Thời lượng (phút)</span>
-          <Input
-            aria-label="Thời lượng"
-            className="h-10 bg-background px-3 tabular-nums"
-            type="number"
-            min={1}
-            max={maxMinutes}
-            disabled={busy}
-            value={config.duration_seconds / 60}
-            onChange={e => setConfig({ ...config, duration_seconds: Number(e.target.value) * 60 })}
-          />
-        </label>
+          <label className="grid gap-1.5 sm:col-span-3">
+            <span className="text-sm font-medium text-foreground">Tối đa số câu hỏi</span>
+            <Input
+              aria-label="Số câu hỏi"
+              className="h-10 bg-background px-3 tabular-nums"
+              type="number"
+              min={1}
+              max={maxQuestions}
+              disabled={busy}
+              value={config.max_questions}
+              onChange={e => setConfig({ ...config, max_questions: Number(e.target.value) })}
+            />
+          </label>
+        </div>
 
-        <label className="grid gap-1.5 sm:col-span-3">
-          <span className="text-sm font-medium text-foreground">Tối đa số câu hỏi</span>
-          <Input
-            aria-label="Số câu hỏi"
-            className="h-10 bg-background px-3 tabular-nums"
-            type="number"
-            min={1}
-            max={maxQuestions}
-            disabled={busy}
-            value={config.max_questions}
-            onChange={e => setConfig({ ...config, max_questions: Number(e.target.value) })}
-          />
-        </label>
+        {config.focused_question_mode === null && config.max_questions >= 4 && (
+          <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border bg-background px-3 py-2 text-xs text-foreground">
+            <input
+              type="checkbox"
+              className="size-4 accent-brand-orange"
+              disabled={busy}
+              checked={Boolean(config.include_behavioral_in_mixed)}
+              onChange={e => setConfig({ ...config, include_behavioral_in_mixed: e.target.checked })}
+            />
+            <span>Kèm 1 câu tình huống &amp; hành vi (STAR) ngay cả khi JD thuần kỹ thuật</span>
+          </label>
+        )}
+
+        {(config.focused_question_mode === 'CODING' || config.focused_question_mode === 'DESIGN')
+          && config.max_questions > 0
+          && (config.duration_seconds / config.max_questions) < 120 && (
+          <p className="text-xs text-amber-700 dark:text-amber-300">
+            Gợi ý: với dạng {modeLabels[config.focused_question_mode]}, nên dành ít nhất 2–3 phút mỗi câu để đủ thời gian suy nghĩ, viết code hoặc phân tích đánh đổi.
+          </p>
+        )}
+
+        {availableSkills.length > 1 && config.focused_question_mode !== 'BEHAVIORAL' && (
+          <div className="space-y-2 border-t border-border/60 pt-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-medium text-foreground">
+                Kỹ năng muốn tập trung <span className="text-muted-foreground">(tuỳ chọn · mặc định theo ưu tiên JD)</span>
+              </span>
+              {selectedFocusSkills.length > 0 && (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={clearFocusSkills}
+                  className="cursor-pointer text-xs font-medium text-brand-orange underline-offset-4 hover:underline disabled:opacity-50"
+                >
+                  Đặt lại tất cả ({selectedFocusSkills.length})
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Chọn kỹ năng muốn tập trung">
+              {availableSkills.slice(0, 14).map(skillItem => {
+                const active = selectedFocusSkills.includes(skillItem.id);
+                return (
+                  <button
+                    key={skillItem.id}
+                    type="button"
+                    disabled={busy}
+                    aria-pressed={active}
+                    onClick={() => toggleFocusSkill(skillItem.id)}
+                    className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 ${
+                      active
+                        ? 'border-brand-green bg-brand-green/10 text-brand-green'
+                        : 'border-border/80 bg-background text-muted-foreground hover:border-foreground/25 hover:text-foreground'
+                    }`}
+                  >
+                    <span>{skillItem.label}</span>
+                    {skillItem.isCore && (
+                      <span className="rounded bg-orange-500/15 px-1 py-0.2 text-[10px] font-bold text-orange-800 dark:text-orange-300">
+                        Core
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>}
 
       <footer className="flex flex-wrap items-center justify-between gap-4 border-t pt-5">

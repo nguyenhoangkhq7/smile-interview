@@ -83,15 +83,21 @@ public class CompetencyProjection {
                 boolean previousPositive = positive(status);
                 if (items.stream().anyMatch(c -> c.essential() && c.lastAssessment() != null
                         && c.lastAssessment().attemptNumber() > previousBasis.attemptNumber()
-                        && Set.of(AT, BELOW).contains(c.assessment()) && positive(c.assessment()) != previousPositive))
+                        && Set.of(AT, BELOW, NOT_DEMONSTRATED).contains(c.assessment()) && positive(c.assessment()) != previousPositive))
                     status = INSUFFICIENT;
             }
             if (NONE.equals(status) && lastChecked != null) status = INSUFFICIENT;
             if (basis == null || VERIFY.equals(status)) {
                 for (Criterion criterion : items) basis = newer(basis, criterion.lastAssessment());
             }
+            boolean improvingOnly = VERIFY.equals(status)
+                    && items.stream().anyMatch(c -> "IMPROVING".equals(c.trend()))
+                    && items.stream().filter(c -> c.essential() && VERIFY.equals(c.assessment()))
+                            .allMatch(c -> "IMPROVING".equals(c.trend()));
             String explanation = VERIFY.equals(status)
-                    ? "Có bằng chứng mâu thuẫn. Cần hai lượt xác nhận nhất quán về sau ở các bối cảnh độc lập để cập nhật kết luận."
+                    ? (improvingOnly
+                        ? "Lượt mới nhất đã đạt yêu cầu (đang tiến bộ). Cần thêm một lượt xác nhận ở bối cảnh mới để khóa trạng thái Đáp ứng yêu cầu."
+                        : "Có bằng chứng mâu thuẫn. Cần hai lượt xác nhận nhất quán về sau ở các bối cảnh độc lập để cập nhật kết luận.")
                     : NONE.equals(status) ? "Nội dung này chưa được kiểm tra; không được xem là điểm yếu."
                     : INSUFFICIENT.equals(status) ? "Đã kiểm tra nhưng chưa đủ bằng chứng độc lập để kết luận theo yêu cầu JD."
                     : lastChecked != null && basis != null && lastChecked.attemptNumber() > basis.attemptNumber()
@@ -172,7 +178,11 @@ public class CompetencyProjection {
                         if (evidence.equals(finalEvidence)) last = evidence;
                     }
                     boolean contradictory = contains(state.path("contradictions"), criterionId);
-                    String status = contradictory ? VERIFY : "BELOW".equals(last.path("performance").asText()) ? BELOW : AT;
+                    boolean explicitInability = last.path("explicit_inability").asBoolean(false);
+                    String lastPerf = last.path("performance").asText();
+                    String status = contradictory ? VERIFY
+                            : "BELOW".equals(lastPerf) ? BELOW
+                            : explicitInability ? NOT_DEMONSTRATED : AT;
                     Set<String> criterionContexts = new LinkedHashSet<>();
                     String context = normalize(last.path("evidence_scope").asText());
                     if (!context.isBlank()) criterionContexts.add(context);
@@ -188,7 +198,7 @@ public class CompetencyProjection {
                     boolean hasRequiredFailure = objective.criteria.values().stream()
                             .filter(c -> c.definition.path("essential").asBoolean(true))
                             .anyMatch(c -> !c.signals.isEmpty() && c.signals.getLast().source().equals(source)
-                                    && BELOW.equals(c.signals.getLast().assessment()));
+                                    && Set.of(BELOW, NOT_DEMONSTRATED).contains(c.signals.getLast().assessment()));
                     if (positive(assessment) ? allRequiredSupported : hasRequiredFailure)
                         objective.signals.add(new Signal(assessment, source, contexts));
                 }
@@ -251,6 +261,10 @@ public class CompetencyProjection {
     }
 
     private static boolean validEvidence(JsonNode evidence, JsonNode turn, JsonNode objective, String criterionId) {
+        if (evidence.path("is_extension").asBoolean(false)
+                || (turn != null && "PROBE_DEEPER".equals(turn.path("action").asText()))) {
+            return false;
+        }
         return validEvidenceAtDepth(evidence, turn, objective, criterionId, objective.path("target_depth").asInt(-1));
     }
 
@@ -261,23 +275,35 @@ public class CompetencyProjection {
                 || !objective.path("target_depth").isInt() || !evidence.path("question_depth").isInt()
                 || evidence.path("question_depth").asInt() != depth) return false;
         String performance = evidence.path("performance").asText(), observation = evidence.path("observation").asText();
-        if (!Set.of("AT_TARGET", "ABOVE", "BELOW").contains(performance)
-                || !Set.of("SUPPORTS", "CONTRADICTS").contains(observation)
-                || ("CONTRADICTS".equals(observation) && !"BELOW".equals(performance))) return false;
+        boolean explicitInability = evidence.path("explicit_inability").asBoolean(false);
+        boolean validSubstantive = Set.of("AT_TARGET", "ABOVE", "BELOW").contains(performance)
+                && Set.of("SUPPORTS", "CONTRADICTS").contains(observation)
+                && (!"CONTRADICTS".equals(observation) || "BELOW".equals(performance));
+        boolean validInability = explicitInability
+                && "NO_EVIDENCE".equals(observation)
+                && "UNDETERMINED".equals(performance);
+        if (!validSubstantive && !validInability) return false;
         String excerpt = evidence.path("response_excerpt").asText();
         return !excerpt.isBlank() && turn.path("answer").asText("").contains(excerpt);
     }
 
     private static boolean hasExtensionEvidence(JsonNode state, Map<String, JsonNode> turns, JsonNode objective) {
         int depth = objective.path("extension_depth").asInt(-1);
-        if (depth <= objective.path("target_depth").asInt()) return false;
+        int target = objective.path("target_depth").asInt(-1);
+        boolean allowL4Stretch = target == 4 && depth == 4;
+        if (depth <= target && !allowL4Stretch) return false;
         for (JsonNode criterion : objective.path("criteria")) {
             if (!criterion.path("essential").asBoolean(true)) continue;
             boolean found = false;
             for (JsonNode evidence : state.path("evidence_history")) {
-                if ("ABOVE".equals(evidence.path("performance").asText())
+                JsonNode turn = turns.get(evidence.path("turn_id").asText());
+                boolean isStretchTurn = !allowL4Stretch
+                        || evidence.path("is_extension").asBoolean(false)
+                        || (turn != null && "PROBE_DEEPER".equals(turn.path("action").asText()));
+                if (isStretchTurn
+                        && "ABOVE".equals(evidence.path("performance").asText())
                         && "SUPPORTS".equals(evidence.path("observation").asText())
-                        && validEvidenceAtDepth(evidence, turns.get(evidence.path("turn_id").asText()), objective,
+                        && validEvidenceAtDepth(evidence, turn, objective,
                             criterion.path("criterion_id").asText(), depth)) found = true;
             }
             if (!found) return false;

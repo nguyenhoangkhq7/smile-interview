@@ -9,18 +9,21 @@ from .models import (
 )
 from .assessment import criterion_resolved
 from .policy_config import InterviewPolicy
-from .conversation import brief_feedback, display_skill_name
+from .conversation import MAX_FEEDBACK_LENGTH, MAX_PRACTICE_FEEDBACK_LENGTH, brief_feedback, display_skill_name
 
-_STAR_RESULT = re.compile(r"\b(?:kết quả|giảm|tăng|cải thiện|tiết kiệm|đạt|%|giờ|phút|giây|sau đó|nhờ đó|result|impact|improved|reduced)\b", re.IGNORECASE)
+_STAR_RESULT = re.compile(r"\b(?:kết quả|giảm|tăng|cải thiện|tiết kiệm|đạt|%|giờ|phút|giây|nhờ đó|result|impact|improved|reduced)\b", re.IGNORECASE)
 _STAR_ACTION = re.compile(r"\b(?:tôi đã|em đã|mình đã|tự|trực tiếp|đề xuất|triển khai|sửa|xử lý|i led|i built|i fixed|i implemented)\b", re.IGNORECASE)
+_STAR_NEGATED = re.compile(r"\b(?:không biết|chưa biết|chưa làm|không xử lý được|không nhớ)\b", re.IGNORECASE)
 _DESIGN_TRADEOFF = re.compile(r"\b(?:đánh đổi|trade.?off|độ trễ|latency|nhất quán|consistency|chi phí|cost|scale|mở rộng|bottleneck|nghẽn|ràng buộc)\b", re.IGNORECASE)
+_CODING_COMPLEXITY = re.compile(r"(?:\bO\s*\([^)]+\)|độ phức tạp|complexity|time\s+complexity|space\s+complexity|bộ nhớ|ca biên|edge\s*case|rỗng|trùng lặp)", re.IGNORECASE)
+_DEBUG_VERIFY = re.compile(r"\b(?:kiểm thử|test|unit\s*test|tái hiện|reproduc\w*|verify|xác minh|log|trace|monitor|regression)\b", re.IGNORECASE)
 
 
 def _depth_role(item: RecordedEvidence, target_depth: int) -> Literal["TARGET", "DIAGNOSTIC", "EXTENSION"]:
+    if item.is_extension or item.question_depth > target_depth:
+        return "EXTENSION"
     if item.question_depth < target_depth:
         return "DIAGNOSTIC"
-    if item.question_depth > target_depth:
-        return "EXTENSION"
     return "TARGET"
 
 
@@ -34,15 +37,30 @@ def _study_recommendations(state: ObjectiveState) -> list[str]:
         cid = c.criterion_id
         res = state.criterion_results.get(cid)
         progress = state.criterion_progress.get(cid, CriterionProgress())
+        used_hint = cid in state.hinted_criteria
+        stagnant_gap = (
+            progress.stop_reason in {"NO_PROGRESS", "CRITERION_BUDGET"}
+            and bool(progress.unresolved_aspects)
+        )
         had_struggle = (
             progress.easier_spent
             or cid in state.assisted_criteria
+            or used_hint
             or any(e.criterion_id == cid and (e.performance == "BELOW" or e.explicit_inability) for e in history)
         )
-        if res is None and not had_struggle:
-            continue  # Unasked/unverified is not an observed weakness.
-        if res is None or cid in state.contradictions or res.performance == "BELOW" or cid in state.assisted_criteria:
+        if res is None and not had_struggle and not stagnant_gap:
+            continue  # Unasked/unverified without concrete gaps is not an observed weakness.
+        if res is None and stagnant_gap and not had_struggle:
+            gap = progress.unresolved_aspects[0].rstrip(".")
+            recommendations.append(
+                f"{obj.skill_id} ({obj.claim}): Làm rõ và luyện diễn đạt sâu hơn về {c.description} — cần bổ sung: {gap}."
+            )
+        elif res is None or cid in state.contradictions or res.performance == "BELOW" or cid in state.assisted_criteria:
             recommendations.append(f"{obj.skill_id} ({obj.claim}): Ưu tiên ôn luyện {c.description} — mục tiêu: {c.at_target}.")
+        elif used_hint and not progress.transfer_verified:
+            recommendations.append(
+                f"{obj.skill_id} ({obj.claim}): Đã dùng gợi ý ở {c.description} — hãy luyện lại độc lập để vững phản xạ khi phỏng vấn thật."
+            )
         elif had_struggle:
             recommendations.append(f"{obj.skill_id} ({obj.claim}): Tiếp tục luyện các bài toán {c.description} để củng cố phản xạ độc lập.")
     return list(dict.fromkeys(recommendations))
@@ -60,13 +78,21 @@ def criterion_report(state: ObjectiveState, criterion: Criterion, policy: Interv
         criterion_id=key, essential=criterion.essential,
         description=criterion.description,
         assessment=assessment,
+        hinted=key in state.hinted_criteria,
+        transfer_verified=progress.transfer_verified,
     )
 
 
 def _positive_assessment(state: ObjectiveState, key: str) -> Assessment:
     extension = state.objective.extension_depth
-    evidence = [e for e in state.evidence_history if e.criterion_id == key and e.independent
-                and e.question_depth == extension and e.observation in {"SUPPORTS", "CONTRADICTS"}]
+    target = state.objective.target_depth
+    evidence = [
+        e for e in state.evidence_history
+        if e.criterion_id == key and e.independent
+        and e.question_depth == extension
+        and (e.is_extension or (extension is not None and extension > target))
+        and e.observation in {"SUPPORTS", "CONTRADICTS"}
+    ]
     if extension is not None and evidence and all(e.performance == "ABOVE" for e in evidence):
         return Assessment.ABOVE
     return Assessment.AT
@@ -103,19 +129,21 @@ def objective_report(
         *[e.rationale for e in target_results if e.performance == "BELOW" and e.criterion_id not in state.contradictions],
         *[e.rationale for e in history if e.independent and e.explicit_inability],
     ]))
+    criteria_reports = [criterion_report(state, c, active_policy) for c in obj.criteria]
     return ObjectiveReport(
         objective_id=obj.objective_id, skill_id=obj.skill_id, claim=obj.claim,
         jd_evidence_spans=obj.jd_evidence_spans,
         target_depth=obj.target_depth,
         importance_weight=weight,
         is_core=weight >= active_policy.core_importance,
+        hinted=bool(state.hinted_criteria) or any(c.hinted for c in criteria_reports),
         assessment=state.assessment,
         stop_reason=state.stop_reason,
         strengths=[e.rationale for e in target_results if e.performance in {"AT_TARGET", "ABOVE"} and e.criterion_id not in state.contradictions],
         weaknesses=weaknesses,
         study_recommendations=_study_recommendations(state),
         evidence=evidence,
-        criteria=[criterion_report(state, c, active_policy) for c in obj.criteria],
+        criteria=criteria_reports,
     )
 
 
@@ -143,13 +171,15 @@ def _fallback_introduction_feedback(snapshot: Snapshot) -> str:
 
 def _delivery_notes(turn: Turn, interaction_mode: str) -> list[str]:
     text = (turn.transcript if turn.transcript is not None else (turn.answer or "")).strip()
-    if not text:
+    has_code = bool((turn.submitted_code or "").strip())
+    if not text and not has_code:
         return []
     notes: list[str] = []
     words = len(text.split())
     if turn.mode == Mode.BEHAVIORAL:
-        has_action = bool(_STAR_ACTION.search(text))
-        has_result = bool(_STAR_RESULT.search(text))
+        negated = bool(_STAR_NEGATED.search(text)) and words < 30
+        has_action = not negated and bool(_STAR_ACTION.search(text))
+        has_result = not negated and bool(_STAR_RESULT.search(text))
         if has_action and has_result:
             notes.append("Cấu trúc STAR: đã nêu hành động cá nhân và kết quả/tác động cụ thể.")
         else:
@@ -162,6 +192,15 @@ def _delivery_notes(turn: Turn, interaction_mode: str) -> list[str]:
     elif turn.mode == Mode.DESIGN:
         if not _DESIGN_TRADEOFF.search(text):
             notes.append("Gợi ý trình bày Design: nên nêu rõ giả định tải/ràng buộc và đánh đổi (trade-off) giữa các phương án.")
+    elif turn.mode == Mode.CODING:
+        explanation = (turn.transcript or "").strip() if turn.submitted_code else text
+        if turn.submitted_code and not explanation:
+            notes.append("Gợi ý phỏng vấn Coding: khi nộp mã, hãy kèm 1–2 câu nêu độ phức tạp Big-O và các ca biên bạn đã kiểm tra.")
+        elif explanation and not _CODING_COMPLEXITY.search(explanation):
+            notes.append("Gợi ý phỏng vấn Coding: nên nêu rõ độ phức tạp thời gian/bộ nhớ (Big-O) và cách xử lý ca biên.")
+    elif turn.mode == Mode.DEBUGGING:
+        if words >= 10 and not _DEBUG_VERIFY.search(text):
+            notes.append("Gợi ý trình bày Debugging: ngoài nguyên nhân và cách sửa, nên nêu cách tái hiện và kiểm thử để chắc chắn lỗi không tái diễn.")
     if interaction_mode == "VOICE":
         if words < 15 and not turn.submitted_code:
             notes.append("Trình bày giọng nói còn khá ngắn; nên giải thích thêm lý do và ví dụ minh họa để người phỏng vấn nắm chắc tư duy.")
@@ -170,13 +209,18 @@ def _delivery_notes(turn: Turn, interaction_mode: str) -> list[str]:
     return notes
 
 
-def _default_reference_answer(criterion: Criterion, performance: str) -> str:
+def _default_reference_answer(criterion: Criterion, performance: str, turn: Turn | None = None) -> str:
     if performance in {"AT_TARGET", "ABOVE"}:
         return ""
     parts = [f"Ý cốt lõi cần đạt: {criterion.at_target.rstrip('.')}."]
     if criterion.expected_evidence.strip() and criterion.expected_evidence.strip().casefold() != criterion.at_target.strip().casefold():
         parts.append(f"Hướng triển khai: {criterion.expected_evidence.rstrip('.')}.")
-    return " ".join(parts)
+    base = " ".join(parts)
+    spec = turn.question.coding_spec if turn else None
+    if spec and spec.reference_solution.strip():
+        code = spec.reference_solution.strip()[:700]
+        return f"{base}\n\nMã tham khảo đã kiểm chứng:\n```{spec.language}\n{code}\n```"
+    return base
 
 
 def fallback_session_coaching(snapshot: Snapshot) -> SessionCoaching | None:
@@ -218,28 +262,67 @@ def fallback_session_coaching(snapshot: Snapshot) -> SessionCoaching | None:
     )
 
 
-def coaching_context(snapshot: Snapshot) -> dict[str, object]:
+def _default_level_up_tip(criterion: Criterion, performance: str) -> str:
+    if performance != "AT_TARGET":
+        return ""
+    above = criterion.above_target.strip().rstrip(".")
+    if not above or above.casefold() == criterion.at_target.strip().rstrip(".").casefold():
+        return ""
+    return f"Để đạt mức xuất sắc (Senior), hãy mở rộng thêm: {above}."
+
+
+def coaching_context(snapshot: Snapshot, *, include_turn_maps: bool = True) -> dict[str, object]:
     """Assemble safe, evidence-grounded coaching inputs for end-of-session synthesis."""
     reports = [objective_report(state, snapshot.policy) for state in snapshot.objectives.values() if state.turns_spent > 0]
     opening = snapshot.opening_context
     intro = (snapshot.conversation.introduction.strip() if snapshot.conversation else "")[:800]
     turns_needing_reference = []
-    for turn in snapshot.turns:
-        if not turn.judgment:
-            continue
-        criteria = {c.criterion_id: c for c in snapshot.objectives[turn.objective_id].objective.criteria}
-        for obs in turn.judgment.observations:
-            if obs.performance in {"AT_TARGET", "ABOVE"}:
+    turns_for_level_up = []
+    turns_for_delivery_review = []
+    if include_turn_maps:
+        for turn in snapshot.turns:
+            if not turn.judgment:
                 continue
-            crit = criteria.get(obs.criterion_id)
-            if crit is not None:
-                turns_needing_reference.append({
+            criteria = {c.criterion_id: c for c in snapshot.objectives[turn.objective_id].objective.criteria}
+            answer_text = (turn.transcript if turn.transcript is not None else (turn.answer or "")).strip()
+            if answer_text and (
+                turn.mode in {Mode.BEHAVIORAL, Mode.DESIGN, Mode.CODING, Mode.DEBUGGING}
+                or snapshot.config.interaction_mode == "VOICE"
+            ):
+                turns_for_delivery_review.append({
                     "turn_id": turn.turn_id,
                     "mode": turn.mode.value,
-                    "question": turn.question.text[:260],
+                    "interaction_mode": snapshot.config.interaction_mode,
+                    "answer_excerpt": answer_text[:400],
+                })
+            for obs in turn.judgment.observations:
+                crit = criteria.get(obs.criterion_id)
+                if crit is None:
+                    continue
+                if obs.performance == "AT_TARGET":
+                    turns_for_level_up.append({
+                        "turn_id": turn.turn_id,
+                        "mode": turn.mode.value,
+                        "question": turn.question.text[:280],
+                        "criterion": crit.description,
+                        "above_target": crit.above_target,
+                    })
+                    break
+                if obs.performance == "ABOVE":
+                    break
+                ref_entry: dict[str, object] = {
+                    "turn_id": turn.turn_id,
+                    "mode": turn.mode.value,
+                    "question": turn.question.text[:360],
                     "criterion": crit.description,
                     "at_target": crit.at_target,
-                })
+                }
+                if turn.question.coding_spec and turn.question.coding_spec.reference_solution.strip():
+                    ref_entry["verified_reference_code"] = {
+                        "language": turn.question.coding_spec.language,
+                        "code": turn.question.coding_spec.reference_solution.strip()[:600],
+                    }
+                turns_needing_reference.append(ref_entry)
                 break
     return {
         "role_title": (opening.role_title.strip() if opening else "") or "vị trí ứng tuyển",
@@ -247,7 +330,9 @@ def coaching_context(snapshot: Snapshot) -> dict[str, object]:
         "termination_reason": snapshot.termination_reason,
         "turns_answered": len(snapshot.turns),
         "candidate_introduction": intro,
-        "turns_needing_reference": turns_needing_reference[:6],
+        "turns_needing_reference": turns_needing_reference[:12],
+        "turns_for_level_up": turns_for_level_up[:8],
+        "turns_for_delivery_review": turns_for_delivery_review[:8],
         "objectives": [
             {
                 "skill": display_skill_name(item.skill_id, snapshot.skills),
@@ -274,11 +359,15 @@ def coaching_context(snapshot: Snapshot) -> dict[str, object]:
 def _turn_reviews(snapshot: Snapshot) -> list[TurnReview]:
     reviews = []
     ref_map = snapshot.coaching.turn_reference_answers if snapshot.coaching else {}
+    level_up_map = snapshot.coaching.turn_level_up_tips if snapshot.coaching else {}
+    delivery_map = snapshot.coaching.turn_delivery_notes if snapshot.coaching else {}
     for turn in snapshot.turns:
         if not turn.judgment or not turn.answer:
             continue
-        criteria = {c.criterion_id: c for c in snapshot.objectives[turn.objective_id].objective.criteria}
-        delivery = _delivery_notes(turn, snapshot.config.interaction_mode)
+        state = snapshot.objectives[turn.objective_id]
+        criteria = {c.criterion_id: c for c in state.objective.criteria}
+        llm_delivery = [note.strip() for note in delivery_map.get(turn.turn_id, []) if note and note.strip()]
+        base_delivery = llm_delivery or _delivery_notes(turn, snapshot.config.interaction_mode)
         for obs in turn.judgment.observations:
             criterion = criteria.get(obs.criterion_id)
             if criterion is None:
@@ -295,7 +384,12 @@ def _turn_reviews(snapshot: Snapshot) -> list[TurnReview]:
             if obs.observation == "NO_EVIDENCE" and not turn.judgment.explicit_inability:
                 reason = f"Chưa có bằng chứng cho tiêu chí {criterion.description}. {reason}"
             reference = (ref_map.get(turn.turn_id, "").strip()
-                         or _default_reference_answer(criterion, obs.performance))
+                         or _default_reference_answer(criterion, obs.performance, turn=turn))
+            level_up = (level_up_map.get(turn.turn_id, "").strip()
+                        or _default_level_up_tip(criterion, obs.performance))
+            delivery = list(base_delivery)
+            if any(c.kind == "HINT" for c in turn.clarifications):
+                delivery.append("Lượt này bạn đã dùng gợi ý — hãy thử giải lại độc lập để vững phản xạ khi phỏng vấn thật.")
             reviews.append(TurnReview(
                 turn_id=turn.turn_id,
                 excerpt=excerpt if excerpt and excerpt in turn.answer else "",
@@ -303,6 +397,7 @@ def _turn_reviews(snapshot: Snapshot) -> list[TurnReview]:
                 gaps=gaps,
                 next_step=step,
                 reference_answer=reference,
+                level_up_tip=level_up,
                 delivery_notes=delivery,
             ))
     return reviews
@@ -345,22 +440,42 @@ def pending_turn(turn: Turn | None) -> PendingTurn | None:
     )
 
 
-def public_turn(turn: Turn) -> PublicTurn:
+def public_turn(
+    turn: Turn,
+    *,
+    max_feedback_length: int = MAX_FEEDBACK_LENGTH,
+    allow_sentence_trim: bool = False,
+) -> PublicTurn:
+    safe_checks = (
+        turn.coding_checks.model_copy(update={"hidden_failed_summaries": []})
+        if turn.coding_checks is not None else None
+    )
     return PublicTurn(
+        practice_step=turn.practice_step,
         turn_id=turn.turn_id, objective_id=turn.objective_id,
         mode=turn.mode, question=turn.question.text, answer=turn.answer,
-        feedback=brief_feedback(turn) if turn.judgment else None,
-        submitted_code=turn.submitted_code, transcript=turn.transcript, coding_checks=turn.coding_checks,
+        feedback=(
+            brief_feedback(turn, max_length=max_feedback_length, allow_sentence_trim=allow_sentence_trim)
+            if turn.judgment else None
+        ),
+        submitted_code=turn.submitted_code, transcript=turn.transcript, coding_checks=safe_checks,
         clarifications=list(turn.clarifications),
     )
 
 
 def public_session(snapshot: Snapshot) -> PublicSession:
+    is_practice = snapshot.config.session_purpose == "PRACTICE"
+    max_fb_len = MAX_PRACTICE_FEEDBACK_LENGTH if is_practice else MAX_FEEDBACK_LENGTH
     return PublicSession(
         session_id=snapshot.session_id, state_version=snapshot.state_version,
         is_finished=snapshot.is_finished, deadline_at=snapshot.deadline_at,
+        paused_remaining_seconds=snapshot.paused_remaining_seconds,
         config=snapshot.config, pending_turn=pending_turn(snapshot.pending_turn),
         awaiting_question=snapshot.next_question_action is not None,
-        turns=[public_turn(turn) for turn in snapshot.turns], report=report(snapshot),
+        turns=[
+            public_turn(turn, max_feedback_length=max_fb_len, allow_sentence_trim=is_practice)
+            for turn in snapshot.turns
+        ],
+        report=report(snapshot),
         conversation=snapshot.conversation,
     )

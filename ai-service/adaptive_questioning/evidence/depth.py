@@ -29,8 +29,10 @@ def ground_depth(objective: Objective, requirement: GroundedRequirement, policy:
         objective.depth_basis = "TASK_INTERPRETATION"
     else:
         _infer_depth(objective, requirement, policy)
-    if objective.extension_depth is not None and objective.extension_depth <= objective.target_depth:
-        raise ValueError("Extension depth must exceed the frozen target depth")
+    if objective.extension_depth is not None:
+        allow_l4_stretch = objective.target_depth == 4 and objective.extension_depth == 4
+        if not allow_l4_stretch and objective.extension_depth <= objective.target_depth:
+            raise ValueError("Extension depth must exceed the frozen target depth")
 
 
 def _validate_task_depth(objective: Objective, requirement: GroundedRequirement) -> None:

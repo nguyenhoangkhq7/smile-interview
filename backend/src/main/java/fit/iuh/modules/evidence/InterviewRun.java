@@ -10,6 +10,8 @@ public class InterviewRun {
     @Id @Column(name = "session_id", length = 128)
     private String sessionId;
     private long stateVersion;
+    private java.time.Instant gradingDueAt;
+    private int gradingAttempt;
     @Column(columnDefinition = "text", nullable = false)
     private String configJson;
     @Column(columnDefinition = "text", nullable = false)

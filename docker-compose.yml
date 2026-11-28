@@ -79,6 +79,7 @@ services:
       AI_RUNTIME_BACKEND_URL: http://backend:8081
       AI_RUNTIME_KEY_FILE: /run/smile-ai/ai-runtime.key
       CODE_RUNNER_URL: http://code-runner:8090
+      OPENROUTER_JUDGE_REASONING_EFFORT: ${OPENROUTER_JUDGE_REASONING_EFFORT:-none}
     ports:
       - "8000:8000"
     volumes:

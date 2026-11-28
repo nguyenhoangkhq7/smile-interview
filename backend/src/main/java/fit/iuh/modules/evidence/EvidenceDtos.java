@@ -1,8 +1,10 @@
 package fit.iuh.modules.evidence;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.*;
+import java.util.List;
 import java.util.UUID;
 
 public final class EvidenceDtos {
@@ -17,10 +19,13 @@ public final class EvidenceDtos {
             @JsonProperty("duration_seconds") @Min(60) @Max(7200) int durationSeconds,
             @JsonProperty("max_questions_per_objective") @Min(1) @Max(40) Integer maxPerObjective,
             @JsonProperty("interaction_mode") @Pattern(regexp = "TEXT|VOICE") String interactionMode,
-            @jakarta.validation.Valid @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+            @jakarta.validation.Valid @JsonInclude(JsonInclude.Include.NON_NULL)
             ChecklistRef recheck,
             @JsonProperty("session_purpose") @Pattern(regexp = "ASSESSMENT|PRACTICE") String sessionPurpose,
-            @JsonProperty("include_mastered_skills") Boolean includeMasteredSkills) {
+            @JsonProperty("include_mastered_skills") Boolean includeMasteredSkills,
+            @JsonProperty("include_behavioral_in_mixed") Boolean includeBehavioralInMixed,
+            @JsonProperty("focus_skill_ids") @Size(max = 30) @JsonInclude(JsonInclude.Include.NON_EMPTY)
+            List<@NotBlank @Size(max = 120) String> focusSkillIds) {
         static final int DEFAULT_MAX_PER_OBJECTIVE = 8;
 
         public Config {
@@ -28,15 +33,31 @@ public final class EvidenceDtos {
             maxPerObjective = maxPerObjective == null ? DEFAULT_MAX_PER_OBJECTIVE : maxPerObjective;
             sessionPurpose = sessionPurpose == null ? "ASSESSMENT" : sessionPurpose;
             includeMasteredSkills = includeMasteredSkills != null && includeMasteredSkills;
+            includeBehavioralInMixed = includeBehavioralInMixed != null && includeBehavioralInMixed;
+            focusSkillIds = focusSkillIds == null ? List.of() : focusSkillIds.stream()
+                    .filter(s -> s != null && !s.isBlank())
+                    .map(String::trim)
+                    .distinct()
+                    .toList();
         }
         public Config(String mode, String focusedMode, int maxQuestions, int durationSeconds, int maxPerObjective) {
-            this(mode, focusedMode, maxQuestions, durationSeconds, maxPerObjective, "TEXT", null, "ASSESSMENT", false);
+            this(mode, focusedMode, maxQuestions, durationSeconds, maxPerObjective, "TEXT", null, "ASSESSMENT", false, false, List.of());
         }
         public Config(String mode, String focusedMode, int maxQuestions, int durationSeconds, Integer maxPerObjective,
                       String interactionMode, ChecklistRef recheck) {
-            this(mode, focusedMode, maxQuestions, durationSeconds, maxPerObjective, interactionMode, recheck, "ASSESSMENT", false);
+            this(mode, focusedMode, maxQuestions, durationSeconds, maxPerObjective, interactionMode, recheck, "ASSESSMENT", false, false, List.of());
         }
-        public static Config defaults() { return new Config(null, null, 10, 900, null, "TEXT", null, "ASSESSMENT", false); }
+        public Config(String mode, String focusedMode, int maxQuestions, int durationSeconds, Integer maxPerObjective,
+                      String interactionMode, ChecklistRef recheck, String sessionPurpose, Boolean includeMasteredSkills) {
+            this(mode, focusedMode, maxQuestions, durationSeconds, maxPerObjective, interactionMode, recheck, sessionPurpose, includeMasteredSkills, false, List.of());
+        }
+        public Config(String mode, String focusedMode, int maxQuestions, int durationSeconds, Integer maxPerObjective,
+                      String interactionMode, ChecklistRef recheck, String sessionPurpose, Boolean includeMasteredSkills,
+                      Boolean includeBehavioralInMixed) {
+            this(mode, focusedMode, maxQuestions, durationSeconds, maxPerObjective, interactionMode, recheck,
+                    sessionPurpose, includeMasteredSkills, includeBehavioralInMixed, List.of());
+        }
+        public static Config defaults() { return new Config(null, null, 10, 900, null, "TEXT", null, "ASSESSMENT", false, false, List.of()); }
 
         @JsonIgnore
         @AssertTrue(message = "mode must agree with focused_question_mode")

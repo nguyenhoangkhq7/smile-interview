@@ -33,6 +33,7 @@ public class StudySuggestionProjection {
             var snapshot = json.read(run.getSnapshotJson());
             if (!snapshot.path("is_finished").asBoolean() || !json.read(run.getPublicJson()).path("is_finished").asBoolean()
                     || snapshot.path("turns").isEmpty()) continue;
+            if ("PRACTICE".equals(snapshot.path("config").path("session_purpose").asText("ASSESSMENT"))) continue;
             var source = new CompetencyProjection.Source(attempt.getId(), attempt.getAttemptNumber(),
                     attempt.getEndedAt() == null ? null : attempt.getEndedAt().toString());
             for (var definition : definitions.values()) {
@@ -63,7 +64,8 @@ public class StudySuggestionProjection {
                 if (activity != null) {
                     var state = activity.state();
                     struggled = state.path("criterion_progress").path(criterion.id()).path("easier_spent").asBoolean()
-                            || contains(state.path("assisted_criteria"), criterion.id());
+                            || contains(state.path("assisted_criteria"), criterion.id())
+                            || contains(state.path("hinted_criteria"), criterion.id());
                     for (var evidence : state.path("evidence_history"))
                         if (criterion.id().equals(evidence.path("criterion_id").asText()))
                             struggled |= "BELOW".equals(evidence.path("performance").asText())

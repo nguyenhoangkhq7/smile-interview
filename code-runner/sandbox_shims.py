@@ -1,6 +1,7 @@
 """In-memory service shims and multi-argument invocation helpers for the isolated code-runner."""
 from __future__ import annotations
 
+import asyncio
 import inspect
 import json
 from typing import Any
@@ -156,7 +157,10 @@ def install_shims() -> list[str]:
 def _normalize_output(value: Any) -> Any:
     if isinstance(value, bytes):
         return value.decode("utf-8", errors="replace")
-    if isinstance(value, (tuple, set)):
+    if isinstance(value, set):
+        items = [_normalize_output(item) for item in value]
+        return sorted(items, key=lambda x: json.dumps(x, sort_keys=True, ensure_ascii=False, default=str))
+    if isinstance(value, tuple):
         return [_normalize_output(item) for item in value]
     if isinstance(value, list):
         return [_normalize_output(item) for item in value]
@@ -228,5 +232,8 @@ def invoke_entry_point(fn: Any, raw_stdin: str) -> str:
         out = fn(*arg)
     else:
         out = fn(arg)
+
+    if inspect.isawaitable(out):
+        out = asyncio.run(out)
 
     return json.dumps(_normalize_output(out), ensure_ascii=False, default=str)

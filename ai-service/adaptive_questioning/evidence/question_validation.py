@@ -7,6 +7,7 @@ from .models import Question
 
 VOICE_MAX_WORDS = 90
 VOICE_SOFT_MAX_WORDS = 120
+VOICE_FRAMING_WORD_ALLOWANCE = 15
 
 
 @dataclass(frozen=True)
@@ -21,7 +22,12 @@ _DIRECTIVE = r"(?:hãy|(?:bạn|em)\s+(?:sẽ|cần)|please)"
 _TASK_VERB = (r"(?:phân tích|chẩn đoán|xác định|chỉ ra|nêu|liệt kê|xác minh|giải thích|mô tả|trình bày|đề xuất|viết|triển khai|"
               r"thiết kế|sửa|so sánh|kiểm thử|analy[sz]e|diagnose|identify|explain|describe|propose|"
               r"write|implement|design|fix|compare|test)")
-_SECOND_WORK_PRODUCT = r"(?:đề xuất|viết|triển khai|thiết kế|sửa|so sánh|kiểm thử|propose|write|implement|design|fix|compare|test)"
+_SECOND_WORK_PRODUCT = (
+    r"(?:đề xuất|viết|triển khai|thiết kế|sửa|"
+    r"so sánh(?!\s+(?:đánh đổi|chi phí|ưu\s*nhược|độ trễ|trade[- ]?offs?))|"
+    r"kiểm thử|propose|write|implement|design|fix|"
+    r"compare(?!\s+(?:the\s+)?trade[- ]?offs?)|test)"
+)
 _COMBINED_REQUESTS = re.compile(
     rf"\b{_DIRECTIVE}\s+{_TASK_VERB}\b[^.!?;]*?\b(?:và|rồi|sau đó|and|then)\s+"
     rf"(?:{_DIRECTIVE}\s+)?{_SECOND_WORK_PRODUCT}\b", re.IGNORECASE,
@@ -39,7 +45,10 @@ _JD_REFERENCE = re.compile(
     r"\b(?:JD|mô\s+tả\s+công\s+việc|yêu\s+cầu\s+công\s+việc|vị\s+trí\s+(?:này|ứng\s+tuyển))\b",
     re.IGNORECASE,
 )
-_CV_REFERENCE = re.compile(r"\b(?:CV|hồ\s+sơ)\b", re.IGNORECASE)
+_CV_REFERENCE = re.compile(
+    r"\b(?:CV|hồ\s+sơ|phần\s+giới\s+thiệu|bạn\s+vừa\s+(?:chia\s+sẻ|nhắc|nêu))\b",
+    re.IGNORECASE,
+)
 _JD_ALTERNATIVE = r"\b(?:hoặc|or)\b"
 _OPTION_WORDING = re.compile(r"\b(?:hoặc|or|một\s+trong|một\s+lựa\s+chọn)\b", re.IGNORECASE)
 _REQUIREMENT_CLAIM = re.compile(r"\b(?:yêu\s+cầu|đòi\s+hỏi|bắt\s+buộc|cần|phải|requires?)\b", re.IGNORECASE)
@@ -48,6 +57,10 @@ _CODE_LINE = re.compile(
     r"|(?:return|raise|select|update|insert into|delete from)[ \t]+\S"
     r"|(?:(?:const|let|var)[ \t]+)?[\w.]+(?:\[[^\]\n]+\])?[ \t]*=(?!=)[ \t]*\S"
     r"|(?:if|for|while)[ \t]+(?:\(|[^\n]+:[ \t]*$))", re.IGNORECASE | re.MULTILINE,
+)
+_HARNESS_LEAK = re.compile(
+    r"(?im)(?:^|\b)(?:expected\s+output\s*:|reference\s+solution\s*:|entry\s*point\s*:|"
+    r"hidden_tests\b|sample_tests\b|setup_sql\b|--\s*(?:setup|entry\s*point)\b)",
 )
 _EMPTY_CODE_LINE = re.compile(r"\s*(?:\.{3}|…|(?:#|//|--).*|\[?(?:todo|code here|đoạn mã)\]?)?\s*", re.IGNORECASE)
 
@@ -142,8 +155,24 @@ def _jd_grounding_errors(jd_excerpt: str, framing: list[str], skill_id: str) -> 
     return []
 
 
-def _hard_contract_errors(question: Question, context: dict[str, object]) -> list[str]:
-def question_form_errors(text: str, interaction_mode: str | None) -> dict[str, str]:
+def voice_word_limits(context: dict[str, object] | None = None) -> tuple[int, int]:
+    """Return (soft_limit, hard_limit) for whitespace-separated Vietnamese tokens in VOICE mode."""
+    if not isinstance(context, dict):
+        return VOICE_MAX_WORDS, VOICE_SOFT_MAX_WORDS
+    jd_excerpt, use_cv = required_framing(context)
+    bonus = (
+        (VOICE_FRAMING_WORD_ALLOWANCE if jd_excerpt else 0)
+        + (VOICE_FRAMING_WORD_ALLOWANCE if use_cv else 0)
+    )
+    return VOICE_MAX_WORDS + bonus, VOICE_SOFT_MAX_WORDS + bonus
+
+
+def question_form_errors(
+    text: str,
+    interaction_mode: str | None,
+    *,
+    voice_max_words: int = VOICE_MAX_WORDS,
+) -> dict[str, str]:
     errors = {}
     if not single_question(text):
         errors["MULTIPLE_TASKS"] = "Ask exactly ONE response task; remove independent subquestions or numbered requests"
@@ -154,16 +183,23 @@ def question_form_errors(text: str, interaction_mode: str | None) -> dict[str, s
     if re.search(r"\b(?:hãy|bạn cần)\s+(?:thử\s+)?(?:dùng|sử dụng|mở|truy cập)\s+ChatGPT\b",
                  text, re.IGNORECASE):
         errors["EXTERNAL_TOOL"] = "Provide any needed AI output in the question and ask one task answerable directly here"
-    if interaction_mode == "VOICE" and len(text.split()) > VOICE_MAX_WORDS:
+    if _HARNESS_LEAK.search(text):
+        errors["HARNESS_LEAK"] = (
+            "Do not put raw sandbox/test-harness blocks ('-- Setup', '-- Entry Point', 'Expected Output:', "
+            "'Reference Solution', or raw INSERT seed/test JSON) inside question.text. Keep question.text "
+            "clean natural Vietnamese naming the table/columns or function signature; put DDL, seed rows, "
+            "starter_code, and sample/hidden tests strictly inside coding_spec."
+        )
+    if interaction_mode == "VOICE" and len(text.split()) > voice_max_words:
         errors["LONG_VOICE_QUESTION"] = (
-            f"VOICE question must use at most {VOICE_MAX_WORDS} whitespace-separated words including scenario; "
+            f"VOICE question must use at most {voice_max_words} whitespace-separated words including scenario; "
             "rewrite concisely with ONE focused response task, preserving essential problem data, "
             "target criterion, evidence_scope and required depth. Do not truncate the question."
         )
     return errors
 
 
-def question_errors(question: Question, context: dict[str, object]) -> list[str]:
+def _hard_contract_errors(question: Question, context: dict[str, object]) -> list[str]:
     contract = context["required_question_contract"]
     errors: list[str] = []
     if "recheck_sources" in context:
@@ -183,43 +219,23 @@ def question_errors(question: Question, context: dict[str, object]) -> list[str]
         errors.append("CLARIFY must preserve required_question_contract.evidence_scope exactly")
     if len(question.criterion_ids) != 1 or question.criterion_ids != contract["criterion_ids"]:
         errors.append("criterion_ids must equal required_question_contract.criterion_ids exactly, with ONE criterion")
-    if _missing_referenced_code(question.text):
-        errors.append("The question refers to a missing code snippet. Include the actual code inline in a Markdown "
-                      "code block for TEXT, or describe its exact behavior and inputs aloud for VOICE without "
-                      "referring to an absent snippet.")
-    if re.search(r"\b(?:hãy|bạn cần)\s+(?:thử\s+)?(?:dùng|sử dụng|mở|truy cập)\s+ChatGPT\b",
-                 question.text, re.IGNORECASE):
-        errors.append("Provide any needed AI output in the question and ask one task answerable directly here")
-    if context.get("interaction_mode") == "VOICE" and len(question.text.split()) > VOICE_SOFT_MAX_WORDS:
-        errors.append(
-            f"VOICE question must use at most {VOICE_MAX_WORDS} whitespace-separated words including scenario; "
-            "rewrite concisely with ONE focused response task, preserving essential problem data, "
-            "target criterion, evidence_scope and required depth. Do not truncate the question."
-        )
-    errors.extend(question_form_errors(question.text, context.get("interaction_mode")).values())
-    return errors
-
-
-def _soft_quality_errors(question: Question, context: dict[str, object]) -> list[str]:
-    errors = _grounding_errors(question.text, context)
-    if not single_question(question.text):
-        errors.append("Ask exactly ONE response task; remove independent subquestions or numbered requests")
-    if context.get("interaction_mode") == "VOICE":
-        word_count = len(question.text.split())
-        if VOICE_MAX_WORDS < word_count <= VOICE_SOFT_MAX_WORDS:
-            errors.append(
-                f"VOICE question must use at most {VOICE_MAX_WORDS} whitespace-separated words including scenario; "
-                "rewrite concisely with ONE focused response task, preserving essential problem data, "
-                "target criterion, evidence_scope and required depth. Do not truncate the question."
-            )
     return errors
 
 
 def validate_question(question: Question, context: dict[str, object]) -> ValidationOutcome:
-    return ValidationOutcome(
-        hard_errors=_hard_contract_errors(question, context),
-        soft_errors=_soft_quality_errors(question, context),
-    )
+    hard_errors = _hard_contract_errors(question, context)
+    soft_errors = _grounding_errors(question.text, context)
+    voice_soft_limit, voice_hard_limit = voice_word_limits(context)
+    for code, message in question_form_errors(
+        question.text, context.get("interaction_mode"), voice_max_words=voice_soft_limit,
+    ).items():
+        if code == "MULTIPLE_TASKS" or (
+            code == "LONG_VOICE_QUESTION" and len(question.text.split()) <= voice_hard_limit
+        ):
+            soft_errors.append(message)
+        else:
+            hard_errors.append(message)
+    return ValidationOutcome(hard_errors=hard_errors, soft_errors=soft_errors)
 
 
 def question_errors(question: Question, context: dict[str, object]) -> list[str]:

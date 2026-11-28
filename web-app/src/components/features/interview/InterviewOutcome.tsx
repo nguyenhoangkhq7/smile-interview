@@ -7,6 +7,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { EvidenceSession, interviewError } from '@/services/evidenceInterview';
 import type { SessionHistoryItem } from '@/services/historyService';
 import { applicationProfiles } from '@/services/applicationProfiles';
+import { InterviewSubmissionStatus } from './InterviewSubmissionStatus';
 
 export function InterviewOutcome({ session, metadata }: { session: EvidenceSession; metadata: SessionHistoryItem | null }) {
   const router = useRouter();
@@ -28,8 +29,10 @@ export function InterviewOutcome({ session, metadata }: { session: EvidenceSessi
           <h1 className="text-2xl font-semibold">{completedSkills ? 'Đã kiểm chứng đủ kỹ năng' : 'Lượt phỏng vấn đã kết thúc'}</h1>
           <p>{completedSkills
             ? 'Các kỹ năng phù hợp với dạng hỏi này đã được xác nhận đạt hoặc vượt yêu cầu ở các lượt trước.'
+            : session.submission ? 'Bài đã được lưu. Phiên này chưa có kết quả chấm.'
             : 'Bạn chưa gửi câu trả lời nào. Chưa có dữ liệu để đánh giá năng lực.'}</p>
         </section>}
+    {session.submission?.status === 'UNASSESSED' && <InterviewSubmissionStatus submission={session.submission} />}
     {error && <p role="alert" className="text-destructive">{error}</p>}
     <div className="flex flex-wrap gap-3 border-t pt-5">
       {metadata?.applicationProfileId ? <><Link className={buttonVariants({ variant: 'outline' })} href={`/applications/${metadata.applicationProfileId}#competency`}>Về hồ sơ ứng tuyển</Link>{session.is_finished && <Button disabled={busy} onClick={() => void newAttempt()}>{busy ? 'Đang tạo lượt…' : 'Phỏng vấn lượt mới'}</Button>}</>

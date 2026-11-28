@@ -12,10 +12,11 @@ from uuid import uuid4
 from pydantic import ValidationError
 
 from .assessment import (TERMINAL, apply_judgment, criterion_action, criterion_resolved, eligible_criteria,
-                         mode_for_criterion, next_action, standalone_inability, validate_judgment)
-from .code_runner import CodeExecutionProvider, default_code_runner
+                         eligible_secondary_criteria, mode_for_criterion, next_action,
+                         sanitize_secondary_observations, standalone_inability, validate_judgment)
+from .code_runner import CodeExecutionProvider, CodingSpec, default_code_runner, extract_code_snippet
 from .coding_verification import check_coding_answer, run_sample_code, sanitize_coding_spec
-from .errors import JudgmentUnavailableError, QuestionUnavailableError
+from .errors import JudgmentUnavailableError, ProviderUnavailableError, QuestionUnavailableError
 from .models import (
     Action, Blueprint, BlueprintRequest, ClarifyRequest, CodingCheckResult, ConversationRequest, InterviewConfig,
     InterviewSkillContext, InterviewVerification, Judgment, Mode,
@@ -27,9 +28,10 @@ from .planning import (
     ALL_COMPATIBLE_SKILLS_MASTERED, BEHAVIORAL_FALLBACK_SKILL_ID, BlueprintBuilder, plan, plan_recheck, select_mode,
 )
 from .depth import DEPTH_DEFINITIONS, question_depth
+from .mode_strategy import judge_guidance_for, question_guidance_for
 from .policy_config import InterviewPolicy
 from .criterion_progress import CRITERION_SOFT_LIMIT, progress_for
-from .conversation import turn_introduction
+from .conversation import MAX_FEEDBACK_LENGTH, MAX_PRACTICE_FEEDBACK_LENGTH, turn_introduction
 from .question_validation import first_question, question_errors, validate_question
 from .provider import AlignmentReview, AssessmentProvider, encode_context
 from .reporting import coaching_context, fallback_session_coaching, public_session
@@ -44,11 +46,16 @@ DIAGNOSTIC_SOFT_REPAIR_LIMIT = 2
 JUDGMENT_ATTEMPTS = 2
 MAX_CLARIFICATIONS_PER_TURN = 2
 MAX_HINTS_PER_TURN = 1
-_ASSESSMENT_CLARIFY_MODES = frozenset({Mode.DESIGN, Mode.CODING, Mode.DEBUGGING})
+MAX_AI_WAIT_COMPENSATION_SECONDS = 90
 PREWARM_TTL_SECONDS = 600
+PREWARM_NEXT_TTL_SECONDS = 120
 PREWARM_MAX_ENTRIES = 64
 MAX_CANDIDATE_BACKGROUND_CHARS = 400
+MAX_INTRO_IN_QUESTION_CHARS = 350
+MAX_COVERED_SCOPES = 8
 MAX_PRIOR_STEM_CHARS = 200
+MAX_REVIEW_HISTORY_TURNS = 3
+MAX_REVIEW_ANSWER_CHARS = 600
 _HARD_ALIGNMENT_VERDICTS = frozenset({"GIVES_SOLUTION", "UNANSWERABLE", "WRONG_SKILL"})
 _DIAGNOSTIC_ACTIONS = frozenset({Action.EASIER, Action.CLARIFY})
 _PENALTY_DIAGNOSTIC_SOFT_REVIEW = 1
@@ -82,6 +89,15 @@ class _PrewarmedQuestion:
     future: Future[Turn | None]
 
 
+@dataclass(frozen=True)
+class _PrewarmedNext:
+    created: float
+    action: Action
+    config: InterviewConfig
+    verification: InterviewVerification | None
+    future: Future[tuple[Turn | None, str | None, Exception | None]]
+
+
 class EvidenceWorkflow:
     def __init__(
         self,
@@ -100,8 +116,9 @@ class EvidenceWorkflow:
         self.prewarm_q1 = prewarm_q1
         self.code_runner = code_runner
         self._prewarm_lock = Lock()
-        self._prewarm_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="q1-prewarm")
+        self._prewarm_executor = ThreadPoolExecutor(max_workers=8, thread_name_prefix="turn-prewarm")
         self._prewarmed_q1: OrderedDict[str, _PrewarmedQuestion] = OrderedDict()
+        self._prewarmed_next: OrderedDict[tuple[str, int], _PrewarmedNext] = OrderedDict()
 
     def build_blueprint(self, request: BlueprintRequest) -> Blueprint:
         builder = BlueprintBuilder(self.provider, self.policy, self.preparation_cache)
@@ -193,7 +210,9 @@ class EvidenceWorkflow:
                 self._schedule_q1_prewarm(snapshot)
             event("preparation.ready", phase=snapshot.conversation.phase)
         else:
+            snapshot.paused_remaining_seconds = snapshot.config.duration_seconds
             self._ask(snapshot, Action.INITIAL)
+            self._resume_clock(snapshot)
         return self._result(snapshot)
 
     def _schedule_q1_prewarm(self, snapshot: Snapshot) -> None:
@@ -225,6 +244,84 @@ class EvidenceWorkflow:
             self._prewarmed_q1.pop(key, None)
         while len(self._prewarmed_q1) >= PREWARM_MAX_ENTRIES:
             self._prewarmed_q1.popitem(last=False)
+        expired_next = [
+            key for key, entry in self._prewarmed_next.items() if now - entry.created > PREWARM_NEXT_TTL_SECONDS
+        ]
+        for key in expired_next:
+            self._prewarmed_next.pop(key, None)
+        while len(self._prewarmed_next) >= PREWARM_MAX_ENTRIES:
+            self._prewarmed_next.popitem(last=False)
+
+    def _clear_session_prewarm_locked(self, session_id: str) -> None:
+        self._prewarmed_q1.pop(session_id, None)
+        stale_keys = [key for key in self._prewarmed_next if key[0] == session_id]
+        for key in stale_keys:
+            self._prewarmed_next.pop(key, None)
+
+    def _schedule_next_prewarm(self, snapshot: Snapshot) -> None:
+        action = snapshot.next_question_action
+        if action is None or snapshot.is_finished or not snapshot.queue:
+            return
+        copy = snapshot.model_copy(deep=True)
+        # Keep the same session deadline with a small buffer for in-flight AI wait compensation.
+        copy.deadline_at = max(copy.deadline_at, self.clock() + timedelta(seconds=MAX_AI_WAIT_COMPENSATION_SECONDS))
+
+        def _compute() -> tuple[Turn | None, str | None, Exception | None]:
+            try:
+                self._ask(copy, action)
+                if copy.is_finished:
+                    return None, copy.termination_reason, None
+                return copy.pending_turn, None, None
+            except (QuestionUnavailableError, ProviderUnavailableError) as exc:
+                logger.warning("Next-turn prewarm failed for session %s (%s): %s",
+                               copy.session_id, type(exc).__name__, exc)
+                return None, None, exc
+            except Exception as exc:
+                logger.warning("Next-turn prewarm error for session %s (%s): %s",
+                               copy.session_id, type(exc).__name__, exc)
+                return None, None, None
+
+        future = self._prewarm_executor.submit(copy_context().run, _compute)
+        now = monotonic()
+        key = (snapshot.session_id, snapshot.state_version)
+        with self._prewarm_lock:
+            self._prune_prewarm_locked(now)
+            stale_keys = [existing for existing in self._prewarmed_next if existing[0] == snapshot.session_id]
+            for existing in stale_keys:
+                self._prewarmed_next.pop(existing, None)
+            self._prewarmed_next[key] = _PrewarmedNext(now, action, copy.config, copy.verification, future)
+            self._prewarmed_next.move_to_end(key)
+
+    def _consume_prewarmed_next(self, snapshot: Snapshot) -> tuple[Turn | None, str | None]:
+        key = (snapshot.session_id, snapshot.state_version)
+        with self._prewarm_lock:
+            entry = self._prewarmed_next.pop(key, None)
+        if (entry is None or monotonic() - entry.created > PREWARM_NEXT_TTL_SECONDS
+                or entry.action != snapshot.next_question_action
+                or entry.config != snapshot.config or entry.verification != snapshot.verification):
+            return None, None
+        try:
+            turn, finished_reason, error = entry.future.result(timeout=45)
+        except Exception:
+            return None, None
+        if error is not None:
+            raise error
+        if finished_reason is not None:
+            return None, finished_reason
+        if turn is None or not snapshot.queue:
+            return None, None
+        state = snapshot.objectives.get(snapshot.queue[0])
+        if state is None:
+            return None, None
+        allow_mode_switch = snapshot.config.mode == "MIXED"
+        targets = self._targets(state.model_copy(deep=True), allow_mode_switch=allow_mode_switch)
+        if (not targets
+                or turn.objective_id != state.objective.objective_id
+                or turn.action != snapshot.next_question_action
+                or turn.question.criterion_ids != targets
+                or turn.mode != mode_for_criterion(state, targets[0], allow_mode_switch=allow_mode_switch)):
+            return None, None
+        return turn.model_copy(deep=True), None
 
     def _consume_prewarmed_q1(self, snapshot: Snapshot) -> Turn | None:
         with self._prewarm_lock:
@@ -270,7 +367,12 @@ class EvidenceWorkflow:
             raise ValueError("Action is not allowed in this conversation phase")
         if not request.defer_question and snapshot.next_question_action is not None:
             self._deliver_question(snapshot)
-        return self._result(snapshot)
+        result = self._result(snapshot)
+        has_intro = bool(result.snapshot.conversation and result.snapshot.conversation.introduction.strip())
+        if (self.prewarm_q1 and request.defer_question and has_intro
+                and result.snapshot.next_question_action is not None and not result.snapshot.is_finished):
+            self._schedule_next_prewarm(result.snapshot)
+        return result
 
     def _begin_technical(self, snapshot: Snapshot) -> None:
         conversation = snapshot.conversation
@@ -278,11 +380,30 @@ class EvidenceWorkflow:
         conversation.phase = "INTERVIEW"
         snapshot.deadline_at = self.clock() + timedelta(seconds=snapshot.config.duration_seconds)
         snapshot.next_question_action = Action.INITIAL
+        snapshot.paused_remaining_seconds = snapshot.config.duration_seconds
+
+    def _remaining(self, snapshot: Snapshot) -> float:
+        if snapshot.paused_remaining_seconds is not None:
+            return snapshot.paused_remaining_seconds
+        return (snapshot.deadline_at - self.clock()).total_seconds()
+
+    def _resume_clock(self, snapshot: Snapshot) -> None:
+        if snapshot.pending_turn and snapshot.paused_remaining_seconds is not None:
+            snapshot.deadline_at = self.clock() + timedelta(seconds=snapshot.paused_remaining_seconds)
+            snapshot.paused_remaining_seconds = None
+
+    @staticmethod
+    def _extend_deadline_for_ai_wait(snapshot: Snapshot, elapsed_seconds: float) -> None:
+        """Compensate wall-clock deadline for server-side AI latency so slow model calls do not steal candidate time."""
+        if not snapshot.is_finished and elapsed_seconds > 0:
+            snapshot.deadline_at += timedelta(seconds=elapsed_seconds)
 
     def respond(self, request: TransitionRequest) -> TransitionResult:
         snapshot = request.snapshot.model_copy(deep=True)
         self._check_request(snapshot, request)
-        if self.clock() >= snapshot.deadline_at:
+        received = request.received_at or self.clock()
+        snapshot.paused_remaining_seconds = max(0.0, (snapshot.deadline_at - received).total_seconds())
+        if self._remaining(snapshot) <= 0:
             return self._result(self._finish(snapshot, "TIME_BUDGET"))
         turn = snapshot.pending_turn
         assert turn is not None
@@ -304,13 +425,26 @@ class EvidenceWorkflow:
             if not turn.answer.strip() or (needs_code_input and standalone_inability(turn) is None):
                 raise ValueError("Hãy nộp mã hoặc chọn Chưa làm được")
         turn.judgment = self._judge(snapshot, turn)
-        apply_judgment(state, turn, snapshot.policy)
+        is_practice = snapshot.config.session_purpose == "PRACTICE"
+        max_fb_len = MAX_PRACTICE_FEEDBACK_LENGTH if is_practice else MAX_FEEDBACK_LENGTH
+        apply_judgment(
+            state,
+            turn,
+            snapshot.policy,
+            max_feedback_length=max_fb_len,
+            allow_sentence_trim=is_practice,
+            interaction_mode=snapshot.config.interaction_mode,
+        )
         snapshot.turns.append(turn)
         snapshot.pending_turn = None
         self._advance(snapshot, turn)
         if not request.defer_question and snapshot.next_question_action is not None:
             self._deliver_question(snapshot)
-        return self._result(snapshot)
+        result = self._result(snapshot)
+        if (self.prewarm_q1 and request.defer_question
+                and result.snapshot.next_question_action is not None and not result.snapshot.is_finished):
+            self._schedule_next_prewarm(result.snapshot)
+        return result
 
     def next_question(self, request: NextQuestionRequest) -> TransitionResult:
         snapshot = request.snapshot.model_copy(deep=True)
@@ -319,25 +453,34 @@ class EvidenceWorkflow:
         if (snapshot.is_finished or snapshot.pending_turn is not None or snapshot.next_question_action is None
                 or (snapshot.conversation and snapshot.conversation.phase != "INTERVIEW")):
             raise ValueError("Interview is not waiting for a question")
+        if snapshot.paused_remaining_seconds is None:
+            snapshot.paused_remaining_seconds = max(0.0, self._remaining(snapshot))
         self._deliver_question(snapshot)
         return self._result(snapshot)
 
     def _deliver_question(self, snapshot: Snapshot) -> None:
         action = snapshot.next_question_action
         assert action is not None
-        prewarmed = self._consume_prewarmed_q1(snapshot) if (not snapshot.turns and action == Action.INITIAL) else None
+        has_intro = bool(snapshot.conversation and snapshot.conversation.introduction.strip())
+        prewarmed, finished_reason = self._consume_prewarmed_next(snapshot)
+        if finished_reason is not None:
+            self._finish(snapshot, finished_reason)
+            return
+        if prewarmed is None and not snapshot.turns and action == Action.INITIAL and not has_intro:
+            prewarmed = self._consume_prewarmed_q1(snapshot)
         if prewarmed is not None:
-            if self.clock() >= snapshot.deadline_at:
+            if self._remaining(snapshot) <= 0:
                 self._finish(snapshot, "TIME_BUDGET")
                 return
             state = snapshot.objectives[snapshot.queue[0]]
             state.lifecycle = "ACTIVE"
-            self._targets(state)
+            self._targets(state, allow_mode_switch=snapshot.config.mode == "MIXED")
             snapshot.pending_turn = prewarmed
-            event("question.prewarm_hit", turn_id=prewarmed.turn_id, mode=state.selected_mode.value)
+            event("question.prewarm_hit", turn_id=prewarmed.turn_id, mode=prewarmed.mode.value)
         else:
             self._ask(snapshot, action)
         snapshot.next_question_action = None
+        self._resume_clock(snapshot)
         if snapshot.pending_turn and snapshot.conversation and not snapshot.turns:
             snapshot.pending_turn.introduction = lifecycle.introduction_bridge(
                 snapshot.conversation.introduction, snapshot.skills,
@@ -353,7 +496,7 @@ class EvidenceWorkflow:
             raise ValueError("Stale state version")
         if snapshot.pending_turn.turn_id != request.turn_id:
             raise ValueError("Stale turn identifier")
-        if self.clock() >= snapshot.deadline_at:
+        if self._remaining(snapshot) <= 0:
             return self._result(self._finish(snapshot, "TIME_BUDGET"))
         turn = snapshot.pending_turn
         if len(turn.clarifications) >= MAX_CLARIFICATIONS_PER_TURN:
@@ -366,21 +509,47 @@ class EvidenceWorkflow:
         else:
             if not request.candidate_question.strip():
                 raise ValueError("Hãy nhập nội dung cần làm rõ đề bài")
-            if snapshot.config.session_purpose != "PRACTICE" and turn.mode not in _ASSESSMENT_CLARIFY_MODES:
-                raise ValueError("Trong chế độ Đánh giá, chỉ hỗ trợ hỏi rõ yêu cầu với câu Lập trình, Gỡ lỗi hoặc Thiết kế")
+        ai_started = monotonic()
         reply_text = self._generate_clarification(snapshot, turn, request.kind, request.candidate_question.strip())
         turn.clarifications.append(TurnClarification(
             kind=request.kind,
             question=request.candidate_question.strip(),
             answer=reply_text,
         ))
+        if request.kind == "HINT":
+            state = snapshot.objectives[turn.objective_id]
+            for cid in turn.question.criterion_ids:
+                if cid not in state.hinted_criteria:
+                    state.hinted_criteria.append(cid)
+        self._extend_deadline_for_ai_wait(snapshot, monotonic() - ai_started)
         event("question.clarified", turn_id=turn.turn_id, kind=request.kind, count=len(turn.clarifications))
         return self._result(snapshot)
+
+    @staticmethod
+    def _coding_clarification_contract(spec: CodingSpec) -> dict[str, object]:
+        contract: dict[str, object] = {
+            "language": spec.language,
+            "entry_point": spec.entry_point,
+        }
+        if spec.starter_code.strip():
+            contract["starter_code"] = spec.starter_code.strip()[:1200]
+        if spec.setup_sql.strip():
+            contract["setup_sql"] = spec.setup_sql.strip()[:1200]
+        if spec.sample_tests:
+            contract["sample_tests"] = [
+                {"name": c.name, "input_data": c.input_data[:200], "expected_output": c.expected_output[:200]}
+                for c in spec.sample_tests
+            ]
+        if spec.hidden_tests:
+            contract["hidden_test_names"] = [c.name for c in spec.hidden_tests]
+        if spec.reference_solution.strip():
+            contract["private_reference_solution"] = spec.reference_solution.strip()[:1200]
+        return contract
 
     def _generate_clarification(self, snapshot: Snapshot, turn: Turn, kind: str, question_text: str) -> str:
         state = snapshot.objectives[turn.objective_id]
         criteria = [c.description for c in state.objective.criteria if c.criterion_id in turn.question.criterion_ids]
-        payload = {
+        payload: dict[str, object] = {
             "kind": kind,
             "mode": turn.mode.value,
             "current_question": turn.question.text,
@@ -388,6 +557,8 @@ class EvidenceWorkflow:
             "candidate_question": question_text,
             "prior_clarifications": [c.model_dump(mode="json") for c in turn.clarifications],
         }
+        if turn.question.coding_spec is not None:
+            payload["coding_contract"] = self._coding_clarification_contract(turn.question.coding_spec)
         generator = getattr(self.provider, "clarify_prompt", None)
         if callable(generator):
             try:
@@ -409,7 +580,7 @@ class EvidenceWorkflow:
             raise ValueError("Phiên phỏng vấn không có câu hỏi đang mở để chạy thử mã nguồn")
         if snapshot.pending_turn.turn_id != request.turn_id:
             raise ValueError("Mã lượt không khớp với câu hỏi hiện tại")
-        if self.clock() >= snapshot.deadline_at:
+        if self._remaining(snapshot) <= 0:
             raise ValueError("Phiên phỏng vấn đã hết thời gian")
         outcome = run_sample_code(
             code=request.code,
@@ -435,19 +606,25 @@ class EvidenceWorkflow:
             turn.coding_checks = coding_check.to_result()
             event("coding.checked", turn_id=turn.turn_id, language=coding_check.language,
                   total=coding_check.total, passed=coding_check.passed)
-            if coding_check.passed < coding_check.total:
-                judgment = coding_check.failure_judgment(turn)
-                validate_judgment(judgment, turn)
-                return judgment
         state = snapshot.objectives[turn.objective_id]
         ids = turn.question.criterion_ids
         objective = self._prompt_objective(state, ids)
+        max_fb_len = (
+            MAX_PRACTICE_FEEDBACK_LENGTH if snapshot.config.session_purpose == "PRACTICE" else MAX_FEEDBACK_LENGTH
+        )
         context = {
             "interaction_mode": snapshot.config.interaction_mode,
+            "session_purpose": snapshot.config.session_purpose,
             "objective": objective, "turn": turn,
+            "case_notes": [] if turn.practice_step == "TRANSFER" else self._case_notes(snapshot, state, ids),
             "answer_lines": [{"line": index, "text": text} for index, text in
                              enumerate((turn.answer or "").splitlines(), start=1)],
             "depth_definition": DEPTH_DEFINITIONS[turn.question_depth],
+            "mode_assessment_guidance": judge_guidance_for(
+                turn.mode,
+                coding_passed=coding_check.passed if coding_check is not None else None,
+                coding_total=coding_check.total if coding_check is not None else None,
+            ),
             "prior_observations": [item for item in state.evidence_history if item.criterion_id in ids],
             "prior_turns": [
                 {
@@ -462,18 +639,45 @@ class EvidenceWorkflow:
             ],
         }
         if coding_check is not None:
-            context["coding_checks"] = {"passed": coding_check.passed, "total": coding_check.total}
+            context["coding_checks"] = coding_check.to_judge_payload()
         if turn.clarifications:
             context["turn_clarifications"] = [c.model_dump(mode="json") for c in turn.clarifications]
+        secondary = eligible_secondary_criteria(
+            state, turn, snapshot.policy, coding_compile_error=bool(coding_check and coding_check.compile_error),
+        )
+        if secondary:
+            context["secondary_criteria"] = [c.model_dump(mode="json") for c in secondary]
         last_error = None
         judge_started = monotonic()
         for attempt in range(JUDGMENT_ATTEMPTS):
-            if attempt and self.clock() >= snapshot.deadline_at:
+            if attempt and self._remaining(snapshot) <= 0:
                 break
             judgment = None
             try:
                 judgment = self.provider.judge(encode_context(context))
-                validate_judgment(judgment, turn)
+                is_practice = snapshot.config.session_purpose == "PRACTICE"
+                validate_judgment(
+                    judgment,
+                    turn,
+                    max_feedback_length=max_fb_len,
+                    allow_sentence_trim=is_practice,
+                    interaction_mode=snapshot.config.interaction_mode,
+                )
+                if coding_check is not None and coding_check.passed < coding_check.total:
+                    if any(obs.observation == "SUPPORTS" or obs.performance in {"AT_TARGET", "ABOVE"}
+                           for obs in judgment.observations):
+                        raise ValueError(
+                            "Automated coding tests failed (passed < total): observation must be CONTRADICTS "
+                            "and performance must be BELOW, explaining both valid logic and the failing case."
+                        )
+                sanitize_secondary_observations(
+                    judgment,
+                    state,
+                    turn,
+                    snapshot.policy,
+                    interaction_mode=snapshot.config.interaction_mode,
+                    coding_compile_error=bool(coding_check and coding_check.compile_error),
+                )
                 event("judge.completed", turn_id=turn.turn_id, attempts=attempt + 1,
                       elapsed_seconds=round(monotonic() - judge_started, 3))
                 return judgment
@@ -485,6 +689,11 @@ class EvidenceWorkflow:
                     context["previous_invalid_judgment"] = judgment.model_dump(mode="json")
                 logger.warning("Invalid judge output for turn %s (attempt %s/%s): %s",
                                turn.turn_id, attempt + 1, JUDGMENT_ATTEMPTS, feedback)
+        if coding_check is not None and coding_check.passed < coding_check.total:
+            fallback = coding_check.failure_judgment(turn)
+            validate_judgment(fallback, turn, max_feedback_length=max_fb_len)
+            event("judge.coding_fallback", turn_id=turn.turn_id)
+            return fallback
         raise JudgmentUnavailableError(
             "AI chưa thể chấm câu trả lời một cách hợp lệ. Câu trả lời chưa bị chấm điểm; vui lòng thử gửi lại."
         ) from last_error
@@ -493,7 +702,7 @@ class EvidenceWorkflow:
         updated = snapshot.model_copy(deep=True)
         if not updated.is_finished:
             technical = updated.conversation is None or updated.conversation.phase == "INTERVIEW"
-            self._finish(updated, "TIME_BUDGET" if technical and self.clock() >= updated.deadline_at else "USER_STOP")
+            self._finish(updated, "TIME_BUDGET" if technical and self._remaining(updated) <= 0 else "USER_STOP")
         return self._result(updated)
 
     @staticmethod
@@ -519,7 +728,7 @@ class EvidenceWorkflow:
         if len(snapshot.turns) >= snapshot.config.max_questions:
             self._finish(snapshot, "QUESTION_BUDGET")
             return
-        if self.clock() >= snapshot.deadline_at:
+        if self._remaining(snapshot) <= 0:
             self._finish(snapshot, "TIME_BUDGET")
             return
         state = snapshot.objectives[turn.objective_id]
@@ -528,9 +737,16 @@ class EvidenceWorkflow:
             if progress.stop_reason or state.turns_spent >= snapshot.config.max_questions_per_objective:
                 self._finish(snapshot, progress.stop_reason or "LOCAL_BUDGET")
             else:
-                snapshot.next_question_action = criterion_action(state, target.criterion_id)
+                snapshot.next_question_action = criterion_action(
+                    state, target.criterion_id, mode=turn.mode, last_turn=turn,
+                )
             return
         capped = state.turns_spent >= snapshot.config.max_questions_per_objective
+        state.practice_step = None
+        if snapshot.config.session_purpose == "PRACTICE" and not capped:
+            self._route_practice(snapshot, state, turn)
+            if state.practice_step:
+                return
         allow_mode_switch = snapshot.config.mode == "MIXED"
         # Budgets are checked before routing can request another model generation.
         action = None if capped else next_action(state, turn, snapshot.policy, allow_mode_switch=allow_mode_switch)
@@ -540,7 +756,7 @@ class EvidenceWorkflow:
             state.lifecycle, state.stop_reason = "CLOSED", "SUFFICIENT_EVIDENCE" if sufficient else reason
             snapshot.queue.pop(0)
             action = Action.INITIAL
-        elif self._should_yield(snapshot, state):
+        elif self._should_yield(snapshot, state, action):
             state.lifecycle = "PLANNED"
             snapshot.queue.append(snapshot.queue.pop(0))
             snapshot.queue.sort(key=lambda key: snapshot.objectives[key].turns_spent)
@@ -558,16 +774,35 @@ class EvidenceWorkflow:
         else:
             self._finish(snapshot, "PLAN_COMPLETE")
 
-    def _should_yield(self, snapshot: Snapshot, state: ObjectiveState) -> bool:
+    @staticmethod
+    def _route_practice(snapshot: Snapshot, state: ObjectiveState, turn: Turn) -> None:
+        key = turn.question.criterion_ids[0]
+        if turn.question_depth != state.objective.target_depth or turn.action == Action.DEEPER:
+            return
+        if turn.practice_step == "RETRY":
+            state.practice_step, snapshot.next_question_action = "TRANSFER", Action.FOLLOW_UP
+        elif (not any(t.practice_step for t in snapshot.turns if t.objective_id == turn.objective_id
+                      and key in t.question.criterion_ids)
+              and turn.judgment and (any(c.kind == "HINT" for c in turn.clarifications)
+                                     or any(o.performance not in {"AT_TARGET", "ABOVE"} for o in turn.judgment.observations))):
+            state.practice_step, snapshot.next_question_action = "RETRY", Action.CLARIFY
+        if state.practice_step:
+            state.active_criterion_id = key
+
+    def _should_yield(self, snapshot: Snapshot, state: ObjectiveState, action: Action | None = None) -> bool:
         if len(snapshot.queue) < 2:
             return False
         reserve = len(snapshot.queue) - 1
         available = snapshot.config.max_questions - len(snapshot.turns)
         reserved_seconds = sum(snapshot.objectives[key].objective.estimated_seconds for key in snapshot.queue[1:])
-        time_remaining = (snapshot.deadline_at - self.clock()).total_seconds()
+        time_remaining = self._remaining(snapshot)
         other_turns = [snapshot.objectives[key].turns_spent for key in snapshot.queue[1:]]
-        return (min(other_turns) == 0 and (available <= reserve or time_remaining <= reserved_seconds)
-                or state.turns_spent >= CRITERION_SOFT_LIMIT and min(other_turns) < state.turns_spent)
+        if min(other_turns) == 0 and (available <= reserve or time_remaining <= reserved_seconds):
+            return True
+        # Do not interrupt an immediate code-repair, STAR follow-up, or contradiction verification mid-flow.
+        if action in {Action.CLARIFY, Action.VERIFY}:
+            return False
+        return state.turns_spent >= CRITERION_SOFT_LIMIT and min(other_turns) < state.turns_spent
 
     @staticmethod
     def _criterion_stop_reason(state: ObjectiveState) -> str:
@@ -580,7 +815,7 @@ class EvidenceWorkflow:
 
     def _ask(self, snapshot: Snapshot, action: Action) -> None:
         event("question.started", action=action.value, answered=len(snapshot.turns))
-        if self.clock() >= snapshot.deadline_at:
+        if self._remaining(snapshot) <= 0:
             self._finish(snapshot, "TIME_BUDGET")
             return
         if len(snapshot.turns) >= snapshot.config.max_questions:
@@ -590,25 +825,55 @@ class EvidenceWorkflow:
         if state.turns_spent >= snapshot.config.max_questions_per_objective:
             raise ValueError("Cannot generate beyond the objective budget")
         state.lifecycle = "ACTIVE"
-        context = self._question_context(snapshot, action)
-        question = self._generate_valid_question(context, snapshot)
-        if question is None or self.clock() >= snapshot.deadline_at:
+        if state.practice_step == "RETRY":
+            previous = snapshot.turns[-1]
+            question = Question(**previous.question.model_dump(), depth=previous.question_depth, mode=previous.mode)
+        else:
+            context = self._question_context(snapshot, action)
+            question = self._generate_valid_question(context, snapshot)
+        if question is None or self._remaining(snapshot) <= 0:
             self._finish(snapshot, "TIME_BUDGET")
             return
         assert question.depth is not None
         turn_mode = question.mode or state.selected_mode
+        effective_coding_spec = self._inherit_coding_spec_for_clarify(snapshot, state, action, question)
         snapshot.pending_turn = Turn(
             turn_id=str(uuid4()), objective_id=state.objective.objective_id,
             skill_id=state.objective.skill_id, mode=turn_mode,
-            action=action, question_depth=question.depth,
+            action=action, question_depth=question.depth, practice_step=state.practice_step,
             question=StoredQuestion(
                 text=question.text, criterion_ids=question.criterion_ids, evidence_scope=question.evidence_scope,
-                requires_code=bool(question.coding_spec is not None or (snapshot.recheck_target and question.requires_code)),
-                coding_spec=question.coding_spec,
+                requires_code=bool(effective_coding_spec is not None or (snapshot.recheck_target and question.requires_code)),
+                coding_spec=effective_coding_spec,
             ),
         )
         snapshot.pending_turn.introduction = turn_introduction(snapshot, snapshot.pending_turn)
         event("question.ready", turn_id=snapshot.pending_turn.turn_id, mode=turn_mode.value)
+
+    @staticmethod
+    def _inherit_coding_spec_for_clarify(
+        snapshot: Snapshot,
+        state: ObjectiveState,
+        action: Action,
+        question: Question,
+    ) -> CodingSpec | None:
+        if action != Action.CLARIFY:
+            return question.coding_spec
+        previous = next(
+            (
+                t for t in reversed(snapshot.turns)
+                if t.objective_id == state.objective.objective_id
+                and set(t.question.criterion_ids).intersection(question.criterion_ids)
+                and t.question.coding_spec is not None
+            ),
+            None,
+        )
+        if previous is None or previous.question.coding_spec is None:
+            return question.coding_spec
+        prior_code = (previous.submitted_code or "").strip() or extract_code_snippet(previous.answer or "").strip()
+        if prior_code and len(prior_code) <= 4000:
+            return previous.question.coding_spec.model_copy(update={"starter_code": prior_code})
+        return previous.question.coding_spec.model_copy(deep=True)
 
     @staticmethod
     def _candidate_background(snapshot: Snapshot, skill: InterviewSkillContext | None) -> str | None:
@@ -679,36 +944,54 @@ class EvidenceWorkflow:
             "other_questions": other_questions,
             "prior_observations": [item for item in state.evidence_history if item.criterion_id in targets],
         }
+        if state.practice_step != "TRANSFER":
+            context["case_notes"] = self._case_notes(snapshot, state, targets)
+        has_verified_focus = False
         if snapshot.verification is None:
             context["cv_evidence"] = skill.cv_evidence_spans
         else:
-            self._add_verification_context(context, snapshot.verification, state)
-        background = self._candidate_background(snapshot, skill if snapshot.verification is None else None)
+            has_verified_focus = self._add_verification_context(context, snapshot.verification, state)
+        background = self._candidate_background(snapshot, None if has_verified_focus else skill)
         if background:
             context["candidate_background"] = background
-        guidance_parts: list[str] = []
-        if action == Action.EASIER:
-            guidance_parts.append(
-                "Simplify one decision from the preceding question. Keep its technical subject and make the "
-                "prerequisite observable with a small new case. Do not substitute a generic definition, "
-                "an unrelated task, or a question about why the candidate could not answer."
-            )
-        if action == Action.DEEPER and state.selected_mode == Mode.CODING:
-            guidance_parts.append(
-                "Build on the prior coding problem/solution in history by changing one harder technical constraint "
-                "(e.g. large or streaming input, bounded memory, concurrency, or time/space limit) and ask ONE "
-                "focused question about adapting the algorithm/data structure or evaluating trade-offs for above_target. "
-                "Do not ask the candidate to rewrite the basic function from scratch or split into separate deliverables."
-            )
-        if (not history_turns
-                and action in {Action.INITIAL, Action.FOLLOW_UP}
-                and snapshot.config.interaction_mode == "TEXT"
-                and state.selected_mode in {Mode.CODING, Mode.DEBUGGING}):
-            guidance_parts.append(
-                "When asking for executable Python, JavaScript, or SQL code, optionally populate `coding_spec` "
-                "(language, entry_point or setup_sql, starter_code, 1–2 sample_tests, and 1–3 hidden_tests) so the "
-                "sandbox can verify correctness automatically."
-            )
+        if not history_turns and snapshot.conversation and snapshot.conversation.introduction.strip():
+            context["candidate_introduction"] = " ".join(snapshot.conversation.introduction.split())[
+                :MAX_INTRO_IN_QUESTION_CHARS
+            ]
+        covered_scopes = list(dict.fromkeys(
+            t.question.evidence_scope.strip()
+            for t in snapshot.turns
+            if t.objective_id != state.objective.objective_id and t.question.evidence_scope.strip()
+        ))[:MAX_COVERED_SCOPES]
+        if covered_scopes:
+            context["covered_scopes"] = covered_scopes
+        prior_checks = history_turns[-1].coding_checks if history_turns else None
+        prior_coding_partial = bool(
+            prior_checks is not None and 0 < prior_checks.passed < prior_checks.total
+        )
+        prior_coding_zero_pass = bool(
+            prior_checks is not None and prior_checks.total > 0 and prior_checks.passed == 0
+        )
+        guidance_parts = question_guidance_for(
+            mode=turn_mode,
+            action=action,
+            interaction_mode=snapshot.config.interaction_mode,
+            depth=contract["depth"],
+            has_history=bool(history_turns),
+            prior_coding_partial_failure=prior_coding_partial,
+            prior_coding_zero_pass=prior_coding_zero_pass,
+        )
+        if context.get("case_notes"):
+            guidance_parts.append("Continue the same scenario when relevant. Use the candidate's stated decisions "
+                                  "and agreed assumptions in case_notes; ask only about the current criterion.")
+        if state.practice_step == "TRANSFER":
+            context["recheck_sources"] = [t.question.text for t in history_turns]
+            context["source_scopes"] = [t.question.evidence_scope for t in history_turns]
+            guidance_parts = question_guidance_for(mode=turn_mode, action=Action.INITIAL,
+                                                   interaction_mode=snapshot.config.interaction_mode,
+                                                   depth=contract["depth"], has_history=False)
+            guidance_parts.append("Ask a fresh independent problem testing the same criterion and depth. "
+                                  "Change the concrete case and do not reveal the previous solution or hint.")
         if snapshot.recheck_target:
             target = snapshot.recheck_target
             context["recheck_sources"] = target.source_questions
@@ -722,9 +1005,26 @@ class EvidenceWorkflow:
         return context
 
     @staticmethod
+    def _case_notes(snapshot: Snapshot, state: ObjectiveState, targets: list[str]) -> list[dict]:
+        related = [t for t in snapshot.turns if t.objective_id == state.objective.objective_id
+                   and not set(targets).intersection(t.question.criterion_ids)]
+        if not related:
+            return []
+        scope = related[-1].question.evidence_scope
+        case = [t for t in related if t.question.evidence_scope == scope]
+        return [{
+            "scope": scope,
+            "question": t.question.text[:240],
+            "candidate_account": (t.transcript or t.answer or "")[:600],
+            "agreed_constraints": [c.answer[:200] for c in t.clarifications if c.kind == "CLARIFY_PROMPT"],
+            "open_points": [gap[:160] for obs in (t.judgment.observations if t.judgment else [])
+                            for gap in obs.unresolved_aspects][:2],
+        } for t in case[-3:]]
+
+    @staticmethod
     def _add_verification_context(
         context: dict[str, object], verification: InterviewVerification, state: ObjectiveState,
-    ) -> None:
+    ) -> bool:
         focus = verification.focus_by_criterion.get(state.active_criterion_id)
         jd_excerpt = (focus.jd_excerpt if focus else None) or verification.jd_by_objective.get(
             state.objective.objective_id
@@ -735,9 +1035,11 @@ class EvidenceWorkflow:
         if not context["history"]:
             if focus is None:
                 event("verification.jd_context", reason="no_verified_focus")
-            else:
-                sources["detail_to_verify"] = focus.detail_to_verify
-                context["cv_evidence"] = [focus.cv_excerpt]
+                return False
+            sources["detail_to_verify"] = focus.detail_to_verify
+            context["cv_evidence"] = [focus.cv_excerpt]
+            return True
+        return False
 
     @staticmethod
     def _normalize_question_text(text: str) -> str:
@@ -761,7 +1063,7 @@ class EvidenceWorkflow:
         snapshot: Snapshot,
         candidate: tuple[int, Question, str, bool] | None,
     ) -> Question | None:
-        if candidate is None or self.clock() >= snapshot.deadline_at:
+        if candidate is None or self._remaining(snapshot) <= 0:
             return None
         penalty, question, reason, reviewed = candidate
         if not reviewed:
@@ -783,6 +1085,7 @@ class EvidenceWorkflow:
             self._normalize_question_text(stem) for stem in snapshot.prior_question_stems if stem.strip()
         )
         rejected_seen: set[str] = set()
+        rejected_drafts: list[str] = []
         last_review_error: str | None = None
         last_verdict: str | None = None
         best_fallback: tuple[int, Question, str, bool] | None = None
@@ -791,7 +1094,7 @@ class EvidenceWorkflow:
         gen_seconds = 0.0
         review_seconds = 0.0
         for attempt in range(GENERATION_ATTEMPTS):
-            if self.clock() >= snapshot.deadline_at:
+            if self._remaining(snapshot) <= 0:
                 return None
             if attempt == GENERATION_ATTEMPTS - 1 and self._fall_back_to_jd(context):
                 last_review_error = None
@@ -804,7 +1107,7 @@ class EvidenceWorkflow:
             errors = [*hard_errors, *soft_errors]
             failure = None
             if not errors:
-                if self.clock() >= snapshot.deadline_at:
+                if self._remaining(snapshot) <= 0:
                     return None
                 review_start = monotonic()
                 try:
@@ -821,7 +1124,7 @@ class EvidenceWorkflow:
                 if verdict == "ALIGNED":
                     event("question.generated", attempts=attempt + 1,
                           gen_seconds=round(gen_seconds, 3), review_seconds=round(review_seconds, 3))
-                    return sanitize_coding_spec(question)
+                    return sanitize_coding_spec(question, runner=self.code_runner)
                 failure = verdict
                 last_verdict = verdict
                 if verdict not in _HARD_ALIGNMENT_VERDICTS and question is not None:
@@ -832,13 +1135,18 @@ class EvidenceWorkflow:
                         if fallback_q is not None:
                             event("question.generated", attempts=attempt + 1,
                                   gen_seconds=round(gen_seconds, 3), review_seconds=round(review_seconds, 3))
-                            return sanitize_coding_spec(fallback_q)
+                            return sanitize_coding_spec(fallback_q, runner=self.code_runner)
                 context["rejected_draft"] = question.text
+                rejected_drafts.append(question.text)
+                if len(rejected_drafts) > 1:
+                    context["rejected_drafts"] = rejected_drafts[-2:]
                 rejected_seen.add(self._normalize_question_text(question.text))
                 base_repair = ALIGNMENT_REPAIRS.get(
                     verdict,
                     "Revise the question to match the criterion, depth, mode, and single-task scope.",
                 )
+                if verdict == "WRONG_SKILL" and is_diagnostic:
+                    base_repair += " Keep it directly tied to the same criterion and expected_evidence using one concrete prerequisite or missing detail."
                 last_review_error = f"{base_repair} Chi tiết lỗi: {reason}" if reason else base_repair
                 errors = [last_review_error]
             else:
@@ -849,6 +1157,9 @@ class EvidenceWorkflow:
                         )
                     rejected_seen.add(self._normalize_question_text(question.text))
                     context["rejected_draft"] = question.text
+                    rejected_drafts.append(question.text)
+                    if len(rejected_drafts) > 1:
+                        context["rejected_drafts"] = rejected_drafts[-2:]
                 if repeated and last_review_error:
                     errors.append(f"Previous rejection to fix: {last_review_error}")
             context["validation_error"] = "; ".join(errors)
@@ -858,7 +1169,7 @@ class EvidenceWorkflow:
         if fallback is not None:
             event("question.generated", attempts=GENERATION_ATTEMPTS,
                   gen_seconds=round(gen_seconds, 3), review_seconds=round(review_seconds, 3))
-            return sanitize_coding_spec(fallback)
+            return sanitize_coding_spec(fallback, runner=self.code_runner)
         raise QuestionUnavailableError("AI chưa tạo được câu hỏi phù hợp. Dữ liệu đã lưu được giữ nguyên; vui lòng thử lại.")
 
     @staticmethod
@@ -867,6 +1178,7 @@ class EvidenceWorkflow:
         if isinstance(sources, dict) and sources.pop("detail_to_verify", None) is not None:
             context["cv_evidence"] = []
             context.pop("rejected_draft", None)
+            context.pop("rejected_drafts", None)
             context["validation_error"] = "Use a hypothetical case from the JD for the same criterion."
             event("verification.jd_context", reason="cv_drafts_rejected")
             return True
@@ -884,16 +1196,22 @@ class EvidenceWorkflow:
     def _review_context(context, question: Question) -> str:
         objective = context["objective"]
         contract = context["required_question_contract"]
-        history = context["history"]
+        history = context["history"][-MAX_REVIEW_HISTORY_TURNS:]
         history_pairs = []
         for item in history:
             if isinstance(item, dict):
                 q_field = item.get("question")
                 q_text = q_field.text if hasattr(q_field, "text") else (q_field.get("text", "") if isinstance(q_field, dict) else str(q_field))
-                history_pairs.append({"question": q_text, "answer": item.get("answer"),
+                ans = item.get("answer")
+                if isinstance(ans, str) and len(ans) > MAX_REVIEW_ANSWER_CHARS:
+                    ans = ans[:MAX_REVIEW_ANSWER_CHARS] + "…"
+                history_pairs.append({"question": q_text, "answer": ans,
                                       "action": item.get("action"), "depth": item.get("question_depth")})
             else:
-                history_pairs.append({"question": item.question.text, "answer": item.answer,
+                ans = item.answer
+                if isinstance(ans, str) and len(ans) > MAX_REVIEW_ANSWER_CHARS:
+                    ans = ans[:MAX_REVIEW_ANSWER_CHARS] + "…"
+                history_pairs.append({"question": item.question.text, "answer": ans,
                                       "action": item.action, "depth": item.question_depth})
         payload = {
             "question": question.text,
@@ -910,6 +1228,7 @@ class EvidenceWorkflow:
             "probe_reason": context["probe_reason"],
             "unresolved": context["criterion_progress"].unresolved_aspects,
             "history": history_pairs,
+            "case_notes": context.get("case_notes", []),
         }
         if "recheck_sources" in context:
             payload.update(source_questions=context["recheck_sources"], source_scopes=context["source_scopes"],
@@ -970,7 +1289,7 @@ class EvidenceWorkflow:
         return [candidates[0]]
 
     def _reallocate(self, snapshot: Snapshot) -> None:
-        remaining = (snapshot.deadline_at - self.clock()).total_seconds()
+        remaining = self._remaining(snapshot)
         for state in snapshot.objectives.values():
             if state.excluded_reason == "PLAN_BUDGET" and state.objective.estimated_seconds <= remaining:
                 modes = [item.mode for item in state.objective.suitable_modes]
@@ -985,6 +1304,7 @@ class EvidenceWorkflow:
 
     def _finish(self, snapshot: Snapshot, reason: str) -> Snapshot:
         snapshot.is_finished, snapshot.termination_reason = True, reason
+        snapshot.paused_remaining_seconds = None
         for key in snapshot.queue:
             state = snapshot.objectives[key]
             state.lifecycle, state.stop_reason = "CLOSED", reason
@@ -993,7 +1313,7 @@ class EvidenceWorkflow:
         snapshot.pending_turn = None
         snapshot.next_question_action = None
         with self._prewarm_lock:
-            self._prewarmed_q1.pop(snapshot.session_id, None)
+            self._clear_session_prewarm_locked(snapshot.session_id)
 
         closing_text: str | None = None
         if snapshot.turns:
@@ -1019,12 +1339,31 @@ class EvidenceWorkflow:
             return None
         generator = getattr(self.provider, "session_coaching", None)
         if callable(generator):
+            full_ctx = coaching_context(snapshot, include_turn_maps=True)
             try:
-                generated = generator(encode_context(coaching_context(snapshot)))
+                generated = generator(encode_context(full_ctx))
                 return SessionCoaching.model_validate(generated)
             except Exception as exc:
-                logger.warning("Falling back to deterministic session coaching (%s): %s", type(exc).__name__, exc)
-                event("coaching.fallback", error_type=type(exc).__name__)
+                logger.warning("Full session coaching failed (%s): %s; retrying compact summary", type(exc).__name__, exc)
+                event("coaching.compact_retry", error_type=type(exc).__name__)
+                has_turn_maps = bool(
+                    full_ctx.get("turns_needing_reference")
+                    or full_ctx.get("turns_for_level_up")
+                    or full_ctx.get("turns_for_delivery_review")
+                )
+                if has_turn_maps:
+                    try:
+                        compact_ctx = coaching_context(snapshot, include_turn_maps=False)
+                        generated = generator(encode_context(compact_ctx))
+                        return SessionCoaching.model_validate(generated)
+                    except Exception as compact_exc:
+                        logger.warning(
+                            "Compact session coaching also failed (%s): %s",
+                            type(compact_exc).__name__, compact_exc,
+                        )
+                        event("coaching.fallback", error_type=type(compact_exc).__name__)
+                else:
+                    event("coaching.fallback", error_type=type(exc).__name__)
         return fallback_session_coaching(snapshot)
 
     def _generate_opening(self, request: StartRequest) -> str | None:

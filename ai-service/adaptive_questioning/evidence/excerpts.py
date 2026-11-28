@@ -13,7 +13,42 @@ def source_lines(line_range: tuple[int, int], answer: str) -> str | None:
     return excerpt if excerpt.strip() else None
 
 
-def source_excerpt(excerpt: str, answer: str) -> str | None:
+_VOICE_EDGE_PUNCT = ",.;:?!"
+
+
+def _strip_voice_punct(token: str) -> str:
+    return token.strip(_VOICE_EDGE_PUNCT)
+
+
+def _match_voice_punctuation(excerpt: str, answer: str) -> str | None:
+    """Allow light STT punctuation differences (`, . ; : ? !`) while requiring exact contiguous words/accents."""
+    if "..." in excerpt or "…" in excerpt:
+        return None
+    needle_tokens = [
+        _strip_voice_punct(unicodedata.normalize("NFC", token))
+        for token in excerpt.split()
+    ]
+    needle_tokens = [token for token in needle_tokens if token]
+    if not needle_tokens:
+        return None
+    answer_tokens: list[tuple[str, int, int]] = []
+    for match in re.finditer(r"\S+", answer):
+        cleaned = _strip_voice_punct(unicodedata.normalize("NFC", match.group()))
+        if cleaned:
+            answer_tokens.append((cleaned, match.start(), match.end()))
+    count = len(needle_tokens)
+    for index in range(len(answer_tokens) - count + 1):
+        if all(answer_tokens[index + offset][0] == needle_tokens[offset] for offset in range(count)):
+            return answer[answer_tokens[index][1]:answer_tokens[index + count - 1][2]]
+    return None
+
+
+def source_excerpt(
+    excerpt: str,
+    answer: str,
+    *,
+    allow_punctuation_tolerance: bool = False,
+) -> str | None:
     """Never paraphrase, ignore case/accents, or join noncontiguous evidence."""
     if not excerpt.strip():
         return None
@@ -47,4 +82,6 @@ def source_excerpt(excerpt: str, answer: str) -> str | None:
         if offset in starts and end in ends:
             return answer[starts[offset]:ends[end]]
         offset = normalized.find(needle, offset + 1)
+    if allow_punctuation_tolerance:
+        return _match_voice_punctuation(excerpt, answer)
     return None

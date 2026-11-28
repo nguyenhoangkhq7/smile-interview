@@ -56,7 +56,7 @@ class EvidenceServiceTest {
         session();
         var answer = new EvidenceDtos.Answer(UUID.randomUUID(), "turn", 1, "answer");
         var saved = json.read("{\"state_version\":2}");
-        when(store.replay("s", answer.requestId(), json.hash(answer))).thenReturn(saved);
+        when(store.acceptAnswer(eq("s"), eq(answer), any())).thenReturn(saved);
         assertThat(service.respond("s", owner, answer)).isEqualTo(saved);
         verifyNoInteractions(ai, runs);
     }
@@ -66,36 +66,24 @@ class EvidenceServiceTest {
         InterviewRun run = new InterviewRun(); run.setStateVersion(2);
         when(runs.findById("s")).thenReturn(Optional.of(run));
         var answer = new EvidenceDtos.Answer(UUID.randomUUID(), "turn", 1, "answer");
+        when(store.acceptAnswer(eq("s"), eq(answer), any())).thenThrow(EvidenceStore.conflict("stale"));
         assertThatThrownBy(() -> service.respond("s", owner, answer)).isInstanceOf(ResponseStatusException.class);
         verifyNoInteractions(ai);
     }
 
-    @Test void answerCommitsBeforeQuestionGenerationAndRetryReplaysOnlyItsOwnCommand() {
+    @Test void nextQuestionFailureKeepsGradedStateAndRetryReplaysOnlyItsOwnCommand() {
         session();
         var run = new InterviewRun();
-        run.setStateVersion(1);
+        run.setStateVersion(2);
         run.setConfigJson("{}");
-        run.setSnapshotJson("{\"pending_turn\":{\"turn_id\":\"turn-1\"}}");
-        when(runs.findById("s")).thenReturn(Optional.of(run));
-        var answer = new EvidenceDtos.Answer(UUID.randomUUID(), "turn-1", 1, "answer");
         var graded = json.read("""
             {"snapshot":{"next_question_action":"INITIAL","turns":[{"answer":"answer"}]},
              "public":{"state_version":2,"awaiting_question":true,"turns":[{"answer":"answer"}]}}
             """);
-        when(ai.compute(eq("respond"), any())).thenReturn(graded);
-        when(store.commit(any())).thenAnswer(call -> {
-            var commit = call.<EvidenceStore.Commit>getArgument(0);
-            var next = commit.result();
-            run.setStateVersion(next.path("public").path("state_version").asLong());
-            run.setSnapshotJson(next.path("snapshot").toString());
-            run.setPublicJson(next.path("public").toString());
-            return next.path("public");
-        });
-        assertThat(service.respond("s", owner, answer)).isEqualTo(graded.path("public"));
-        var gradePayload = org.mockito.ArgumentCaptor.forClass(com.fasterxml.jackson.databind.JsonNode.class);
-        verify(ai).compute(eq("respond"), gradePayload.capture());
-        assertThat(gradePayload.getValue().path("defer_question").asBoolean()).isTrue();
-
+        run.setSnapshotJson(graded.path("snapshot").toString());
+        run.setPublicJson(graded.path("public").toString());
+        when(runs.findById("s")).thenReturn(Optional.of(run));
+        when(store.commit(any())).thenAnswer(call -> call.<EvidenceStore.Commit>getArgument(0).result().path("public"));
         var command = new EvidenceDtos.NextQuestion(UUID.randomUUID(), 2);
         var ready = json.read("""
             {"snapshot":{},"public":{"state_version":3,"pending_turn":{"turn_id":"turn-2"}}}
@@ -248,55 +236,15 @@ class EvidenceServiceTest {
         verifyNoInteractions(ai);
     }
 
-    @Test void respondChainsNextQuestionInSameRoundtripAndFallsBackToAwaitingWhenGenerationFails() {
+    @Test void answerReturnsDurableAcknowledgementBeforeAnyModelCall() {
         session();
-        var run = new InterviewRun();
-        run.setStateVersion(1);
-        run.setConfigJson("{}");
-        run.setSnapshotJson("{\"pending_turn\":{\"turn_id\":\"turn-1\"}}");
-        when(runs.findById("s")).thenReturn(Optional.of(run));
-
-        var graded = json.read("""
-            {"snapshot":{"next_question_action":"INITIAL","turns":[{"answer":"answer"}]},
-             "public":{"state_version":2,"is_finished":false,"deadline_at":"2099-01-01T00:00:00Z",
-                       "awaiting_question":true,"turns":[{"answer":"answer"}]}}
-            """);
-        var ready = json.read("""
-            {"snapshot":{"pending_turn":{"turn_id":"turn-2"}},
-             "public":{"state_version":3,"is_finished":false,"deadline_at":"2099-01-01T00:00:00Z",
-                       "awaiting_question":false,"pending_turn":{"turn_id":"turn-2","question":"Q2"}}}
-            """);
-        when(ai.compute(eq("respond"), any())).thenReturn(graded);
-        when(ai.compute(eq("next-question"), any())).thenReturn(ready);
-        when(store.commit(any())).thenAnswer(call -> {
-            var commit = call.<EvidenceStore.Commit>getArgument(0);
-            var next = commit.result();
-            run.setStateVersion(next.path("public").path("state_version").asLong());
-            run.setSnapshotJson(next.path("snapshot").toString());
-            run.setPublicJson(next.path("public").toString());
-            return next.path("public");
-        });
-
         var answer = new EvidenceDtos.Answer(UUID.randomUUID(), "turn-1", 1, "answer");
-        var response = service.respond("s", owner, answer);
-        assertThat(response.path("state_version").asLong()).isEqualTo(3L);
-        assertThat(response.path("pending_turn").path("turn_id").asText()).isEqualTo("turn-2");
-
-        // Now verify graceful fallback to awaiting_question=true if Tx 2 throws 503
-        run.setStateVersion(3);
-        var graded2 = json.read("""
-            {"snapshot":{"next_question_action":"FOLLOW_UP","turns":[{"answer":"answer2"}]},
-             "public":{"state_version":4,"is_finished":false,"deadline_at":"2099-01-01T00:00:00Z",
-                       "awaiting_question":true,"turns":[{"answer":"answer2"}]}}
+        var ack = json.read("""
+            {"state_version":2,"submission":{"status":"QUEUED","candidate_response":"answer"}}
             """);
-        when(ai.compute(eq("respond"), any())).thenReturn(graded2);
-        when(ai.compute(eq("next-question"), any()))
-                .thenThrow(new ResponseStatusException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE, "Outage"));
-
-        var answer2 = new EvidenceDtos.Answer(UUID.randomUUID(), "turn-2", 3, "answer2");
-        var fallback = service.respond("s", owner, answer2);
-        assertThat(fallback.path("state_version").asLong()).isEqualTo(4L);
-        assertThat(fallback.path("awaiting_question").asBoolean()).isTrue();
+        when(store.acceptAnswer(eq("s"), eq(answer), any())).thenReturn(ack);
+        assertThat(service.respond("s", owner, answer)).isEqualTo(ack);
+        verifyNoInteractions(ai);
     }
 
     @ParameterizedTest
@@ -377,5 +325,54 @@ class EvidenceServiceTest {
         assertThat(ctx.state().path("state_version").asInt()).isEqualTo(2);
         assertThat(ctx.terms()).containsExactly("SQL Optimization", "PostgreSQL Indexing", "spring boot");
         verify(runs, times(1)).findById("s");
+    }
+
+    @Test void priorPracticeAttemptsShareQuestionStemsWithoutLeakingAssessments() {
+        var profile = new fit.iuh.modules.application.ApplicationProfile();
+        profile.setId(UUID.randomUUID());
+        profile.setSkillGapJson("[{\"jd_skill_id\":\"sql\",\"semantic_alignment\":\"MATCH\"}]");
+        profile.setBlueprintJson("""
+            {"objectives":[{"objective_id":"obj-sql","skill_id":"sql","claim":"Tune queries","target_depth":3,
+              "criteria":[{"criterion_id":"c1","description":"Explain plan","essential":true}]}]}
+            """);
+        var practice = Session.builder().id("s-practice").userId(owner.getId()).attemptNumber(1)
+                .status("Completed").applicationProfile(profile).build();
+        var nextAssess = Session.builder().id("s-assess").userId(owner.getId()).attemptNumber(2)
+                .status("Not started").applicationProfile(profile).build();
+        var practiceRun = new InterviewRun();
+        practiceRun.setSessionId("s-practice");
+        practiceRun.setPublicJson("{\"is_finished\":true}");
+        practiceRun.setSnapshotJson("""
+            {"is_finished":true,
+             "config":{"session_purpose":"PRACTICE"},
+             "turns":[{"turn_id":"t1","objective_id":"obj-sql","answer":"Use EXPLAIN ANALYZE",
+                       "question":{"text":"How do you inspect a slow SQL query?"}}],
+             "objectives":{"obj-sql":{
+               "objective":{"objective_id":"obj-sql","skill_id":"sql","claim":"Tune queries","target_depth":3,
+                 "criteria":[{"criterion_id":"c1","description":"Explain plan","essential":true}]},
+               "assessment":"DEMONSTRATED_AT_TARGET","lifecycle":"CLOSED","turns_spent":1
+             }}}
+            """);
+
+        when(sessions.findById("s-assess")).thenReturn(Optional.of(nextAssess));
+        when(runs.findById("s-assess")).thenReturn(Optional.empty());
+        when(turns.findBySessionIdOrderByIdAsc("s-assess")).thenReturn(java.util.List.of());
+        when(inputs.skills(nextAssess)).thenReturn(json.read("[{\"jd_skill_id\":\"sql\"}]"));
+        when(sessions.findByApplicationProfileIdOrderByAttemptNumberDesc(profile.getId()))
+                .thenReturn(java.util.List.of(nextAssess, practice));
+        when(runs.findAllById(java.util.List.of("s-practice"))).thenReturn(java.util.List.of(practiceRun));
+        var aiResult = json.read("{\"snapshot\":{\"state_version\":1},\"public\":{\"state_version\":1}}");
+        when(ai.compute(eq("start"), any())).thenReturn(aiResult);
+        when(store.commit(any())).thenReturn(aiResult.path("public"));
+
+        service.start("s-assess", owner, EvidenceDtos.Config.defaults());
+
+        var payloadCaptor = org.mockito.ArgumentCaptor.forClass(com.fasterxml.jackson.databind.JsonNode.class);
+        verify(ai).compute(eq("start"), payloadCaptor.capture());
+        var priorAttempts = payloadCaptor.getValue().path("prior_attempts");
+        assertThat(priorAttempts.path("objective_assessments").isEmpty()).isTrue();
+        assertThat(priorAttempts.path("mastered_skill_ids").isEmpty()).isTrue();
+        assertThat(priorAttempts.path("prior_question_stems").get(0).asText())
+                .isEqualTo("How do you inspect a slow SQL query?");
     }
 }

@@ -17,6 +17,8 @@ export interface InterviewStartConfig {
   interaction_mode: InteractionMode;
   session_purpose?: SessionPurpose;
   include_mastered_skills?: boolean;
+  include_behavioral_in_mixed?: boolean;
+  focus_skill_ids?: string[];
   focused_question_mode: QuestionMode | null;
   max_questions: number;
   duration_seconds: number;
@@ -66,6 +68,7 @@ export interface PendingTurn {
   clarifications?: TurnClarification[];
 }
 export interface EvidenceTurn {
+  practice_step?: 'RETRY' | 'TRANSFER' | null;
   turn_id: string; objective_id: string; mode: QuestionMode;
   question: string; answer: string | null; feedback: string | null;
   submitted_code?: string | null; transcript?: string | null;
@@ -99,10 +102,11 @@ export interface ObjectiveReport {
   target_depth?: number;
   importance_weight?: number;
   is_core?: boolean;
+  hinted?: boolean;
   stop_reason: string | null;
   strengths: string[]; weaknesses: string[]; study_recommendations?: string[];
   evidence: PublicEvidence[];
-  criteria?: { criterion_id: string; description: string; assessment: Assessment; essential?: boolean }[];
+  criteria?: { criterion_id: string; description: string; assessment: Assessment; essential?: boolean; hinted?: boolean; transfer_verified?: boolean }[];
 }
 export interface TurnReview {
   turn_id: string;
@@ -111,6 +115,7 @@ export interface TurnReview {
   gaps?: string[];
   next_step: string;
   reference_answer?: string;
+  level_up_tip?: string;
   delivery_notes?: string[];
 }
 export interface EvidenceReport {
@@ -121,6 +126,8 @@ export interface EvidenceReport {
   coaching?: SessionCoaching | null;
 }
 export interface EvidenceSession {
+  submission?: { status: 'QUEUED' | 'FAILED' | 'UNASSESSED'; turn_id: string; received_at: string; candidate_response: string; submitted_code?: string };
+  paused_remaining_seconds?: number | null;
   schema_version: 2; session_id: string; state_version: number; is_finished: boolean;
   deadline_at: string; config: InterviewConfig; pending_turn: PendingTurn | null;
   awaiting_question?: boolean;
@@ -143,6 +150,9 @@ export interface ConversationRequest {
 }
 export function conversationPhase(session: EvidenceSession | null) {
   return session?.conversation?.phase ?? (session?.is_finished ? 'FINISHED' : 'INTERVIEW');
+}
+export function isCodeTurn(turn?: PendingTurn | null): boolean {
+  return Boolean(turn && (turn.mode === 'CODING' || turn.requires_code || turn.coding_spec));
 }
 export function voiceTurn(session: EvidenceSession | null) {
   if (!session) return null;
@@ -203,7 +213,7 @@ export const evidenceInterview = {
     const data = await requestStart(id, config);
     if (!data || data.schema_version !== 2 || data.session_id !== id || !data.config || !data.report
       || !Array.isArray(data.turns) || typeof data.is_finished !== 'boolean'
-      || (!data.is_finished && !data.awaiting_question && !((data.conversation?.phase === 'OPENING' || data.conversation?.phase === 'SELF_INTRODUCTION')
+      || (!data.is_finished && !data.awaiting_question && !data.submission && !((data.conversation?.phase === 'OPENING' || data.conversation?.phase === 'SELF_INTRODUCTION')
           && data.conversation.message?.message_id && data.conversation.message.text?.trim())
         && (typeof data.pending_turn?.question !== 'string' || !data.pending_turn.question.trim()))) {
       throw new Error('Chưa nhận được phiên phỏng vấn hợp lệ. Vui lòng bấm bắt đầu để thử lại.');

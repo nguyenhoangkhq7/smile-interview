@@ -24,6 +24,7 @@ from adaptive_questioning.evidence.provider import (
     AlignmentReview,
     BlueprintSignature,
     QuestionAlignmentSignature,
+    compact_alignment_context,
     encode_context,
 )
 from .dataset import dialogue_examples, get_gold_judge_examples, get_gold_question_examples
@@ -50,7 +51,7 @@ JUDGE_FILE = "reflective_judge.json"
 ALIGNMENT_FILE = "alignment_reviewer.json"
 BLUEPRINT_FILE = "blueprint_drafter.json"
 CompileStrategy = Literal["labeled", "bootstrap", "random_search", "mipro"]
-MAX_REASONING_CHARS = 200
+MAX_REASONING_CHARS = 120
 
 
 def _fingerprint() -> str:
@@ -145,6 +146,7 @@ def _project_judge_examples(examples: list[dspy.Example]) -> list[dspy.Example]:
         judgment = Judgment.model_validate(example.judgment)
         assessment = EvidenceAssessment(
             observations=judgment.observations,
+            secondary_observations=judgment.secondary_observations,
             explicit_inability=judgment.explicit_inability,
             inability_excerpt=judgment.inability_excerpt,
             feedback=judgment.feedback,
@@ -179,9 +181,10 @@ def _clean_judge_demo(demo: dict) -> dict:
     cleaned = dict(demo)
     assessment = cleaned.get("assessment")
     if isinstance(assessment, dict):
-        for obs in assessment.get("observations", []):
-            if obs.get("response_line_range") is not None:
-                obs["response_excerpt"] = ""
+        for field_name in ("observations", "secondary_observations"):
+            for obs in assessment.get(field_name, []):
+                if obs.get("response_line_range") is not None:
+                    obs["response_excerpt"] = ""
     return cleaned
 
 
@@ -253,6 +256,79 @@ def _question_demo_bucket(ex: dspy.Example) -> tuple[str, str]:
     return str(contract.get("action", "INITIAL")), str(req.get("mode", ""))
 
 
+def _order_branch_demos(branch_name: str, branch_examples: list[dspy.Example]) -> list[dspy.Example]:
+    diverse = _stratify_examples(branch_examples, _question_demo_bucket)
+    if branch_name == "followup":
+        priorities = [("PROBE_DEEPER", "CODING"), ("FOLLOW_UP", None), ("VERIFY_CONTRADICTION", None)]
+    elif branch_name == "diagnostic":
+        priorities = [("ASK_EASIER", None), ("CLARIFY", "CODING"), ("CLARIFY", "BEHAVIORAL")]
+    else:
+        return diverse
+    chosen: list[dspy.Example] = []
+    remaining = list(diverse)
+    for target_action, target_mode in priorities:
+        match = next(
+            (
+                ex for ex in remaining
+                if _question_demo_bucket(ex)[0] == target_action
+                and (target_mode is None or _question_demo_bucket(ex)[1] == target_mode)
+            ),
+            None,
+        )
+        if match is not None:
+            chosen.append(match)
+            remaining.remove(match)
+    return chosen + remaining
+
+
+def _project_alignment_examples(examples: list[dspy.Example]) -> list[dspy.Example]:
+    """Normalize alignment demo contexts (single depth_definition, no empty lists) and strip non-signature keys."""
+    return [
+        dspy.Example(
+            context=compact_alignment_context(ex.context),
+            review=ex.review,
+        ).with_inputs("context")
+        for ex in examples
+    ]
+
+
+def _project_blueprint_examples(examples: list[dspy.Example]) -> list[dspy.Example]:
+    """Keep only BlueprintSignature fields (context, blueprint) in compiled demos."""
+    return [
+        dspy.Example(
+            context=ex.context,
+            blueprint=ex.blueprint,
+        ).with_inputs("context")
+        for ex in examples
+    ]
+
+
+def _ordered_alignment_demos(examples: list[dspy.Example]) -> list[dspy.Example]:
+    """Balance ALIGNED diagnostics (ASK_EASIER/CLARIFY) with hard defect rejections."""
+    strat = _stratify_examples(examples, lambda ex: ex.verdict)
+    priorities = [
+        ("ALIGNED", "ASK_EASIER"),
+        ("ALIGNED", "CLARIFY"),
+        ("WRONG_SKILL", None),
+        ("GIVES_SOLUTION", None),
+    ]
+    chosen: list[dspy.Example] = []
+    remaining = list(strat)
+    for verdict, action in priorities:
+        match = next(
+            (
+                ex for ex in remaining
+                if ex.verdict == verdict
+                and (action is None or json.loads(ex.context).get("action") == action)
+            ),
+            None,
+        )
+        if match is not None:
+            chosen.append(match)
+            remaining.remove(match)
+    return chosen + remaining
+
+
 def compile_with_labeled_few_shot(
     k_question: int = 3,
     k_judge: int = 3,
@@ -283,9 +359,9 @@ def compile_with_labeled_few_shot(
     grouped_q = _project_question_examples(train_q, question_mod)
     for branch_name, branch_examples in grouped_q.items():
         if branch_examples and k_question > 0:
-            diverse = _stratify_examples(branch_examples, _question_demo_bucket)
+            diverse = _order_branch_demos(branch_name, branch_examples)
             compiled = dspy.LabeledFewShot(k=min(k_question, len(diverse))).compile(
-                getattr(question_mod, branch_name), trainset=diverse,
+                getattr(question_mod, branch_name), trainset=diverse, sample=False,
             )
             setattr(question_mod, branch_name, compiled)
 
@@ -293,7 +369,7 @@ def compile_with_labeled_few_shot(
     if stage1_j and k_judge > 0:
         diverse_j = _stratify_examples(stage1_j, lambda ex: _stage1_bucket(ex.toDict()))
         judge_mod.assess = dspy.LabeledFewShot(k=min(k_judge, len(diverse_j))).compile(
-            judge_mod.assess, trainset=diverse_j,
+            judge_mod.assess, trainset=diverse_j, sample=False,
         )
     return question_mod, judge_mod
 
@@ -363,7 +439,7 @@ def _compile_aux_bootstrap(
     metric_threshold: float = 0.8,
 ) -> tuple[dspy.Predict, dspy.Predict]:
     align_mod, bp_mod = _new_aux_modules()
-    stratified_align = _stratify_examples(get_alignment_examples("train"), lambda ex: ex.verdict)
+    stratified_align = _project_alignment_examples(_stratify_examples(get_alignment_examples("train"), lambda ex: ex.verdict))
     align_k = min(4, max(3, max_bootstrapped_demos))
     with dspy.context(lm=lm, adapter=dspy.JSONAdapter()):
         compiled_a = dspy.BootstrapFewShot(
@@ -463,23 +539,23 @@ def compile_all_modules(
             k_question=3, k_judge=3, use_extended=use_extended,
         )
         align_mod, bp_mod = _new_aux_modules()
-        strat_align = _stratify_examples(get_alignment_examples("train"), lambda ex: ex.verdict)
+        strat_align = _project_alignment_examples(_ordered_alignment_demos(get_alignment_examples("train")))
         compiled_a = dspy.LabeledFewShot(k=min(4, len(strat_align))).compile(
-            align_mod, trainset=strat_align,
+            align_mod, trainset=strat_align, sample=False,
         )
         strat_bp = _stratify_examples(
             get_blueprint_examples("train"),
             lambda ex: (bool(ex.allow_extension_probes), any(not s.get("job_tasks") for s in ex.skills)),
         )
         # Put extension-enabled example and inferred fallback example in the compact 2-demo set.
-        ordered_bp = sorted(
+        ordered_bp = _project_blueprint_examples(sorted(
             strat_bp,
             key=lambda ex: (
                 0 if ex.allow_extension_probes else (1 if any(not s.get("job_tasks") for s in ex.skills) else 2)
             ),
-        )
+        ))
         compiled_b = dspy.LabeledFewShot(k=min(2, len(ordered_bp))).compile(
-            bp_mod, trainset=ordered_bp,
+            bp_mod, trainset=ordered_bp, sample=False,
         )
         return compiled_q, compiled_j, compiled_a, compiled_b
 
@@ -503,7 +579,7 @@ def compile_all_modules(
         train_j = get_extended_judge_examples("train", include_base=True) if use_extended else get_gold_judge_examples("train")
         strat_q = _stratify_examples(train_q, lambda ex: (json.loads(ex.context).get("action", "INITIAL"), json.loads(ex.context).get("interaction_mode", "TEXT")))
         strat_j = _stratify_examples(train_j, lambda ex: (ex.judgment.observations[0].observation, ex.judgment.observations[0].response_line_range is not None))
-        strat_a = _stratify_examples(get_alignment_examples("train"), lambda ex: ex.verdict)
+        strat_a = _project_alignment_examples(_stratify_examples(get_alignment_examples("train"), lambda ex: ex.verdict))
         q_mod, j_mod = _new_modules()
         a_mod, b_mod = _new_aux_modules()
         compiled_q = _compile_random_search(
@@ -550,7 +626,8 @@ def compile_all_modules(
     )
     compiled_a = _compile_mipro(
         a_mod, alignment_evaluation_metric,
-        get_alignment_examples("train"), get_alignment_examples("dev"), lm, prompt_lm=teacher,
+        _project_alignment_examples(get_alignment_examples("train")),
+        _project_alignment_examples(get_alignment_examples("dev")), lm, prompt_lm=teacher,
         adapter=dspy.JSONAdapter(), max_bootstrapped_demos=3, max_labeled_demos=3,
     )
     compiled_b = _compile_mipro(

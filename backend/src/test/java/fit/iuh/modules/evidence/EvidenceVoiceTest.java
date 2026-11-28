@@ -222,4 +222,21 @@ class EvidenceVoiceTest {
         assertThat(length).isBetween(115L, 120L);
         assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
     }
+
+    @Test void simliDurationIncludesBoundedAiLatencyBufferForRemainingQuestions() {
+        var state = json.read("""
+            {"state_version":2,"config":{"interaction_mode":"VOICE","max_questions":10},"is_finished":false,
+             "turns":[{"turn_id":"t0"}],"pending_turn":{"turn_id":"t1"}}
+            """);
+        ((com.fasterxml.jackson.databind.node.ObjectNode) state).put("deadline_at", Instant.now().plusSeconds(120).toString());
+        when(interviews.read("s", user)).thenReturn(state);
+        when(voice.avatarSession(any())).thenReturn("{\"session_token\":\"buffered\"}");
+        var response = new MockHttpServletResponse();
+        controller.avatarSession("s", user, new EvidenceVoiceController.Turn("t1", 2), response);
+        var payload = ArgumentCaptor.forClass(Object.class);
+        verify(voice).avatarSession(payload.capture());
+        var length = ((Number) ((Map<?, ?>) payload.getValue()).get("max_session_length")).longValue();
+        // 120s deadline + 9 remaining questions * 18s = 282s
+        assertThat(length).isBetween(275L, 285L);
+    }
 }

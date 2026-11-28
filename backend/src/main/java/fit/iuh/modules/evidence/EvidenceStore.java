@@ -12,6 +12,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDateTime;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -36,6 +38,107 @@ public class EvidenceStore {
     }
 
     @Transactional
+    public JsonNode acceptAnswer(String id, EvidenceDtos.Answer answer, Instant receivedAt) {
+        sessions.lockById(id).orElseThrow(() -> conflict("Session removed"));
+        var run = runs.findById(id).orElseThrow(() -> conflict("Interview not started"));
+        String hash = json.hash(answer);
+        var cached = replay(id, answer.requestId(), hash);
+        if (cached != null) return cached.hasNonNull("submission") ? json.read(run.getPublicJson()) : cached;
+        if (run.getStateVersion() != answer.expectedVersion() || run.getGradingDueAt() != null)
+            throw conflict("Trạng thái phiên đã thay đổi. Hãy tải lại phiên.");
+        ObjectNode visible = (ObjectNode) json.read(run.getPublicJson());
+        ObjectNode snapshot = (ObjectNode) json.read(run.getSnapshotJson());
+        JsonNode turn = snapshot.path("pending_turn");
+        if (visible.path("is_finished").asBoolean() || !answer.turnId().equals(turn.path("turn_id").asText()))
+            throw conflict("Câu hỏi này đã kết thúc.");
+        JsonNode previous = visible.path("submission");
+        if ("FAILED".equals(previous.path("status").asText())) {
+            if (!answer.response().equals(previous.path("candidate_response").asText())
+                    || !java.util.Objects.equals(answer.code(), previous.path("submitted_code").asText(null)))
+                throw conflict("Chỉ có thể chấm lại bài đã nộp.");
+            receivedAt = Instant.parse(previous.path("received_at").asText());
+        }
+        Instant deadline = Instant.parse(snapshot.path("deadline_at").asText());
+        if (!receivedAt.isBefore(deadline)) throw conflict("Đã hết thời gian nộp bài.");
+        validateAnswer(snapshot, turn, answer);
+        long version = run.getStateVersion() + 1;
+        ObjectNode submission = visible.putObject("submission");
+        submission.put("turn_id", answer.turnId()).put("candidate_response", answer.response())
+                .put("received_at", receivedAt.toString()).put("status", "QUEUED");
+        if (answer.code() != null) submission.put("submitted_code", answer.code());
+        visible.putNull("pending_turn").put("state_version", version);
+        visible.put("paused_remaining_seconds", Duration.between(receivedAt, deadline).toNanos() / 1e9);
+        snapshot.put("state_version", version).set("paused_remaining_seconds", visible.path("paused_remaining_seconds"));
+        run.setStateVersion(version);
+        run.setSnapshotJson(snapshot.toString());
+        run.setPublicJson(visible.toString());
+        run.setGradingDueAt(Instant.now());
+        run.setGradingAttempt(0);
+        runs.save(run);
+        saveReceipt(new Commit(id, answer.expectedVersion(), answer.requestId(), hash, null, null), run.getPublicJson());
+        return json.read(run.getPublicJson());
+    }
+
+    private void validateAnswer(JsonNode snapshot, JsonNode turn, EvidenceDtos.Answer answer) {
+        var question = turn.path("question");
+        boolean requiresCode = question.path("requires_code").asBoolean();
+        boolean acceptsCode = requiresCode || question.hasNonNull("coding_spec") || "CODING".equals(turn.path("mode").asText());
+        if (answer.code() != null && (!acceptsCode || answer.code().isBlank()))
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Lượt này không nhận mã hoặc mã đang trống.");
+        if (requiresCode && "VOICE".equals(snapshot.path("config").path("interaction_mode").asText())
+                && answer.code() == null && !isInability(answer.response()))
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Hãy nộp mã hoặc chọn Chưa làm được.");
+    }
+
+    private static boolean isInability(String response) {
+        String normalized = java.text.Normalizer.normalize(response, java.text.Normalizer.Form.NFC)
+                .strip().toLowerCase(java.util.Locale.ROOT).replaceAll("\\s+", " ");
+        return normalized.matches("(?:dạ[, ]+)?(?:(?:tôi|em|mình) )?(?:(?:không|chưa) (?:biết|làm được|trả lời được|nhớ)"
+                + "(?: câu trả lời| trả lời| cách làm| câu này)?|bỏ qua(?: câu này| câu hỏi này)?|skip(?: this question)?)(?: ạ)?[.!…]*");
+    }
+
+    public record GradingJob(String sessionId, long version, int attempt, JsonNode payload, JsonNode config) {}
+
+    @Transactional
+    public GradingJob claimAnswer(Duration lease) {
+        return runs.lockNextSubmission().map(run -> {
+            JsonNode submission = json.read(run.getPublicJson()).path("submission");
+            ObjectNode payload = (ObjectNode) submission.deepCopy();
+            payload.remove("status");
+            payload.set("snapshot", json.read(run.getSnapshotJson()));
+            payload.put("expected_state_version", run.getStateVersion()).put("defer_question", true);
+            run.setGradingAttempt(run.getGradingAttempt() + 1);
+            run.setGradingDueAt(Instant.now().plus(lease));
+            return new GradingJob(run.getSessionId(), run.getStateVersion(), run.getGradingAttempt(),
+                    payload, json.read(run.getConfigJson()));
+        }).orElse(null);
+    }
+
+    @Transactional
+    public void gradingFailed(GradingJob job) {
+        if (sessions.lockById(job.sessionId()).isEmpty()) return;
+        var run = runs.lockRun(job.sessionId()).orElse(null);
+        if (run == null || run.getStateVersion() != job.version() || run.getGradingAttempt() != job.attempt()) return;
+        if (job.attempt() < 3) {
+            run.setGradingDueAt(Instant.now().plusSeconds(job.attempt() * 5L));
+            return;
+        }
+        ObjectNode visible = (ObjectNode) json.read(run.getPublicJson());
+        ((ObjectNode) visible.path("submission")).put("status", "FAILED");
+        run.setPublicJson(visible.toString());
+        run.setGradingDueAt(null);
+    }
+
+    @Transactional
+    public void completeGrading(GradingJob job, JsonNode result) {
+        if (sessions.lockById(job.sessionId()).isEmpty()) return;
+        var run = runs.lockRun(job.sessionId()).orElse(null);
+        if (run == null || run.getStateVersion() != job.version() || run.getGradingAttempt() != job.attempt()
+                || run.getGradingDueAt() == null) return;
+        commit(new Commit(job.sessionId(), job.version(), null, null, job.config(), result));
+    }
+
+    @Transactional
     public JsonNode commit(Commit input) {
         Session session = sessions.lockById(input.sessionId()).orElseThrow(() -> conflict("Session removed"));
         if (input.requestId() != null) {
@@ -56,8 +159,12 @@ public class EvidenceStore {
         var profile = session.getApplicationProfile();
         if (profile != null && profile.getBlueprintJson() == null) {
             var objectives = json.read("[]").deepCopy();
-            input.result().path("snapshot").path("objectives").elements().forEachRemaining(state ->
-                    ((com.fasterxml.jackson.databind.node.ArrayNode) objectives).add(state.path("objective")));
+            input.result().path("snapshot").path("objectives").elements().forEachRemaining(state -> {
+                var objective = state.path("objective");
+                if (!"behavioral_competency".equals(objective.path("skill_id").asText())) {
+                    ((com.fasterxml.jackson.databind.node.ArrayNode) objectives).add(objective);
+                }
+            });
             if (objectives.isEmpty()) throw conflict("Interview blueprint is missing");
             profile.setBlueprintJson(json.tree(java.util.Map.of("objectives", objectives)).toString());
         }
@@ -85,6 +192,11 @@ public class EvidenceStore {
         }
         if (!normalized.hasNonNull("session_purpose")) normalized.put("session_purpose", "ASSESSMENT");
         if (!normalized.hasNonNull("include_mastered_skills")) normalized.put("include_mastered_skills", false);
+        if (!normalized.hasNonNull("include_behavioral_in_mixed")) normalized.put("include_behavioral_in_mixed", false);
+        JsonNode focusSkills = normalized.get("focus_skill_ids");
+        if (focusSkills == null || focusSkills.isNull() || (focusSkills.isArray() && focusSkills.isEmpty())) {
+            normalized.remove("focus_skill_ids");
+        }
         if (normalized.get("recheck") instanceof ObjectNode ref) {
             for (String key : java.util.List.of("taskId", "checklistItemId")) {
                 if (ref.path(key).isIntegralNumber() && ref.path(key).canConvertToLong()) ref.put(key, ref.path(key).longValue());
@@ -128,11 +240,21 @@ public class EvidenceStore {
 
     private InterviewRun updateRun(InterviewRun run, Commit input) {
         if (run == null) run = new InterviewRun();
+        if (run.getPublicJson() != null && input.result().path("public").path("is_finished").asBoolean()) {
+            var submission = json.read(run.getPublicJson()).path("submission");
+            if ("FAILED".equals(submission.path("status").asText()) || "UNASSESSED".equals(submission.path("status").asText())) {
+                ObjectNode ungraded = submission.deepCopy();
+                ungraded.put("status", "UNASSESSED");
+                ((ObjectNode) input.result().path("public")).set("submission", ungraded);
+            }
+        }
         run.setSessionId(input.sessionId());
         run.setStateVersion(input.expectedVersion() + 1);
         run.setConfigJson(input.config().toString());
         run.setSnapshotJson(input.result().path("snapshot").toString());
         run.setPublicJson(input.result().path("public").toString());
+        run.setGradingDueAt(null);
+        run.setGradingAttempt(0);
         return run;
     }
 
@@ -150,7 +272,7 @@ public class EvidenceStore {
         boolean finished = visible.path("is_finished").asBoolean();
         String reason = visible.path("report").path("termination_reason").asText();
         session.setStatus(!finished ? "In progress" : "USER_STOP".equals(reason)
-                ? (visible.path("turns").isEmpty() ? "Cancelled" : "Stopped early") : "Completed");
+                ? (visible.path("turns").isEmpty() && !visible.hasNonNull("submission") ? "Cancelled" : "Stopped early") : "Completed");
         session.setEndedAt(finished ? LocalDateTime.now() : null);
         Map<String, String> skillByObjective = new HashMap<>();
         for (JsonNode objective : visible.path("report").path("objectives")) {

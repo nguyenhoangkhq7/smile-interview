@@ -10,6 +10,7 @@ const errors = [];
 const clarifyCalls = [];
 const runCodeCalls = [];
 const respondCalls = [];
+const timelineAttempts = [1, 4, 6, 7, 10, 11, 14, 15, 16, 17, 18, 20, 25, 26, 29, 30, 31, 33];
 let session = null;
 
 const codingSpec = {
@@ -226,33 +227,18 @@ try {
     if (path.endsWith('/interview')) return send(session || {}, session ? 200 : 404);
     if (path.endsWith(`/application-profiles/${profileId}/competency`)) {
       return send({
-        completedAttempts: 2,
+        completedAttempts: timelineAttempts.length,
         practiceAttempts: 1,
         incompatibleAssessments: 0,
-        timeline: [
-          {
-            sessionId: 'att-1',
-            attemptNumber: 1,
-            assessedAt: '2026-11-20T09:00:00',
-            kind: 'ASSESSMENT',
-            weightedReadinessPercent: 35,
-            coreObjectivesMet: 0,
-            coreObjectivesTotal: 2,
-            essentialCriteriaMet: 2,
-            essentialCriteriaTotal: 6,
-          },
-          {
-            sessionId: 'att-2',
-            attemptNumber: 2,
-            assessedAt: '2026-11-27T09:00:00',
-            kind: 'RECHECK',
-            weightedReadinessPercent: 75,
-            coreObjectivesMet: 2,
-            coreObjectivesTotal: 2,
-            essentialCriteriaMet: 5,
-            essentialCriteriaTotal: 6,
-          },
-        ],
+        timeline: timelineAttempts.map(attemptNumber => ({
+          sessionId: `att-${attemptNumber}`,
+          attemptNumber,
+          assessedAt: null,
+          kind: attemptNumber === 30 ? 'RECHECK' : 'ASSESSMENT',
+          weightedReadinessPercent: attemptNumber === 33 ? 75 : 35,
+          essentialCriteriaMet: attemptNumber === 33 ? 5 : 2,
+          essentialCriteriaTotal: 6,
+        })),
         skills: [{
           skillId: 'python',
           baselineAlignment: 'MATCH',
@@ -346,7 +332,29 @@ try {
   await waitText('Tiến bộ mức độ sẵn sàng (có trọng số Core)');
   await waitText('+40% so với lượt đầu');
   await waitText('1 lượt luyện tập');
-  assert.ok(await page.$('svg[aria-label="Biểu đồ tiến bộ sẵn sàng qua từng lượt"]'));
+  const chartSelector = 'svg[aria-label="Biểu đồ tiến bộ sẵn sàng qua từng lượt"]';
+  await page.evaluate(() => document.fonts.ready);
+  for (const width of [1365, 390]) {
+    await page.setViewport({ width, height: 1000 });
+    await page.waitForFunction((selector) => {
+      const chart = document.querySelector(selector);
+      return chart && Math.abs(chart.viewBox.baseVal.width - chart.clientWidth) < 1;
+    }, {}, chartSelector);
+    const chart = await page.$eval(chartSelector, (svg) => ({
+      points: svg.querySelectorAll('circle').length,
+      links: svg.closest('section').querySelectorAll('a').length,
+      labels: [...svg.querySelectorAll('text[text-anchor="middle"]')].map(label => {
+        const { left, right } = label.getBoundingClientRect();
+        return { text: label.textContent, left, right };
+      }),
+    }));
+    assert.equal(chart.points, timelineAttempts.length);
+    assert.equal(chart.links, timelineAttempts.length);
+    assert.equal(chart.labels[0].text, 'Lượt 1');
+    assert.equal(chart.labels.at(-1).text, 'Lượt 33');
+    assert.ok(chart.labels.every((label, index, labels) => !index || label.left > labels[index - 1].right),
+      `Timeline labels overlap at ${width}px`);
+  }
 
   assert.deepEqual(errors, []);
   console.log('PASS: Practice mode, clarify/hint, CodeMirror 6 /run-code, weighted readiness, L1-L4/Core badges, reference answer, delivery notes, and progress timeline.');

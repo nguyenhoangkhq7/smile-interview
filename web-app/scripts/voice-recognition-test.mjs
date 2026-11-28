@@ -15,7 +15,7 @@ const source = (await fs.readFile(new URL('../src/hooks/useEvidenceVoice.ts', im
 globalThis.__recognizer = {};
 const { VoiceConversation } = await import(asModule(`
 import { encodeWav, VoiceDetector } from '${audioModule}';
-import { conversationPhase, voiceTurn } from '${lifecycleModule}';
+import { conversationPhase, isCodeTurn, voiceTurn } from '${lifecycleModule}';
 const interviewVoice = globalThis.__recognizer;
 const interviewError = error => error.message;
 ${source}
@@ -85,6 +85,14 @@ const harness = handler => {
   h.engine.stop();
 }
 {
+  const h = harness(({ phase }) => accepted(phase));
+  h.options.session = { pending_turn: { mode: 'CODING', requires_code: false } };
+  h.engine.setAuto(true);
+  h.feed(0.5); h.feed(1.2, 0); await settled();
+  assert.equal(h.state.countdown, false, 'A CODING turn without requires_code still suppresses auto-submit while coding');
+  h.engine.stop();
+}
+{
   let release;
   const h = harness(() => new Promise(resolve => { release = resolve; }));
   h.feed(4.5); await settled();
@@ -124,6 +132,25 @@ const harness = handler => {
   assert.equal(previewSignal?.aborted, true, 'Stopping speech aborts in-flight preview immediately');
   assert.equal(h.options.answer, 'Câu trả lời cuối cùng nhanh.');
   assert.equal(h.engine.canSubmit(), true);
+  h.engine.stop();
+}
+{
+  const h = harness(({ phase }) => accepted(phase, 'Em dùng B-Tree index.'));
+  h.options.session = { session_id: 's', state_version: 1, pending_turn: { turn_id: 't', mode: 'TECHNICAL_EXPLANATION' } };
+  h.engine.player = { stop() {}, close() {} };
+  h.engine.ready = true;
+  h.engine.announcedTurn = 't';
+  h.feed(0.5); h.feed(1.2, 0); await settled();
+  assert.equal(h.options.answer, 'Em dùng B-Tree index.');
+  // Clarify/Hint bumps state_version on the same turn_id -> spoken draft must stay intact.
+  h.options.session = { session_id: 's', state_version: 2, pending_turn: { turn_id: 't', mode: 'TECHNICAL_EXPLANATION' } };
+  h.engine.sync();
+  assert.equal(h.options.answer, 'Em dùng B-Tree index.', 'Clarify version bump on same turn must not wipe spoken draft');
+  assert.equal(h.engine.turn.expected_state_version, 2);
+  // Explicit clearDraft resets the spoken answer cleanly.
+  h.engine.clearDraft();
+  assert.equal(h.options.answer, '');
+  assert.equal(h.state.captions, '');
   h.engine.stop();
 }
 console.log('PASS: provisional/final isolation, contextual audio, review gate, pause flush, retry, cancellation and long speech.');

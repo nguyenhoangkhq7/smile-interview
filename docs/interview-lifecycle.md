@@ -24,7 +24,9 @@ Speech/avatar cho phần hội thoại kiểm tra chủ phiên, VOICE, message I
 
 - `conversation` lưu trong snapshot, public state và dynamic state; không cần migration database.
 - `POST /api/v2/sessions/{id}/interview/conversation` nhận `request_id`, `message_id`, `expected_state_version`, `action`, `introduction`. Các action là `NEXT`, `SUBMIT_INTRODUCTION`, `SKIP_INTRODUCTION`.
-- Backend lưu phần giới thiệu hoặc câu trả lời đã chấm trước khi yêu cầu AI sinh câu chuyên môn tiếp theo. Khi `awaiting_question=true`, client gọi `POST /api/v2/sessions/{id}/interview/next-question` với `request_id` và `expected_state_version`. Nếu bước sinh câu thất bại, client có thể tải lại phiên và thử riêng bước này. Receipt và kiểm tra phiên bản ngăn ghi trùng khi retry.
+- Khi nhận `POST /respond`, backend lưu nguyên bài nộp và thời điểm nhận trong PostgreSQL. Phản hồi có `submission.status=QUEUED`. Client đọc lại phiên qua `GET` để nhận kết quả. Worker tiếp tục chấm khi người dùng đóng trang và nhận lại công việc nếu tiến trình cũ ngừng giữa chừng. Sau ba lần chấm lỗi, giao diện cho phép chấm lại đúng bài đã lưu hoặc kết thúc với bài chưa chấm.
+- Khi `awaiting_question=true`, client gọi `POST /api/v2/sessions/{id}/interview/next-question`. Thời gian làm bài còn lại được lưu tại `paused_remaining_seconds` từ lúc nộp đến khi câu tiếp theo sẵn sàng. Có thể tải lại trang hoặc thử riêng bước sinh câu. Migration V19 bổ sung thời điểm xử lý và số lần thử cho hàng đợi chấm.
+- Trong phiên luyện tập, nếu còn lượt, ứng viên có thể gặp lại bài vừa làm sau góp ý rồi thử một tình huống khác cùng tiêu chí và độ khó. Bài làm lại sau hướng dẫn được ghi riêng với lần thể hiện độc lập.
 - Snapshot cũ không có `conversation` giữ nguyên luồng đang chạy. API tính toán nội bộ `/start` không có `opening` tiếp tục hỗ trợ contract cũ; backend public luôn gửi `opening` cho phiên mới.
 - Reload không tự mở micro. Reload tại SELF_INTRODUCTION tiếp tục phần tự giới thiệu, không đọc lại lời mở đầu.
 

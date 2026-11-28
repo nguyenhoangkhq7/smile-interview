@@ -65,6 +65,8 @@ class InterviewConfig(BaseModel):
     interaction_mode: Literal["TEXT", "VOICE"] = "TEXT"
     session_purpose: Literal["ASSESSMENT", "PRACTICE"] = "ASSESSMENT"
     include_mastered_skills: bool = False
+    include_behavioral_in_mixed: bool = False
+    focus_skill_ids: list[str] = Field(default_factory=list, max_length=30)
     mode: Literal["MIXED", "FOCUSED"] = "MIXED"
     focused_question_mode: Mode | None = None
     recheck: ChecklistRef | None = None
@@ -201,6 +203,8 @@ class SessionCoaching(BaseModel):
     actionable_study_steps: list[str] = Field(default_factory=list, max_length=6)
     introduction_feedback: str = Field(default="", max_length=600)
     turn_reference_answers: dict[str, str] = Field(default_factory=dict)
+    turn_level_up_tips: dict[str, str] = Field(default_factory=dict)
+    turn_delivery_notes: dict[str, list[str]] = Field(default_factory=dict)
 
 
 class PriorAttemptContext(BaseModel):
@@ -216,10 +220,12 @@ class RecordedEvidence(_EvidenceBase):
     evidence_scope: str = ""
     independent: bool = True
     explicit_inability: bool = False
+    is_extension: bool = False
 
 
 class Judgment(BaseModel):
     observations: list[Observation]
+    secondary_observations: list[Observation] = Field(default_factory=list)
     feedback: str
     explicit_inability: bool = False
     inability_excerpt: str = ""
@@ -243,6 +249,7 @@ class Question(StoredQuestion):
 
 
 class CriterionProgress(BaseModel):
+    transfer_verified: bool = False
     turns_spent: int = 0
     clarification_spent: bool = False
     easier_spent: bool = False
@@ -264,10 +271,12 @@ class ObjectiveState(BaseModel):
     turns_spent: int = 0
     evidence_history: list[RecordedEvidence] = Field(default_factory=list)
     assisted_criteria: list[str] = Field(default_factory=list)
+    hinted_criteria: list[str] = Field(default_factory=list)
     criterion_results: dict[str, RecordedEvidence] = Field(default_factory=dict)
     contradictions: list[str] = Field(default_factory=list)
     criterion_progress: dict[str, CriterionProgress] = Field(default_factory=dict)
     active_criterion_id: str | None = None
+    practice_step: Literal["RETRY", "TRANSFER"] | None = None
     probe_reason: str = "Initial evidence for an essential criterion"
 
 
@@ -309,6 +318,7 @@ class CodingCheckResult(BaseModel):
     language: str = ""
     compile_error: str = ""
     sample_results: list[CodingCaseResult] = Field(default_factory=list)
+    hidden_failed_summaries: list[str] = Field(default_factory=list)
 
 
 class TurnClarification(BaseModel):
@@ -334,6 +344,7 @@ class Turn(BaseModel):
     coding_checks: CodingCheckResult | None = None
     judgment: Judgment | None = None
     introduction: str = ""
+    practice_step: Literal["RETRY", "TRANSFER"] | None = None
 
 
 class Snapshot(BaseModel):
@@ -348,6 +359,7 @@ class Snapshot(BaseModel):
     objectives: dict[str, ObjectiveState]
     queue: list[str]
     deadline_at: datetime
+    paused_remaining_seconds: float | None = Field(default=None, ge=0)
     verification: InterviewVerification | None = None
     pending_turn: Turn | None = None
     next_question_action: Action | None = None
@@ -470,6 +482,7 @@ class TransitionRequest(BaseModel):
     candidate_response: str = Field(max_length=50000)
     submitted_code: str | None = Field(default=None, max_length=50000)
     defer_question: bool = False
+    received_at: datetime | None = None
 
     @model_validator(mode="after")
     def require_answer(self):
@@ -515,14 +528,17 @@ class TurnReview(BaseModel):
     gaps: list[str] = Field(default_factory=list)
     next_step: str
     reference_answer: str = ""
+    level_up_tip: str = ""
     delivery_notes: list[str] = Field(default_factory=list)
 
 
 class CriterionReport(BaseModel):
+    transfer_verified: bool = False
     essential: bool = True
     criterion_id: str
     description: str
     assessment: Assessment
+    hinted: bool = False
 
 
 class ObjectiveReport(BaseModel):
@@ -533,6 +549,7 @@ class ObjectiveReport(BaseModel):
     target_depth: int = Field(default=2, ge=1, le=4)
     importance_weight: float = Field(default=0.5, ge=0.0, le=1.0)
     is_core: bool = False
+    hinted: bool = False
     assessment: Assessment
     stop_reason: str | None
     strengths: list[str]
@@ -562,6 +579,7 @@ class PendingTurn(BaseModel):
 
 
 class PublicTurn(BaseModel):
+    practice_step: Literal["RETRY", "TRANSFER"] | None = None
     submitted_code: str | None = None
     transcript: str | None = None
     coding_checks: CodingCheckResult | None = None
@@ -580,6 +598,7 @@ class PublicSession(BaseModel):
     state_version: int
     is_finished: bool
     deadline_at: datetime
+    paused_remaining_seconds: float | None = None
     config: InterviewConfig
     pending_turn: PendingTurn | None
     awaiting_question: bool = False

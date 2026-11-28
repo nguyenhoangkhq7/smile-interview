@@ -99,7 +99,7 @@ def test_exhausted_judge_returns_503_and_same_answer_can_be_retried(setup, monke
         assert len(retried.json()["snapshot"]["turns"]) == 1
 
 
-def test_judgment_retry_stops_at_deadline_without_mutating_input(setup, monkeypatch):
+def test_judgment_of_accepted_answer_can_retry_after_deadline_without_mutating_input(setup, monkeypatch):
     provider, engine, now = setup
     initial = start(engine).snapshot
     saved = initial.model_dump_json()
@@ -116,7 +116,8 @@ def test_judgment_retry_stops_at_deadline_without_mutating_input(setup, monkeypa
     monkeypatch.setattr(provider, "judge", invalid)
     with pytest.raises(JudgmentUnavailableError):
         answer(engine, initial)
-    assert len(calls) == 1
+    from adaptive_questioning.evidence.workflow import JUDGMENT_ATTEMPTS
+    assert len(calls) == JUDGMENT_ATTEMPTS
     assert initial.model_dump_json() == saved
 
 

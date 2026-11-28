@@ -1,3 +1,6 @@
+import type { EvidenceSession } from '@/services/evidenceInterview';
+import type { ResultData } from '@/components/features/interview/result/resultData';
+
 export interface QuestionBankItem {
   id?: string;
   code?: string;
@@ -166,6 +169,80 @@ export function exportQuestionBankToCSV(questionBank: ExportableQuestionItem[], 
   document.body.appendChild(link);
   link.click();
 
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+export function exportEvidenceSessionMarkdown(
+  session: EvidenceSession,
+  data: ResultData,
+  title: string,
+): void {
+  const lines: string[] = [
+    `# Tài liệu ôn tập phỏng vấn — ${title}`,
+    '',
+    `- **Tín hiệu dự kiến:** ${data.hiringSignal.label} — ${data.hiringSignal.description}`,
+    `- **Số câu đã trả lời:** ${session.turns.length} · **Kỹ năng:** ${data.skills.length}`,
+  ];
+  if (data.weightedReadiness.provisionalPercent !== null) {
+    lines.push(`- **Mức độ sẵn sàng (bảo thủ / có trọng số Core):** ${data.weightedReadiness.provisionalPercent}%`);
+  }
+  if (data.modeBreakdown.length > 0) {
+    lines.push(
+      `- **Theo dạng câu hỏi:** ${data.modeBreakdown.map(m => `${m.label} (${m.strong}/${m.total} đạt)`).join(' · ')}`,
+    );
+  }
+  lines.push('');
+
+  if (data.coaching?.overall_summary) {
+    lines.push('## Nhận xét tổng hợp', '', data.coaching.overall_summary, '');
+    if (data.coaching.introduction_feedback) {
+      lines.push(`> **Tự giới thiệu:** ${data.coaching.introduction_feedback}`, '');
+    }
+  }
+
+  const strengths = [...new Set([...data.strengths, ...(data.coaching?.top_strengths ?? [])])];
+  if (strengths.length) {
+    lines.push('## Điểm làm tốt', '', ...strengths.map(s => `- ${s}`), '');
+  }
+  const gaps = [...new Set([...data.weaknesses, ...(data.coaching?.priority_gaps ?? [])])];
+  if (gaps.length) {
+    lines.push('## Cần cải thiện', '', ...gaps.map(g => `- ${g}`), '');
+  }
+  const steps = [...new Set([...data.recommendations, ...(data.coaching?.actionable_study_steps ?? [])])];
+  if (steps.length) {
+    lines.push('## Hành động ôn tập tiếp theo', '', ...steps.map(s => `- ${s}`), '');
+  }
+
+  lines.push('## Chi tiết từng câu hỏi & Đáp án tham khảo', '');
+  for (const item of data.questions) {
+    lines.push(`### Câu ${item.index + 1} · ${item.badge.label}`);
+    lines.push('', `**Câu hỏi (${item.turn.mode}):**`, '', item.turn.question, '');
+    lines.push('**Câu trả lời của bạn:**', '');
+    if (item.turn.submitted_code) {
+      lines.push('```', item.turn.submitted_code.trimEnd(), '```', '');
+      if (item.turn.transcript?.trim()) lines.push(`*Giải thích:* ${item.turn.transcript.trim()}`, '');
+    } else {
+      lines.push(item.turn.answer || '(Chưa có câu trả lời)', '');
+    }
+    for (const review of item.reviews) {
+      lines.push(`- **Đánh giá:** ${review.reason}`);
+      if (review.gaps?.length) lines.push(`- **Phần còn thiếu:** ${review.gaps.join('; ')}`);
+      if (review.delivery_notes?.length) lines.push(`- **Cách trình bày:** ${review.delivery_notes.join('; ')}`);
+      if (review.reference_answer) lines.push('', '**Gợi ý khung trả lời chuẩn:**', '', review.reference_answer);
+      if (review.level_up_tip) lines.push('', `**Nâng lên mức Senior:** ${review.level_up_tip}`);
+      lines.push('');
+    }
+  }
+
+  const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  const cleanId = (session.session_id || 'export').trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+  link.href = url;
+  link.setAttribute('download', `on_tap_phong_van_${cleanId}.md`);
+  document.body.appendChild(link);
+  link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
