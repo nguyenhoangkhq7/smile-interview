@@ -83,11 +83,23 @@ const editorChromeTheme = EditorView.theme({
   },
 });
 
+function detectNonSandboxLanguage(spec: PublicCodingSpec | null | undefined, hintText: string): string | null {
+  if (spec) return null;
+  const lower = hintText.toLowerCase();
+  if (/\b(?:java|spring\s*boot|springboot|jvm)\b/.test(lower)) return 'Java / Spring';
+  if (/\b(?:golang|go\s+func|func\s+\w+\s*\([^)]*\)\s*(?:\[|error|int|string))\b/.test(lower)) return 'Go';
+  if (/\b(?:c#|csharp|\.net|dotnet|asp\.net)\b/.test(lower)) return 'C# / .NET';
+  if (/\b(?:c\+\+|cpp|std::)\b/.test(lower)) return 'C++';
+  if (/\b(?:react|next\.?js|jsx|tsx)\b/.test(lower)) return 'React / TypeScript';
+  if (/\btypescript\b/.test(lower)) return 'TypeScript';
+  return null;
+}
+
 function inferLanguage(spec: PublicCodingSpec | null | undefined, hintText: string): CodingLanguage {
   if (spec?.language) return spec.language;
   const lower = hintText.toLowerCase();
   if (/\b(?:sql|select\b|postgres|mysql|sqlite|index|query|truy vấn)\b/.test(lower)) return 'sql';
-  if (/\b(?:javascript|typescript|node\.?js|react|next\.?js|const\s+\w+|function\s+\w+)\b/.test(lower)) return 'javascript';
+  if (/\b(?:javascript|typescript|node\.?js|react|next\.?js|const\s+\w+|function\s+\w+|java|spring|golang|c#|c\+\+)\b/.test(lower)) return 'javascript';
   return 'python';
 }
 
@@ -117,18 +129,22 @@ export function InterviewCodeEditor({
   defaultAutocomplete = true,
 }: InterviewCodeEditorProps) {
   const { resolvedTheme } = useTheme();
+  const nonSandboxLabel = detectNonSandboxLanguage(codingSpec, questionHint);
   const [language, setLanguage] = useState<CodingLanguage>(() => inferLanguage(codingSpec, questionHint));
+  const [sandboxOverride, setSandboxOverride] = useState(false);
   const [autocompleteOn, setAutocompleteOn] = useState(defaultAutocomplete);
+  const [showSamples, setShowSamples] = useState(false);
   const [running, setRunning] = useState(false);
   const [runResult, setRunResult] = useState<RunCodeResult | null>(null);
   const [runError, setRunError] = useState('');
 
   const langMeta = languageOptions.find(opt => opt.value === language) ?? languageOptions[0];
   const sampleCount = codingSpec?.sample_tests?.length ?? 0;
+  const isSemanticOnly = Boolean(nonSandboxLabel) && !sandboxOverride;
 
   const extensions = useMemo(() => {
     const langExt = language === 'javascript'
-      ? javascript({ jsx: true, typescript: true })
+      ? javascript({ jsx: isSemanticOnly, typescript: isSemanticOnly })
       : language === 'sql'
         ? sql()
         : python();
@@ -137,7 +153,7 @@ export function InterviewCodeEditor({
       list.push(createSandboxAutocomplete(language));
     }
     return list;
-  }, [language, autocompleteOn, readOnly, disabled]);
+  }, [language, isSemanticOnly, autocompleteOn, readOnly, disabled]);
 
   async function handleRun() {
     if (!value.trim() || running || disabled) return;
@@ -167,41 +183,61 @@ export function InterviewCodeEditor({
       className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border/90 bg-background shadow-2xs transition-shadow focus-within:border-brand-green/60 focus-within:ring-2 focus-within:ring-brand-green/15"
     >
       {/* Single-row IDE toolbar */}
-      <div className="flex items-center justify-between gap-2 border-b bg-muted/35 px-2.5 py-1.5 text-xs">
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b bg-muted/35 px-2.5 py-1.5 text-xs">
         <div className="flex min-w-0 items-center gap-2">
-          <div className="relative shrink-0">
-            <select
-              aria-label="Ngôn ngữ lập trình"
-              className="h-7 appearance-none rounded-md border border-border/80 bg-background pr-6 pl-2.5 text-xs font-semibold text-foreground outline-none transition-colors hover:border-foreground/30 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
-              value={language}
-              disabled={disabled || readOnly || Boolean(codingSpec?.language)}
-              onChange={e => setLanguage(e.target.value as CodingLanguage)}
-            >
-              {languageOptions.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-            <ChevronDown
-              size={13}
-              aria-hidden="true"
-              className="pointer-events-none absolute top-1/2 right-1.5 -translate-y-1/2 text-muted-foreground"
-            />
-          </div>
+          {!isSemanticOnly && (
+            <div className="relative shrink-0">
+              <select
+                aria-label="Ngôn ngữ lập trình"
+                className="h-7 appearance-none rounded-md border border-border/80 bg-background pr-6 pl-2.5 text-xs font-semibold text-foreground outline-none transition-colors hover:border-foreground/30 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+                value={language}
+                disabled={disabled || readOnly || Boolean(codingSpec?.language)}
+                onChange={e => { setLanguage(e.target.value as CodingLanguage); setSandboxOverride(true); }}
+              >
+                {languageOptions.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+              <ChevronDown
+                size={13}
+                aria-hidden="true"
+                className="pointer-events-none absolute top-1/2 right-1.5 -translate-y-1/2 text-muted-foreground"
+              />
+            </div>
+          )}
 
           {sampleCount > 0 ? (
-            <span
-              className="inline-flex min-w-0 items-center gap-1 truncate rounded-md bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300"
+            <button
+              type="button"
+              aria-expanded={showSamples}
+              onClick={() => setShowSamples(prev => !prev)}
+              className="inline-flex min-w-0 cursor-pointer items-center gap-1 truncate rounded-md bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 transition-colors hover:bg-emerald-500/15 dark:text-emerald-300"
               title={codingSpec?.entry_point
-                ? `${sampleCount} ca thử mẫu · Hàm kỳ vọng: ${codingSpec.entry_point}()`
-                : `${sampleCount} ca thử mẫu`}
+                ? `Xem ${sampleCount} ca thử mẫu · Hàm kỳ vọng: ${codingSpec.entry_point}()`
+                : `Xem ${sampleCount} ca thử mẫu`}
             >
-              <span className="shrink-0">{sampleCount} ca mẫu</span>
+              <span className="shrink-0">
+                {codingSpec?.setup_sql?.trim() ? `${sampleCount} ca mẫu · Schema` : `${sampleCount} ca mẫu`}
+              </span>
               {codingSpec?.entry_point && (
                 <>
                   <span aria-hidden="true">·</span>
                   <code className="truncate font-mono text-[11px]">{codingSpec.entry_point}()</code>
                 </>
               )}
+              <ChevronDown
+                size={12}
+                aria-hidden="true"
+                className={`shrink-0 transition-transform ${showSamples ? 'rotate-180' : ''}`}
+              />
+            </button>
+          ) : isSemanticOnly ? (
+            <span
+              className="inline-flex min-w-0 items-center gap-1 truncate rounded-md bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:text-amber-200"
+              title={`Sandbox chỉ chạy Python/JS/SQL. Với ${nonSandboxLabel}, bạn viết code tự do và bấm Gửi câu trả lời để AI chấm ngữ nghĩa.`}
+            >
+              <span className="truncate">{nonSandboxLabel} · Chấm ngữ nghĩa</span>
+              <Info size={12} aria-hidden="true" className="hidden shrink-0 opacity-75 sm:inline" />
             </span>
           ) : (
             <span
@@ -217,7 +253,18 @@ export function InterviewCodeEditor({
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5">
-          {!readOnly && (
+          {!readOnly && isSemanticOnly && (
+            <button
+              type="button"
+              disabled={disabled}
+              title="Chuyển sang trình chạy thử Python / JavaScript / SQL"
+              onClick={() => setSandboxOverride(true)}
+              className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-md border border-border/70 px-2 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+            >
+              Dùng sandbox
+            </button>
+          )}
+          {!readOnly && !isSemanticOnly && (
             <button
               type="button"
               aria-pressed={autocompleteOn}
@@ -248,7 +295,7 @@ export function InterviewCodeEditor({
               <span className="hidden sm:inline">Mã mẫu</span>
             </Button>
           )}
-          {!readOnly && (
+          {!readOnly && !isSemanticOnly && (
             <Button
               type="button"
               size="sm"
@@ -265,12 +312,43 @@ export function InterviewCodeEditor({
         </div>
       </div>
 
+      {/* Collapsible sample test & SQL schema preview */}
+      {showSamples && (sampleCount > 0 || Boolean(codingSpec?.setup_sql?.trim())) && (
+        <div className="max-h-36 shrink-0 space-y-1.5 overflow-y-auto border-b bg-muted/20 px-3 py-2 text-[11px]">
+          {codingSpec?.setup_sql?.trim() && (
+            <div className="rounded-md border border-border/70 bg-background px-2.5 py-1.5">
+              <p className="font-semibold text-foreground">Lược đồ bảng mẫu (SQLite)</p>
+              <pre className="mt-1 overflow-x-auto font-mono text-[11px] whitespace-pre-wrap text-muted-foreground">
+                {codingSpec.setup_sql.trim()}
+              </pre>
+            </div>
+          )}
+          {(codingSpec?.sample_tests ?? []).map((sample, idx) => (
+            <div key={`${sample.name}-${idx}`} className="rounded-md border border-border/70 bg-background px-2.5 py-1.5">
+              <p className="font-semibold text-foreground">{sample.name}</p>
+              <div className="mt-1 grid gap-1 font-mono text-muted-foreground sm:grid-cols-2">
+                {sample.input_data && (
+                  <span className="break-all">Đầu vào: <strong className="text-foreground">{sample.input_data}</strong></span>
+                )}
+                <span className="break-all">Kỳ vọng: <strong className="text-foreground">{sample.expected_output}</strong></span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Main CodeMirror 6 surface */}
-      <div className={`min-h-0 flex-1 overflow-auto ${compact ? 'min-h-36 max-h-56' : 'min-h-48'}`}>
+      <div
+        className={`flex-1 overflow-auto ${
+          hasConsole
+            ? (compact ? 'min-h-24 max-h-40' : 'min-h-24')
+            : (compact ? 'min-h-36 max-h-56' : 'min-h-44')
+        }`}
+      >
         <CodeMirror
           value={value}
           height="100%"
-          minHeight={compact ? '144px' : '196px'}
+          minHeight={hasConsole ? '88px' : (compact ? '144px' : '176px')}
           theme={resolvedTheme === 'dark' ? oneDark : 'light'}
           extensions={extensions}
           editable={!disabled && !readOnly}
@@ -286,8 +364,11 @@ export function InterviewCodeEditor({
 
       {/* Docked collapsible console drawer */}
       {hasConsole && (
-        <div role="status" className="border-t bg-muted/25 text-xs">
-          <div className="flex items-center justify-between gap-2 border-b border-border/60 px-3 py-1.5">
+        <div
+          role="status"
+          className={`flex min-h-0 shrink-0 flex-col border-t bg-muted/25 text-xs ${compact ? '' : 'max-h-[55%]'}`}
+        >
+          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/60 px-3 py-1.5">
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1.5 font-semibold text-foreground">
                 <Terminal size={13} className="text-muted-foreground" aria-hidden="true" />
@@ -324,7 +405,7 @@ export function InterviewCodeEditor({
             </button>
           </div>
 
-          <div className="max-h-36 space-y-2 overflow-y-auto px-3 py-2.5">
+          <div className={`min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain px-3 py-2.5 ${compact ? 'max-h-52' : ''}`}>
             {runError && (
               <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 px-2.5 py-2 text-xs text-destructive">
                 {runError}
@@ -340,13 +421,13 @@ export function InterviewCodeEditor({
               </p>
             )}
             {runResult?.compile_error && (
-              <pre className="max-h-28 overflow-auto rounded-lg bg-destructive/10 p-2 font-mono text-[11px] whitespace-pre-wrap text-destructive">
+              <pre className="overflow-x-auto rounded-lg bg-destructive/10 p-2 font-mono text-[11px] whitespace-pre-wrap text-destructive">
                 {runResult.compile_error}
               </pre>
             )}
             {freeRunSuccess && (
               (runResult?.stdout ?? '').trim() ? (
-                <pre className="max-h-28 overflow-auto rounded-lg bg-slate-950 px-3 py-2 font-mono text-[11px] whitespace-pre-wrap text-slate-100">
+                <pre className="overflow-x-auto rounded-lg bg-slate-950 px-3 py-2 font-mono text-[11px] whitespace-pre-wrap text-slate-100">
                   {(runResult?.stdout ?? '').trim()}
                 </pre>
               ) : (
@@ -357,27 +438,35 @@ export function InterviewCodeEditor({
             )}
             {(runResult?.results ?? []).length > 0 && (
               <ul className="space-y-1.5">
-                {(runResult?.results ?? []).map(item => (
-                  <li key={item.name} className="rounded-lg border bg-background px-2.5 py-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="flex items-center gap-1.5 font-medium">
-                        {item.passed
-                          ? <CheckCircle2 size={13} className="text-emerald-600" aria-hidden="true" />
-                          : <XCircle size={13} className="text-destructive" aria-hidden="true" />}
-                        {item.name}
-                      </span>
-                      <span className="tabular-nums text-[11px] text-muted-foreground">{item.elapsed_ms} ms</span>
-                    </div>
-                    {item.error ? (
-                      <p className="mt-1 font-mono text-[11px] break-words text-destructive">{item.error}</p>
-                    ) : !item.passed ? (
-                      <div className="mt-1 grid gap-1 font-mono text-[11px] text-muted-foreground sm:grid-cols-2">
-                        <span>Thực tế: <strong className="text-foreground">{item.actual_output || '(rỗng)'}</strong></span>
-                        <span>Kỳ vọng: <strong className="text-foreground">{item.expected_output}</strong></span>
+                {(runResult?.results ?? []).map(item => {
+                  const sampleInput = codingSpec?.sample_tests?.find(s => s.name === item.name)?.input_data;
+                  return (
+                    <li key={item.name} className="rounded-lg border bg-background px-2.5 py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="flex items-center gap-1.5 font-medium">
+                          {item.passed
+                            ? <CheckCircle2 size={13} className="text-emerald-600" aria-hidden="true" />
+                            : <XCircle size={13} className="text-destructive" aria-hidden="true" />}
+                          {item.name}
+                        </span>
+                        <span className="tabular-nums text-[11px] text-muted-foreground">{item.elapsed_ms} ms</span>
                       </div>
-                    ) : null}
-                  </li>
-                ))}
+                      {sampleInput && (
+                        <p className="mt-1 font-mono text-[11px] break-all text-muted-foreground">
+                          Đầu vào: <strong className="text-foreground">{sampleInput}</strong>
+                        </p>
+                      )}
+                      {item.error ? (
+                        <p className="mt-1 font-mono text-[11px] break-words text-destructive">{item.error}</p>
+                      ) : !item.passed ? (
+                        <div className="mt-1 grid gap-1 font-mono text-[11px] text-muted-foreground sm:grid-cols-2">
+                          <span>Thực tế: <strong className="text-foreground">{item.actual_output || '(rỗng)'}</strong></span>
+                          <span>Kỳ vọng: <strong className="text-foreground">{item.expected_output}</strong></span>
+                        </div>
+                      ) : null}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>

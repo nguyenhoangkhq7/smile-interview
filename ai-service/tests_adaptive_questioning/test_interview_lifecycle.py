@@ -63,13 +63,23 @@ def test_opening_introduction_and_farewell_are_separate_from_assessment(mode):
     assert command(engine, snapshot, "NEXT").snapshot.conversation.phase == "FINISHED"
 
 
-def test_introduction_is_not_given_to_question_generator_or_judge():
+def test_introduction_personalizes_first_question_without_entering_judge():
     provider, _, engine, snapshot = setup()
-    contexts = []
-    original = provider.question
-    provider.question = lambda context: (contexts.append(json.loads(context)), original(context))[1]
-    command(engine, snapshot, "SUBMIT_INTRODUCTION", "SECRET_UNSCORED_INTRO")
-    assert "SECRET_UNSCORED_INTRO" not in json.dumps(contexts)
+    question_contexts = []
+    judge_contexts = []
+    original_q = provider.question
+    original_j = provider.judge
+    provider.question = lambda context: (question_contexts.append(json.loads(context)), original_q(context))[1]
+    provider.judge = lambda context: (judge_contexts.append(json.loads(context)), original_j(context))[1]
+    after_intro = command(engine, snapshot, "SUBMIT_INTRODUCTION", "SECRET_UNSCORED_INTRO")
+    assert question_contexts[0]["candidate_introduction"] == "SECRET_UNSCORED_INTRO"
+    engine.respond(TransitionRequest(
+        snapshot=after_intro.snapshot,
+        turn_id=after_intro.snapshot.pending_turn.turn_id,
+        expected_state_version=after_intro.snapshot.state_version,
+        candidate_response="EXPLAIN ANALYZE",
+    ))
+    assert "SECRET_UNSCORED_INTRO" not in json.dumps(judge_contexts)
 
 
 def test_skip_reload_and_early_stop():
@@ -238,7 +248,7 @@ def test_dynamic_opening_and_closing_use_user_and_jd_context_without_leaking_to_
 
     snap = command(engine, start_res.snapshot, "NEXT").snapshot
     snap = command(engine, snap, "SUBMIT_INTRODUCTION", "SECRET_INTRO_TAILORED").snapshot
-    assert "SECRET_INTRO_TAILORED" not in json.dumps(provider.question_contexts)
+    assert provider.question_contexts[0]["candidate_introduction"] == "SECRET_INTRO_TAILORED"
     assert "SECRET_CV_SUMMARY_5_NAM_JAVA" not in json.dumps(provider.question_contexts)
 
     finished = engine.respond(TransitionRequest(

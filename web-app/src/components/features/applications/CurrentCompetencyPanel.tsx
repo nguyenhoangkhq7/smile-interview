@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { ArrowUpRight, ChevronDown, Info, RefreshCw, Search } from 'lucide-react';
+import { ArrowUpRight, ChevronDown, ChevronRight, Info, RefreshCw, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { MarkdownContent } from '@/components/common/MarkdownContent';
@@ -10,7 +10,7 @@ import { jdSkillLabel } from '@/lib/skillLabels';
 import { cn } from '@/lib/utils';
 import {
   applicationProfiles, competencySummary, skillLastChecked,
-  type CompetencyCriterion, type CompetencyObjective, type CompetencySource, type CompetencyStatus, type CurrentCompetency,
+  type CompetencyCriterion, type CompetencyObjective, type CompetencySkill, type CompetencySource, type CompetencyStatus, type CurrentCompetency,
 } from '@/services/applicationProfiles';
 import { interviewError } from '@/services/evidenceInterview';
 import type { SkillGapResult } from '@/services/cvJdMatching';
@@ -20,15 +20,15 @@ import { searchText, skillLabel } from './applicationUi';
 const groupOrder = ['verify', 'review', 'incomplete', 'unassessed', 'met'] as const;
 type Group = typeof groupOrder[number];
 type Filter = 'all' | Group;
-type SelectedEvidence = { skillId: string; objectiveId: string; criterionId: string };
+type SelectedCriterion = { skillId: string; objectiveId: string; criterionId: string };
 
 const presentation: Record<CompetencyStatus, { group: Group; label: string; criterionLabel?: string }> = {
-  NOT_ASSESSED: { group: 'unassessed', label: 'Chưa có dữ liệu', criterionLabel: 'Chưa có bằng chứng đánh giá' },
+  NOT_ASSESSED: { group: 'unassessed', label: 'Chưa có dữ liệu', criterionLabel: 'Chưa đánh giá' },
   INSUFFICIENT_EVIDENCE: { group: 'incomplete', label: 'Chưa đủ bằng chứng' },
   PARTIALLY_ASSESSED: { group: 'incomplete', label: 'Đã kiểm tra một phần' },
-  NOT_DEMONSTRATED: { group: 'review', label: 'Chưa thể hiện được' },
-  DEMONSTRATED_BELOW_TARGET: { group: 'review', label: 'Dưới yêu cầu', criterionLabel: 'Có bằng chứng dưới yêu cầu' },
-  DEMONSTRATED_AT_TARGET: { group: 'met', label: 'Đáp ứng yêu cầu', criterionLabel: 'Có bằng chứng đáp ứng' },
+  NOT_DEMONSTRATED: { group: 'review', label: 'Chưa thể hiện được', criterionLabel: 'Chưa đạt' },
+  DEMONSTRATED_BELOW_TARGET: { group: 'review', label: 'Dưới yêu cầu', criterionLabel: 'Chưa đạt' },
+  DEMONSTRATED_AT_TARGET: { group: 'met', label: 'Đáp ứng yêu cầu', criterionLabel: 'Đạt yêu cầu' },
   DEMONSTRATED_ABOVE_TARGET: { group: 'met', label: 'Vượt yêu cầu' },
   NEEDS_VERIFICATION: { group: 'verify', label: 'Cần kiểm chứng lại' },
 };
@@ -48,6 +48,12 @@ const groupColor: Record<Group, string> = {
   met: 'bg-emerald-50 text-emerald-900 dark:bg-emerald-500/15 dark:text-emerald-200',
 };
 const skillPageSize = 6;
+const genericObjectivePrefix = 'Đánh giá kiến thức thực hành ';
+const evidenceAssessment: Partial<Record<string, CompetencyStatus>> = {
+  BELOW: 'DEMONSTRATED_BELOW_TARGET',
+  AT_TARGET: 'DEMONSTRATED_AT_TARGET',
+  ABOVE: 'DEMONSTRATED_ABOVE_TARGET',
+};
 const linkClass = 'inline-flex items-center gap-1 rounded-sm text-xs font-medium text-brand-green underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring';
 
 function Status({ value, criterion = false }: { value: CompetencyStatus; criterion?: boolean }) {
@@ -59,111 +65,243 @@ function Status({ value, criterion = false }: { value: CompetencyStatus; criteri
   );
 }
 
-function SourceLink({ source, children }: { source: CompetencySource; children?: ReactNode }) {
+function SourceLink({ source, children }: { source: CompetencySource; children: ReactNode }) {
   return (
-    <Link prefetch={false} className={linkClass} href={`/interview/session/${source.sessionId}/result`}>
-      {children ?? `Lượt ${source.attemptNumber}`}
+    <Link prefetch={false} className={cn(linkClass, 'min-h-8')} href={`/interview/session/${source.sessionId}/result`}>
+      {children}
       <ArrowUpRight size={13} className="shrink-0" aria-hidden="true" />
     </Link>
   );
 }
 
-function ObjectiveDetails({
-  objective, showStatus, onEvidence,
+function criterionTarget(criterion: CompetencyCriterion) {
+  const target = criterion.atTarget?.trim();
+  return target === criterion.description.trim() ? undefined : target;
+}
+
+function CriterionStatus({ criterion }: { criterion: CompetencyCriterion }) {
+  if (criterion.assessment !== 'NEEDS_VERIFICATION' || !criterion.trend) {
+    return <Status value={criterion.assessment} criterion />;
+  }
+  return (
+    <span className={cn('inline-flex max-w-full rounded-md px-2 py-1 text-xs font-medium', groupColor.verify)}>
+      {criterion.trend === 'IMPROVING' ? 'Lượt gần nhất đã đạt' : 'Lượt gần nhất chưa đạt'} · Cần kiểm tra thêm
+    </span>
+  );
+}
+
+function CriterionRow({
+  criterion, onDetails, targetAsDescription = false,
 }: {
-  objective: CompetencyObjective;
-  showStatus: boolean;
-  onEvidence: (criterionId: string) => void;
+  criterion: CompetencyCriterion;
+  onDetails: () => void;
+  targetAsDescription?: boolean;
 }) {
+  const descriptionId = useId();
+  const buttonLabelId = useId();
+  const target = criterionTarget(criterion);
+  const hasDetails = (!targetAsDescription && target) || criterion.lastAssessment || criterion.trend || criterion.evidence.length > 0;
+
+  return (
+    <li className="min-w-0 space-y-1.5 py-3 first:pt-0 last:pb-0">
+      <div id={descriptionId}>
+        <MarkdownContent className="text-sm! leading-relaxed!" content={targetAsDescription && target ? target : criterion.description} />
+      </div>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+        <CriterionStatus criterion={criterion} />
+        {!criterion.essential && <span className="text-xs text-muted-foreground">Bổ sung</span>}
+        {hasDetails && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="min-h-8 px-2 text-xs text-brand-green"
+            aria-labelledby={`${buttonLabelId} ${descriptionId}`}
+            aria-haspopup="dialog"
+            onClick={onDetails}
+          >
+            <span id={buttonLabelId}>{criterion.evidence.length ? 'Xem câu trả lời' : target && !targetAsDescription ? 'Xem điều kiện đạt' : 'Xem đánh giá'}</span>
+            <ChevronRight size={14} aria-hidden="true" />
+          </Button>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function ObjectiveHistory({ objective }: { objective: CompetencyObjective }) {
   const { lastChecked, lastAssessment } = objective;
   const resultSource = lastChecked ?? lastAssessment;
   const assessmentFromEarlierAttempt = Boolean(lastChecked && lastAssessment && lastAssessment.sessionId !== lastChecked.sessionId);
+  const needsVerification = objective.assessment === 'NEEDS_VERIFICATION';
+  if (!needsVerification && !resultSource) return null;
 
   return (
-    <article className="space-y-3 border-b border-border pb-4 last:border-b-0 last:pb-0">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0 flex-1 basis-48">
-          <p className="text-xs font-medium text-muted-foreground">Mục tiêu</p>
-          <MarkdownContent className="mt-1 text-sm font-semibold [overflow-wrap:anywhere]" content={objective.claim} />
+    <details className="group/history mt-2">
+      <summary className="flex min-h-8 w-fit cursor-pointer list-none items-center gap-1.5 rounded-sm text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden">
+        <ChevronDown size={14} className="transition group-open/history:rotate-180" aria-hidden="true" />
+        Lịch sử đánh giá
+      </summary>
+      <div className="space-y-1 pb-2">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          Kết quả mục tiêu
+          <Status value={objective.assessment} />
         </div>
-        {showStatus && <Status value={objective.assessment} />}
+        {needsVerification ? (
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Kết quả từ các câu trả lời chưa nhất quán. Cần hai lượt kiểm tra cho kết quả nhất quán trong hai tình huống khác nhau.
+          </p>
+        ) : (assessmentFromEarlierAttempt || objective.assessment === 'INSUFFICIENT_EVIDENCE') && objective.explanation && (
+          <p className="text-xs leading-relaxed text-muted-foreground">{objective.explanation}</p>
+        )}
+        {resultSource && (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <SourceLink source={resultSource}>Xem kết quả lượt {resultSource.attemptNumber}</SourceLink>
+            {assessmentFromEarlierAttempt && lastAssessment && (
+              <SourceLink source={lastAssessment}>Xem căn cứ đánh giá ở lượt {lastAssessment.attemptNumber}</SourceLink>
+            )}
+          </div>
+        )}
       </div>
-      {(objective.assessment === 'NEEDS_VERIFICATION' || assessmentFromEarlierAttempt) && objective.explanation && (
-        <p className="text-xs leading-relaxed text-muted-foreground">{objective.explanation}</p>
-      )}
-      {objective.criteria.length > 0 && (
-        <div>
-          <p className="mb-1 text-xs font-medium text-muted-foreground">Tiêu chí đánh giá</p>
-          <ul className="divide-y divide-border">
-            {objective.criteria.map(criterion => {
-              const atTarget = criterion.atTarget?.trim();
-              return (
-                <li key={criterion.id} className="space-y-1.5 py-2.5 first:pt-1">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <MarkdownContent className="min-w-0 flex-1 basis-56 text-sm [overflow-wrap:anywhere]" content={criterion.description} />
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className={cn('rounded-md px-2 py-1 text-xs font-medium', criterion.essential ? 'bg-brand-green/10 text-brand-green' : 'bg-muted text-muted-foreground')}>
-                        {criterion.essential ? 'Cần đạt' : 'Bổ sung'}
-                      </span>
-                      <Status value={criterion.assessment} criterion />
-                    </div>
-                  </div>
-                  {criterion.trend && <p className="text-xs text-muted-foreground">{criterion.trend === 'IMPROVING'
-                    ? 'Lượt này đã đạt; cần thêm một tình huống để xác nhận.'
-                    : 'Lượt này dưới yêu cầu; cần thêm một tình huống để xác nhận.'}</p>}
-                  {atTarget && atTarget !== criterion.description.trim() && (
-                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs leading-relaxed">
-                      <span className="font-semibold text-foreground">Đạt khi</span>
-                      <MarkdownContent className="min-w-0 flex-1 basis-48 text-sm! text-muted-foreground [overflow-wrap:anywhere]" content={atTarget} />
-                    </div>
-                  )}
-                  {criterion.evidence.length > 0 && (
-                    <Button variant="ghost" size="sm" className="-ml-2 text-xs text-brand-green" onClick={() => onEvidence(criterion.id)}>
-                      Xem bằng chứng ({criterion.evidence.length})
-                      <ArrowUpRight size={13} aria-hidden="true" />
-                    </Button>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+    </details>
+  );
+}
+
+function ObjectiveDetails({
+  objective, skillId, skillName, expanded, onToggle, onCriterion,
+}: {
+  objective: CompetencyObjective;
+  skillId: string;
+  skillName: string;
+  expanded: boolean;
+  onToggle?: () => void;
+  onCriterion: (criterionId: string) => void;
+}) {
+  const titleId = useId();
+  const detailsId = useId();
+  const claim = objective.claim.trim();
+  const generic = [skillId, skillName].some(name => claim === genericObjectivePrefix + name);
+  const onlyCriterion = objective.criteria.length === 1 ? objective.criteria[0] : undefined;
+  const concreteGoal = generic && onlyCriterion?.essential && criterionTarget(onlyCriterion) ? onlyCriterion : undefined;
+  const title = concreteGoal?.description ?? (generic ? `Thực hành · ${skillName}` : claim || 'Chưa có mô tả mục tiêu.');
+
+  return (
+    <article aria-labelledby={titleId} className="min-w-0">
+      <header className="flex min-h-8 items-start gap-2">
+        <div id={titleId} role="heading" aria-level={4} className="min-w-0 flex-1">
+          <MarkdownContent className="max-w-prose text-lg! leading-snug! font-semibold tracking-tight" content={title} />
         </div>
-      )}
-      {resultSource && (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <SourceLink source={resultSource}>Xem kết quả lượt {resultSource.attemptNumber}</SourceLink>
-          {assessmentFromEarlierAttempt && lastAssessment && (
-            <SourceLink source={lastAssessment}>Căn cứ từ lượt {lastAssessment.attemptNumber}</SourceLink>
-          )}
-        </div>
-      )}
+        {onToggle && (
+          <Button variant="ghost" size="sm" className="shrink-0 px-2 text-xs text-muted-foreground" aria-describedby={titleId} aria-expanded={expanded} aria-controls={detailsId} onClick={onToggle}>
+            {objective.criteria.length} tiêu chí
+            <ChevronDown size={15} className={cn('transition', expanded && 'rotate-180')} aria-hidden="true" />
+          </Button>
+        )}
+      </header>
+      <div id={detailsId} hidden={!expanded} className="mt-1">
+        {expanded && (
+          <>
+            {objective.criteria.length ? (
+              <div className="my-3 max-w-3xl rounded-lg bg-muted/45 px-4 py-3">
+                <p className="mb-2 text-xs font-semibold text-muted-foreground">{concreteGoal ? 'Tiêu chí để đạt yêu cầu' : 'Tiêu chí phỏng vấn'}</p>
+                <ul role="list" className="divide-y divide-border/70" aria-label="Tiêu chí và kết quả phỏng vấn">
+                  {objective.criteria.map(criterion => (
+                    <CriterionRow key={criterion.id} criterion={criterion} targetAsDescription={Boolean(concreteGoal)} onDetails={() => onCriterion(criterion.id)} />
+                  ))}
+                </ul>
+              </div>
+            ) : <p className="text-sm text-muted-foreground">Chưa có tiêu chí cho mục tiêu này.</p>}
+            <ObjectiveHistory objective={objective} />
+          </>
+        )}
+      </div>
     </article>
   );
 }
 
-function EvidenceContent({ criterion }: { criterion: CompetencyCriterion }) {
+function SkillObjectives({
+  skill, skillName, onCriterion,
+}: {
+  skill: CompetencySkill;
+  skillName: string;
+  onCriterion: (objectiveId: string, criterionId: string) => void;
+}) {
+  const [selectedId, setSelectedId] = useState<string | null>();
+  const { objectives } = skill;
+  const activeId = objectives.length === 1 || selectedId !== null
+    ? (objectives.find(objective => objective.id === selectedId)?.id ?? objectives[0]?.id)
+    : null;
+
+  if (!objectives.length) return <p className="text-sm text-muted-foreground">Chưa có tiêu chí phỏng vấn cho kỹ năng này.</p>;
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-medium text-muted-foreground">Mục tiêu đánh giá</p>
+      <div className="divide-y divide-border/70 [&>article+article]:pt-3 [&>article:not(:last-child)]:pb-3">
+        {objectives.map(objective => (
+          <ObjectiveDetails
+            key={objective.id}
+            objective={objective}
+            skillId={skill.skillId}
+            skillName={skillName}
+            expanded={objective.id === activeId}
+            onToggle={objectives.length > 1 ? () => setSelectedId(objective.id === activeId ? null : objective.id) : undefined}
+            onCriterion={criterionId => onCriterion(objective.id, criterionId)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CriterionContent({ criterion }: { criterion: CompetencyCriterion }) {
+  const atTarget = criterionTarget(criterion);
+
   return (
     <div className="max-h-[60dvh] space-y-5 overflow-y-auto overscroll-contain pr-1">
-      <div className="rounded-xl bg-muted/40 p-3.5">
-        <p className="mb-1.5 text-xs font-medium text-muted-foreground">Tiêu chí đang xem</p>
-        <MarkdownContent className="font-medium [overflow-wrap:anywhere]" content={criterion.description} />
-      </div>
-      {[...criterion.evidence].reverse().map(evidence => (
-        <article key={`${evidence.source.sessionId}:${evidence.turnId}`} className="space-y-3 border-b pb-5 last:border-0 last:pb-0">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <SourceLink source={evidence.source} />
-            <Status value={evidence.performance === 'BELOW' ? 'DEMONSTRATED_BELOW_TARGET' : 'DEMONSTRATED_AT_TARGET'} criterion />
+      <div className="space-y-2 rounded-xl bg-muted/40 p-3.5">
+        <MarkdownContent className="font-medium" content={criterion.description} />
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          <CriterionStatus criterion={criterion} />
+          <span>{criterion.essential ? 'Bắt buộc' : 'Bổ sung'}</span>
+          {criterion.lastAssessment && <span>Lượt {criterion.lastAssessment.attemptNumber}</span>}
+        </div>
+        {atTarget && (
+          <div className="space-y-1">
+            <p className="text-xs font-semibold">Để đạt yêu cầu</p>
+            <MarkdownContent className="text-sm! text-muted-foreground" content={atTarget} />
           </div>
-          <blockquote className="rounded-xl border-l-2 border-brand-orange/40 bg-muted/30 p-4 text-sm leading-6">
-            <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">“{evidence.responseExcerpt}”</p>
-          </blockquote>
-          <MarkdownContent className="text-muted-foreground [overflow-wrap:anywhere]" content={evidence.rationale} />
-          <details className="rounded-lg border p-3">
-            <summary className="cursor-pointer text-xs font-medium text-muted-foreground">Câu hỏi làm căn cứ</summary>
-            <MarkdownContent className="mt-3 [overflow-wrap:anywhere]" content={evidence.question} />
-          </details>
-        </article>
-      ))}
+        )}
+        {criterion.assessment === 'NEEDS_VERIFICATION' && criterion.trend && (
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Các lượt phỏng vấn cho kết quả khác nhau. Cần kiểm tra lại tiêu chí này trong một tình huống khác để kết luận.
+          </p>
+        )}
+      </div>
+      {criterion.evidence.length > 0 && <h3 className="text-sm font-semibold">Câu trả lời và nhận xét ({criterion.evidence.length})</h3>}
+      {[...criterion.evidence].reverse().map(evidence => {
+        const assessment = evidenceAssessment[evidence.performance];
+        return (
+          <article key={`${evidence.source.sessionId}:${evidence.turnId}`} className="space-y-3 border-b pb-5 last:border-0 last:pb-0">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <SourceLink source={evidence.source}>Xem kết quả lượt {evidence.source.attemptNumber}</SourceLink>
+              {assessment && <Status value={assessment} criterion />}
+            </div>
+            <blockquote className="rounded-xl border-l-2 border-brand-orange/40 bg-muted/30 p-4 text-sm leading-6">
+              <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">“{evidence.responseExcerpt}”</p>
+            </blockquote>
+            {evidence.rationale && (
+              <div className="space-y-1">
+                <p className="text-xs font-semibold">Nhận xét về câu trả lời</p>
+                <MarkdownContent className="text-muted-foreground [overflow-wrap:anywhere]" content={evidence.rationale} />
+              </div>
+            )}
+            <details className="rounded-lg border p-3">
+              <summary className="cursor-pointer text-xs font-medium">Xem câu hỏi</summary>
+              <MarkdownContent className="mt-3 [overflow-wrap:anywhere]" content={evidence.question} />
+            </details>
+          </article>
+        );
+      })}
     </div>
   );
 }
@@ -182,7 +320,7 @@ export function CurrentCompetencyPanel({
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter | null>(null);
   const [limit, setLimit] = useState(skillPageSize);
-  const [selected, setSelected] = useState<SelectedEvidence | null>(null);
+  const [selected, setSelected] = useState<SelectedCriterion | null>(null);
   const requestKey = `${profileId}:${refreshKey}:${revision}`;
 
   useEffect(() => {
@@ -240,7 +378,6 @@ export function CurrentCompetencyPanel({
   const selectedRow = rows.find(row => row.skill.skillId === selected?.skillId);
   const selectedObjective = selectedRow?.skill.objectives.find(objective => objective.id === selected?.objectiveId);
   const selectedCriterion = selectedObjective?.criteria.find(criterion => criterion.id === selected?.criterionId);
-  const hasConclusions = summary.meetingTarget + summary.belowTarget > 0;
 
   function refresh() {
     setRevision(current => current + 1);
@@ -316,20 +453,15 @@ export function CurrentCompetencyPanel({
       {data && (
         <>
           {Boolean(data.timeline?.length) && <CompetencyProgressTimeline timeline={data.timeline!} />}
-          {data.incompatibleAssessments > 0 && (
-            <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900 dark:bg-amber-500/15 dark:text-amber-200">
-              {data.incompatibleAssessments} đánh giá có bộ tiêu chí khác nên chưa được gộp vào kết quả hiện tại.
-            </p>
-          )}
 
           {summary.totalSkills > 0 && (
             <section aria-labelledby="competency-skills-title" className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h3 id="competency-skills-title" className="font-semibold">Kỹ năng</h3>
-                  {checkedCount > 0 && !hasConclusions && (
-                    <p className="mt-0.5 text-xs text-muted-foreground">Chưa có kết luận đáp ứng hoặc dưới yêu cầu.</p>
-                  )}
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Hiển thị {Math.min(filtered.length, limit)} trên {summary.totalSkills} kỹ năng
+                  </p>
                 </div>
                 <label className="flex min-w-0 w-full items-center gap-2 rounded-lg border bg-background px-3 focus-within:ring-2 focus-within:ring-ring sm:w-44">
                   <Search size={15} className="shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -371,26 +503,22 @@ export function CurrentCompetencyPanel({
               </div>
 
               {filtered.length ? (
-                <div className="divide-y overflow-hidden rounded-xl border bg-background">
-                  {filtered.slice(0, limit).map(({ skill, name, checked, status }) => (
-                    <details key={skill.skillId} name="competency-skills" data-skill={skill.skillId} className="group/skill">
-                      <summary className="flex min-h-12 cursor-pointer list-none flex-wrap items-center justify-between gap-x-3 gap-y-1 px-3 py-2.5 transition hover:bg-muted/40 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring sm:px-4 [&::-webkit-details-marker]:hidden">
-                        <span className="min-w-0 flex-1 text-sm font-semibold [overflow-wrap:anywhere]">{name}</span>
-                        <span className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-2">
-                          {checked && <span className="text-xs text-muted-foreground">Lượt {checked.attemptNumber}</span>}
-                          {(activeFilter === 'all' || groupLabel[activeFilter] !== status.label) && <Status value={skill.assessment} />}
-                          <ChevronDown size={15} className="shrink-0 text-muted-foreground transition group-open/skill:rotate-180" aria-hidden="true" />
+                <div className="space-y-2">
+                  {filtered.slice(0, limit).map(({ skill, name, status }) => (
+                    <details key={skill.skillId} name="competency-skills" data-skill={skill.skillId} className="group/skill rounded-xl border bg-card">
+                      <summary className="flex cursor-pointer list-none items-center gap-3 rounded-xl px-4 py-3 transition hover:bg-muted/40 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring group-open/skill:rounded-b-none group-open/skill:bg-brand-green/5 sm:px-5 [&::-webkit-details-marker]:hidden">
+                        <span className="min-w-0 flex-1 space-y-0.5">
+                          <span className="block text-base font-semibold [overflow-wrap:anywhere]">{name}</span>
+                          <span className="block text-xs text-muted-foreground">Kết quả kỹ năng · {status.label}</span>
                         </span>
+                        <ChevronDown size={16} className="shrink-0 text-muted-foreground transition group-open/skill:rotate-180" aria-hidden="true" />
                       </summary>
-                      <div className="space-y-4 border-t bg-muted/20 p-3 sm:p-4">
-                        {skill.objectives.length ? skill.objectives.map(objective => (
-                          <ObjectiveDetails
-                            key={objective.id}
-                            objective={objective}
-                            showStatus={skill.objectives.length > 1 || objective.assessment !== skill.assessment}
-                            onEvidence={criterionId => setSelected({ skillId: skill.skillId, objectiveId: objective.id, criterionId })}
-                          />
-                        )) : <p className="text-sm text-muted-foreground">Chưa có tiêu chí phỏng vấn cho kỹ năng này.</p>}
+                      <div className="space-y-3 border-t px-4 py-4 sm:px-5">
+                        <SkillObjectives
+                          skill={skill}
+                          skillName={name}
+                          onCriterion={(objectiveId, criterionId) => setSelected({ skillId: skill.skillId, objectiveId, criterionId })}
+                        />
                         {status.group === 'review' && (
                           <Link prefetch={false} className={linkClass} href={`/practice/${profileId}`}>
                             Mở kế hoạch ôn tập
@@ -438,11 +566,11 @@ export function CurrentCompetencyPanel({
       <Dialog open={Boolean(selectedCriterion)} onOpenChange={open => !open && setSelected(null)}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Bằng chứng đánh giá · {selectedRow?.name}</DialogTitle>
-            <DialogDescription>Trích đoạn câu trả lời và nhận xét theo tiêu chí đã chọn.</DialogDescription>
+            <DialogTitle className="pr-8">Chi tiết tiêu chí</DialogTitle>
+            <DialogDescription>{selectedRow?.name}</DialogDescription>
           </DialogHeader>
-          {selectedCriterion && <EvidenceContent criterion={selectedCriterion} />}
-          <DialogFooter><Button variant="outline" onClick={() => setSelected(null)}>Đóng bằng chứng</Button></DialogFooter>
+          {selectedCriterion && <CriterionContent criterion={selectedCriterion} />}
+          <DialogFooter><Button variant="outline" onClick={() => setSelected(null)}>Đóng</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </section>

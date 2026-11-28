@@ -9,7 +9,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
   assessmentLabels, assessmentStatus, cleanStudyRecommendation, depthLevelLabels, evidenceDepthLabels,
-  isBoilerplateClaim, looksLikeRawCode, normalizeSameText, questionBadge, resultReasons,
+  isBoilerplateClaim, looksLikeRawCode, modeDisplayLabels, normalizeSameText, questionBadge, resultReasons,
   skillStatuses, uniqueFindings, type ResultData,
 } from './resultData';
 
@@ -70,6 +70,36 @@ export function ResultCoachingSummary({ summary, introFeedback }: { summary: str
   );
 }
 
+export function ResultModeBreakdown({ modes }: { modes: ResultData['modeBreakdown'] }) {
+  if (!modes.length) return null;
+  return (
+    <div className="space-y-2 rounded-xl border border-slate-200/70 bg-slate-50/70 p-3.5 dark:border-border/70 dark:bg-muted/20">
+      <p className="text-xs font-semibold tracking-wide text-slate-600 uppercase dark:text-muted-foreground">
+        Hiệu suất theo dạng câu hỏi
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {modes.map(item => {
+          const tone = item.weak > 0 && item.strong === 0
+            ? 'border-orange-200/80 bg-orange-50/80 text-orange-950 dark:border-orange-500/30 dark:bg-orange-500/15 dark:text-orange-200'
+            : item.weak > 0 || item.partial > 0
+              ? 'border-amber-200/80 bg-amber-50/80 text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-200'
+              : 'border-emerald-200/80 bg-emerald-50/80 text-emerald-950 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-200';
+          return (
+            <div key={item.mode} className={cn('inline-flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs', tone)}>
+              <span className="font-semibold">{item.label}</span>
+              <span className="tabular-nums font-medium">
+                {item.strong}/{item.total} đạt
+                {item.weak > 0 ? ` · ${item.weak} cần sửa` : ''}
+                {item.partial > 0 ? ` · ${item.partial} làm rõ` : ''}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function ResultFeedback({ data }: { data: ResultData }) {
   const partialSkills = data.skills
     .filter(skill => skill.status === 'partial')
@@ -126,6 +156,9 @@ function SkillCard({ skill }: { skill: ResultData['skills'][number] }) {
   const status = skillStatuses[skill.status];
   const allCriteria = skill.objectives.flatMap(objective => objective.criteria ?? []);
   const hasEssentialMeta = allCriteria.length > 0 && allCriteria.every(c => typeof c.essential === 'boolean');
+  const visibleCriteria = hasEssentialMeta
+    ? allCriteria.filter(c => c.essential || c.assessment !== 'NOT_ASSESSED')
+    : allCriteria;
   const countedCriteria = hasEssentialMeta ? allCriteria.filter(c => c.essential) : allCriteria;
   const passedCount = countedCriteria.filter(c => c.assessment === 'DEMONSTRATED_AT_TARGET' || c.assessment === 'DEMONSTRATED_ABOVE_TARGET').length;
   const isCore = skill.objectives.some(objective => objective.is_core || (objective.importance_weight ?? 0) >= 0.7);
@@ -158,8 +191,13 @@ function SkillCard({ skill }: { skill: ResultData['skills'][number] }) {
               </span>
             ))}
           </div>
-          <span className={cn('rounded-full border px-2.5 py-0.5 text-xs font-semibold', status.tone)}>
-            {status.label}
+          <span className={cn(
+            'rounded-full border px-2.5 py-0.5 text-xs font-semibold',
+            skill.status === 'strong' && skill.hinted
+              ? 'bg-teal-50 text-teal-800 border-teal-200/70'
+              : status.tone,
+          )}>
+            {skill.status === 'strong' && skill.hinted ? 'Đạt · có gợi ý' : status.label}
           </span>
         </div>
         <p className="text-xs text-slate-600 dark:text-muted-foreground">
@@ -171,15 +209,17 @@ function SkillCard({ skill }: { skill: ResultData['skills'][number] }) {
         )}
       </div>
 
-      {allCriteria.length > 0 && (
+      {visibleCriteria.length > 0 && (
         <details className="group border-t border-slate-100 dark:border-border pt-2.5">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-xs font-semibold text-[#a02707] dark:text-orange-300">
-            Xem tiêu chí ({allCriteria.length})
+            Xem tiêu chí ({visibleCriteria.length})
             <ChevronDown size={15} className="group-open:rotate-180" />
           </summary>
           <div className="mt-2.5 space-y-2">
             {skill.objectives.map(objective => {
-              const criteria = objective.criteria ?? [];
+              const criteria = (objective.criteria ?? []).filter(
+                c => !hasEssentialMeta || c.essential || c.assessment !== 'NOT_ASSESSED',
+              );
               const customClaim = !isBoilerplateClaim(objective.claim, objective.skill_id);
               return (
                 <div key={objective.objective_id} className="space-y-1.5 text-xs">
@@ -187,11 +227,21 @@ function SkillCard({ skill }: { skill: ResultData['skills'][number] }) {
                   <ul className="space-y-1.5">
                     {criteria.map(criterion => {
                       const cStatus = skillStatuses[assessmentStatus(criterion.assessment)];
+                      const passedWithHint = Boolean(criterion.hinted && !criterion.transfer_verified)
+                        && (criterion.assessment === 'DEMONSTRATED_AT_TARGET' || criterion.assessment === 'DEMONSTRATED_ABOVE_TARGET');
                       return (
-                        <li key={criterion.criterion_id} className="flex flex-wrap items-start justify-between gap-2 rounded-lg bg-slate-50 px-2.5 py-2">
-                          <span className="min-w-0 flex-1 leading-relaxed text-slate-700 dark:text-foreground wrap-anywhere">{criterion.description}</span>
-                          <span className={cn('shrink-0 rounded-md px-2 py-0.5 text-[11px] font-medium', cStatus.tone)}>
-                            {assessmentLabels[criterion.assessment]}
+                        <li key={criterion.criterion_id} className="flex flex-wrap items-start justify-between gap-2 rounded-lg bg-slate-50 dark:bg-muted/40 px-2.5 py-2">
+                          <span className="min-w-0 flex-1 leading-relaxed text-slate-700 dark:text-foreground wrap-anywhere">
+                            {criterion.description}
+                            {hasEssentialMeta && criterion.essential === false && (
+                              <span className="ml-1.5 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Bổ sung</span>
+                            )}
+                          </span>
+                          <span className={cn(
+                            'shrink-0 rounded-md px-2 py-0.5 text-[11px] font-medium',
+                            passedWithHint ? 'bg-teal-50 text-teal-800 border border-teal-200/70' : cStatus.tone,
+                          )}>
+                            {passedWithHint ? 'Đạt (có gợi ý)' : assessmentLabels[criterion.assessment]}
                           </span>
                         </li>
                       );
@@ -247,27 +297,47 @@ export function ResultSkills({ skills }: { skills: ResultData['skills'] }) {
   );
 }
 
-type QuestionFilter = 'all' | 'strong' | 'extension' | 'diagnostic' | 'weak' | 'clarified' | 'partial';
+type QuestionFilter = 'all' | 'strong' | 'extension' | 'diagnostic' | 'weak' | 'clarified' | 'partial' | 'retry';
 
 export function ResultQuestions({ questions }: { questions: ResultData['questions'] }) {
   const [filter, setFilter] = useState<QuestionFilter>('all');
+  const [modeFilter, setModeFilter] = useState<string>('all');
   const [limit, setLimit] = useState(5);
   const annotated = questions.map(item => ({ ...item, badge: item.badge ?? questionBadge(item) }));
-  const filtered = filter === 'all' ? annotated : annotated.filter(item => item.badge.key === filter);
+  const byMode = modeFilter === 'all' ? annotated : annotated.filter(item => item.turn.mode === modeFilter);
+  const filtered = filter === 'all' ? byMode : byMode.filter(item => item.badge.key === filter);
   const filterMeta: { id: Exclude<QuestionFilter, 'all'>; label: string }[] = [
     { id: 'extension', label: 'Vượt yêu cầu' },
     { id: 'strong', label: 'Đạt yêu cầu' },
     { id: 'diagnostic', label: 'Chẩn đoán nền tảng' },
     { id: 'weak', label: 'Cần cải thiện' },
     { id: 'clarified', label: 'Hỏi làm rõ' },
+    { id: 'retry', label: 'Làm lại sau góp ý' },
     { id: 'partial', label: 'Chưa kết luận' },
   ];
   const filters = [
-    { id: 'all' as const, label: 'Tất cả', count: annotated.length },
+    { id: 'all' as const, label: 'Tất cả', count: byMode.length },
     ...filterMeta
-      .map(meta => ({ ...meta, count: annotated.filter(item => item.badge.key === meta.id).length }))
+      .map(meta => ({ ...meta, count: byMode.filter(item => item.badge.key === meta.id).length }))
       .filter(meta => meta.count > 0),
   ];
+  const modeOrder = Object.keys(modeDisplayLabels);
+  const presentModes = [...new Set(annotated.map(item => item.turn.mode).filter(Boolean))]
+    .sort((a, b) => {
+      const idxA = modeOrder.indexOf(a);
+      const idxB = modeOrder.indexOf(b);
+      return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB);
+    });
+  const modeFilters = presentModes.length > 1
+    ? [
+        { id: 'all', label: 'Mọi dạng', count: annotated.length },
+        ...presentModes.map(mode => ({
+          id: mode,
+          label: modeDisplayLabels[mode] ?? mode,
+          count: annotated.filter(item => item.turn.mode === mode).length,
+        })),
+      ]
+    : [];
 
   return (
     <section id="questions" className={resultSection}>
@@ -275,12 +345,29 @@ export function ResultQuestions({ questions }: { questions: ResultData['question
         <h2 className="text-lg font-bold">
           Chi tiết câu hỏi <span className="text-sm font-medium text-muted-foreground">({questions.length} câu)</span>
         </h2>
-        {filters.length > 2 && (
-          <FilterBar filters={filters} value={filter} label="Lọc câu hỏi" onChange={value => { setFilter(value); setLimit(5); }} />
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {modeFilters.length > 0 && (
+            <FilterBar
+              filters={modeFilters}
+              value={modeFilter}
+              label="Lọc theo dạng câu hỏi"
+              onChange={value => { setModeFilter(value); setFilter('all'); setLimit(5); }}
+            />
+          )}
+          {filters.length > 2 && (
+            <FilterBar filters={filters} value={filter} label="Lọc câu hỏi" onChange={value => { setFilter(value); setLimit(5); }} />
+          )}
+        </div>
       </div>
       <div className="space-y-2.5">
-        {filtered.slice(0, limit).map(({ turn, reviews, skillId, index, evidence, badge, depthRole, clarifiedLater }) => {
+        {filtered.length === 0 ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
+            <span>Không có câu hỏi nào khớp bộ lọc hiện tại.</span>
+            <Button variant="outline" size="sm" onClick={() => { setModeFilter('all'); setFilter('all'); setLimit(5); }}>
+              Xóa bộ lọc
+            </Button>
+          </div>
+        ) : filtered.slice(0, limit).map(({ turn, reviews, skillId, index, evidence, badge, depthRole, clarifiedLater }) => {
           const rationales = uniqueFindings(evidence.map(item => item.rationale));
           const excerpts = evidence.filter(item =>
             item.response_excerpt.trim() && !normalizeSameText(item.response_excerpt, turn.answer || ''),
@@ -296,6 +383,11 @@ export function ResultQuestions({ questions }: { questions: ResultData['question
                 <span className="min-w-0 flex-1 space-y-0.5">
                   <span className="flex flex-wrap items-center gap-2 text-xs">
                     {skillId && <span className="font-semibold text-slate-700 dark:text-foreground">{skillLabel(skillId)}</span>}
+                    {turn.mode && (
+                      <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600 dark:bg-muted dark:text-muted-foreground">
+                        {modeDisplayLabels[turn.mode] ?? turn.mode}
+                      </span>
+                    )}
                     <span className={cn('rounded-full border px-2 py-0.5 text-[11px] font-medium', badge.tone)}>{badge.label}</span>
                   </span>
                   <span className="line-clamp-1 block text-sm font-medium text-slate-900 dark:text-foreground wrap-anywhere">{turn.question}</span>
@@ -313,6 +405,23 @@ export function ResultQuestions({ questions }: { questions: ResultData['question
                     )}
                   </div>
                   <MarkdownContent content={turn.question} />
+                  {Boolean(turn.clarifications?.length) && (
+                    <details className="mt-2 rounded-lg border border-slate-200/80 bg-card p-2.5 text-xs dark:border-border">
+                      <summary className="cursor-pointer font-semibold text-slate-700 dark:text-foreground">
+                        Trao đổi làm rõ đề bài ({turn.clarifications!.length})
+                      </summary>
+                      <div className="mt-2 space-y-1.5">
+                        {turn.clarifications!.map((item, cIdx) => (
+                          <div key={cIdx} className="space-y-0.5 rounded-md bg-muted/40 p-2 leading-relaxed">
+                            <p className="font-semibold text-foreground">
+                              {item.kind === 'HINT' ? 'Gợi ý đã xin' : `Câu hỏi làm rõ: ${item.question}`}
+                            </p>
+                            <p className="text-muted-foreground">{item.answer}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
                 </div>
                 <div className="space-y-1.5 rounded-lg border border-slate-200/70 dark:border-border/70 bg-card p-3">
                   <p className="text-xs font-semibold text-slate-500 dark:text-muted-foreground uppercase">Câu trả lời của bạn</p>
@@ -320,7 +429,44 @@ export function ResultQuestions({ questions }: { questions: ResultData['question
                     <pre className="overflow-auto whitespace-pre">{turn.submitted_code}</pre>
                     {turn.transcript && <p>Lời giải thích · {turn.transcript}</p>}
                   </> : <AnswerContent content={turn.answer || 'Chưa có câu trả lời.'} mode={turn.mode} />}
-                  {turn.coding_checks && <p>Kiểm thử tự động · Đạt {turn.coding_checks.passed}/{turn.coding_checks.total} ca.</p>}
+                  {turn.coding_checks && (
+                    <div className="space-y-1.5 border-t border-slate-100 pt-2 text-xs dark:border-border">
+                      <p className="font-medium">
+                        Kiểm thử tự động · Đạt {turn.coding_checks.passed}/{turn.coding_checks.total} ca.
+                      </p>
+                      {turn.coding_checks.compile_error && (
+                        <pre className="max-h-28 overflow-auto rounded-md bg-destructive/10 p-2 font-mono text-[11px] whitespace-pre-wrap text-destructive">
+                          {turn.coding_checks.compile_error}
+                        </pre>
+                      )}
+                      {Boolean(turn.coding_checks.sample_results?.length) && (
+                        <ul className="space-y-1">
+                          {turn.coding_checks.sample_results!.map((sample, sIdx) => (
+                            <li key={`${sample.name}-${sIdx}`} className="rounded-md border border-slate-200/70 bg-muted/25 px-2.5 py-1.5 dark:border-border">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-medium text-foreground">{sample.name}</span>
+                                <span className={cn(
+                                  'rounded px-1.5 py-0.5 text-[10px] font-semibold',
+                                  sample.passed
+                                    ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-500/20 dark:text-emerald-200'
+                                    : 'bg-orange-100 text-orange-900 dark:bg-orange-500/20 dark:text-orange-200',
+                                )}>
+                                  {sample.passed ? 'Đạt' : 'Chưa đạt'}
+                                </span>
+                              </div>
+                              {sample.error ? (
+                                <p className="mt-1 font-mono text-[11px] text-destructive">{sample.error}</p>
+                              ) : !sample.passed ? (
+                                <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+                                  Thực tế: <strong className="text-foreground">{sample.actual_output || '(rỗng)'}</strong> · Kỳ vọng: <strong className="text-foreground">{sample.expected_output}</strong>
+                                </p>
+                              ) : null}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
                 </div>
                 {reviews.length > 0 ? reviews.map((review, i) => <div key={i} className="space-y-2 rounded-lg bg-sky-50 p-3 dark:bg-muted">
                   {review.excerpt && <blockquote className="whitespace-pre-wrap border-l-2 pl-3">{review.excerpt}</blockquote>}
@@ -337,7 +483,17 @@ export function ResultQuestions({ questions }: { questions: ResultData['question
                       <summary className="cursor-pointer font-semibold text-emerald-900 dark:text-emerald-300">
                         Gợi ý khung trả lời chuẩn
                       </summary>
-                      <p className="mt-1.5 leading-relaxed text-slate-800 dark:text-foreground">{review.reference_answer}</p>
+                      <div className="mt-1.5 leading-relaxed text-slate-800 dark:text-foreground">
+                        <MarkdownContent content={review.reference_answer} />
+                      </div>
+                    </details>
+                  )}
+                  {review.level_up_tip && (
+                    <details className="rounded-md border border-indigo-200/70 bg-indigo-50/70 p-2.5 text-xs dark:border-indigo-500/30 dark:bg-indigo-950/30">
+                      <summary className="cursor-pointer font-semibold text-indigo-900 dark:text-indigo-300">
+                        Cách nâng lên mức Xuất sắc (Senior)
+                      </summary>
+                      <p className="mt-1.5 leading-relaxed text-slate-800 dark:text-foreground">{review.level_up_tip}</p>
                     </details>
                   )}
                 </div>) : hasEvaluation ? (

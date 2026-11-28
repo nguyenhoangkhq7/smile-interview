@@ -271,6 +271,35 @@ def test_timeout_marks_unasked_objective_not_assessed(setup):
     assert all(obj.assessment == Assessment.NOT_ASSESSED for obj in result.public.report.objectives)
 
 
+def test_durable_submission_keeps_remaining_time_through_queue_judging_and_generation(setup, monkeypatch):
+    from adaptive_questioning.evidence.models import NextQuestionRequest
+    provider, engine, clock = setup
+    first = start(engine, [skill(), skill("java")]).snapshot
+    received_at = first.deadline_at - timedelta(seconds=5)
+    clock[0] = received_at + timedelta(minutes=2)
+    original_judge, original_question = provider.judge, provider.question
+
+    def slow_judge(context):
+        clock[0] += timedelta(seconds=8)
+        return original_judge(context)
+
+    def slow_question(context):
+        clock[0] += timedelta(minutes=2)
+        return original_question(context)
+
+    monkeypatch.setattr(provider, "judge", slow_judge)
+    monkeypatch.setattr(provider, "question", slow_question)
+    graded = engine.respond(TransitionRequest(snapshot=first, turn_id=first.pending_turn.turn_id,
+                            expected_state_version=first.state_version, candidate_response="EXPLAIN ANALYZE",
+                            received_at=received_at, defer_question=True))
+    assert graded.public.awaiting_question and graded.public.paused_remaining_seconds == 5
+    clock[0] += timedelta(minutes=4)
+    restored = Snapshot.model_validate_json(graded.snapshot.model_dump_json())
+    ready = engine.next_question(NextQuestionRequest(snapshot=restored, expected_state_version=restored.state_version))
+    assert ready.public.pending_turn and ready.public.paused_remaining_seconds is None
+    assert ready.public.deadline_at == clock[0] + timedelta(seconds=5)
+
+
 def test_focused_mode_failure_and_budget_exclusions(setup):
     _, engine, _ = setup
     with pytest.raises(ValueError, match="phù hợp"):

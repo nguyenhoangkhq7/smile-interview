@@ -123,3 +123,107 @@ def test_judge_reasoning_effort_env_configuration(monkeypatch):
     lm = dspy.LM("openai/gpt-4o-mini", api_key="test-key")
     provider = DSPyAssessmentProvider(lm=lm)
     assert provider.judge_lm.kwargs["extra_body"] == {"reasoning": {"effort": "low"}}
+
+
+def test_compiled_modules_include_aligned_diagnostic_reviews_and_easier_demo():
+    from adaptive_questioning.optimization.compiler import DEFAULT_COMPILED_DIR, load_all_compiled_modules
+
+    q_mod, _, a_mod, _ = load_all_compiled_modules(DEFAULT_COMPILED_DIR)
+    diagnostic_actions = [json.loads(d["question_contract"])["action"] for d in q_mod.diagnostic.predict.demos]
+    assert "ASK_EASIER" in diagnostic_actions
+    assert "CLARIFY" in diagnostic_actions
+
+    alignment_pairs = [
+        (d["review"]["verdict"], json.loads(d["context"]).get("action"))
+        for d in a_mod.demos
+    ]
+    assert sum(1 for verdict, _ in alignment_pairs if verdict == "ALIGNED") >= 2
+    assert ("ALIGNED", "ASK_EASIER") in alignment_pairs
+    assert ("ALIGNED", "CLARIFY") in alignment_pairs
+
+
+def test_deferred_respond_prewarms_next_question_without_duplicate_generation(setup, monkeypatch):
+    from adaptive_questioning.evidence.models import NextQuestionRequest, TransitionRequest
+    from adaptive_questioning.evidence.workflow import EvidenceWorkflow
+
+    provider, _, _ = setup
+    engine = EvidenceWorkflow(provider, prewarm_q1=True)
+    first = start(engine)
+    provider.observation, provider.performance = "UNCLEAR", "UNDETERMINED"
+
+    calls = []
+    original_question = provider.question
+
+    def counted_question(context):
+        calls.append(json.loads(context)["action"])
+        return original_question(context)
+
+    monkeypatch.setattr(provider, "question", counted_question)
+    graded = engine.respond(TransitionRequest(
+        snapshot=first.snapshot,
+        turn_id=first.snapshot.pending_turn.turn_id,
+        expected_state_version=first.snapshot.state_version,
+        candidate_response="Em sẽ tối ưu truy vấn.",
+        defer_question=True,
+    ))
+    assert graded.public.awaiting_question is True
+    assert graded.snapshot.pending_turn is None
+
+    loaded = engine.next_question(NextQuestionRequest(
+        snapshot=graded.snapshot,
+        expected_state_version=graded.snapshot.state_version,
+    ))
+    assert loaded.public.awaiting_question is False
+    assert loaded.snapshot.pending_turn is not None
+    assert loaded.snapshot.pending_turn.action == Action.CLARIFY
+    assert calls == ["CLARIFY"]
+
+
+def test_prewarmed_next_failure_surfaces_once_and_allows_fresh_manual_retry(setup, monkeypatch):
+    from adaptive_questioning.evidence.models import NextQuestionRequest, TransitionRequest
+    from adaptive_questioning.evidence.workflow import EvidenceWorkflow
+
+    provider, _, _ = setup
+    engine = EvidenceWorkflow(provider, prewarm_q1=True)
+    first = start(engine)
+    provider.observation, provider.performance = "CONTRADICTS", "BELOW"
+
+    q_calls = 0
+    original_question = provider.question
+
+    def counted_question(context):
+        nonlocal q_calls
+        q_calls += 1
+        return original_question(context)
+
+    review_mode = {"fail": True}
+    monkeypatch.setattr(provider, "question", counted_question)
+    monkeypatch.setattr(
+        provider,
+        "review_question",
+        lambda _: {"verdict": "WRONG_SKILL", "reason": "Lỗi"} if review_mode["fail"] else {"verdict": "ALIGNED", "reason": ""},
+    )
+
+    graded = engine.respond(TransitionRequest(
+        snapshot=first.snapshot,
+        turn_id=first.snapshot.pending_turn.turn_id,
+        expected_state_version=first.snapshot.state_version,
+        candidate_response="Sai rồi.",
+        defer_question=True,
+    ))
+    with pytest.raises(QuestionUnavailableError):
+        engine.next_question(NextQuestionRequest(
+            snapshot=graded.snapshot,
+            expected_state_version=graded.snapshot.state_version,
+        ))
+    # Prewarm ran 3 attempts once; consuming it must NOT re-run 3 more attempts back-to-back.
+    assert q_calls == 3
+
+    # Manual retry after popping the failed prewarm runs fresh and succeeds.
+    review_mode["fail"] = False
+    retried = engine.next_question(NextQuestionRequest(
+        snapshot=graded.snapshot,
+        expected_state_version=graded.snapshot.state_version,
+    ))
+    assert retried.snapshot.pending_turn is not None
+    assert q_calls == 4

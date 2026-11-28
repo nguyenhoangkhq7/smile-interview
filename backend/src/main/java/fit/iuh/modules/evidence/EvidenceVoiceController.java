@@ -64,9 +64,13 @@ public class EvidenceVoiceController {
         var state = active(sessionId, user, turn.turn_id(), turn.expected_state_version());
         var phase = state.path("conversation").path("phase").asText("INTERVIEW");
         long remaining = Duration.between(Instant.now(), Instant.parse(deadline(state))).getSeconds();
-        // One connection covers the introduction, full technical budget and farewell.
+        // One connection covers the introduction, full technical budget, AI latency compensation and farewell.
         if ("OPENING".equals(phase) || "SELF_INTRODUCTION".equals(phase))
             remaining += state.path("config").path("duration_seconds").asLong(900);
+        long remainingQuestions = Math.max(0L, state.path("config").path("max_questions").asLong(0L) - state.path("turns").size());
+        if (remainingQuestions > 0) {
+            remaining += Math.min(300L, remainingQuestions * 18L);
+        }
         if (state.path("conversation").isObject()) remaining += 120;
         response.setHeader("Cache-Control", "no-store");
         return voice.avatarSession(Map.of("max_session_length", Math.max(1, Math.min(7200, remaining))));

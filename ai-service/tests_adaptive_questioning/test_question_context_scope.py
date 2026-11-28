@@ -4,6 +4,7 @@ import json
 import pytest
 
 from adaptive_questioning.evidence.models import Action, RecordedEvidence
+from adaptive_questioning.evidence.dspy_modules import build_question_inputs
 from adaptive_questioning.evidence.provider import encode_context
 from test_evidence_depth_policy import audit, task_skill
 from test_evidence_workflow import answer, start
@@ -33,7 +34,7 @@ def test_switching_objective_excludes_unrelated_answer_but_preserves_transcript(
     assert len(json.dumps(context)) < len(json.dumps(old_context)) / 2
 
 
-def test_switching_criterion_does_not_send_previous_criterion_answer(audit):
+def test_switching_criterion_keeps_decisions_outside_the_active_grading_history(audit):
     provider, engine, _ = audit
     provider.criterion_count = 2
     initial = start(engine, [task_skill()])
@@ -42,7 +43,9 @@ def test_switching_criterion_does_not_send_previous_criterion_answer(audit):
     assert result.snapshot.pending_turn.question.criterion_ids != initial.snapshot.pending_turn.question.criterion_ids
     context = question_context(provider)
     assert context["history"] == []
-    assert "ANSWER_FOR_PREVIOUS_CRITERION" not in json.dumps(context)
+    assert context["case_notes"][0]["candidate_account"] == "ANSWER_FOR_PREVIOUS_CRITERION"
+    _, inputs = build_question_inputs(json.dumps(context))
+    assert json.loads(inputs["session_context"])["case_notes"] == context["case_notes"]
     assert context["other_questions"] == [{
         "question": initial.snapshot.pending_turn.question.text, "truncated": False,
     }]
@@ -135,7 +138,7 @@ def test_resumed_chain_keeps_contradictions_and_legacy_multicriterion_turns(audi
     assert len(context["prior_observations"]) == 1
     assert context["other_questions"] == [{"question": other_criterion.question.text[:300], "truncated": True}]
     assert "Other question" not in json.dumps(context)
-    assert "OTHER_CRITERION_ANSWER" not in json.dumps(context)
+    assert context["case_notes"][0]["candidate_account"] == "OTHER_CRITERION_ANSWER"
     assert "UNRELATED_ANSWER" not in json.dumps(context)
     assert "UNRELATED_EVIDENCE" not in json.dumps(context)
     assert snapshot.model_dump(mode="json") == before

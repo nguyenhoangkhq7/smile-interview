@@ -155,7 +155,7 @@ export function CandidateCvJdSummary({ skills, report, view = 'analysis' }: {
       <p className="shrink-0 text-3xl font-semibold tabular-nums text-emerald-800">{hasScore ? `${Math.round(score * 100)}%` : '—'}</p>
       <div className="min-w-0"><p className="text-sm font-medium">Mức phù hợp CV–JD</p><p className="mt-0.5 text-xs leading-5 text-muted-foreground">{hasScore ? 'Ước tính từ tài liệu, chưa phải kết quả đánh giá qua phỏng vấn.' : 'Chưa có điểm phù hợp từ tài liệu.'}</p></div>
     </div>}
-    {report?.degraded && <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200">Một phần phân tích chưa đầy đủ. {profileView ? 'Bạn có thể xem tài liệu đã lưu để kiểm tra.' : 'Bạn có thể kiểm tra tài liệu hoặc phân tích lại.'}</p>}
+    {!profileView && report?.degraded && <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200">Một phần phân tích chưa đầy đủ. Bạn có thể kiểm tra tài liệu hoặc phân tích lại.</p>}
     {showControls && <div className="flex flex-wrap items-center justify-between gap-3">
       <div role="group" aria-label="Lọc đối chiếu kỹ năng" className="flex flex-wrap gap-1">
         {filters.map(item => <button key={item.value} type="button" aria-pressed={filter === item.value}

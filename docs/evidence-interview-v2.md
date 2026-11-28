@@ -119,7 +119,7 @@ Backend kiểm tra chủ sở hữu trước khi trả state hoặc receipt. Fro
 
 Server suy ra `MIXED` khi `focused_question_mode` là `null` hoặc bị bỏ qua, và `FOCUSED` khi có dạng câu hỏi cụ thể. Client cũ vẫn có thể gửi `mode` nếu khớp với quy tắc này. Khi bỏ qua `max_questions_per_objective`, Backend áp dụng mặc định 8. Snapshot và response có cả `mode` đã suy ra và giới hạn thực tế của phiên.
 
-Khi trang phỏng vấn đang mở, bộ đếm kiểm tra `deadline_at` mỗi giây và khi tab nhận focus/đổi trạng thái hiển thị. Hết hạn tự gọi `/stop`, kể cả sau lỗi chấm AI; không tự nộp bản nháp. Nếu đang gửi câu trả lời, chờ yêu cầu đó hoàn tất rồi kiểm tra lại hạn. Lỗi kết thúc tạm thời được thử lại cách nhau ít nhất 5 giây với cùng request ID; HTTP 409 tải lại state trước khi thử với version mới. Trang kết quả chỉ đọc không gửi lệnh kết thúc. Đây là bộ đếm phía trình duyệt; khi đóng trang hoàn toàn, backend kiểm tra hạn ở yêu cầu tiếp theo. `web-app/scripts/interview-expiry-smoke.mjs` kiểm thử 7 tình huống bằng API fixtures: idle, lỗi chấm, lỗi stop, xung đột version, yêu cầu đang chạy, voice và chỉ đọc.
+Khi ứng viên đang làm bài, trình duyệt kiểm tra `deadline_at` mỗi giây và khi quay lại tab. Khi đã nộp, backend lưu bài và thời gian còn lại trong PostgreSQL. Giao diện theo dõi trạng thái chấm qua `GET`. Đồng hồ chạy tiếp khi câu kế tiếp sẵn sàng. Khi hết giờ làm bài, trình duyệt gửi `/stop` với cùng request ID cho các lần thử lại. Luồng khôi phục và chấm nền được mô tả trong [vòng đời phỏng vấn](interview-lifecycle.md).
 
 Migration `V2__evidence_interviews.sql` thêm:
 

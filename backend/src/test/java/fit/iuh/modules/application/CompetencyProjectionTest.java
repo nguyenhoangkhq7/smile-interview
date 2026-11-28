@@ -269,4 +269,57 @@ class CompetencyProjectionTest {
         assertThat(result.timeline().get(1).weightedReadinessPercent()).isEqualTo(100);
         assertThat(result.timeline().get(1).essentialCriteriaMet()).isEqualTo(2);
     }
+
+    @Test void l4DesignStretchProbeGrantsAboveTargetAndImprovingVerificationShowsProgressExplanation() {
+        var blueprint = (ObjectNode) json.read(profile.getBlueprintJson());
+        ObjectNode sqlDef = (ObjectNode) blueprint.path("objectives").get(0);
+        sqlDef.put("target_depth", 4).put("extension_depth", 4);
+        profile.setBlueprintJson(blueprint.toString());
+
+        var l4Run = attempt(1, Map.of("sql", ABOVE), "design-core");
+        state(l4Run).set("objective", sqlDef.deepCopy());
+        ((ObjectNode) state(l4Run).path("evidence_history").get(0)).put("question_depth", 4).put("performance", "AT_TARGET");
+        ((ObjectNode) state(l4Run).path("criterion_results").path("sql-c1")).put("question_depth", 4).put("performance", "AT_TARGET");
+        ObjectNode stretch = ((ObjectNode) state(l4Run).path("evidence_history").get(0)).deepCopy()
+                .put("turn_id", "l4-stretch").put("question_depth", 4).put("performance", "ABOVE").put("is_extension", true);
+        ((ArrayNode) state(l4Run).path("evidence_history")).add(stretch);
+        ObjectNode stretchTurn = ((ObjectNode) l4Run.snapshot().path("turns").get(0)).deepCopy()
+                .put("turn_id", "l4-stretch").put("action", "PROBE_DEEPER");
+        ((ArrayNode) l4Run.snapshot().path("turns")).add(stretchTurn);
+        assertThat(sql(view(l4Run)).assessment()).isEqualTo(ABOVE);
+
+        var firstFail = attempt(1, Map.of("java", BELOW), "java-A");
+        var secondPass = attempt(2, Map.of("java", AT), "java-B");
+        var javaObj = view(firstFail, secondPass).skills().getLast().objectives().getFirst();
+        assertThat(javaObj.assessment()).isEqualTo(VERIFY);
+        assertThat(javaObj.explanation()).contains("đang tiến bộ");
+    }
+
+    @Test void explicitInabilityPreservesNotDemonstratedInCompetencyProjection() {
+        var unable = attempt(1, Map.of("sql", NOT_DEMONSTRATED), "query-inability");
+        var sqlState = state(unable);
+        var ev = (ObjectNode) sqlState.path("evidence_history").get(0);
+        ev.put("observation", "NO_EVIDENCE")
+                .put("performance", "UNDETERMINED")
+                .put("explicit_inability", true)
+                .put("response_excerpt", "Em không biết.")
+                .put("rationale", "Ứng viên cho biết chưa trả lời được câu hỏi này.");
+        sqlState.putObject("criterion_results");
+        ((ObjectNode) unable.snapshot().path("turns").get(0)).put("answer", "Em không biết.");
+
+        View projected = view(unable);
+        assertThat(sql(projected).assessment()).isEqualTo(BELOW);
+        var objective = sql(projected).objectives().getFirst();
+        assertThat(objective.assessment()).isEqualTo(NOT_DEMONSTRATED);
+        var criterion = objective.criteria().getFirst();
+        assertThat(criterion.assessment()).isEqualTo(NOT_DEMONSTRATED);
+        assertThat(criterion.evidence()).hasSize(1);
+        assertThat(criterion.evidence().getFirst().responseExcerpt()).isEqualTo("Em không biết.");
+
+        // Subsequent AT_TARGET attempt triggers VERIFY with IMPROVING trend rather than skipping verification.
+        var improved = attempt(2, Map.of("sql", AT), "query-recovered");
+        var afterImprove = view(unable, improved);
+        assertThat(sql(afterImprove).assessment()).isEqualTo(VERIFY);
+        assertThat(sql(afterImprove).objectives().getFirst().criteria().getFirst().trend()).isEqualTo("IMPROVING");
+    }
 }

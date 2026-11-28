@@ -1,15 +1,22 @@
 """Grounded evidence ledger and deterministic sufficiency; CV priors never decide results."""
 import re
 import unicodedata
-from .models import Action, Assessment, Judgment, Mode, ObjectiveState, Observation, RecordedEvidence, Turn
+from .models import Action, Assessment, Criterion, Judgment, Mode, ObjectiveState, Observation, RecordedEvidence, Turn
+from .mode_strategy import supports_easier_drop
 from .policy_config import InterviewPolicy
 from .criterion_progress import CRITERION_SOFT_LIMIT, progress_for, record_progress
-from .conversation import ACKNOWLEDGMENT, INABILITY_ACKNOWLEDGMENT, MAX_FEEDBACK_LENGTH
+from .conversation import ACKNOWLEDGMENT, INABILITY_ACKNOWLEDGMENT, MAX_FEEDBACK_LENGTH, fit_feedback_length
 from .excerpts import source_excerpt, source_lines
+from .telemetry import event
 
 VALID_PERFORMANCE = {"BELOW", "AT_TARGET", "ABOVE"}
 SUBSTANTIVE = {"SUPPORTS", "CONTRADICTS"}
 TERMINAL = {Assessment.AT, Assessment.ABOVE, Assessment.BELOW, Assessment.NOT_DEMONSTRATED}
+MAX_SECONDARY_CRITERIA_IN_PROMPT = 3
+MAX_SECONDARY_OBSERVATIONS_PER_TURN = 2
+_MIN_SECONDARY_EXCERPT_CHARS = 25
+_MIN_SECONDARY_EXCERPT_WORDS = 5
+_MIN_SECONDARY_RATIONALE_CHARS = 10
 _VIETNAMESE_DIACRITICS = re.compile(
     r"[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]",
     re.IGNORECASE,
@@ -36,8 +43,14 @@ def _looks_like_english_prose(text: str) -> bool:
 def standalone_inability(turn: Turn) -> Judgment | None:
     answer = (turn.answer or "").strip()
     normalized = " ".join(unicodedata.normalize("NFC", answer).casefold().split())
-    if not re.fullmatch(r"(?:dạ[, ]+)?(?:(?:tôi|em|mình) )?(?:không|chưa) biết"
-                        r"(?: câu trả lời| trả lời| cách làm)?(?: ạ)?[.!…]*", normalized):
+    if not re.fullmatch(
+        r"(?:dạ[, ]+)?(?:(?:tôi|em|mình) )?"
+        r"(?:(?:không|chưa) (?:biết|làm được|trả lời được|nhớ)(?: câu trả lời| trả lời| cách làm| câu này)?"
+        r"|bỏ qua(?: câu này| câu hỏi này)?"
+        r"|skip(?: this question)?)"
+        r"(?: ạ)?[.!…]*",
+        normalized,
+    ):
         return None
     return Judgment(
         explicit_inability=True, inability_excerpt=answer, feedback=INABILITY_ACKNOWLEDGMENT,
@@ -47,12 +60,26 @@ def standalone_inability(turn: Turn) -> Judgment | None:
     )
 
 
-def validate_judgment(judgment: Judgment, turn: Turn) -> None:
-    if len(judgment.feedback.strip()) > MAX_FEEDBACK_LENGTH:
+def validate_judgment(
+    judgment: Judgment,
+    turn: Turn,
+    *,
+    max_feedback_length: int = MAX_FEEDBACK_LENGTH,
+    allow_sentence_trim: bool = False,
+    interaction_mode: str = "TEXT",
+) -> None:
+    if len(judgment.feedback.strip()) > max_feedback_length:
         # Presentation failure must not discard otherwise valid assessment evidence.
-        judgment.feedback = ACKNOWLEDGMENT
+        judgment.feedback = fit_feedback_length(
+            judgment.feedback,
+            max_length=max_feedback_length,
+            allow_sentence_trim=allow_sentence_trim,
+        )
+    voice_punct = interaction_mode == "VOICE" and not turn.submitted_code
     if judgment.explicit_inability:
-        grounded = source_excerpt(judgment.inability_excerpt, turn.answer or "")
+        grounded = source_excerpt(
+            judgment.inability_excerpt, turn.answer or "", allow_punctuation_tolerance=voice_punct,
+        )
         if grounded is None:
             raise ValueError("Explicit inability requires a grounded excerpt: copy ONE contiguous passage "
                              "from turn.answer into inability_excerpt, without paraphrasing or added words")
@@ -76,7 +103,9 @@ def validate_judgment(judgment: Judgment, turn: Turn) -> None:
         if substantive:
             grounded = (source_lines(item.response_line_range, turn.answer or "")
                         if item.response_line_range is not None
-                        else source_excerpt(item.response_excerpt, turn.answer or ""))
+                        else source_excerpt(
+                            item.response_excerpt, turn.answer or "", allow_punctuation_tolerance=voice_punct,
+                        ))
             if grounded is None:
                 raise ValueError(f"Evidence excerpt not found in candidate answer for criterion_id={item.criterion_id}. "
                                  "Copy ONE contiguous passage from turn.answer into response_excerpt exactly; "
@@ -94,10 +123,126 @@ def validate_judgment(judgment: Judgment, turn: Turn) -> None:
             raise ValueError("Contradictory performance must be below its criterion anchor")
 
 
-def apply_judgment(state: ObjectiveState, turn: Turn, policy: InterviewPolicy | None = None) -> None:
+def eligible_secondary_criteria(
+    state: ObjectiveState,
+    turn: Turn,
+    policy: InterviewPolicy | None = None,
+    *,
+    coding_compile_error: bool = False,
+) -> list[Criterion]:
+    """Return unresolved sibling criteria in the same objective eligible for opportunistic positive credit."""
+    active_policy = policy or InterviewPolicy()
+    if (
+        turn.question_depth != state.objective.target_depth
+        or turn.action in {Action.EASIER, Action.VERIFY, Action.DEEPER}
+        or turn.practice_step == "RETRY"
+        or any(item.kind == "HINT" for item in turn.clarifications)
+        or coding_compile_error
+        or (turn.coding_checks is not None and bool(turn.coding_checks.compile_error))
+    ):
+        return []
+    primary_ids = set(turn.question.criterion_ids)
+    excluded = set(state.assisted_criteria) | set(state.hinted_criteria) | set(state.contradictions)
+    candidates = [
+        criterion for criterion in state.objective.criteria
+        if criterion.criterion_id not in primary_ids
+        and criterion.criterion_id not in excluded
+        and not criterion_resolved(state, criterion.criterion_id, active_policy)
+    ]
+    candidates.sort(key=lambda c: (not c.essential,))
+    return candidates[:MAX_SECONDARY_CRITERIA_IN_PROMPT]
+
+
+def _is_substantive_secondary_excerpt(grounded: str, *, has_line_range: bool) -> bool:
+    stripped = grounded.strip()
+    if has_line_range or "\n" in stripped:
+        non_empty_lines = [line for line in stripped.splitlines() if line.strip()]
+        return len(non_empty_lines) >= 2 or len(stripped) >= _MIN_SECONDARY_EXCERPT_CHARS
+    return len(stripped) >= _MIN_SECONDARY_EXCERPT_CHARS and len(stripped.split()) >= _MIN_SECONDARY_EXCERPT_WORDS
+
+
+def sanitize_secondary_observations(
+    judgment: Judgment,
+    state: ObjectiveState,
+    turn: Turn,
+    policy: InterviewPolicy | None = None,
+    *,
+    interaction_mode: str = "TEXT",
+    coding_compile_error: bool = False,
+) -> list[Observation]:
+    """Filter opportunistic secondary observations with 5 hard gates; never fails primary grading."""
+    raw = list(judgment.secondary_observations)
+    if not raw:
+        return []
+    if judgment.explicit_inability:
+        judgment.secondary_observations = []
+        return []
+    allowed_ids = {
+        c.criterion_id
+        for c in eligible_secondary_criteria(state, turn, policy, coding_compile_error=coding_compile_error)
+    }
+    if not allowed_ids:
+        event("judge.secondary_dropped", turn_id=turn.turn_id, count=len(raw), reason="turn_ineligible")
+        judgment.secondary_observations = []
+        return []
+    voice_punct = interaction_mode == "VOICE" and not turn.submitted_code
+    accepted: list[Observation] = []
+    seen_ids: set[str] = set()
+    dropped = 0
+    for item in raw:
+        if len(accepted) >= MAX_SECONDARY_OBSERVATIONS_PER_TURN:
+            dropped += 1
+            continue
+        if (
+            item.criterion_id not in allowed_ids
+            or item.criterion_id in seen_ids
+            or item.observation != "SUPPORTS"
+            or item.performance != "AT_TARGET"
+            or bool(item.unresolved_aspects)
+            or _looks_like_english_prose(item.rationale)
+            or len(item.rationale.strip()) < _MIN_SECONDARY_RATIONALE_CHARS
+        ):
+            dropped += 1
+            continue
+        grounded = (
+            source_lines(item.response_line_range, turn.answer or "")
+            if item.response_line_range is not None
+            else source_excerpt(item.response_excerpt, turn.answer or "", allow_punctuation_tolerance=voice_punct)
+        )
+        if grounded is None or not _is_substantive_secondary_excerpt(
+            grounded, has_line_range=item.response_line_range is not None,
+        ):
+            dropped += 1
+            continue
+        seen_ids.add(item.criterion_id)
+        accepted.append(item.model_copy(update={"response_excerpt": grounded, "resolves_contradiction": False}))
+    if dropped:
+        event("judge.secondary_dropped", turn_id=turn.turn_id, count=dropped, accepted=len(accepted))
+    judgment.secondary_observations = accepted
+    return accepted
+
+
+def apply_judgment(
+    state: ObjectiveState,
+    turn: Turn,
+    policy: InterviewPolicy | None = None,
+    *,
+    max_feedback_length: int = MAX_FEEDBACK_LENGTH,
+    allow_sentence_trim: bool = False,
+    interaction_mode: str = "TEXT",
+) -> None:
     judgment = turn.judgment
     assert judgment is not None
-    validate_judgment(judgment, turn)
+    validate_judgment(
+        judgment,
+        turn,
+        max_feedback_length=max_feedback_length,
+        allow_sentence_trim=allow_sentence_trim,
+        interaction_mode=interaction_mode,
+    )
+    secondary = sanitize_secondary_observations(
+        judgment, state, turn, policy, interaction_mode=interaction_mode,
+    )
     state.turns_spent += 1
     for observation in judgment.observations:
         if observation.performance == "ABOVE" and not (
@@ -107,24 +252,40 @@ def apply_judgment(state: ObjectiveState, turn: Turn, policy: InterviewPolicy | 
             observation.performance = "AT_TARGET"
         _record_observation(state, turn, observation)
     record_progress(state, turn)
+    for observation in secondary:
+        _record_observation(state, turn, observation, is_secondary=True)
+        event("judge.secondary_evidence", turn_id=turn.turn_id, criterion_id=observation.criterion_id)
     state.assessment = assess(state, policy)
     # Candidate-facing feedback suppresses hints. Only delivered assistance taints evidence.
 
 
-def _record_observation(state: ObjectiveState, turn: Turn, observation: Observation) -> None:
+def _record_observation(
+    state: ObjectiveState,
+    turn: Turn,
+    observation: Observation,
+    *,
+    is_secondary: bool = False,
+) -> None:
     evidence = RecordedEvidence(
         **observation.model_dump(exclude={"response_line_range", "resolves_contradiction", "unresolved_aspects"}),
-        turn_id=turn.turn_id, question_depth=turn.question_depth,
+        turn_id=turn.turn_id,
+        question_depth=state.objective.target_depth if is_secondary else turn.question_depth,
         evidence_scope=turn.question.evidence_scope,
-        independent=observation.criterion_id not in state.assisted_criteria,
-        explicit_inability=bool(turn.judgment and turn.judgment.explicit_inability),
+        independent=(observation.criterion_id not in state.assisted_criteria
+                     and turn.practice_step != "RETRY"
+                     and not any(item.kind == "HINT" for item in turn.clarifications)),
+        explicit_inability=False if is_secondary else bool(turn.judgment and turn.judgment.explicit_inability),
+        is_extension=False if is_secondary else (turn.action == Action.DEEPER),
     )
     if evidence.explicit_inability and evidence.observation not in SUBSTANTIVE:
         evidence.response_excerpt = turn.judgment.inability_excerpt
     if not any(_fingerprint(previous) == _fingerprint(evidence) for previous in state.evidence_history):
         state.evidence_history.append(evidence)
-    if not evidence.independent or evidence.question_depth != state.objective.target_depth:
+    if not evidence.independent or evidence.is_extension or evidence.question_depth != state.objective.target_depth:
         return  # diagnostics and extensions never overwrite target results
+    if not is_secondary and turn.practice_step == "TRANSFER":
+        progress_for(state, observation.criterion_id).transfer_verified = (
+            evidence.observation == "SUPPORTS" and evidence.performance in {"AT_TARGET", "ABOVE"})
     _update_target_result(state, turn, evidence, resolves_contradiction=observation.resolves_contradiction)
 
 
@@ -151,7 +312,14 @@ def _update_target_result(
         and turn.action == Action.FOLLOW_UP
         and key not in state.contradictions
     )
-    if incompatible and not recovered_after_easier and key not in state.contradictions:
+    recovered_after_clarify = (
+        previous is not None
+        and previous.performance == "BELOW"
+        and evidence.performance in {"AT_TARGET", "ABOVE"}
+        and turn.action == Action.CLARIFY
+        and key not in state.contradictions
+    )
+    if incompatible and not (recovered_after_easier or recovered_after_clarify or turn.practice_step == "TRANSFER") and key not in state.contradictions:
         state.contradictions.append(key)
     if turn.action == Action.VERIFY and resolves_contradiction and key in state.contradictions:
         state.contradictions.remove(key)
@@ -178,14 +346,21 @@ def _diagnosed_failure(state: ObjectiveState, key: str, policy: InterviewPolicy)
         return False
     evidence = _criterion_evidence(state, key)
     target = state.objective.target_depth
-    target_failed = any(item.question_depth == target and _failure(item) for item in evidence)
+    if (
+        target == 1
+        and any(item.question_depth == 1 and item.explicit_inability for item in evidence)
+        and progress_for(state, key).stop_reason == "NO_PROGRESS"
+    ):
+        return True
+    target_failed = any(item.question_depth == target and not item.is_extension and _failure(item) for item in evidence)
+    no_easier_drop = state.selected_mode is not None and not supports_easier_drop(state.selected_mode)
     diagnostic = any(
         (item.question_depth < target and (item.observation in SUBSTANTIVE or item.explicit_inability))
         or item.explicit_inability
         for item in evidence
-    )
+    ) or (no_easier_drop and progress_for(state, key).clarification_spent)
     contexts = {item.evidence_scope.casefold().strip() for item in evidence
-                if item.question_depth <= target
+                if item.question_depth <= target and not item.is_extension
                 and (item.observation in SUBSTANTIVE or item.explicit_inability) and item.evidence_scope.strip()}
     return target_failed and (diagnostic or target == 1) and len(contexts) >= policy.min_failure_contexts
 
@@ -201,7 +376,7 @@ def assess(state: ObjectiveState, policy: InterviewPolicy | None = None) -> Asse
     if len(diagnosed) == len(required) and not any(
             item.performance in {"AT_TARGET", "ABOVE"} and item.observation == "SUPPORTS"
             for key in required for item in _criterion_evidence(state, key)
-            if item.question_depth <= state.objective.target_depth):
+            if item.question_depth <= state.objective.target_depth and not item.is_extension):
         return Assessment.NOT_DEMONSTRATED
     if any(key not in state.criterion_results and key not in diagnosed for key in required):
         return Assessment.INSUFFICIENT
@@ -217,9 +392,14 @@ def _above_target(state: ObjectiveState, required: list[str]) -> bool:
     extension = state.objective.extension_depth
     if extension is None or not required:
         return False
+    target = state.objective.target_depth
     for key in required:
-        evidence = [item for item in _criterion_evidence(state, key)
-                    if item.question_depth == extension and item.observation in SUBSTANTIVE]
+        evidence = [
+            item for item in _criterion_evidence(state, key)
+            if item.question_depth == extension
+            and (item.is_extension or extension > target)
+            and item.observation in SUBSTANTIVE
+        ]
         if not evidence or any(item.performance != "ABOVE" for item in evidence):
             return False
     return True
@@ -249,7 +429,9 @@ def next_action(
     unresolved = [key for key in eligible if key in essential and not criterion_resolved(state, key, policy)]
     if not unresolved:
         return None
-    return criterion_action(state, _choose_criterion(state, unresolved))
+    chosen = _choose_criterion(state, unresolved)
+    active_mode = mode_for_criterion(state, chosen, allow_mode_switch=allow_mode_switch)
+    return criterion_action(state, chosen, mode=active_mode, last_turn=turn)
 
 
 def _diagnostic_recovery(state: ObjectiveState, turn: Turn, eligible: list[str]) -> Action | None:
@@ -264,7 +446,22 @@ def _diagnostic_recovery(state: ObjectiveState, turn: Turn, eligible: list[str])
     return None
 
 
-def criterion_action(state: ObjectiveState, key: str) -> Action:
+def _should_offer_code_repair(turn: Turn | None, key: str) -> bool:
+    if turn is None or key not in turn.question.criterion_ids or turn.coding_checks is None:
+        return False
+    if turn.judgment and turn.judgment.explicit_inability:
+        return False
+    checks = turn.coding_checks
+    return checks.total > 0 and checks.passed < checks.total
+
+
+def criterion_action(
+    state: ObjectiveState,
+    key: str,
+    *,
+    mode: Mode | None = None,
+    last_turn: Turn | None = None,
+) -> Action:
     progress = progress_for(state, key)
     if key in state.contradictions:
         return _probe(state, key, Action.VERIFY, "Resolve conflicting target-level evidence")
@@ -272,8 +469,26 @@ def criterion_action(state: ObjectiveState, key: str) -> Action:
         return _probe(state, key, Action.FOLLOW_UP, "Collect initial evidence for an untested essential criterion")
     evidence = [e for e in state.evidence_history if e.criterion_id == key]
     last = evidence[-1] if evidence else None
-    if last and (last.performance == "BELOW" or last.explicit_inability) and not progress.easier_spent and state.objective.target_depth > 1:
-        return _probe(state, key, Action.EASIER, "Ask for one simpler prerequisite decision using a small concrete case")
+    active_mode = mode or state.selected_mode
+    if _should_offer_code_repair(last_turn, key) and not progress.clarification_spent:
+        return _probe(
+            state, key, Action.CLARIFY,
+            "Ask the candidate to inspect and fix the remaining failing edge or logic case in their submitted code",
+        )
+    if last and (last.performance == "BELOW" or last.explicit_inability):
+        if active_mode is not None and not supports_easier_drop(active_mode):
+            if last.explicit_inability:
+                return _probe(
+                    state, key, Action.FOLLOW_UP,
+                    "Ask for a simpler concrete example from coursework, internship, or personal project",
+                )
+            if not progress.clarification_spent:
+                return _probe(
+                    state, key, Action.CLARIFY,
+                    "Probe the missing STAR detail (personal Action or measurable Result) in the candidate's own story",
+                )
+        elif not progress.easier_spent and state.objective.target_depth > 1:
+            return _probe(state, key, Action.EASIER, "Ask for one simpler prerequisite decision using a small concrete case")
     if last and last.observation in {"UNCLEAR", "NO_EVIDENCE"} and not progress.clarification_spent:
         return _probe(state, key, Action.CLARIFY, "Clarify the missing or ambiguous evidence without hints")
     gaps = "; ".join(progress.unresolved_aspects)

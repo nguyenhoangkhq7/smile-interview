@@ -101,4 +101,32 @@ class StudySuggestionProjectionTest {
         var item = project().getFirst().criteria().getFirst();
         assertThat(item.kind()).isEqualTo("REINFORCE");
     }
+
+    @Test void passingAfterHintTriggersReinforceAndPracticeSessionsAreIgnored() {
+        answer(1, "c1", "AT_TARGET");
+        state().putArray("hinted_criteria").add("c1");
+        assertThat(project().getFirst().criteria().getFirst().kind()).isEqualTo("REINFORCE");
+
+        // A later PRACTICE attempt must not override official ASSESSMENT activity or source.
+        var assessRun = new InterviewRun();
+        assessRun.setSessionId(session.getId());
+        assessRun.setSnapshotJson(snapshot.toString());
+        assessRun.setPublicJson(snapshot.toString());
+
+        var practiceSession = Session.builder().id("s2-practice").attemptNumber(2).status("Completed").build();
+        ObjectNode practiceSnap = snapshot.deepCopy();
+        practiceSnap.putObject("config").put("session_purpose", "PRACTICE");
+        ((ObjectNode) practiceSnap.path("objectives").path("a")).putArray("hinted_criteria");
+        var practiceRun = new InterviewRun();
+        practiceRun.setSessionId(practiceSession.getId());
+        practiceRun.setSnapshotJson(practiceSnap.toString());
+        practiceRun.setPublicJson(practiceSnap.toString());
+
+        var attempts = List.of(session, practiceSession);
+        var runs = List.of(assessRun, practiceRun);
+        var result = suggestions.project(profile, competency.project(profile, attempts, runs), attempts, runs);
+        var c1 = result.getFirst().criteria().getFirst();
+        assertThat(c1.kind()).isEqualTo("REINFORCE");
+        assertThat(c1.source().sessionId()).isEqualTo("s1");
+    }
 }

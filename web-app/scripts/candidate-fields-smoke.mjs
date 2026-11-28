@@ -197,7 +197,7 @@ try {
   many = false;
   degraded = true;
   await page.reload({ waitUntil: 'networkidle0' });
-  assert.match(await page.$eval(summary, element => element.innerText), /Một phần phân tích chưa đầy đủ/);
+  assert.doesNotMatch(await page.$eval(summary, element => element.innerText), /Một phần phân tích chưa đầy đủ/);
   empty = true;
   await page.reload({ waitUntil: 'networkidle0' });
   assert.match(await page.$eval(summary, element => element.innerText), /Chưa có kết quả đối chiếu kỹ năng/);

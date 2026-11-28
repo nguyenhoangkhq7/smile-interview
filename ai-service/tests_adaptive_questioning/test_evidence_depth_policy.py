@@ -595,7 +595,7 @@ def test_missing_essential_in_chosen_mode_stops_with_explicit_reason(audit):
     assert sum(criterion.assessment == Assessment.NOT_ASSESSED for criterion in obj.criteria) == 1
 
 
-def test_question_generation_elapsed_time_cannot_publish_expired_pending_turn(audit):
+def test_first_question_generation_preserves_candidate_time(audit):
     provider, engine, now = audit
     original = provider.question
 
@@ -606,9 +606,8 @@ def test_question_generation_elapsed_time_cannot_publish_expired_pending_turn(au
 
     provider.question = slow_question
     result = start(engine)
-    assert result.public.is_finished
-    assert result.public.pending_turn is None
-    assert result.public.report.termination_reason == "TIME_BUDGET"
+    assert not result.public.is_finished and result.public.pending_turn
+    assert result.public.deadline_at == now[0] + timedelta(seconds=result.public.config.duration_seconds)
     assert result.public.report.objectives[0].assessment == Assessment.NOT_ASSESSED
 
 

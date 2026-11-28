@@ -65,17 +65,32 @@ def start_coding(provider, engine, monkeypatch, **config):
 def test_duplicate_payload_counterexample_prevents_false_pass(setup, monkeypatch):
     provider, engine, _ = setup
     snapshot = start_coding(provider, engine, monkeypatch)
-    monkeypatch.setattr(provider, "judge", lambda _: pytest.fail("A verified mismatch needs no model judgment"))
+    seen_judge_contexts = []
+    original_judge = provider.judge
+
+    def overly_generous_judge(context):
+        seen_judge_contexts.append(json.loads(context))
+        # Simulate a Judge that erroneously tries to pass despite failing a hidden test.
+        return original_judge(context)
+
+    monkeypatch.setattr(provider, "judge", overly_generous_judge)
     text = LAST_RECORD + "\n\nEm dùng dict để giữ thứ tự chèn."
 
     result = answer(engine, snapshot, text)
 
+    # Judge was invoked with coding_checks, rejected on false-pass, and fell back deterministically to BELOW.
+    assert len(seen_judge_contexts) == 2
+    assert seen_judge_contexts[0]["coding_checks"]["passed"] == 2
+    assert seen_judge_contexts[0]["coding_checks"]["total"] == 3
+    assert seen_judge_contexts[0]["coding_checks"]["hidden_failed_summaries"]
+    assert result.public.turns[0].coding_checks.hidden_failed_summaries == []
     record = result.snapshot.turns[0].judgment.observations[0]
     assert (record.observation, record.performance) == ("CONTRADICTS", "BELOW")
     assert record.response_excerpt.rstrip() == LAST_RECORD
     assert "1/3" in record.rationale
     assert result.public.report.objectives[0].assessment == Assessment.INSUFFICIENT
-    assert result.snapshot.pending_turn.action == "ASK_EASIER"
+    # Partial pass (2/3) prompts code-repair CLARIFY on the same problem first instead of dropping to ASK_EASIER.
+    assert result.snapshot.pending_turn.action == Action.CLARIFY
 
 
 @pytest.mark.parametrize(("code", "interaction_mode", "expected_passed"), [

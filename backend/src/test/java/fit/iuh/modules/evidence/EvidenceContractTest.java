@@ -64,6 +64,17 @@ class EvidenceContractTest {
         assertThat(mapper.readValue(legacy, EvidenceDtos.Config.class).interactionMode()).isEqualTo("TEXT");
         var voice = mapper.readValue(legacy.replace("\"MIXED\"", "\"MIXED\",\"interaction_mode\":\"VOICE\""), EvidenceDtos.Config.class);
         assertThat(mapper.valueToTree(voice).path("interaction_mode").asText()).isEqualTo("VOICE");
+        var withBehavioral = mapper.readValue(
+                legacy.replace("\"MIXED\"", "\"MIXED\",\"include_behavioral_in_mixed\":true"),
+                EvidenceDtos.Config.class);
+        assertThat(withBehavioral.includeBehavioralInMixed()).isTrue();
+        assertThat(mapper.valueToTree(withBehavioral).path("include_behavioral_in_mixed").asBoolean()).isTrue();
+        assertThat(mapper.valueToTree(withBehavioral).has("focus_skill_ids")).isFalse();
+        var withFocus = mapper.readValue(
+                legacy.replace("\"MIXED\"", "\"MIXED\",\"focus_skill_ids\":[\" postgresql \",\"redis\",\"postgresql\"]"),
+                EvidenceDtos.Config.class);
+        assertThat(withFocus.focusSkillIds()).containsExactly("postgresql", "redis");
+        assertThat(mapper.valueToTree(withFocus).path("focus_skill_ids").size()).isEqualTo(2);
     }
     @Test
     void c2ContextSurvivesJavaRoundtrip() throws Exception {

@@ -13,6 +13,7 @@ const labels: Record<string, string> = {
   'crypto trading': 'Chứng khoán & Crypto',
   'financial investment': 'Đầu tư tài chính',
   'web development basics': 'Phát triển web cơ bản',
+  'behavioral competency': 'Kinh nghiệm & Ứng xử (STAR)',
 };
 
 // Reproduce the old ASCII-only slug strictly for looking up names in saved evidence.

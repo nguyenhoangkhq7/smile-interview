@@ -3034,5 +3034,200 @@
       "inability_excerpt": "",
       "feedback_contains_hint": false
     }
+  },
+  {
+    "sample_id": "xj38",
+    "split": "train",
+    "context": {
+      "interaction_mode": "TEXT",
+      "session_purpose": "ASSESSMENT",
+      "objective": {
+        "skill_id": "rest_api",
+        "target_depth": 3,
+        "extension_depth": null,
+        "claim": "Thiết kế endpoint tạo đơn hàng an toàn khi client gửi lại",
+        "criteria": [
+          {
+            "criterion_id": "xj38:c1",
+            "description": "Đảm bảo idempotency khi client gửi trùng request tạo đơn hàng",
+            "expected_evidence": "Dùng khóa idempotency lưu trạng thái và trả lại kết quả cũ khi trùng khóa.",
+            "below_target": "Tạo đơn mới lặp lại hoặc không đối chiếu khóa ở tầng lưu trữ.",
+            "at_target": "Kiểm tra idempotency key ở tầng lưu trữ và trả lại phản hồi nhất quán cho lần gửi trùng.",
+            "above_target": "Xử lý đồng thời race condition và TTL cho khóa idempotency.",
+            "essential": true
+          }
+        ]
+      },
+      "turn": {
+        "turn_id": "xj38-turn",
+        "objective_id": "xj38",
+        "skill_id": "rest_api",
+        "mode": "DESIGN",
+        "action": "INITIAL",
+        "question_depth": 3,
+        "question": {
+          "text": "Thiết kế cơ chế chống tạo trùng đơn hàng cho API `POST /orders` khi client retry sau timeout?",
+          "criterion_ids": [
+            "xj38:c1"
+          ],
+          "evidence_scope": "xj38-idempotent-orders"
+        },
+        "clarifications": [
+          {
+            "kind": "CLARIFY_PROMPT",
+            "question": "Hệ thống chạy trên một instance database PostgreSQL duy nhất hay đa vùng?",
+            "answer": "Giả sử một cụm PostgreSQL duy nhất, không cần xử lý đa vùng địa lý."
+          }
+        ],
+        "answer": "Client gửi header Idempotency-Key. Server lưu bảng idempotency_keys trên PostgreSQL với ràng buộc UNIQUE trên key kèm response JSON; khi retry cùng key sẽ truy vấn bản ghi cũ và trả nguyên kết quả đó mà không tạo đơn mới.",
+        "judgment": null,
+        "introduction": ""
+      },
+      "turn_clarifications": [
+        {
+          "kind": "CLARIFY_PROMPT",
+          "question": "Hệ thống chạy trên một instance database PostgreSQL duy nhất hay đa vùng?",
+          "answer": "Giả sử một cụm PostgreSQL duy nhất, không cần xử lý đa vùng địa lý."
+        }
+      ],
+      "answer_lines": [
+        {
+          "line": 1,
+          "text": "Client gửi header Idempotency-Key. Server lưu bảng idempotency_keys trên PostgreSQL với ràng buộc UNIQUE trên key kèm response JSON; khi retry cùng key sẽ truy vấn bản ghi cũ và trả nguyên kết quả đó mà không tạo đơn mới."
+        }
+      ],
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "prior_observations": [],
+      "prior_turns": []
+    },
+    "judgment": {
+      "observations": [
+        {
+          "criterion_id": "xj38:c1",
+          "response_excerpt": "lưu bảng idempotency_keys trên PostgreSQL với ràng buộc UNIQUE trên key kèm response JSON; khi retry cùng key sẽ truy vấn bản ghi cũ",
+          "response_line_range": null,
+          "observation": "SUPPORTS",
+          "performance": "AT_TARGET",
+          "rationale": "Ứng viên chủ động hỏi rõ phạm vi đơn cụm PostgreSQL và thiết kế đúng cơ chế ràng buộc UNIQUE trên Idempotency-Key cùng việc trả lại phản hồi đã lưu khi retry.",
+          "resolves_contradiction": false,
+          "unresolved_aspects": []
+        }
+      ],
+      "feedback": "Bạn đã làm rõ phạm vi hệ thống trước và thiết kế cơ chế Idempotency-Key với ràng buộc UNIQUE nhất quán.",
+      "explicit_inability": false,
+      "inability_excerpt": "",
+      "feedback_contains_hint": false
+    }
+  },
+  {
+    "sample_id": "xj39",
+    "split": "train",
+    "context": {
+      "interaction_mode": "TEXT",
+      "session_purpose": "PRACTICE",
+      "objective": {
+        "skill_id": "python",
+        "target_depth": 2,
+        "extension_depth": null,
+        "claim": "Khử trùng lặp giữ bản ghi đầu tiên",
+        "criteria": [
+          {
+            "criterion_id": "xj39:c1",
+            "description": "Viết hàm deduplicate_events(events) giữ bản ghi đầu tiên theo thứ tự gốc",
+            "expected_evidence": "Dùng cấu trúc tra cứu O(1) giữ bản ghi đầu tiên mỗi event_id và bảo toàn thứ tự.",
+            "below_target": "Ghi đè bản ghi đầu bằng bản ghi cuối hoặc làm sai thứ tự.",
+            "at_target": "Giữ bản ghi xuất hiện đầu tiên theo đúng thứ tự đầu vào.",
+            "above_target": "Đảm bảo O(n) và xử lý ca biên hợp lệ.",
+            "essential": true
+          }
+        ]
+      },
+      "turn": {
+        "turn_id": "xj39-turn",
+        "objective_id": "xj39",
+        "skill_id": "python",
+        "mode": "CODING",
+        "action": "INITIAL",
+        "question_depth": 2,
+        "question": {
+          "text": "Hãy viết hàm Python `deduplicate_events(events)` giữ bản ghi xuất hiện đầu tiên của mỗi `event_id` theo thứ tự đầu vào.",
+          "criterion_ids": [
+            "xj39:c1"
+          ],
+          "evidence_scope": "xj39-dedup"
+        },
+        "submitted_code": "def deduplicate_events(events):\n    by_id = {e['event_id']: e for e in events}\n    return list(by_id.values())",
+        "transcript": "Em dùng dict để đạt O(n) và giữ thứ tự chèn.",
+        "answer": "def deduplicate_events(events):\n    by_id = {e['event_id']: e for e in events}\n    return list(by_id.values())\n\nEm dùng dict để đạt O(n) và giữ thứ tự chèn.",
+        "judgment": null,
+        "introduction": ""
+      },
+      "answer_lines": [
+        {
+          "line": 1,
+          "text": "def deduplicate_events(events):"
+        },
+        {
+          "line": 2,
+          "text": "    by_id = {e['event_id']: e for e in events}"
+        },
+        {
+          "line": 3,
+          "text": "    return list(by_id.values())"
+        },
+        {
+          "line": 4,
+          "text": ""
+        },
+        {
+          "line": 5,
+          "text": "Em dùng dict để đạt O(n) và giữ thứ tự chèn."
+        }
+      ],
+      "depth_definitions": {
+        "1": "Foundation: recognize, define and explain fundamental concepts",
+        "2": "Application: independently apply a concept to a concrete bounded task",
+        "3": "Analysis & Problem Solving: investigate causes, debug and reason through alternatives",
+        "4": "Design & Trade-offs: design a solution, evaluate constraints and technical trade-offs"
+      },
+      "prior_observations": [],
+      "prior_turns": [],
+      "coding_checks": {
+        "passed": 2,
+        "total": 3,
+        "language": "python",
+        "hidden_failed_summaries": [
+          "Ca kiểm thử ẩn 'keep-first' trả về kết quả khác kỳ vọng (cần kiểm tra logic/ca biên)."
+        ]
+      }
+    },
+    "judgment": {
+      "observations": [
+        {
+          "criterion_id": "xj39:c1",
+          "response_excerpt": "",
+          "response_line_range": [
+            1,
+            3
+          ],
+          "observation": "CONTRADICTS",
+          "performance": "BELOW",
+          "rationale": "Ứng viên chọn dict đạt O(n) và vượt qua 2/3 ca thử không trùng, nhưng dict comprehension ghi đè giá trị cũ bằng bản ghi trùng xuất hiện sau nên sai yêu cầu giữ bản ghi đầu tiên.",
+          "resolves_contradiction": false,
+          "unresolved_aspects": [
+            "tránh ghi đè bản ghi đầu tiên khi gặp event_id trùng lặp"
+          ]
+        }
+      ],
+      "feedback": "Hướng dùng dict để đạt O(n) là hợp lý và đã qua 2/3 ca thử, nhưng cách gán trực tiếp trong dict comprehension đang ghi đè mất bản ghi đầu tiên khi khóa trùng.",
+      "explicit_inability": false,
+      "inability_excerpt": "",
+      "feedback_contains_hint": false
+    }
   }
 ]

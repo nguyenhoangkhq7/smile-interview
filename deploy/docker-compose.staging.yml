@@ -39,6 +39,8 @@ services:
       ENVIRONMENT: production
       HF_HOME: /app/.cache/huggingface
       GNN_REQUIRE_CHECKPOINT: ${GNN_REQUIRE_CHECKPOINT:-true}
+      AI_RUNTIME_BACKEND_URL: http://backend:8081
+      AI_RUNTIME_KEY_FILE: /run/smile-ai/ai-runtime.key
       CODE_RUNNER_URL: ${CODE_RUNNER_URL:-http://code-runner:8090}
       OMP_NUM_THREADS: "2"
       MKL_NUM_THREADS: "2"
@@ -47,6 +49,7 @@ services:
     expose:
       - "8000"
     volumes:
+      - ai_runtime_key:/run/smile-ai:ro
       - sbert_cache:/app/.cache/huggingface
       - type: bind
         source: ${GNN_CHECKPOINT_DIR:-../ai-service/matching_cv/data/checkpoints/paper_aligned_gnn}
@@ -71,11 +74,14 @@ services:
       JAVA_TOOL_OPTIONS: "-Xms384m -Xmx768m -XX:+UseG1GC"
       SPRING_DATASOURCE_URL: "jdbc:postgresql://${RDS_ENDPOINT:?Set the RDS endpoint hostname}:5432/${RDS_DB_NAME:-interview_practice_db}?sslmode=verify-full&sslrootcert=/run/rds-ca/rds-global-bundle.pem"
       FASTAPI_AI_BASE_URL: http://ai-service:8000
+      APP_AI_RUNTIME_AUTO_PROVISION: "true"
+      AI_RUNTIME_KEY_FILE: /run/smile-ai/ai-runtime.key
       APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:?Set exact Vercel staging origin}
       APP_SECURITY_REQUIRE_HARDENED_ADMIN: "true"
     expose:
       - "8081"
     volumes:
+      - ai_runtime_key:/run/smile-ai
       - backend_uploads:/app/uploads
       - type: bind
         source: ${RDS_CA_BUNDLE:-./certs/rds-global-bundle.pem}
@@ -109,6 +115,7 @@ services:
       - internal
 
 volumes:
+  ai_runtime_key:
   backend_uploads:
   sbert_cache:
 

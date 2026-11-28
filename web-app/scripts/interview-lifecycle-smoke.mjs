@@ -15,6 +15,7 @@ async function scenario(mode, action) {
   const page = await browser.newPage();
   const errors = [], commands = [], answers = [], transcriptions = [], speeches = [], questionLoads = [];
   let session = null, failedIntro = false, failedSpeech = false;
+  let queuedSubmission = null, releaseGrade = false;
   page.on('pageerror', error => errors.push(error.message));
   await page.setViewport({ width: 1280, height: 900 });
   await page.evaluateOnNewDocument(() => {
@@ -22,7 +23,7 @@ async function scenario(mode, action) {
       user: { id: 'test', username: 'Test', role: 'USER' }, isAuthenticated: true,
       token: `e30.${btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 }))}.fixture`,
     }, version: 0 }));
-    const context = new AudioContext();
+    const context = new AudioContext({ sampleRate: 16000 });
     navigator.mediaDevices.getUserMedia = async () => {
       const stream = context.createMediaStreamDestination().stream; window.__voiceStream = stream; return stream;
     };
@@ -94,6 +95,12 @@ async function scenario(mode, action) {
       const command = JSON.parse(request.postData()); answers.push(command);
       assert.equal(session.conversation.phase, 'INTERVIEW');
       assert.equal(command.turn_id, session.pending_turn.turn_id);
+      if (mode === 'VOICE' && action === 'question-retry' && !session.turns.length) {
+        session.state_version++;
+        queuedSubmission = { ...structuredClone(session), pending_turn: null, paused_remaining_seconds: 10,
+          submission: { status: 'QUEUED', turn_id: command.turn_id, candidate_response: command.candidate_response,
+            received_at: new Date().toISOString() } };
+      }
       session.turns.push({ turn_id: session.pending_turn.turn_id, objective_id: session.pending_turn.objective_id,
         mode: session.pending_turn.mode, question: session.pending_turn.question,
         answer: command.candidate_response, feedback: 'Đã ghi nhận.' });
@@ -101,7 +108,7 @@ async function scenario(mode, action) {
       if (action === 'question-retry' && session.turns.length === 1) {
         session.pending_turn = null; session.awaiting_question = true;
       } else finish('PLAN_COMPLETE');
-      return send(session);
+      return send(queuedSubmission || session);
     }
     if (url.pathname.endsWith('/interview/stop')) {
       session.state_version++; finish('USER_STOP'); return send(session);
@@ -123,7 +130,10 @@ async function scenario(mode, action) {
       return send({ phase: command.phase, verification: 'not_requested', review_required: false,
         text: session.conversation.phase === 'SELF_INTRODUCTION' ? intro : 'Em dùng EXPLAIN ANALYZE.' });
     }
-    if (url.pathname.endsWith('/interview')) return send(session || {}, session ? 200 : 404);
+    if (url.pathname.endsWith('/interview')) {
+      if (releaseGrade) queuedSubmission = null;
+      return send(queuedSubmission || session || {}, session ? 200 : 404);
+    }
     return send({});
   });
   const click = async label => { const button = await page.waitForFunction(text => [...document.querySelectorAll('button')].find(node => node.textContent.includes(text) || node.getAttribute('aria-label') === text), {}, label); await button.asElement().click(); };
@@ -171,6 +181,13 @@ async function scenario(mode, action) {
       } else if (action === 'question-retry') {
         const failed = failedQuestionLoad();
         await feed();
+        await page.waitForSelector('[role="dialog"][aria-label="Đang chấm câu trả lời…"]', { visible: true });
+        await page.waitForSelector('[data-interview-mode="VOICE"]', { visible: true });
+        assert.equal(await page.$('summary::-p-text(Xem bài đã nộp)'), null);
+        await page.waitForFunction(() => !window.__voiceStream.getAudioTracks()[0].enabled);
+        assert.ok(await page.evaluate(() => window.__avatar === document.querySelector('video')
+          && window.__simliMock.stops === 0), 'Grading keeps the active avatar connected');
+        releaseGrade = true;
         await failed;
         await page.waitForSelector('button::-p-text(Thử tải lại câu hỏi)');
         await page.waitForFunction(() => !window.__voiceStream.getAudioTracks()[0].enabled);
@@ -254,6 +271,9 @@ async function scenario(mode, action) {
     }
     assert.deepEqual(errors, []);
     console.log(`PASS: ${mode} ${action}, separate introduction, reload and farewell before results`);
+  } catch (error) {
+    console.error(mode, action, await page.evaluate(() => document.querySelector('[role="alert"]')?.textContent));
+    throw error;
   } finally { await page.close(); }
 }
 try {

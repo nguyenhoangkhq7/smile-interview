@@ -29,9 +29,12 @@ export function useEvidenceInterview(id: string, readOnly = false) {
     setError('');
     try {
       const current = await evidenceInterview.get(id);
-      const previous = await historyService.getSessionById(id);
-      setMetadata(previous);
       setSession(current);
+      const previous = await historyService.getSessionById(id).catch(cause => {
+        if (!current) throw cause;
+        return null;
+      });
+      setMetadata(previous);
       setLegacy(false);
       if (!current) {
         if (!previous) throw new Error('Không tìm thấy phiên phỏng vấn.');
@@ -43,6 +46,29 @@ export function useEvidenceInterview(id: string, readOnly = false) {
   }, [id, readOnly]);
 
   useEffect(() => { void reload(); }, [reload]);
+
+  const gradingVersion = session?.submission?.status === 'QUEUED' ? session.state_version : null;
+  useEffect(() => {
+    if (gradingVersion === null) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    async function poll() {
+      try {
+        const current = await evidenceInterview.get(id);
+        if (cancelled) return;
+        if (current && current.state_version >= gradingVersion!) {
+          setError('');
+          setSession(previous => previous && previous.state_version > current.state_version ? previous : current);
+          if (current.submission?.status !== 'QUEUED') return;
+        }
+      } catch (cause) {
+        if (!cancelled) setError(interviewError(cause));
+      }
+      if (!cancelled) timer = setTimeout(poll, 1500);
+    }
+    timer = setTimeout(poll, 500);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [id, gradingVersion]);
 
   const run = useCallback(async (operation: () => Promise<EvidenceSession>) => {
     if (inFlight.current) return;
@@ -69,19 +95,31 @@ export function useEvidenceInterview(id: string, readOnly = false) {
   }), [id, run, session]);
   const submit = (response = answer, code?: string) => conversationPhase(session) === 'SELF_INTRODUCTION'
     ? converse('SUBMIT_INTRODUCTION', response) : run(async () => {
-    if (!session?.pending_turn || (!response.trim() && !code?.trim())) throw new Error('Hãy nhập câu trả lời.');
+    const turnId = session?.pending_turn?.turn_id || (session?.submission?.status === 'FAILED' && session.submission.turn_id);
+    if (!session || !turnId || (!response.trim() && !code?.trim())) throw new Error('Hãy nhập câu trả lời.');
     const previous = retry.current;
     if (
       !previous
       || previous.candidate_response !== response
       || previous.submitted_code !== code
-      || previous.turn_id !== session.pending_turn.turn_id
+      || previous.turn_id !== turnId
       || previous.expected_state_version !== session.state_version
     ) {
-      retry.current = { request_id: crypto.randomUUID(), turn_id: session.pending_turn.turn_id,
+      retry.current = { request_id: crypto.randomUUID(), turn_id: turnId,
         expected_state_version: session.state_version, candidate_response: response, submitted_code: code };
     }
-    const next = await evidenceInterview.answer(id, retry.current!);
+    let next: EvidenceSession;
+    try { next = await evidenceInterview.answer(id, retry.current!); }
+    catch (cause) {
+      const current = await evidenceInterview.get(id).catch(() => null);
+      if (!current) throw cause;
+      const saved = current.submission;
+      const accepted = saved?.turn_id === turnId && saved.candidate_response === response && saved.submitted_code === code;
+      const graded = current.turns.some(turn => turn.turn_id === turnId && (turn.submitted_code ?? undefined) === code
+        && (code === undefined ? turn.answer : turn.transcript) === response);
+      if (!accepted && !graded) throw cause;
+      next = current;
+    }
     retry.current = null; setAnswer('');
     return next;
   });
@@ -108,7 +146,7 @@ export function useEvidenceInterview(id: string, readOnly = false) {
   useEffect(() => {
     if (!session?.awaiting_question || loading || busy || readOnly || inFlight.current) return;
     const key = `${id}:${session.state_version}`;
-    if (automaticQuestion.current === key || Date.parse(session.deadline_at) <= Date.now()) return;
+    if (automaticQuestion.current === key || (session.paused_remaining_seconds == null && Date.parse(session.deadline_at) <= Date.now())) return;
     automaticQuestion.current = key;
     void loadNextQuestion();
   }, [id, session, loading, busy, readOnly, loadNextQuestion]);
@@ -135,12 +173,19 @@ export function useEvidenceInterview(id: string, readOnly = false) {
     if (!session || session.is_finished || readOnly) return;
     let nextAttemptAt = 0;
     const tick = () => {
+      if (session.paused_remaining_seconds != null) {
+        setSecondsLeft(Math.ceil(session.paused_remaining_seconds));
+        return;
+      }
       const now = Date.now();
       const phase = conversationPhase(session);
       const prelude = phase === 'OPENING' || phase === 'SELF_INTRODUCTION';
       const deadline = prelude ? session.conversation!.expires_at : session.deadline_at;
       const remaining = Math.max(0, Math.ceil((Date.parse(deadline) - now) / 1000));
-      setSecondsLeft(remaining);
+      // Freeze visible countdown while waiting on AI so server-side latency compensation stays seamless.
+      if (!inFlight.current) {
+        setSecondsLeft(remaining);
+      }
       // Earlier grading errors must never prevent expiry. Serialize with answer submission
       // and retry transient stop failures using the same idempotent request ID.
       if (!remaining && !inFlight.current && now >= nextAttemptAt) {

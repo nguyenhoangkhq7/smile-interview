@@ -13,9 +13,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.nio.charset.StandardCharsets;
-import java.time.Instant;
-import java.time.format.DateTimeParseException;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -134,20 +131,9 @@ public class EvidenceService {
     }
 
     public JsonNode respond(String sessionId, User user, EvidenceDtos.Answer answer) {
+        var receivedAt = java.time.Instant.now();
         owned(sessionId, user);
-        String hash = json.hash(answer);
-        JsonNode cached = store.replay(sessionId, answer.requestId(), hash);
-        if (cached != null) return tryAdvanceNextQuestion(sessionId, answer.requestId(), cached);
-        InterviewRun run = current(sessionId, answer.expectedVersion());
-        var command = new java.util.HashMap<String, Object>(Map.of("snapshot", json.read(run.getSnapshotJson()),
-                "turn_id", answer.turnId(), "expected_state_version", answer.expectedVersion(),
-                "candidate_response", answer.response(), "defer_question", true));
-        if (answer.code() != null) command.put("submitted_code", answer.code());
-        JsonNode payload = json.tree(command);
-        JsonNode result = ai.compute("respond", payload);
-        JsonNode committed = store.commit(new EvidenceStore.Commit(sessionId, run.getStateVersion(), answer.requestId(),
-                hash, json.read(run.getConfigJson()), result));
-        return tryAdvanceNextQuestion(sessionId, answer.requestId(), committed);
+        return store.acceptAnswer(sessionId, answer, receivedAt);
     }
 
     public JsonNode nextQuestion(String sessionId, User user, EvidenceDtos.NextQuestion command) {
@@ -210,7 +196,7 @@ public class EvidenceService {
         String hash = json.hash(stop);
         JsonNode cached = store.replay(sessionId, stop.requestId(), hash);
         if (cached != null) return cached;
-        InterviewRun run = current(sessionId, stop.expectedVersion());
+        InterviewRun run = current(sessionId, stop.expectedVersion(), true);
         JsonNode visible = json.read(run.getPublicJson());
         if (visible.path("is_finished").asBoolean()) return visible;
         JsonNode result = ai.compute("stop", json.read(run.getSnapshotJson()));
@@ -222,68 +208,14 @@ public class EvidenceService {
         owned(sessionId, user);
         String hash = json.hash(command);
         JsonNode cached = store.replay(sessionId, command.requestId(), hash);
-        if (cached != null) return tryAdvanceNextQuestion(sessionId, command.requestId(), cached);
+        if (cached != null) return cached;
         InterviewRun run = current(sessionId, command.expectedVersion());
         var payload = Map.of("snapshot", json.read(run.getSnapshotJson()), "message_id", command.messageId(),
                 "expected_state_version", command.expectedVersion(), "action", command.action(),
                 "introduction", Objects.requireNonNullElse(command.introduction(), ""), "defer_question", true);
         JsonNode result = ai.compute("conversation", payload);
-        JsonNode committed = store.commit(new EvidenceStore.Commit(sessionId, run.getStateVersion(), command.requestId(),
+        return store.commit(new EvidenceStore.Commit(sessionId, run.getStateVersion(), command.requestId(),
                 hash, json.read(run.getConfigJson()), result));
-        return tryAdvanceNextQuestion(sessionId, command.requestId(), committed);
-    }
-
-    private JsonNode tryAdvanceNextQuestion(String sessionId, UUID parentRequestId, JsonNode committed) {
-        if (!canAutoAdvanceQuestion(committed) || parentRequestId == null) {
-            return committed;
-        }
-        long expectedVersion = committed.path("state_version").asLong();
-        UUID derivedRequestId = UUID.nameUUIDFromBytes(
-                (parentRequestId + ":next").getBytes(StandardCharsets.UTF_8));
-        var derivedCommand = new EvidenceDtos.NextQuestion(derivedRequestId, expectedVersion);
-        String derivedHash = json.hash(Map.of("next-question", derivedCommand));
-        try {
-            JsonNode cachedNext = store.replay(sessionId, derivedRequestId, derivedHash);
-            if (cachedNext != null) {
-                return cachedNext;
-            }
-            InterviewRun run = current(sessionId, expectedVersion);
-            var payload = Map.of(
-                    "snapshot", json.read(run.getSnapshotJson()),
-                    "expected_state_version", expectedVersion
-            );
-            JsonNode nextResult = ai.compute("next-question", payload);
-            if (nextResult == null) {
-                return committed;
-            }
-            return store.commit(new EvidenceStore.Commit(
-                    sessionId,
-                    run.getStateVersion(),
-                    derivedRequestId,
-                    derivedHash,
-                    json.read(run.getConfigJson()),
-                    nextResult
-            ));
-        } catch (Exception ex) {
-            log.warn("Chained next-question generation deferred for session_id={} state_version={} ({}): {}",
-                    sessionId, expectedVersion, ex.getClass().getSimpleName(), ex.getMessage());
-            return committed;
-        }
-    }
-
-    private boolean canAutoAdvanceQuestion(JsonNode visible) {
-        if (visible == null || visible.path("is_finished").asBoolean() || !visible.path("awaiting_question").asBoolean()) {
-            return false;
-        }
-        String deadline = visible.path("deadline_at").asText("");
-        if (deadline.isBlank()) {
-            return false;
-        }
-        try {
-            return Instant.parse(deadline).isAfter(Instant.now());
-        } catch (DateTimeParseException ex) {
-            return false;
-        }
     }
 
     private Map<String, Object> priorAttemptContext(Session currentSession, ApplicationProfile profile) {
@@ -333,13 +265,16 @@ public class EvidenceService {
             InterviewRun r = runBySession.get(attempt.getId());
             if (r == null || r.getSnapshotJson() == null) continue;
             JsonNode snapshot = json.read(r.getSnapshotJson());
-            snapshot.path("objectives").fields().forEachRemaining(entry -> {
-                String objId = entry.getKey();
-                String status = entry.getValue().path("assessment").asText("");
-                if (!objId.isBlank() && !status.isBlank() && !"NOT_ASSESSED".equals(status)) {
-                    objectiveAssessments.putIfAbsent(objId, status);
-                }
-            });
+            boolean isPractice = "PRACTICE".equals(snapshot.path("config").path("session_purpose").asText("ASSESSMENT"));
+            if (!isPractice) {
+                snapshot.path("objectives").fields().forEachRemaining(entry -> {
+                    String objId = entry.getKey();
+                    String status = entry.getValue().path("assessment").asText("");
+                    if (!objId.isBlank() && !status.isBlank() && !"NOT_ASSESSED".equals(status)) {
+                        objectiveAssessments.putIfAbsent(objId, status);
+                    }
+                });
+            }
             for (JsonNode turn : snapshot.path("turns")) {
                 if (priorQuestionStems.size() >= MAX_PRIOR_QUESTION_STEMS) break;
                 String stem = clip(turn.path("question").path("text").asText(""), MAX_PRIOR_QUESTION_STEM_LENGTH);
@@ -405,8 +340,14 @@ public class EvidenceService {
     }
 
     private InterviewRun current(String id, long version) {
+        return current(id, version, false);
+    }
+
+    private InterviewRun current(String id, long version, boolean allowFailedSubmission) {
         InterviewRun run = run(id);
         if (run.getStateVersion() != version) throw EvidenceStore.conflict("State changed; refresh the interview");
+        if (run.getGradingDueAt() != null || (!allowFailedSubmission && run.getGradingAttempt() > 0))
+            throw EvidenceStore.conflict("Bài đã nộp đang chờ kết quả chấm.");
         return run;
     }
 }

@@ -30,8 +30,9 @@ jobs:
           docker build -t smile-code-runner:test code-runner
           docker run --rm -e PYTHONPATH=/app -v "$PWD/code-runner/test_server.py:/tests/test_server.py:ro" smile-code-runner:test \
             sh -ec 'python -m venv --system-site-packages /tmp/testenv && /tmp/testenv/bin/pip install pytest==9.0.2 && /tmp/testenv/bin/python -m pytest -q -p no:cacheprovider /tests/test_server.py'
-      - name: Test matching and GNN graph contracts
+      - name: Check AI app imports and matching graph contracts
         run: |
           docker build -t smile-ai:test ai-service
+          docker run --rm smile-ai:test python -c 'from app.main import app'
           docker run --rm -e PYTHONPATH=/app -v "$PWD/ai-service/matching_cv/tests:/tests:ro" smile-ai:test \
             sh -ec 'python -m venv --system-site-packages /tmp/testenv && /tmp/testenv/bin/pip install pytest==9.0.2 && /tmp/testenv/bin/python -m pytest -q -p no:cacheprovider /tests/test_semantic_importance_gnn_v4.py -k "not checkpoint"'

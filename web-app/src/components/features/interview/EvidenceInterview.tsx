@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { useEvidenceInterview } from '@/hooks/useEvidenceInterview';
 import { EvidenceTextInterview } from './EvidenceTextInterview';
+import { InterviewSubmissionStatus } from './InterviewSubmissionStatus';
 import { EvidenceSession, EvidenceTurn, conversationPhase, turnSkillId } from '@/services/evidenceInterview';
 import { IntroductionHistory } from './InterviewConversation';
 import { EvidenceSetup, modeLabels } from './EvidenceSetup';
@@ -40,6 +41,11 @@ export function EvidenceInterview() {
   const { session, busy, error } = interview;
   const phase = conversationPhase(session);
   const conversationVisible = ['OPENING', 'SELF_INTRODUCTION', 'CLOSING'].includes(phase);
+  const grading = session?.submission?.status === 'QUEUED' && !session.is_finished;
+  const awaitingQuestion = Boolean(session?.awaiting_question && !session.is_finished && (busy || !error));
+  const processingLabel = grading ? 'Đang chấm câu trả lời…'
+    : awaitingQuestion ? (session?.turns.length ? 'Đang chuẩn bị câu hỏi tiếp theo…' : 'Đang chuẩn bị câu hỏi đầu tiên…')
+      : null;
   if (interview.loading) return <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
     <BrandLoading label="Đang tải phiên phỏng vấn…" description="Đang chuẩn bị không gian luyện tập của bạn." className="min-h-[60vh]" />
   </main>;
@@ -54,20 +60,35 @@ export function EvidenceInterview() {
   }
   return <main className="mx-auto w-full max-w-6xl space-y-4 px-4 py-5 sm:px-6">
     {interview.metadata?.applicationProfileId && session?.config.interaction_mode !== 'VOICE' && <header className="space-y-2 border-b pb-5"><Link className="text-sm text-brand-orange" href={`/applications/${interview.metadata.applicationProfileId}`}>← Về hồ sơ ứng tuyển</Link><h2 className="text-xl font-semibold">{interview.metadata.applicationProfileTitle} · Lượt {interview.metadata.attemptNumber}</h2></header>}
-    {session?.awaiting_question && session.config.interaction_mode === 'VOICE' && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4">
+    {session?.awaiting_question && session.config.interaction_mode === 'VOICE' && !awaitingQuestion && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4">
       <p role="status">{session.turns.length > 0 ? 'Đã lưu câu trả lời. ' : session.conversation?.introduction ? 'Đã lưu phần giới thiệu. ' : ''}
-        {busy ? 'Đang chuẩn bị câu hỏi…' : session.turns.length ? 'Câu tiếp theo đang chờ tải.' : 'Câu hỏi đầu tiên đang chờ tải.'}</p>
-      {!busy && <Button variant="outline" onClick={() => void interview.loadNextQuestion()}>Thử tải lại câu hỏi</Button>}
+        {session.turns.length ? 'Câu tiếp theo đang chờ tải.' : 'Câu hỏi đầu tiên đang chờ tải.'}</p>
+      <Button variant="outline" onClick={() => void interview.loadNextQuestion()}>Thử tải lại câu hỏi</Button>
     </div>}
     {error && !session?.awaiting_question && <div role="alert" className="rounded border border-red-300 p-4"><p>{error}</p><Button variant="outline" onClick={() => void interview.reload()}>Tải lại phiên</Button></div>}
     {!session && <EvidenceSetup busy={busy} profileId={interview.metadata?.applicationProfileId} onStart={config => void interview.start(config)} />}
+    {session?.submission && !grading && (!session.is_finished || conversationVisible) && <InterviewSubmissionStatus submission={session.submission} busy={busy}
+      retry={() => void interview.submit(session.submission!.candidate_response, session.submission!.submitted_code)}
+      stop={() => setConfirmStop(true)} />}
     {session && <>
       {session.is_finished && !conversationVisible ? <InterviewOutcome session={session} metadata={interview.metadata} />
         : session.config.interaction_mode === 'VOICE'
-          ? <VoiceInterview interview={interview} suspended={confirmStop || Boolean(error)} onStop={() => setConfirmStop(true)} />
-          : <EvidenceTextInterview interview={interview} onHistory={() => setHistoryOpen(true)} onStop={() => setConfirmStop(true)} />}
+          ? <VoiceInterview interview={interview} suspended={confirmStop || Boolean(error) || Boolean(session.submission && !session.is_finished)} onStop={() => setConfirmStop(true)} />
+          : (!session.submission || grading || conversationVisible) && <EvidenceTextInterview interview={interview} onHistory={() => setHistoryOpen(true)} onStop={() => setConfirmStop(true)} />}
     </>}
+    {processingLabel && (
+      <Dialog open disablePointerDismissal onOpenChange={(open, event) => { if (!open) event.cancel(); }}>
+        <DialogContent
+          aria-label={processingLabel}
+          showCloseButton={false}
+          overlayClassName="bg-black/35 supports-backdrop-filter:backdrop-blur-sm motion-reduce:animate-none"
+          className="rounded-2xl p-5 sm:max-w-xs motion-reduce:animate-none"
+        >
+          <BrandLoading embedded label={processingLabel} description={grading ? 'Thời gian làm bài đã tạm dừng.' : undefined} />
+        </DialogContent>
+      </Dialog>
+    )}
     <Dialog open={historyOpen} onOpenChange={setHistoryOpen}><DialogContent className="sm:max-w-3xl"><DialogHeader><DialogTitle>Lịch sử phỏng vấn</DialogTitle><DialogDescription>Câu mới nhất hiển thị trước. Mở từng câu để xem lại câu trả lời và nhận xét.</DialogDescription></DialogHeader><div role="region" aria-label="Nội dung lịch sử" tabIndex={0} className="max-h-[65dvh] min-w-0 space-y-3 overflow-y-auto overscroll-contain pr-1"><IntroductionHistory interview={interview} />{session?.turns.length ? <Transcript session={session} turns={session.turns} /> : <p className="py-8 text-center text-muted-foreground">Chưa có câu trả lời nào được gửi.</p>}</div><DialogFooter><Button variant="outline" onClick={() => setHistoryOpen(false)}>Đóng lịch sử</Button></DialogFooter></DialogContent></Dialog>
-    <Dialog open={confirmStop} onOpenChange={open => !busy && setConfirmStop(open)}><DialogContent><DialogHeader><DialogTitle>Kết thúc lượt phỏng vấn?</DialogTitle><DialogDescription>{session?.turns.length ? 'Các câu trả lời đã gửi sẽ được giữ lại và dùng để tạo kết quả. Lượt này sẽ được ghi nhận là kết thúc sớm.' : 'Bạn chưa gửi câu trả lời nào. Lượt này sẽ được ghi nhận là đã hủy và chưa có dữ liệu đánh giá.'} Nội dung chưa nộp sẽ không được tính.</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" disabled={busy} onClick={() => setConfirmStop(false)}>Tiếp tục phỏng vấn</Button><Button disabled={busy} onClick={() => { setConfirmStop(false); void interview.stop(); }}>Kết thúc lượt</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={confirmStop} onOpenChange={open => !busy && setConfirmStop(open)}><DialogContent><DialogHeader><DialogTitle>Kết thúc lượt phỏng vấn?</DialogTitle><DialogDescription>{session?.submission?.status === 'FAILED' ? 'Bài vừa nộp sẽ được giữ lại ở trạng thái chưa chấm. Các lượt đã chấm vẫn có trong kết quả.' : session?.turns.length ? 'Các câu trả lời đã gửi sẽ được giữ lại và dùng để tạo kết quả. Lượt này sẽ được ghi nhận là kết thúc sớm.' : 'Bạn chưa gửi câu trả lời nào. Lượt này sẽ được ghi nhận là đã hủy và chưa có dữ liệu đánh giá.'} Nội dung chưa nộp sẽ không được tính.</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" disabled={busy} onClick={() => setConfirmStop(false)}>Tiếp tục phỏng vấn</Button><Button disabled={busy} onClick={() => { setConfirmStop(false); void interview.stop(); }}>Kết thúc lượt</Button></DialogFooter></DialogContent></Dialog>
   </main>;
 }

@@ -1,10 +1,14 @@
 """Optional feedback before the next question, with human-readable skill transitions."""
 from collections.abc import Sequence
+import re
 from .models import InterviewSkillContext, Snapshot, Turn
 
 MAX_FEEDBACK_LENGTH = 300
+MAX_PRACTICE_FEEDBACK_LENGTH = 550
 ACKNOWLEDGMENT = "Cảm ơn bạn, mình đã ghi nhận câu trả lời."
 INABILITY_ACKNOWLEDGMENT = "Cảm ơn bạn đã chia sẻ."
+_SENTENCE_END = re.compile(r"[.!?](?:\s|$)")
+_MIN_TRIMMED_FEEDBACK_CHARS = 20
 
 _KNOWN_ACRONYMS = {
     "sql": "SQL",
@@ -65,11 +69,41 @@ def display_skill_name(skill_id: str, skills: Sequence[InterviewSkillContext] | 
     return format_skill_slug(skill_id)
 
 
+def fit_feedback_length(
+    text: str,
+    *,
+    max_length: int = MAX_FEEDBACK_LENGTH,
+    allow_sentence_trim: bool = False,
+) -> str:
+    """Keep feedback within max_length; trim PRACTICE coaching at a sentence boundary instead of discarding."""
+    cleaned = " ".join((text or "").split())
+    if len(cleaned) <= max_length:
+        return cleaned
+    if allow_sentence_trim:
+        window = cleaned[:max_length]
+        last_end = -1
+        for match in _SENTENCE_END.finditer(window):
+            last_end = match.start() + 1
+        if last_end >= _MIN_TRIMMED_FEEDBACK_CHARS:
+            return window[:last_end].strip()
+    return ACKNOWLEDGMENT
+
+
 def turn_introduction(snapshot: Snapshot, turn: Turn) -> str:
     if not snapshot.turns:
         return ""
     previous = snapshot.turns[-1]
-    feedback = brief_feedback(previous)
+    is_practice = snapshot.config.session_purpose == "PRACTICE"
+    max_len = MAX_PRACTICE_FEEDBACK_LENGTH if is_practice else MAX_FEEDBACK_LENGTH
+    feedback = brief_feedback(previous, max_length=max_len, allow_sentence_trim=is_practice)
+    if turn.practice_step:
+        if turn.practice_step == "RETRY" and feedback in {"", ACKNOWLEDGMENT, INABILITY_ACKNOWLEDGMENT}:
+            state = snapshot.objectives[turn.objective_id]
+            criterion = next(c for c in state.objective.criteria if c.criterion_id in turn.question.criterion_ids)
+            feedback = f"Ở lần thử này, hãy tập trung vào {criterion.description.rstrip('.')}."
+        bridge = ("Hãy thử trả lời lại câu vừa rồi sau phần góp ý."
+                  if turn.practice_step == "RETRY" else "Giờ bạn thử tự giải một tình huống mới cùng mức độ nhé.")
+        return "\n\n".join(part for part in (feedback, bridge) if part)
     if previous.skill_id != turn.skill_id:
         skill_label = display_skill_name(turn.skill_id, snapshot.skills)
         bridge = f"Tiếp theo, mình chuyển sang trao đổi về {skill_label} nhé."
@@ -77,7 +111,12 @@ def turn_introduction(snapshot: Snapshot, turn: Turn) -> str:
     return feedback
 
 
-def brief_feedback(turn: Turn) -> str:
+def brief_feedback(
+    turn: Turn,
+    *,
+    max_length: int = MAX_FEEDBACK_LENGTH,
+    allow_sentence_trim: bool = False,
+) -> str:
     judgment = turn.judgment
     if judgment and judgment.explicit_inability and all(
         item.observation == "NO_EVIDENCE" for item in judgment.observations
@@ -85,5 +124,8 @@ def brief_feedback(turn: Turn) -> str:
         return INABILITY_ACKNOWLEDGMENT
     if judgment is None or judgment.feedback_contains_hint:
         return ACKNOWLEDGMENT
-    feedback = " ".join(judgment.feedback.split())
-    return feedback if len(feedback) <= MAX_FEEDBACK_LENGTH else ACKNOWLEDGMENT
+    return fit_feedback_length(
+        judgment.feedback,
+        max_length=max_length,
+        allow_sentence_trim=allow_sentence_trim,
+    )

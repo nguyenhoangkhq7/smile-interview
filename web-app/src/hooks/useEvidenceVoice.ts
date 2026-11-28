@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import { EvidenceSession, conversationPhase, voiceTurn, interviewError } from '@/services/evidenceInterview';
+import { EvidenceSession, conversationPhase, isCodeTurn, voiceTurn, interviewError } from '@/services/evidenceInterview';
 import { interviewVoice, VoiceTurn, type RecognitionResult } from '@/services/interviewVoice';
 import { encodeWav, VoiceDetector } from '@/lib/voiceAudio';
 import { SimliAvatar } from '@/lib/simliAvatar';
@@ -124,12 +124,22 @@ class VoiceConversation {
     const phase = conversationPhase(session);
     if (phase === 'CLOSING' && this.paused) { this.paused = false; this.emit({ paused: false }); }
     const next = voiceTurn(session);
-    if (!session || session.session_id !== options.id || (!next && !session.awaiting_question)) {
+    if (!session || session.session_id !== options.id || (!next && !session.awaiting_question && !session.submission)) {
       this.stop(); this.update(initial); return;
     }
     const acceptingSpeech = next !== null && (phase === 'SELF_INTRODUCTION' || phase === 'INTERVIEW');
     this.microphone?.getAudioTracks().forEach(track => { track.enabled = acceptingSpeech && !this.paused; });
-    if (this.turn?.turn_id !== next?.turn_id || this.turn?.expected_state_version !== next?.expected_state_version) {
+    const sameTurnVersionBump = Boolean(
+      this.turn && next
+      && this.turn.turn_id === next.turn_id
+      && this.turn.expected_state_version !== next.expected_state_version,
+    );
+    if (sameTurnVersionBump && next) {
+      // Clarify/Hint bumps state_version on the same turn; preserve in-progress spoken draft and segments.
+      this.turn = next;
+      for (const item of this.queue) item.turn = next;
+      if (this.failed) this.failed.turn = next;
+    } else if (this.turn?.turn_id !== next?.turn_id || this.turn?.expected_state_version !== next?.expected_state_version) {
       this.generation++; this.cancelTimer(); this.cancelSpeech(); this.recognitionAbort?.abort();
       this.queue = []; this.failed = null; this.detector.reset(); this.submitting = false;
       this.segments = []; this.contextFrames = []; this.contextMs = 0; this.segment = 0; this.baseDraft = options.answer;
@@ -355,25 +365,35 @@ class VoiceConversation {
     }
     this.failed = null; this.publishRecognition(); this.emit({ retryAvailable: false, error: '' }); void this.drain();
   }
+  clearDraft() {
+    this.generation++;
+    this.cancelTimer();
+    this.recognitionAbort?.abort();
+    this.queue = []; this.failed = null; this.detector.reset();
+    this.segments = []; this.contextFrames = []; this.contextMs = 0; this.segment = 0;
+    this.baseDraft = ''; this.draft = '';
+    this.current().setAnswer('');
+    this.emit({ captions: '', retryAvailable: false, review: null, error: '', listening: false });
+  }
 
   private scheduleSubmit() {
     this.cancelTimer();
     const options = this.current();
-    if (options.session?.pending_turn?.requires_code || !this.auto || this.paused || options.suspended || options.busy || this.submitting || this.detector.active
+    if (isCodeTurn(options.session?.pending_turn) || !this.auto || this.paused || options.suspended || options.busy || this.submitting || this.detector.active
       || !this.canSubmit() || this.playing || this.speechAbort || !this.draft.trim()) return;
     const generation = this.generation;
     this.emit({ countdown: true });
     this.timer = setTimeout(async () => {
       this.timer = null; this.emit({ countdown: false });
       const latest = this.current();
-      if (latest.session?.pending_turn?.requires_code || this.closed || this.paused || latest.suspended || latest.busy || this.detector.active
+      if (isCodeTurn(latest.session?.pending_turn) || this.closed || this.paused || latest.suspended || latest.busy || this.detector.active
         || !this.canSubmit() || generation !== this.generation) return;
       this.beforeSubmit();
       const next = await latest.submit(this.draft);
       this.submitting = false;
       // No automatic retry of paid grading; leave the exact draft/request ID for a manual retry.
       if (!next) this.emit({ error: 'Chưa gửi được câu trả lời. Nội dung vẫn được giữ; hãy bấm Gửi để thử lại.' });
-    }, 500);
+    }, 1800);
   }
 
   stop() {
@@ -424,6 +444,7 @@ export function useEvidenceVoice(options: Options) {
     pause: () => engine.current?.pause(!state.paused),
     replay: () => engine.current?.speak(), interrupt: () => engine.current?.cancelSpeech(),
     retry: () => engine.current?.retry(), discard: () => engine.current?.discard(),
+    clearDraft: () => engine.current?.clearDraft(),
     confirmReview: (segment: number, alternative: boolean) => engine.current?.confirmReview(segment, alternative),
     rejectReview: (segment: number) => { setAutomatic(false); engine.current?.rejectReview(segment); },
     cancelAuto: () => engine.current?.cancelTimer(),

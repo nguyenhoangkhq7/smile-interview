@@ -4,15 +4,18 @@ interface BrandLoadingProps {
   label: string;
   description?: string;
   className?: string;
+  embedded?: boolean;
 }
 
-export function BrandLoading({ label, description, className = '' }: BrandLoadingProps) {
+export function BrandLoading({ label, description, className = '', embedded = false }: BrandLoadingProps) {
+  const layout = embedded ? 'py-3 text-sm' : 'min-h-64 rounded-2xl border border-border bg-card p-8 shadow-sm';
+
   return (
     <div
       role="status"
       aria-live="polite"
       aria-atomic="true"
-      className={`flex min-h-64 flex-col items-center justify-center gap-3 rounded-2xl border border-border bg-card p-8 text-center shadow-sm ${className}`}
+      className={`flex flex-col items-center justify-center gap-3 text-center ${layout} ${className}`}
     >
       <picture>
         <source srcSet="/logo.png" media="(prefers-reduced-motion: reduce)" />
@@ -23,7 +26,7 @@ export function BrandLoading({ label, description, className = '' }: BrandLoadin
           width={128}
           height={128}
           unoptimized
-          className="size-32 object-contain"
+          className={embedded ? 'size-24 object-contain' : 'size-32 object-contain'}
         />
       </picture>
       <p className="font-semibold text-foreground">{label}</p>
