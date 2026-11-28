@@ -44,7 +44,10 @@ def test_module1_to_module2_pipeline_endpoint(fixed_matching_result):
     pipe_data = pipe_res.json()
     assert pipe_data["analysis_id"] == "test-session-123"
     assert len(pipe_data["skills"]) == 2
-    assert set(pipe_data["report"]) == {"matching_score", "degraded"}
+    assert set(pipe_data["report"]) == {"matching_score", "degraded", "cv_skills", "eligibility"}
+    assert pipe_data["report"]["eligibility"] == m1_data["eligibility"]
+    assert pipe_data["report"]["cv_skills"] == m1_data["cv_skills"]
+    assert any(s["skill_id"] == "kafka" and s["evidence_spans"] for s in pipe_data["report"]["cv_skills"])
     assert all("flags" not in skill for skill in pipe_data["skills"])
     kubernetes = next(skill for skill in pipe_data['skills'] if skill['jd_skill_id'] == 'kubernetes')
     assert kubernetes['jd_skill_name'] == 'Quản trị Kubernetes'

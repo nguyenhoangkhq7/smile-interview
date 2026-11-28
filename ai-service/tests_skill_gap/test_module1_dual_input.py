@@ -81,4 +81,4 @@ def test_multipart_pdf_upload_pipeline(dual_input_client):
     assert response.status_code == 200
     res_data = response.json()
     assert res_data["analysis_id"] == "test-multipart-pdf-1"
-    assert set(res_data["report"]) == {"matching_score", "degraded"}
+    assert set(res_data["report"]) == {"matching_score", "degraded", "cv_skills", "eligibility"}

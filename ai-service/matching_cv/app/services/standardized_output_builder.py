@@ -26,6 +26,7 @@ from matching_cv.app.schemas.standardized_output import (
     SkillGapRow,
     StandardizedPipelineOutput,
 )
+from matching_cv.app.services.competency_extraction_quality import is_domain_skill
 from matching_cv.app.services.extraction_adapter import ExtractionDataAdapter
 from matching_cv.app.services.resume_evidence_matching import apply_resume_evidence
 from matching_cv.research.data.canonical_skill_normalizer import normalize_canonical_skill
@@ -502,6 +503,9 @@ def build_skill_gap(
     eligible_cv_ids: Optional[set[str]] = None,
     enable_directed_hierarchy_soft_match: bool = True,
     reasoning_results: Optional[Any] = None,
+    *,
+    jd_domain_ids: Optional[set[str]] = None,
+    cv_domain_ids: Optional[set[str]] = None,
 ) -> Tuple[List[SkillGapRow], List[Dict[str, Any]]]:
     nodes = list(graph_data.skill_nodes.values())
     jd_nodes = [n for n in nodes if n.jd_canonical_id]
@@ -554,14 +558,17 @@ def build_skill_gap(
     rows: List[SkillGapRow] = []
     details: List[Dict[str, Any]] = []
     prereq_floor = min(float(min_soft_match), 0.40)
+    jd_domains = jd_domain_ids or set()
+    cv_candidates = {node.cv_canonical_id for node in cv_nodes_sorted}
+    cv_domains = cv_candidates & (cv_domain_ids or set())
+    cv_other = cv_candidates - cv_domains
 
     for jn in jd_nodes:
         detail: Dict[str, Any] = {"jd_skill_id": jn.jd_canonical_id, "jd_node_id": jn.node_id}
         matched: Optional[str] = None
         soft: Optional[float] = None
-        is_shared = bool(jn.cv_canonical_id) and (
-            eligible_cv_ids is None or jn.cv_canonical_id in eligible_cv_ids
-        )
+        comparable = {jn.jd_canonical_id} & cv_domains if jn.jd_canonical_id in jd_domains else cv_other
+        is_shared = jn.cv_canonical_id in comparable
 
         if is_shared:  # Priority A: shared graph node (verified identity under active merge policy)
             matched = jn.cv_canonical_id
@@ -589,6 +596,8 @@ def build_skill_gap(
             rejected: Optional[Tuple[float, Any, float, str, int]] = None
             # Tuple: (eff_score, cv_node, raw_cos, dir_rel, dir_hops)
             for cn in cv_nodes_sorted:
+                if cn.cv_canonical_id not in comparable:
+                    continue
                 raw_val = pair_cos.get((jn.node_id, cn.node_id))
                 if raw_val is None or not math.isfinite(raw_val):
                     continue
@@ -725,6 +734,8 @@ def build_standardized_output(
         threshold,
         ctx.skill_importance_output,
         reasoning_results=ctx.reasoning_results,
+        jd_domain_ids=_explicit_domain_ids(_get(ctx.unified_response, "jd")),
+        cv_domain_ids=_explicit_domain_ids(_get(ctx.unified_response, "cv")),
     )
 
     has_score = ctx.matching_score is not None
@@ -814,6 +825,12 @@ def _build_match(skill: ProficiencySkill, row: Optional[SkillGapRow], *, verifie
     )
 
 
+def _explicit_domain_ids(document) -> set[str]:
+    explicit = _get(document, "explicit")
+    skills = _get(explicit, "skills", [])
+    return {normalize_canonical_skill(skill.skill_id) for skill in skills if is_domain_skill(skill)}
+
+
 def build_module1_output(ctx: PublicOutputContext) -> Module1Output:
     """Build the native Smile Interview contract from the matching pipeline's results."""
     documents = (ctx.unified_response.cv, ctx.unified_response.jd)
@@ -829,6 +846,8 @@ def build_module1_output(ctx: PublicOutputContext) -> Module1Output:
         settings.SKILL_GAP_MIN_SOFT_MATCH, ctx.skill_importance_output,
         eligible_cv_ids=set(cv_by_id),
         reasoning_results=ctx.reasoning_results,
+        jd_domain_ids=_explicit_domain_ids(ctx.unified_response.jd),
+        cv_domain_ids=_explicit_domain_ids(ctx.unified_response.cv),
     )
     by_jd_id = {row.jd_skill_id: row for row in rows}
     canonical_matches = {

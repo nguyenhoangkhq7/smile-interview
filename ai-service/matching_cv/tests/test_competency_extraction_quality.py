@@ -3,10 +3,17 @@
 import hashlib
 import json
 
+import pytest
+
+from matching_cv.app.schemas.implicit_skill_extraction import (
+    ImplicitEvidence, ImplicitEvidenceSnippet, ImplicitExtractedSkill, ImplicitExtractionResult, ImplicitExtractionStats,
+)
+from matching_cv.app.schemas.skill_extraction import Evidence, ExtractedSkill
 from matching_cv.app.schemas.unified_skill_extraction import DocumentUnifiedResult, UnifiedExtractFileResponse
 from matching_cv.app.services import cached_extraction_service
 from matching_cv.app.services.pipeline_extraction import refine_cached_pair
 from matching_cv.app.services.skill_postprocessor import skill_postprocessor
+from matching_cv.app.services.unified_skill_service import deduplicate_explicit_implicit
 
 def _process(text, side, mentions):
     return skill_postprocessor.process_extraction(
@@ -21,7 +28,7 @@ def _skill_ids(result):
     return {skill.skill_id for skill in result.skills}
 
 
-def test_cv_recovers_grounded_payments_without_promoting_project_objects():
+def test_cv_keeps_project_objects_as_context_without_promoting_payments():
     context = "Used Kafka to decouple inventory updates from checkout."
     payment = "Migrated a legacy payment module to a separate service without downtime."
     cv = f"Experience\n• {context}\n• {payment}"
@@ -32,11 +39,66 @@ def test_cv_recovers_grounded_payments_without_promoting_project_objects():
         ("payment module", "context", "Domain Knowledge", payment),
     ])
 
-    assert _skill_ids(result) == {"kafka", "payments"}
+    assert _skill_ids(result) == {"kafka"}
     assert {item.skill_id for item in result.non_skill_entities} == {"inventory-updates", "checkout", "payment-module"}
-    evidence = next(skill for skill in result.skills if skill.skill_id == "payments").evidences[0]
-    assert evidence.surface_form == cv[evidence.mention_start:evidence.mention_end] == "payment"
+    evidence = next(item for item in result.non_skill_entities if item.skill_id == "payment-module").evidences[0]
+    assert evidence.surface_form == cv[evidence.mention_start:evidence.mention_end] == "payment module"
     assert cv[evidence.start:evidence.end] == evidence.sentence == payment
+
+
+@pytest.mark.parametrize(("label", "sentence"), [
+    ("thanh toán", "Triển khai module thanh toán cho người bán."),
+    ("inventory", "Built a dashboard for inventory."),
+    ("billing", "Experience with Java for a billing platform."),
+    ("payments", "Experience in implementing a payments module for merchants."),
+    ("healthcare", "Developed a portal for healthcare providers."),
+])
+def test_domain_mentions_in_project_actions_remain_context(label, sentence):
+    for side, heading in (("CV", "Experience"), ("JD", "Responsibilities")):
+        result = _process(f"{heading}\n{sentence}", side, [(label, "domain", "Domain Knowledge", sentence)])
+        assert not result.skills
+        assert any(item.kind == "context" and item.evidences[0].sentence == sentence
+                   for item in result.non_skill_entities)
+
+
+def test_explicit_payment_requirement_and_payment_aliases_are_retained():
+    first = "Experience in Payment is required."
+    repeated = "Payments expertise is preferred."
+    jd = _process(f"Requirements\n{first}\n{repeated}", "JD", [
+        ("Payment", "domain", "Domain Knowledge", first),
+        ("Payments", "domain", "Domain Knowledge", repeated),
+    ])
+    assert _skill_ids(jd) == {"payments"}
+    assert {evidence.sentence for evidence in jd.skills[0].evidences} == {first, repeated}
+
+    source = "Có kinh nghiệm trong nghiệp vụ thanh toán."
+    cv = _process(f"Kinh nghiệm\n{source}", "CV", [("thanh toán", "domain", "Domain Knowledge", source)])
+    assert _skill_ids(cv) == {"payments"}
+    assert cv.skills[0].evidences[0].surface_form == "thanh toán"
+
+
+def test_domain_requirement_in_role_intro_keeps_only_candidate_evidence():
+    company = "We have extensive experience in healthcare."
+    candidate = "We are looking for someone with experience in healthcare."
+    jd = _process(f"About the role\n{company}\n{candidate}", "JD", [
+        ("healthcare", "domain", "Domain Knowledge", company),
+        ("healthcare", "domain", "Domain Knowledge", candidate),
+    ])
+    assert [evidence.sentence for evidence in jd.skills[0].evidences] == [candidate]
+    assert [evidence.sentence for evidence in jd.non_skill_entities[0].evidences] == [company]
+
+
+def test_inferred_domain_is_not_an_accepted_skill():
+    paragraph = "Built a portal for healthcare providers."
+    implicit = ImplicitExtractionResult(stats=ImplicitExtractionStats(total_inferences=1, unique_skills=1), skills=[ImplicitExtractedSkill(
+        skill_id="healthcare", label="Healthcare", category="Domain Knowledge",
+        evidences=[ImplicitEvidence(inferred_from_raw=paragraph, snippets=[
+            ImplicitEvidenceSnippet(text=paragraph, start=0, end=len(paragraph), verbatim_ok=True),
+        ])],
+    )])
+    result = deduplicate_explicit_implicit(None, implicit, validation_policy="dedup_only")
+    assert not result.accepted_implicit_skills
+    assert [item.skill_id for item in result.rejected_implicit_skills] == ["healthcare"]
 
 
 def test_cv_recovers_verbatim_integration_tests_when_extraction_only_returns_the_tool():
@@ -129,6 +191,12 @@ def test_cache_refinement_checks_document_identity_and_is_idempotent():
             raw_text=text,
             explicit=_process(text, side.upper(), []),
         )
+    # Older cached runs promoted this project description to a domain skill.
+    documents["cv"].explicit.skills.append(ExtractedSkill(
+        skill_id="payments", kind="domain", category="Domain Knowledge", evidences=[
+            Evidence(surface_form="payment", sentence="Migrated a payment gateway to a new service."),
+        ],
+    ))
     cached = UnifiedExtractFileResponse(run_id="old-cache", status="completed", **documents)
 
     assert refine_cached_pair(cached, cv + " Edited.", jd) is None
@@ -136,7 +204,8 @@ def test_cache_refinement_checks_document_identity_and_is_idempotent():
     assert once is not None
     twice = refine_cached_pair(once, cv, jd)
     assert twice == once
-    assert once.summary.cv_explicit_count == 1
+    assert once.summary.cv_explicit_count == 0
+    assert once.cv.explicit.non_skill_entities[0].evidences[0].sentence == "Migrated a payment gateway to a new service."
 
 
 def test_design_system_work_recovers_mislabeled_competency():

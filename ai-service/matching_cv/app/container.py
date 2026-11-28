@@ -1,11 +1,13 @@
 """Composition root for the analyze API runtime dependencies."""
 
+import asyncio
 from dataclasses import dataclass
 from io import BytesIO
 
 from fastapi import UploadFile
 
 from matching_cv.app.core.config import settings
+from matching_cv.app.eligibility.service import check_eligibility
 from matching_cv.app.schemas.module1 import Module1Output
 from matching_cv.app.services.cached_extraction_service import cached_extraction_service
 from matching_cv.app.services.gnn_inference_service import gnn_inference_service
@@ -73,7 +75,19 @@ class MatchedDocuments:
 async def match_documents(
     cv_text: str, jd_text: str, *, include_compatibility_score: bool = False,
 ) -> MatchedDocuments:
-    """Run the self-contained Module 1 pipeline (Stages 0-6) for CV and JD text."""
+    """Run independent skill and application-condition checks for the same documents."""
+    eligibility = asyncio.create_task(check_eligibility(cv_text, jd_text))
+    try:
+        matched = await _match_skills(cv_text, jd_text, include_compatibility_score)
+        matched.output.eligibility = await eligibility
+        return matched
+    finally:
+        if not eligibility.done():
+            eligibility.cancel()
+            await asyncio.gather(eligibility, return_exceptions=True)
+
+
+async def _match_skills(cv_text: str, jd_text: str, include_compatibility_score: bool) -> MatchedDocuments:
     with BytesIO(cv_text.encode("utf-8")) as cv_data, BytesIO(jd_text.encode("utf-8")) as jd_data:
         result = await pipeline_orchestrator.execute_pipeline(
             cv_file=UploadFile(cv_data, filename="candidate.txt"),

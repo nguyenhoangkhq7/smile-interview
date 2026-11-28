@@ -30,7 +30,7 @@ class SkillGapJobsTest {
     }
 
     private AnalyzeWithReportResponseDto result() {
-        return new AnalyzeWithReportResponseDto(session, List.of(), new SkillGapReportDto(null, false));
+        return new AnalyzeWithReportResponseDto(session, List.of(), new SkillGapReportDto(null, false, null, null));
     }
 
     @Test void ownerChecksPrecedeCacheAndPollingAndDuplicatesShareWork() throws Exception {

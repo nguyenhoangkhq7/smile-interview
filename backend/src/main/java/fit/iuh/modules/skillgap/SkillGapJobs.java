@@ -33,7 +33,7 @@ public class SkillGapJobs {
     private final ObjectMapper json;
     private final AiPolicyConfigService aiPolicy;
 
-    @Value("${app.skill-gap.pipeline-version:1}")
+    @Value("${app.skill-gap.pipeline-version:2}")
     private String pipelineVersion;
 
     record Input(String cv, String jd, String skills, String report, String cachedKey, long cachedRevision, boolean fixed) {}

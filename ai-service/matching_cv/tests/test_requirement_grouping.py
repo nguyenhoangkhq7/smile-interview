@@ -68,6 +68,52 @@ def test_independent_requirement_and_conjunction_remain_separate():
     assert {"python", "scripting-language"} <= _items(prepared.cv).keys()
 
 
+def test_node_runtime_mentions_merge_into_the_qualified_requirement():
+    responsibilities = "Design and build features spanning our Node.js/NestJS backend and React frontend."
+    requirement = "3+ years of professional experience with both Node.js (Express or NestJS) and React."
+    jd = f"Key responsibilities\n• {responsibilities}\nRequirements\n• {requirement}"
+    work = "Built a Node.js/Express backend."
+    cv = f"Experience\n• {work}"
+    pair = _pair(cv, [_tool("Express", work), _tool("Node.js", work)], jd, [
+        _tool("Node.js", responsibilities),
+        _tool("Node.js (Express or NestJS)", requirement),
+        _tool("NestJS", responsibilities),
+        _tool("React", responsibilities),
+    ])
+
+    prepared = prepare_pipeline_skills(pair, cv, jd)
+    assert set(_items(prepared.jd)) == {"nodejs-framework", "react"}
+    assert prepared.jd._requirement_groups == {"nodejs-framework": ("express", "nestjs")}
+    assert prepared.jd._strict_requirement_group_ids == {"nodejs-framework"}
+    node = _items(prepared.jd)["nodejs-framework"]
+    assert node.label == "Node.js (Express or NestJS)"
+    assert responsibilities in {evidence.sentence for evidence in node.evidences}
+    assert "Node.js (Express or NestJS)" in {evidence.sentence for evidence in node.evidences}
+    assert _items(prepared.cv)["nodejs-framework"].label == "Express"
+    assert prepare_pipeline_skills(prepared, cv, jd).jd.explicit.skills == prepared.jd.explicit.skills
+
+
+def test_node_runtime_alone_does_not_prove_the_framework_requirement():
+    jd = "Requirements\nExperience with Node.js (Express or NestJS)."
+    cv = "Skills\nNode.js"
+    pair = _pair(cv, [_tool("Node.js", "Node.js")], jd, [
+        _tool("Node.js", "Experience with Node.js (Express or NestJS)."),
+    ])
+    prepared = prepare_pipeline_skills(pair, cv, jd)
+    assert set(_items(prepared.jd)) == {"nodejs-framework"}
+    assert "nodejs-framework" not in _items(prepared.cv)
+
+
+def test_independent_node_runtime_requirement_survives_optional_framework_group():
+    required = "Node.js is required for backend maintenance."
+    optional = "We prefer experience with Node.js (Express or NestJS)."
+    jd = f"Requirements\n• {required}\nNice to have\n• {optional}"
+    cv = "Skills\nNode.js"
+    pair = _pair(cv, [_tool("Node.js", "Node.js")], jd, [_tool("Node.js", required)])
+    prepared = prepare_pipeline_skills(pair, cv, jd)
+    assert {item.label for item in prepared.jd.explicit.skills} == {"Node.js", "Node.js (Express or NestJS)"}
+
+
 def test_cloud_provider_use_is_not_a_certification():
     cv = "Experience\nBuilt a service on AWS."
     jd = "Nice to have\nAWS or GCP certification."
@@ -101,7 +147,7 @@ def test_monolith_context_preserves_architecture_competency():
     assert not evaluate_competency_retention(label="legacy monolith", side="CV").should_retain
 
 
-def test_open_options_accept_supported_equivalents_and_singular_payment_evidence():
+def test_open_options_accept_supported_equivalents_without_inferring_domain_experience():
     migration = "Migrated a legacy payment module to a standalone service."
     broker_work = "Configured NATS for message delivery."
     cv = f"Experience\n• {migration}\n• {broker_work}"
@@ -110,8 +156,41 @@ def test_open_options_accept_supported_equivalents_and_singular_payment_evidence
     original = _pair(cv, [_tool("NATS", broker_work)], jd, [])
     prepared = prepare_pipeline_skills(original, cv, jd)
     assert _items(prepared.cv)["message-broker"].label == "NATS"
-    assert _items(prepared.cv)["regulated-domain-experience"].label == "payment"
+    assert "regulated-domain-experience" not in _items(prepared.cv)
+    assert _items(prepared.jd)["regulated-domain-experience"].category == "Domain Knowledge"
     assert prepared.jd._requirement_groups["message-broker"] == ("kafka",)
+
+
+def test_domain_comparison_uses_explicit_jd_requirements():
+    experience = "Experience in payments and merchant reconciliation."
+    cv = f"Experience\n{experience}"
+    candidate = ("payments", "domain", "Domain Knowledge", experience)
+    context = "Build services for payments."
+    jd = f"Responsibilities\n{context}"
+    pair = _pair(cv, [candidate], jd, [("payments", "domain", "Domain Knowledge", context)])
+    prepared = prepare_pipeline_skills(pair, cv, jd)
+    assert not _items(prepared.cv)
+    assert not _items(prepared.jd)
+    assert prepared.cv.explicit.non_skill_entities[0].evidences[0].sentence == experience
+
+    jd = "Requirements\nExperience in fintech, payments, or another highly regulated domain."
+    prepared = prepare_pipeline_skills(_pair(cv, [candidate], jd, []), cv, jd)
+    assert _items(prepared.cv)["regulated-domain-experience"].label == "payments"
+
+
+def test_other_stated_cv_domains_stay_context_when_jd_requires_a_specific_domain():
+    payment = "Experience in payments."
+    insurance = "Experience in insurance."
+    cv = f"Experience\n{payment}\n{insurance}"
+    jd = f"Requirements\n{payment}"
+    pair = _pair(cv, [
+        ("payments", "domain", "Domain Knowledge", payment),
+        ("insurance", "domain", "Domain Knowledge", insurance),
+    ], jd, [("payments", "domain", "Domain Knowledge", payment)])
+
+    prepared = prepare_pipeline_skills(pair, cv, jd)
+    assert set(_items(prepared.cv)) == {"payments"}
+    assert [skill.skill_id for skill in prepared.cv.explicit.non_skill_entities] == ["insurance"]
 
 
 def test_group_projection_moves_every_alias_of_the_selected_option():

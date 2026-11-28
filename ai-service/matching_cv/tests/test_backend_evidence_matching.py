@@ -156,14 +156,16 @@ def test_backend_pdf_requirements_use_the_cv_evidence(backend_case):
     evidence = {skill.skill_id: " ".join(skill.evidence_spans).casefold() for skill in output.cv_skills}
 
     for skill_id, phrase in {
-        "fintech": "fintech platforms",
-        "payments": "payment module",
         "query-optimization": "query indexing",
         "query-performance": "latency by 38%",
         "restful-microservices": "microservices",
     }.items():
         assert matches[skill_id].soft_match >= 0.85
         assert phrase in evidence[matches[skill_id].matched_cv_skill_id]
+
+    for skill_id in ("fintech", "payments"):
+        assert matches[skill_id].matched_cv_skill_id == "none"
+        assert matches[skill_id].soft_match == 0
 
     assert matches["java"].matched_cv_skill_id == "java"
     assert matches["java"].soft_match >= 0.85
@@ -275,7 +277,7 @@ def test_direct_listed_skills_take_precedence_over_related_tools(backend_case):
         "Sử dụng GitHub Actions để tự động hóa việc triển khai.",
     ],
 )
-def test_work_evidence_preserves_github_actions_and_downtime_free_payments(backend_case, github_evidence):
+def test_work_evidence_preserves_github_actions_without_inferring_payments(backend_case, github_evidence):
     _, jd, _ = backend_case
     payment_evidence = "Migrated the payment module to a standalone service without downtime."
     text = f"Experience\n{github_evidence}\n{payment_evidence}"
@@ -285,10 +287,31 @@ def test_work_evidence_preserves_github_actions_and_downtime_free_payments(backe
     matches = {match.jd_skill_id: match for match in output.match_results}
     evidence = {skill.skill_id: skill.evidence_spans for skill in output.cv_skills}
 
-    for skill_id, sentence in {"github-actions": github_evidence, "payments": payment_evidence}.items():
-        assert matches[skill_id].matched_cv_skill_id == skill_id
-        assert matches[skill_id].soft_match >= 0.85
-        assert any(span in sentence for span in evidence[skill_id])
+    assert matches["github-actions"].matched_cv_skill_id == "github-actions"
+    assert matches["github-actions"].soft_match >= 0.85
+    assert any(span in github_evidence for span in evidence["github-actions"])
+    assert matches["payments"].matched_cv_skill_id == "none"
+    assert "payments" not in evidence
+
+
+def test_domain_requirement_matches_explicit_domain_evidence_and_excludes_technical_tools(monkeypatch):
+    requirement = "Experience in payments is required."
+    jd = _document("JD", f"Requirements\n{requirement}", [
+        _explicit_skill("payments", "payments", requirement, domain=True),
+    ])
+    tool = "Integrated Stripe for checkout."
+    experience = "Experience in payment processing and merchant settlement."
+    text = f"Experience\n{tool}\n{experience}"
+    cv = _document("CV", text, [
+        _explicit_skill("stripe", "Stripe", tool),
+        _explicit_skill("payment", "payment", experience, domain=True),
+    ])
+    monkeypatch.setitem(SEMANTIC_SCORES, ("stripe", "payments"), 0.99)
+    tool_only = build_module1_output(_context(cv, jd, retained_cv_ids=["stripe"]))
+    assert tool_only.match_results[0].matched_cv_skill_id == "none"
+    with_domain = build_module1_output(_context(cv, jd, retained_cv_ids=["stripe", "payments"]))
+    assert with_domain.match_results[0].matched_cv_skill_id == "payments"
+    assert with_domain.match_results[0].soft_match == 1.0
 
 
 def test_unrelated_work_bullets_do_not_prove_restful_microservices(backend_case):
@@ -393,8 +416,6 @@ def test_resume_graph_evidence_is_idempotent_and_excludes_related_tools_and_nega
     pair = UnifiedExtractFileResponse(run_id="verified-negative", status="completed", cv=cv, jd=jd)
     enriched = enrich_verified_resume_skills(pair, text)
 
-    assert [skill.skill_id for skill in enriched.cv._verified_resume_skills] == ["payments"]
-    evidence = enriched.cv._verified_resume_skills[0].evidences[0].snippets[0]
-    assert evidence.verbatim_ok and text[evidence.start:evidence.end] == "Migrated a payment module."
+    assert not enriched.cv._verified_resume_skills
     assert enrich_verified_resume_skills(enriched, text) is enriched
     assert pair.cv._verified_resume_skills == []

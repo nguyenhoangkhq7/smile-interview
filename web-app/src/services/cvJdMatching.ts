@@ -1,4 +1,5 @@
 import axiosClient from '@/lib/axiosClient';
+import type { EligibilityReport } from './eligibility';
 import { useAuthStore } from '@/store/authStore';
 
 export type SemanticAlignment = 'MATCH' | 'PARTIAL' | 'MISSING';
@@ -27,7 +28,16 @@ export interface SkillGapResult {
   job_tasks?: JobTask[];
 }
 
+export interface ExtractedCvSkill {
+  skill_id: string;
+  skill_name?: string | null;
+  type: 'explicit' | 'implicit';
+  evidence_spans: string[];
+}
+
 export interface SkillGapReport {
+  eligibility?: EligibilityReport | null;
+  cv_skills?: ExtractedCvSkill[] | null;
   matching_score?: number | null;
   degraded: boolean;
 }

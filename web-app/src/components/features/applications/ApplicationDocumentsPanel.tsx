@@ -64,7 +64,7 @@ export function ApplicationDocumentsPanel({ profile }: { profile: ApplicationPro
       </section>
 
       <section className="rounded-2xl border bg-card p-4 sm:p-6">
-        <h2 className="text-lg font-semibold tracking-tight">Đối chiếu theo kỹ năng</h2>
+        <h2 className="text-lg font-semibold tracking-tight">Kết quả đối chiếu CV và JD</h2>
         <p className="mt-1 text-sm text-muted-foreground">Các trạng thái mô tả thông tin tìm được trong CV.</p>
         <div className="mt-4">
           <CandidateCvJdSummary skills={profile.skills} report={profile.analysis} view="profile" />
